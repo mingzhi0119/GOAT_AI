@@ -8,12 +8,11 @@ from goat_ai.config import USER_FACING_ERROR, Settings, load_settings
 from goat_ai.constants import (
     SESSION_MESSAGES,
     SESSION_PENDING_ANALYSIS,
-    SESSION_THEME,
     WELCOME_ASSISTANT,
 )
 from goat_ai.ollama_client import OllamaService
 from goat_ai.styles import SIMON_APP_CSS
-from goat_ai.theme_controls import get_theme_css, render_theme_switcher
+from goat_ai.theme_controls import FLOATING_THEME_HTML
 from goat_ai.tools import build_analysis_user_message
 from goat_ai.uploads import load_tabular_upload
 
@@ -25,16 +24,13 @@ def _init_session_state() -> None:
         st.session_state[SESSION_MESSAGES] = [{"role": "assistant", "content": WELCOME_ASSISTANT}]
     if SESSION_PENDING_ANALYSIS not in st.session_state:
         st.session_state[SESSION_PENDING_ANALYSIS] = None
-    if SESSION_THEME not in st.session_state:
-        st.session_state[SESSION_THEME] = "System"
 
 
 def _inject_styles() -> None:
-    """Inject base branding CSS and active theme overrides."""
+    """Inject base branding CSS and floating theme-switcher buttons."""
     st.markdown(SIMON_APP_CSS, unsafe_allow_html=True)
-    theme_css = get_theme_css()
-    if theme_css:
-        st.markdown(theme_css, unsafe_allow_html=True)
+    # Floating Light / Dark buttons in the top-right header bar
+    st.markdown(FLOATING_THEME_HTML, unsafe_allow_html=True)
 
 
 def _stream_assistant_turn(ollama: OllamaService, model: str, *, failure_log: str) -> str:
@@ -59,9 +55,6 @@ def _render_sidebar(settings: Settings, ollama: OllamaService) -> str:
             st.image(str(settings.logo_svg), use_container_width=True)
         else:
             st.caption("Add logo: `static/urochester_simon_business_horizontal.svg` (local asset; no CDN).")
-
-        with st.popover("🎨 Theme & display", use_container_width=True):
-            render_theme_switcher()
 
         r1, r2 = st.columns(2)
         with r1:
@@ -112,6 +105,14 @@ def _render_sidebar(settings: Settings, ollama: OllamaService) -> str:
                         {"role": "user", "content": build_analysis_user_message(df)}
                     )
                     st.session_state[SESSION_PENDING_ANALYSIS] = True
+
+        # Attribution — bottom of sidebar
+        st.markdown(
+            "<p style='text-align:center;font-size:0.72rem;"
+            "color:rgba(255,255,255,0.55);margin-top:2rem;'>"
+            "Powered by Mingzhi Hu</p>",
+            unsafe_allow_html=True,
+        )
 
     return selected_model
 
