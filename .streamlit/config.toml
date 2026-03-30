@@ -1,3 +1,7 @@
 # Match app.py light main area; avoids white-on-white when OS/browser prefers dark
 [theme]
 base = "light"
+
+# Align with app.py GOAT_MAX_UPLOAD_MB (20); Streamlit rejects huge uploads before Python runs
+[server]
+maxUploadSize = 20

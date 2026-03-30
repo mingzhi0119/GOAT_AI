@@ -120,3 +120,7 @@ fi
 
 echo "🔗 Local URL: http://127.0.0.1:${PORT}/"
 echo "   (Public URL depends on your reverse proxy, e.g. https://ai.simonbb.com/mingzhi/)"
+echo ""
+echo "🛑 To stop: kill \$(cat ${PROJECT_DIR}/streamlit.pid)   (or: kill <pid> from ps)"
+echo "📄 Logs: tail -f ${PROJECT_DIR}/streamlit.log"
+echo "❤️  Health: curl -sf http://127.0.0.1:${PORT}/_stcore/health"
