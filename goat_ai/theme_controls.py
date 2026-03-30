@@ -1,50 +1,69 @@
-"""In-app theme switcher using Streamlit's browser theme cache (same as Settings → Theme)."""
+"""In-app theme switcher: session-state radio + CSS injection (no fragile iframe/localStorage)."""
 
 from __future__ import annotations
 
-import streamlit.components.v1 as components
+import streamlit as st
 
-# Matches frontend/lib/src/util/storageUtils.ts + theme/utils.ts (CachedTheme selection).
-_THEME_COMPONENT_HTML = """
-<div class="goat-theme-btns">
-  <button type="button" class="goat-tbtn" onclick="window.goatSetTheme('Light')">Light</button>
-  <button type="button" class="goat-tbtn" onclick="window.goatSetTheme('Dark')">Dark</button>
-  <button type="button" class="goat-tbtn" onclick="window.goatSetTheme('System')">System</button>
-</div>
+from goat_ai.constants import SESSION_THEME
+
+_LIGHT_OVERRIDES = """
 <style>
-  .goat-theme-btns { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: stretch; }
-    .goat-tbtn {
-    flex: 1 1 30%;
-    min-width: 4.5rem;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 0.85rem;
-    padding: 0.45rem 0.35rem;
-    border-radius: 6px;
-      border: 1px solid #003A70;
-    background: #FFCD00;
-      color: #003A70;
-  }
-  .goat-tbtn:hover { filter: brightness(1.05); }
-  .goat-tbtn:active { filter: brightness(0.95); }
+/* ---- Light theme: force bright main area ---- */
+[data-testid="stAppViewContainer"] > section.main,
+[data-testid="stMain"] { background-color: #f8f9fa !important; }
+
+section.main [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"],
+section.main [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] p,
+section.main [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] span,
+section.main [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] li {
+  color: #1a1a2e !important;
+}
+section.main h1, section.main h2, section.main h3,
+section.main [data-testid="stCaption"] { color: #1a1a2e !important; }
+[data-testid="stChatInput"] textarea, [data-testid="stChatInput"] div { color: #1a1a2e !important; }
+
+/* Selectbox / text-input text in main area */
+section.main .stSelectbox div[data-baseweb] span,
+section.main .stTextInput input { color: #1a1a2e !important; }
 </style>
-<script>
-(function () {
-  window.goatSetTheme = function (mode) {
-    try {
-      var w = window.parent;
-      var k = "stActiveTheme-" + w.location.pathname + "-v2";
-      w.localStorage.setItem(k, JSON.stringify(mode));
-      w.location.reload();
-    } catch (e) {
-      console.error(e);
-    }
-  };
-})();
-</script>
+"""
+
+_DARK_OVERRIDES = """
+<style>
+/* ---- Dark theme: force dark main area ---- */
+[data-testid="stAppViewContainer"] > section.main,
+[data-testid="stMain"] { background-color: #0e1117 !important; }
+
+section.main [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"],
+section.main [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] p,
+section.main [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] span,
+section.main [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] li {
+  color: #fafafa !important;
+}
+section.main h1, section.main h2, section.main h3,
+section.main [data-testid="stCaption"] { color: #fafafa !important; }
+[data-testid="stChatInput"] textarea, [data-testid="stChatInput"] div { color: #fafafa !important; }
+</style>
 """
 
 
 def render_theme_switcher() -> None:
-    """Embed Light / Dark / System controls (persists like the main app theme menu)."""
-    components.html(_THEME_COMPONENT_HTML, height=52)
+    """Render Light / Dark / System selector bound directly to session state."""
+    st.caption("Display theme")
+    st.radio(
+        "Theme",
+        options=["System", "Light", "Dark"],
+        key=SESSION_THEME,
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+
+
+def get_theme_css() -> str:
+    """Return CSS overrides for the currently selected theme."""
+    theme = st.session_state.get(SESSION_THEME, "System")
+    if theme == "Light":
+        return _LIGHT_OVERRIDES
+    if theme == "Dark":
+        return _DARK_OVERRIDES
+    return ""

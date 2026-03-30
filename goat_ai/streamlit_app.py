@@ -8,11 +8,12 @@ from goat_ai.config import USER_FACING_ERROR, Settings, load_settings
 from goat_ai.constants import (
     SESSION_MESSAGES,
     SESSION_PENDING_ANALYSIS,
+    SESSION_THEME,
     WELCOME_ASSISTANT,
 )
 from goat_ai.ollama_client import OllamaService
 from goat_ai.styles import SIMON_APP_CSS
-from goat_ai.theme_controls import render_theme_switcher
+from goat_ai.theme_controls import get_theme_css, render_theme_switcher
 from goat_ai.tools import build_analysis_user_message
 from goat_ai.uploads import load_tabular_upload
 
@@ -24,10 +25,16 @@ def _init_session_state() -> None:
         st.session_state[SESSION_MESSAGES] = [{"role": "assistant", "content": WELCOME_ASSISTANT}]
     if SESSION_PENDING_ANALYSIS not in st.session_state:
         st.session_state[SESSION_PENDING_ANALYSIS] = None
+    if SESSION_THEME not in st.session_state:
+        st.session_state[SESSION_THEME] = "System"
 
 
 def _inject_styles() -> None:
+    """Inject base branding CSS and active theme overrides."""
     st.markdown(SIMON_APP_CSS, unsafe_allow_html=True)
+    theme_css = get_theme_css()
+    if theme_css:
+        st.markdown(theme_css, unsafe_allow_html=True)
 
 
 def _stream_assistant_turn(ollama: OllamaService, model: str, *, failure_log: str) -> str:
@@ -55,12 +62,24 @@ def _render_sidebar(settings: Settings, ollama: OllamaService) -> str:
 
         with st.popover("🎨 Theme & display", use_container_width=True):
             render_theme_switcher()
+
         r1, r2 = st.columns(2)
         with r1:
-            if st.button("🔄 Refresh", use_container_width=True, key="sb_refresh", help="Re-run the app script"):
+            if st.button(
+                "🔄 Refresh",
+                use_container_width=True,
+                key="sb_refresh",
+                help="Clear cache and re-run the app",
+            ):
+                st.cache_data.clear()
                 st.rerun()
         with r2:
-            if st.button("🗑️ Clear chat", use_container_width=True, key="sb_clear", help="Reset conversation"):
+            if st.button(
+                "🗑️ Clear chat",
+                use_container_width=True,
+                key="sb_clear",
+                help="Reset conversation history",
+            ):
                 st.session_state[SESSION_MESSAGES] = [{"role": "assistant", "content": WELCOME_ASSISTANT}]
                 st.session_state[SESSION_PENDING_ANALYSIS] = None
                 st.rerun()
