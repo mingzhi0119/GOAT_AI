@@ -1,7 +1,7 @@
-# ── Streamlit UI (current, kept as fallback) ─────────────────────────────────
+# ── Streamlit UI (current, kept as fallback during migration) ─────────────────
 streamlit==1.40.2
 
-# ── FastAPI backend (new stack) ───────────────────────────────────────────────
+# ── FastAPI backend ────────────────────────────────────────────────────────────
 fastapi==0.135.2
 uvicorn==0.35.0
 python-multipart==0.0.20
