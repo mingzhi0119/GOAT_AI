@@ -26,7 +26,7 @@ export default function App() {
     <div style={{ fontFamily: 'sans-serif', padding: '2rem' }}>
       <h1>🐐 GOAT AI — Phase 0</h1>
       <p>
-        <strong>React build:</strong> ✅ working (Node {process.env.NODE_ENV})
+        <strong>React build:</strong> ✅ working (mode: {import.meta.env.MODE})
       </p>
       <p>
         <strong>FastAPI /api/health:</strong>{' '}
