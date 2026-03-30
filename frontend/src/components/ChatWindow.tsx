@@ -64,20 +64,20 @@ const ChatWindow: FC<Props> = ({ messages, isStreaming, selectedModel, onSendMes
           /* Empty state */
           <div className="flex flex-col items-center justify-center h-full gap-5 text-center px-4">
             <div
-              className="w-20 h-20 rounded-2xl flex items-center justify-center overflow-hidden"
+              className="w-20 h-20 rounded-2xl overflow-hidden"
               style={{
                 border: '1.5px solid #FFCD00',
-                background: 'rgba(0, 0, 0, 0.18)',
+                background: '#2b2b2b',
               }}
             >
               <img
                 src="./golden_goat_icon.png"
                 alt="GOAT AI"
-                style={{ width: '88%', height: '88%', objectFit: 'contain' }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
             </div>
             <div>
-              <h2 className="text-xl font-bold mb-1" style={{ color: 'var(--navy)' }}>
+              <h2 className="text-xl font-bold mb-1" style={{ color: 'var(--text-main)' }}>
                 Welcome to GOAT AI
               </h2>
               <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
@@ -85,7 +85,7 @@ const ChatWindow: FC<Props> = ({ messages, isStreaming, selectedModel, onSendMes
               </p>
               {selectedModel && (
                 <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                  Model: <span style={{ color: 'var(--navy)' }}>{selectedModel}</span>
+                  Model: <span style={{ color: 'var(--gold)' }}>{selectedModel}</span>
                 </p>
               )}
             </div>
