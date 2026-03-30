@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GOAT AI — one-shot server deploy (Streamlit + optional Vite frontend build)
+# GOAT AI — one-shot server deploy (Streamlit only)
 # Usage: ./deploy.sh   OR (no +x yet): bash deploy.sh
 # Override branch, e.g.: GIT_BRANCH=python_version ./deploy.sh
 
@@ -68,21 +68,11 @@ else
   echo "⚠️  requirements.txt not found; skipping pip install."
 fi
 
-# 3. Optional frontend (Vite/React under frontend/)
-if [ -f frontend/package.json ]; then
-  echo "📦 Installing frontend dependencies (npm)..."
-  (cd frontend && (npm ci || npm install))
-  if grep -q '"build"' frontend/package.json 2>/dev/null; then
-    echo "🏗️  Compiling frontend assets..."
-    (cd frontend && npm run build)
-  fi
-fi
-
-# 4. Process cleanup on deployment port
+# 3. Process cleanup on deployment port
 echo "🧹 Freeing port $PORT..."
 free_port "$PORT"
 
-# 5. Launch Streamlit (project root: app.py)
+# 4. Launch Streamlit (project root: app.py)
 LOG_FILE="${PROJECT_DIR}/streamlit.log"
 STREAMLIT_BIN="$VENV_DIR/bin/streamlit"
 if [ ! -x "$STREAMLIT_BIN" ]; then
@@ -98,7 +88,7 @@ nohup "$STREAMLIT_BIN" run "$APP_FILE" \
   >> "$LOG_FILE" 2>&1 &
 echo $! > "${PROJECT_DIR}/streamlit.pid"
 
-# 6. Deployment verification
+# 5. Deployment verification
 sleep 3
 HEALTH_URL="http://127.0.0.1:${PORT}/_stcore/health"
 BASE_URL="http://127.0.0.1:${PORT}/"

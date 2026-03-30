@@ -1,5 +1,7 @@
 # GOAT AI: Technical Requirement Document & Development Plan
 
+> **2026 update:** The project **no longer uses React/Vite**. The shipped UI is **Streamlit** (`app.py`). Historical sections below that mention React are **archived**. Current roadmap: [`docs/CIS438_INDUSTRIALIZATION_PLAN.md`](docs/CIS438_INDUSTRIALIZATION_PLAN.md).
+
 ## 1. Project Vision
 **GOAT AI** serves as a high-performance "Strategic Intelligence Dashboard" engineered specifically for business executives and analysts at the Simon Business School. The platform's core value lies in providing unparalleled, AI-driven strategic insights securely and at blazing speeds by leveraging local, dedicated A100 GPU resources. By integrating advanced data analysis tools with a robust conversational AI interface, GOAT AI empowers end-users to make data-backed, high-impact business decisions rapidly.
 
