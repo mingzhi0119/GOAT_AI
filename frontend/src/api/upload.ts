@@ -7,7 +7,7 @@ export async function* streamUpload(
   form.append('file', file)
   form.append('model', model)
 
-  const resp = await fetch('/api/upload', { method: 'POST', body: form })
+  const resp = await fetch('./api/upload', { method: 'POST', body: form })
   if (!resp.ok) throw new Error(`Upload API: HTTP ${resp.status}`)
   if (!resp.body) throw new Error('Upload API: no response body')
 

@@ -17,7 +17,7 @@ function* parseSSELines(lines: string[]): Generator<string> {
 
 /** Stream a chat completion as tokens via Server-Sent Events. */
 export async function* streamChat(req: ChatRequest): AsyncGenerator<string> {
-  const resp = await fetch('/api/chat', {
+  const resp = await fetch('./api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
