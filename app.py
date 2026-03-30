@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 
 import pandas as pd
 import requests
@@ -7,6 +8,9 @@ import streamlit as st
 
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 GENERATE_TIMEOUT = int(os.environ.get("OLLAMA_GENERATE_TIMEOUT", "120"))
+
+_APP_DIR = Path(__file__).resolve().parent
+_SIMON_LOGO_SVG = _APP_DIR / "static" / "urochester_simon_business_horizontal.svg"
 
 
 def stream_ollama_generate(model: str, prompt: str, placeholder) -> str:
@@ -39,13 +43,35 @@ if "messages" not in st.session_state:
 if "ollama_pending_prompt" not in st.session_state:
     st.session_state.ollama_pending_prompt = None
 
-# Injecting Simon Blue style CSS
+# Injecting Simon Blue style CSS (main area stays light + dark text so Dark theme toggle does not hide chat)
 st.markdown(
     """
     <style>
-    .stApp { background-color: #f8f9fa; }
+    .stApp { background-color: #f8f9fa !important; color: #1a1a1a !important; }
     [data-testid="stSidebar"] { background-color: #002855; color: white; }
     .stButton>button { background-color: #FFCD00; color: #002855; border-radius: 5px; }
+    /* Chat + markdown in main: force readable text when Streamlit theme is Dark */
+    section.main, section[data-testid="stMain"], [data-testid="stAppViewContainer"] > .main {
+      color: #1a1a1a !important;
+    }
+    section.main [data-testid="stChatMessage"],
+    section.main [data-testid="stChatMessage"] p,
+    section.main [data-testid="stChatMessage"] span,
+    section.main [data-testid="stMarkdownContainer"],
+    section.main [data-testid="stMarkdownContainer"] p,
+    section.main .stMarkdown,
+    section.main h1, section.main h2, section.main h3,
+    section.main [data-testid="stCaption"] {
+      color: #1a1a1a !important;
+    }
+    /* Sidebar logo: light backing so navy SVG reads on Simon blue */
+    [data-testid="stSidebar"] [data-testid="stImage"] img,
+    [data-testid="stSidebar"] img {
+      background: #ffffff !important;
+      padding: 8px !important;
+      border-radius: 6px !important;
+      box-sizing: border-box !important;
+    }
     </style>
 """,
     unsafe_allow_html=True,
@@ -54,9 +80,12 @@ st.markdown(
 # 2. Sidebar: Configuration and Data Upload
 selected_model = "llama3:latest"
 with st.sidebar:
-    st.image(
-        "https://upload.wikimedia.org/wikipedia/en/thumb/3/3a/University_of_Rochester_Simon_Business_School_logo.png/250px-University_of_Rochester_Simon_Business_School_logo.png"
-    )
+    if _SIMON_LOGO_SVG.is_file():
+        st.image(str(_SIMON_LOGO_SVG), use_container_width=True)
+    else:
+        st.image(
+            "https://upload.wikimedia.org/wikipedia/en/thumb/3/3a/University_of_Rochester_Simon_Business_School_logo.png/250px-University_of_Rochester_Simon_Business_School_logo.png"
+        )
     st.title("Admin Console")
     st.caption(f"Ollama: `{OLLAMA_BASE_URL}`")
 

@@ -1,0 +1,3 @@
+# Match app.py light main area; avoids white-on-white when OS/browser prefers dark
+[theme]
+base = "light"
