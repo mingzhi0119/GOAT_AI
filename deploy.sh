@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 # GOAT AI — one-shot server deploy (Streamlit + optional Vite frontend build)
-# Usage: chmod +x deploy.sh && ./deploy.sh
+# Usage: ./deploy.sh   OR (no +x yet): bash deploy.sh
 # Override branch, e.g.: GIT_BRANCH=python_version ./deploy.sh
+
+# Make this script executable for the next run (works when you start with: bash deploy.sh)
+_DEPLOY_SCRIPT="${BASH_SOURCE[0]:-$0}"
+if [[ -f "$_DEPLOY_SCRIPT" ]]; then
+  chmod +x "$_DEPLOY_SCRIPT" 2>/dev/null || true
+fi
+unset _DEPLOY_SCRIPT
 
 set -euo pipefail
 
@@ -39,11 +46,13 @@ if [ ! -d "$PROJECT_DIR/.git" ]; then
   git clone "$REPO_URL" "$PROJECT_DIR"
 fi
 
-echo "🔄 Synchronizing repository (branch: $GIT_BRANCH)..."
+echo "🔄 Pulling latest from origin (branch: $GIT_BRANCH)..."
 cd "$PROJECT_DIR"
 git fetch --all --prune
 git checkout "$GIT_BRANCH"
+# Match remote exactly (same effect as a clean pull when deploy machine should not keep local commits)
 git reset --hard "origin/${GIT_BRANCH}"
+echo "✅ Repository is up to date with origin/${GIT_BRANCH}"
 
 # 2. Python virtualenv and dependencies
 if [ ! -x "$VENV_DIR/bin/python" ]; then
