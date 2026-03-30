@@ -61,7 +61,7 @@ fi
 
 # ── 7. FastAPI start + health check ─────────────────────────────────────────
 info "Step 7: Start FastAPI on port $PORT and hit /api/health"
-uvicorn server:app --host 0.0.0.0 --port "$PORT" \
+python3 -m uvicorn server:app --host 0.0.0.0 --port "$PORT" \
   --log-level warning &
 SERVER_PID=$!
 sleep 2
@@ -106,5 +106,5 @@ ok "Phase 0 complete — all checks passed"
 echo "══════════════════════════════════════════════════"
 echo ""
 echo "Next: run the server in background with:"
-echo "  nohup uvicorn server:app --host 0.0.0.0 --port $PORT > fastapi.log 2>&1 &"
+echo "  nohup python3 -m uvicorn server:app --host 0.0.0.0 --port $PORT > fastapi.log 2>&1 &"
 echo "  echo \$! > fastapi.pid"
