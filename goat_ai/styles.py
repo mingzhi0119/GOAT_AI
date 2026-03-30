@@ -18,7 +18,7 @@ SIMON_APP_CSS = """
     }
 
     [data-testid="stSidebar"] {
-      background-color: #002855 !important;
+      background-color: #003A70 !important;
       color: #ffffff !important;
     }
     [data-testid="stSidebar"] p,
@@ -40,20 +40,40 @@ SIMON_APP_CSS = """
       box-sizing: border-box !important;
     }
     [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
-      background-color: rgba(255, 255, 255, 0.12) !important;
-      border: 1px solid rgba(255, 205, 0, 0.55) !important;
+      background-color: rgba(255, 255, 255, 0.18) !important;
+      border: 1px solid rgba(255, 205, 0, 0.65) !important;
       color: #ffffff !important;
     }
     [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] * {
       color: #ffffff !important;
     }
     [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button {
-      color: #002855 !important;
+      color: #003A70 !important;
       background-color: #FFCD00 !important;
       border: none !important;
     }
 
-    .stButton>button { background-color: #FFCD00 !important; color: #002855 !important; border-radius: 5px !important; }
+    .stButton>button { background-color: #FFCD00 !important; color: #003A70 !important; border-radius: 5px !important; }
+
+    /* Sidebar buttons (popover + st.button): force Simon gold / navy (fixes gray + white text) */
+    [data-testid="stSidebar"] .stButton > button,
+    [data-testid="stSidebar"] [data-testid="stPopover"] button,
+    [data-testid="stSidebar"] button[aria-haspopup="dialog"] {
+      background-color: #FFCD00 !important;
+      color: #003A70 !important;
+      border: 1px solid #003A70 !important;
+      border-radius: 6px !important;
+    }
+    /* File uploader inner button */
+    [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button {
+      color: #002855 !important;
+      background-color: #FFCD00 !important;
+      border: none !important;
+    }
+    [data-testid="stSidebar"] a {
+      color: #FFCD00 !important;
+      text-decoration: underline;
+    }
 
     [data-testid="stHeader"] [data-testid="stToolbar"] button {
       border: 1px solid rgba(255, 205, 0, 0.65) !important;

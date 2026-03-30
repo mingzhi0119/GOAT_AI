@@ -12,6 +12,7 @@ from goat_ai.constants import (
 )
 from goat_ai.ollama_client import OllamaService
 from goat_ai.styles import SIMON_APP_CSS
+from goat_ai.theme_controls import render_theme_switcher
 from goat_ai.tools import build_analysis_user_message
 from goat_ai.uploads import load_tabular_upload
 
@@ -53,11 +54,7 @@ def _render_sidebar(settings: Settings, ollama: OllamaService) -> str:
             st.caption("Add logo: `static/urochester_simon_business_horizontal.svg` (local asset; no CDN).")
 
         with st.popover("🎨 Theme & display", use_container_width=True):
-            st.markdown(
-                "Switch **Light**, **Dark**, or **System** via the **⋮** button "
-                "(top-right of the page) → **Settings** → **Theme**."
-            )
-            st.caption("That menu button has a gold outline so it is easier to spot.")
+            render_theme_switcher()
         r1, r2 = st.columns(2)
         with r1:
             if st.button("🔄 Refresh", use_container_width=True, key="sb_refresh", help="Re-run the app script"):
@@ -68,8 +65,6 @@ def _render_sidebar(settings: Settings, ollama: OllamaService) -> str:
                 st.session_state[SESSION_PENDING_ANALYSIS] = None
                 st.rerun()
 
-        st.title("Admin Console")
-        st.caption(f"Ollama: {settings.ollama_base_url}")
         st.caption(f"Upload limit: {settings.max_upload_mb} MB · Max rows: {settings.max_dataframe_rows:,}")
 
         try:
