@@ -41,7 +41,7 @@ const Sidebar: FC<Props> = ({
 }) => {
   return (
     <aside
-      className="flex flex-col w-64 flex-shrink-0 h-screen"
+      className="flex flex-col w-64 flex-shrink-0 h-screen overflow-x-hidden"
       style={{ background: 'var(--bg-sidebar)' }}
     >
       {/* ── Logo ─────────────────────────────────────────────────── */}
@@ -71,12 +71,12 @@ const Sidebar: FC<Props> = ({
           >
             Model
           </p>
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 min-w-0">
             <select
               value={selectedModel}
               onChange={e => onModelChange(e.target.value)}
               disabled={isLoadingModels || models.length === 0}
-              className="flex-1 rounded-lg px-2.5 py-2 text-xs focus:outline-none truncate"
+              className="flex-1 min-w-0 rounded-lg px-2.5 py-2 text-xs focus:outline-none truncate"
               style={{
                 background: 'rgba(255,255,255,0.1)',
                 color: 'var(--text-sidebar)',

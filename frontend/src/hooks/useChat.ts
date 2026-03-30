@@ -33,7 +33,9 @@ function useStreamIntoMessage() {
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Streaming error'
         setMsgs(prev =>
-          prev.map(m => (m.id === msgId ? { ...m, content: `⚠️ ${msg}` } : m)),
+          prev.map(m =>
+            m.id === msgId ? { ...m, content: msg, isError: true } : m,
+          ),
         )
       } finally {
         setMsgs(prev =>

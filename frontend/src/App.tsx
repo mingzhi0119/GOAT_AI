@@ -3,6 +3,7 @@ import { useModels } from './hooks/useModels'
 import { useTheme } from './hooks/useTheme'
 import ChatWindow from './components/ChatWindow'
 import Sidebar from './components/Sidebar'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 /** Root application — orchestrates hooks and wires state down to leaf components. */
 export default function App() {
@@ -24,12 +25,14 @@ export default function App() {
         theme={theme}
         onToggleTheme={toggleTheme}
       />
-      <ChatWindow
-        messages={chat.messages}
-        isStreaming={chat.isStreaming}
-        selectedModel={models.selectedModel}
-        onSendMessage={content => void chat.sendMessage(content, models.selectedModel)}
-      />
+      <ErrorBoundary>
+        <ChatWindow
+          messages={chat.messages}
+          isStreaming={chat.isStreaming}
+          selectedModel={models.selectedModel}
+          onSendMessage={content => void chat.sendMessage(content, models.selectedModel)}
+        />
+      </ErrorBoundary>
     </div>
   )
 }
