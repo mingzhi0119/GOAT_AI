@@ -70,7 +70,7 @@ const Sidebar: FC<Props> = ({
         className="flex items-center gap-3 px-5 pt-6 pb-5"
         style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}
       >
-        <GoatIcon size={38} color="#FFCD00" />
+        <GoatIcon size={38} />
         <div>
           <h1 className="font-extrabold text-lg leading-tight" style={{ color: 'var(--gold)' }}>
             GOAT AI

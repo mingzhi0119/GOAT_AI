@@ -64,10 +64,17 @@ const ChatWindow: FC<Props> = ({ messages, isStreaming, selectedModel, onSendMes
           /* Empty state */
           <div className="flex flex-col items-center justify-center h-full gap-5 text-center px-4">
             <div
-              className="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl"
-              style={{ background: 'rgba(0,58,112,0.08)' }}
+              className="w-20 h-20 rounded-2xl flex items-center justify-center overflow-hidden"
+              style={{
+                border: '1.5px solid #FFCD00',
+                background: 'rgba(0, 0, 0, 0.18)',
+              }}
             >
-              🐐
+              <img
+                src="./golden_goat_icon.png"
+                alt="GOAT AI"
+                style={{ width: '88%', height: '88%', objectFit: 'contain' }}
+              />
             </div>
             <div>
               <h2 className="text-xl font-bold mb-1" style={{ color: 'var(--navy)' }}>

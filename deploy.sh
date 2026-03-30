@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# GOAT AI — production deploy (FastAPI + React on :8002, Streamlit fallback on :8501)
+# GOAT AI — production deploy (FastAPI + React on :62606, Streamlit fallback on :8501)
 # Usage:
-#   bash deploy.sh              # full deploy (git pull → build → restart)
+#   bash deploy.sh              # full deploy (git pull → pip → build → restart)
+#   QUICK=1 bash deploy.sh      # quick restart: git pull → npm build → restart API only
 #   SKIP_BUILD=1 bash deploy.sh # skip npm build (use existing dist/)
 #   SKIP_STREAMLIT=1 bash deploy.sh # skip Streamlit fallback
 #
@@ -28,8 +29,14 @@ PORT_STREAMLIT="${PORT_STREAMLIT:-8501}"  # Streamlit fallback (kept for referen
 
 SKIP_BUILD="${SKIP_BUILD:-0}"
 SKIP_STREAMLIT="${SKIP_STREAMLIT:-0}"
+QUICK="${QUICK:-0}"
 
-echo "🛠️  GOAT AI — Deploy starting (branch: ${GIT_BRANCH})"
+# QUICK=1 implies skip pip + skip Streamlit
+if [ "${QUICK}" = "1" ]; then
+  SKIP_STREAMLIT=1
+fi
+
+echo "🛠️  GOAT AI — Deploy starting (branch: ${GIT_BRANCH})${QUICK:+ [QUICK mode]}"
 
 # ── Helper: free a TCP port ───────────────────────────────────────────────────
 free_port() {
@@ -57,16 +64,24 @@ git checkout "$GIT_BRANCH"
 git reset --hard "origin/${GIT_BRANCH}"
 echo "✅ Repository up to date."
 
-# ── 2. Python virtualenv + deps ───────────────────────────────────────────────
-if [ ! -x "${VENV_DIR}/bin/python" ]; then
-  echo "🐍 Creating virtualenv at ${VENV_DIR}…"
-  "$PYTHON_BIN" -m venv "$VENV_DIR"
-fi
+# ── 2. Python virtualenv + deps (skipped in QUICK mode) ──────────────────────
+if [ "${QUICK}" = "1" ]; then
+  echo "⚡ [QUICK] Skipping Python venv / pip install."
+  if [ ! -x "${VENV_DIR}/bin/python" ]; then
+    echo "❌ Venv not found at ${VENV_DIR}. Run a full deploy first."
+    exit 1
+  fi
+else
+  if [ ! -x "${VENV_DIR}/bin/python" ]; then
+    echo "🐍 Creating virtualenv at ${VENV_DIR}…"
+    "$PYTHON_BIN" -m venv "$VENV_DIR"
+  fi
 
-echo "📦 Installing Python dependencies…"
-"${VENV_DIR}/bin/pip" install --upgrade pip --quiet
-"${VENV_DIR}/bin/pip" install -r requirements.txt --quiet
-echo "✅ Python deps installed."
+  echo "📦 Installing Python dependencies…"
+  "${VENV_DIR}/bin/pip" install --upgrade pip --quiet
+  "${VENV_DIR}/bin/pip" install -r requirements.txt --quiet
+  echo "✅ Python deps installed."
+fi
 
 # ── 3. Node / npm deps + React build ─────────────────────────────────────────
 FRONTEND_DIR="${PROJECT_DIR}/frontend"
