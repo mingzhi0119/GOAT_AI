@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # GOAT AI — one-shot server deploy (Streamlit only)
 # Usage: ./deploy.sh   OR (no +x yet): bash deploy.sh
-# Override branch, e.g.: GIT_BRANCH=python_version ./deploy.sh
+# Override branch if needed, e.g.: GIT_BRANCH=python_version ./deploy.sh
 
 # Make this script executable for the next run (works when you start with: bash deploy.sh)
 _DEPLOY_SCRIPT="${BASH_SOURCE[0]:-$0}"
@@ -15,8 +15,8 @@ set -euo pipefail
 # --- Configuration Section ---
 REPO_URL="${REPO_URL:-https://github.com/mingzhi0119/GOAT_AI.git}"
 PROJECT_DIR="${PROJECT_DIR:-$HOME/GOAT_AI}"
-# Default main; use python_version (or your deploy branch) when needed
-GIT_BRANCH="${GIT_BRANCH:-python_version}"
+# Default tracking branch for deploy (matches GitHub default)
+GIT_BRANCH="${GIT_BRANCH:-main}"
 PORT="${PORT:-62606}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 VENV_DIR="${VENV_DIR:-$PROJECT_DIR/.venv}"
@@ -24,7 +24,7 @@ APP_FILE="${APP_FILE:-app.py}"
 # Optional: export OLLAMA_BASE_URL before running if Ollama is not on localhost:11434
 #
 # If manual `git pull` fails (e.g. local package-lock.json edits), sync to remote with:
-#   git fetch origin && git reset --hard "origin/${GIT_BRANCH:-python_version}"
+#   git fetch origin && git reset --hard "origin/${GIT_BRANCH:-main}"
 
 echo "🛠️ Starting Deployment Sequence for GOAT AI..."
 
