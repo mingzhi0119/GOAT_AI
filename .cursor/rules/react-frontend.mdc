@@ -1,0 +1,54 @@
+---
+description: TypeScript strict mode, React component rules, hook patterns, and API layer structure for the frontend
+globs: **/*.{ts,tsx}
+alwaysApply: false
+---
+
+# React / TypeScript Standards
+
+## TypeScript Config (required)
+`tsconfig.json` must have `strict: true`, `noUncheckedIndexedAccess: true`, `noImplicitReturns: true`.
+- No `any` — use `unknown` and narrow, or define a proper type.
+- No `@ts-ignore` — fix the type instead.
+
+## API Layer
+- All `fetch()` calls live in `src/api/*.ts` — never inside components or hooks.
+- `src/api/types.ts` mirrors every backend Pydantic model (single source of truth for shared types).
+- SSE streaming via `AsyncGenerator<string>` — not WebSocket.
+
+```typescript
+// ✅ api layer owns network
+export async function* streamChat(req: ChatRequest): AsyncGenerator<string> { ... }
+
+// ❌ fetch inside a component
+const resp = await fetch("/api/chat", ...);  // inside ChatWindow — forbidden
+```
+
+## Components
+- One responsibility per component — render only; no business logic in JSX.
+- Props typed with `interface Props` — never `any`.
+- Every async-boundary component needs an error boundary parent.
+
+## Hooks
+- Business logic lives in `src/hooks/use*.ts` — not in components.
+- Return a typed object, not a positional tuple (unless exactly 2 items).
+- Hooks must not import from `src/components/` (prevents circular deps).
+
+```typescript
+// ✅ hook owns state; component owns rendering
+const { messages, sendMessage, isStreaming } = useChat();
+```
+
+## Module Layout
+```
+frontend/src/
+  api/          types.ts + one file per endpoint
+  components/   ChatWindow, MessageBubble, Sidebar, FileUpload
+  hooks/        useChat, useModels, useTheme
+  utils/        pure helpers (markdown, formatting)
+  styles/       theme.css (CSS vars), global.css
+  App.tsx
+```
+
+## Theme
+Light/Dark via CSS variables on `<html data-theme>` — instant toggle, no page reload, no localStorage hacks.

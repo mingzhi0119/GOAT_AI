@@ -1,0 +1,29 @@
+---
+description: Core engineering principles and cross-environment compatibility rules for GOAT AI
+alwaysApply: true
+---
+
+# GOAT AI — Core Principles
+
+## Five Non-Negotiables
+1. **Fail fast, fail loud** — bad config crashes at startup with a clear message, never silently at runtime.
+2. **Decouple by boundary** — HTTP handler → service → client. No business logic in route handlers.
+3. **Portable by default** — runs identically on Windows (dev) and Ubuntu A100 (prod) without changes.
+4. **Type everything** — every function signature carries types; untyped code is untestable code.
+5. **Test the boundary, mock the world** — unit tests own pure logic; only integration tests touch real I/O.
+
+## Cross-Environment Checklist (apply to every file)
+- Paths: always `pathlib.Path(__file__).parent / "sub"` — never hardcoded strings.
+- Ports / URLs: always env vars with safe defaults — never `localhost:8000` hardcoded.
+- File I/O: always `encoding="utf-8"` on `open()`.
+- Line endings: `.gitattributes` enforces `eol=lf` — prevents CRLF breakage on Windows dev.
+- Deps: exact pins in `requirements.txt`; `package-lock.json` committed; CI uses `npm ci`.
+- Secrets: `.env` in `.gitignore`; `.env.example` committed; never in scripts or source.
+- Startup: validate all env vars at import time via `pydantic_settings.BaseSettings` — crash with a message, not at first request.
+
+## Commit Checklist
+- [ ] All new functions typed + one-line docstring.
+- [ ] No `print()`, hardcoded paths/ports/secrets, or commented-out code.
+- [ ] New logic has at least a happy-path unit test.
+- [ ] `requirements.txt` / `package-lock.json` updated if deps changed.
+- [ ] `OPERATIONS.md` updated if a new env var or startup step was added.

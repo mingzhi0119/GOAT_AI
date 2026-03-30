@@ -1,0 +1,63 @@
+---
+description: Automated testing patterns for Python (pytest) and TypeScript (Vitest) — mock strategy, fixtures, CI
+globs: {tests,**/__tests__,**/*.test.*,**/conftest*}/**
+alwaysApply: false
+---
+
+# Testing Standards
+
+## Python (pytest)
+
+**Coverage targets**: `goat_ai/tools.py` 100% · `goat_ai/uploads.py` 90% · `backend/services/` 90% · `backend/routers/` 80%
+
+**Mock at the Protocol boundary** — inject `FakeLLMClient`; unit tests never touch real Ollama.
+
+```python
+# ✅ fake satisfies the Protocol — no network needed
+class FakeLLMClient:
+    def list_models(self) -> list[str]: return ["llama3:latest"]
+    def stream_chat(self, model: str, messages: list[ChatTurn]) -> Generator[str, None, None]:
+        yield "Hello"; yield " world"
+
+@pytest.fixture
+def client(app: FastAPI) -> TestClient:
+    app.dependency_overrides[get_llm_client] = lambda: FakeLLMClient()
+    return TestClient(app)
+```
+
+**Rules**:
+- `pytest.fixture` for all shared state — no module-level globals in test files.
+- Parametrize edge cases: empty messages, oversized upload, Ollama timeout.
+- Never `time.sleep()` — use `pytest-asyncio` + async fixtures.
+
+**Layout**:
+```
+tests/
+  conftest.py          # FakeLLMClient, sample DataFrames, tmp Settings
+  unit/                # pure logic — no HTTP
+  integration/         # FastAPI TestClient — mocks DI, no real Ollama
+```
+
+## TypeScript (Vitest + React Testing Library)
+
+```typescript
+// ✅ mock fetch globally — never hit real server
+vi.stubGlobal("fetch", vi.fn().mockResolvedValue(...));
+
+// ✅ test hooks with renderHook
+const { result } = renderHook(() => useChat());
+```
+
+- Assert on ARIA roles/text — not CSS classes or DOM structure.
+- Test files in `src/__tests__/`.
+
+## CI (GitHub Actions)
+```yaml
+- uses: actions/setup-python@v5
+  with: { python-version: "3.12" }          # match server
+- run: pytest tests/ -v --tb=short
+
+- uses: actions/setup-node@v4
+  with: { node-version: "18" }              # match server exactly
+- run: cd frontend && npm ci && npm test -- --run
+```

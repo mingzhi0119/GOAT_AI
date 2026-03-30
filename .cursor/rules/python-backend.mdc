@@ -1,0 +1,57 @@
+---
+description: Python type safety, Pydantic I/O, error handling, logging and module structure for the backend
+globs: **/*.py
+alwaysApply: false
+---
+
+# Python Backend Standards
+
+## Types (mandatory)
+- `from __future__ import annotations` at top of every file.
+- Every function/method fully annotated including return type.
+- `Protocol` for injectable dependencies — never accept a concrete class when an interface suffices.
+- `pydantic.BaseModel` or `dataclass` for all structured data; no bare `dict[str, Any]` crossing boundaries.
+
+```python
+# ✅
+def list_models(self) -> list[str]: ...
+
+# ❌ forbidden
+def list_models(self): ...
+```
+
+## Pydantic for All I/O
+- FastAPI bodies: always `BaseModel` subclass.
+- Config: always `pydantic_settings.BaseSettings` with `env_prefix="GOAT_"` — validated at import.
+- Never parse raw `request.json()` dict in a handler.
+
+## Error Handling (layered)
+| Layer | Rule |
+|-------|------|
+| Service/client | Raise domain exceptions (`OllamaUnavailable`). Never swallow. |
+| Route handler | `try/except` domain exc → `HTTPException` with sanitized message. Log original. |
+| Startup | Invalid config → `SystemExit` with clear message. |
+
+```python
+# ✅ service raises; handler translates
+raise OllamaUnavailable("Cannot reach Ollama") from exc
+raise HTTPException(status_code=503, detail="AI backend unavailable") from exc
+```
+
+## Logging
+- `logging.getLogger(__name__)` in every module — never `print()`.
+- Configure once in `logging_config.py`; never `basicConfig` inside a module.
+- Never log secrets, full file contents, or raw user messages at INFO+.
+
+## Module Layout
+```
+backend/
+  main.py          # create_app() factory
+  config.py        # BaseSettings, validated at import
+  dependencies.py  # Depends() factories
+  exceptions.py    # domain exception hierarchy
+  routers/         # validate → call service → return response (no logic)
+  services/        # business logic, no HTTP primitives
+  models/          # Pydantic schemas only, no methods
+goat_ai/           # shared: LLM client, uploads, tools — zero FastAPI/Streamlit imports
+```
