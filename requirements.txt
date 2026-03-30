@@ -1,5 +1,14 @@
-# Pinned for reproducible deploys (see docs/CIS438_INDUSTRIALIZATION_PLAN.md)
+# ── Streamlit UI (current, kept as fallback) ─────────────────────────────────
 streamlit==1.40.2
-requests==2.32.3
+
+# ── FastAPI backend (new stack) ───────────────────────────────────────────────
+fastapi==0.135.2
+uvicorn==0.35.0
+python-multipart==0.0.20
+
+# ── Data ──────────────────────────────────────────────────────────────────────
 pandas==2.2.3
 openpyxl==3.1.5
+
+# ── HTTP client ───────────────────────────────────────────────────────────────
+requests==2.32.3

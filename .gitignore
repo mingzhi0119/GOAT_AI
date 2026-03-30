@@ -21,6 +21,11 @@ dist-ssr
 !.vscode/extensions.json
 .idea
 .DS_Store
+
+# Cursor IDE — ignore user settings/cache, keep project rules
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/*.mdc
 *.suo
 *.ntvs*
 *.njsproj
