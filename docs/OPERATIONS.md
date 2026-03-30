@@ -70,10 +70,17 @@ bash deploy.sh
 
 ---
 
+## Access URLs
+
+| URL | Description |
+|-----|-------------|
+| `https://ai.simonbb.com/mingzhi/` | **Public URL** — nginx proxies to FastAPI on :62606 |
+| `http://127.0.0.1:62606/api/health` | Internal health check |
+
 ## Health check
 
 ```bash
-curl -sf http://127.0.0.1:8002/api/health
+curl -sf http://127.0.0.1:62606/api/health
 # → {"status":"ok","version":"1.0.0"}
 ```
 

@@ -23,8 +23,8 @@ GIT_BRANCH="${GIT_BRANCH:-main}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 VENV_DIR="${VENV_DIR:-$PROJECT_DIR/.venv}"
 
-PORT_API="${PORT_API:-8002}"           # FastAPI + React SPA
-PORT_STREAMLIT="${PORT_STREAMLIT:-8501}"  # Streamlit fallback
+PORT_API="${PORT_API:-62606}"          # FastAPI + React SPA (proxied via ai.simonbb.com/mingzhi/)
+PORT_STREAMLIT="${PORT_STREAMLIT:-8501}"  # Streamlit fallback (kept for reference)
 
 SKIP_BUILD="${SKIP_BUILD:-0}"
 SKIP_STREAMLIT="${SKIP_STREAMLIT:-0}"
@@ -165,8 +165,8 @@ echo "════════════════════════�
 echo "  GOAT AI — Deployment Complete"
 echo "════════════════════════════════════════════"
 echo ""
-echo "  🌐 React UI  → http://128.151.203.65:${PORT_API}/"
-echo "  🔌 API health→ http://127.0.0.1:${PORT_API}/api/health"
+  echo "  🌐 React UI  → https://ai.simonbb.com/mingzhi/"
+  echo "  🔌 API health→ http://127.0.0.1:${PORT_API}/api/health"
 if [ "${SKIP_STREAMLIT}" != "1" ]; then
   echo "  📊 Streamlit → http://128.151.203.65:${PORT_STREAMLIT}/ (fallback)"
 fi
