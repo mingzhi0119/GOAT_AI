@@ -1,65 +1,129 @@
 # GOAT AI — Install, run, deploy, stop
 
-Python-only stack: **Streamlit** + **Ollama**. No Node.js required.
+> **Current architecture (Phase 2):** FastAPI backend on `:8002` + React/Vite frontend.
+> The React bundle is compiled and served as static files by FastAPI in production.
 
-## Install (development)
+---
+
+## Quick start (development)
+
+### 1. Python backend
 
 ```bash
 cd "$HOME/GOAT_AI"   # or your clone path
 python3 -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+cp .env.example .env        # then edit as needed
+python3 -m uvicorn server:app --host 0.0.0.0 --port 8002 --reload
 ```
 
-Copy `.env.example` to `.env` and adjust variables, or `export` them in your shell (never commit real secrets).
-
-## Run locally
+### 2. React frontend (dev mode, hot-reload on :3000)
 
 ```bash
-source .venv/bin/activate
-export OLLAMA_BASE_URL=http://127.0.0.1:11434   # default if unset
-streamlit run app.py --server.port 62606
+cd frontend
+npm ci
+npm run dev
 ```
 
-Open `http://127.0.0.1:62606/`. Health check: `curl -sf http://127.0.0.1:62606/_stcore/health`.
+Open `http://localhost:3000/`. Vite proxies `/api/*` → `http://localhost:8002`.
 
-## Deploy (JupyterLab / shared server)
+---
 
-From the project directory (e.g. `$HOME/GOAT_AI`):
+## Production build
+
+```bash
+# Build the React SPA (outputs to frontend/dist/)
+cd frontend && npm ci && npm run build && cd ..
+
+# Start FastAPI (serves both API and SPA)
+python3 -m uvicorn server:app --host 0.0.0.0 --port 8002
+```
+
+FastAPI auto-detects `frontend/dist/` and mounts it as a static file server (see `backend/main.py`).
+
+---
+
+## Deploy (A100 server)
 
 ```bash
 bash deploy.sh
 ```
 
-Or `./deploy.sh` after `chmod +x deploy.sh`.
+- **Logs:** `fastapi.log` in the project root.
+- **PID:** `fastapi.pid`
+- **Stop:** `kill "$(cat fastapi.pid)"`
 
-- **Logs:** `streamlit.log` in the project root (append from `nohup`).
-- **PID:** `streamlit.pid` — process id of the Streamlit server.
-- **Stop:** `kill "$(cat streamlit.pid)"` (or `kill <pid>` if the file is stale).
+---
 
 ## Environment variables
 
-| Variable | Purpose |
-|----------|---------|
-| `OLLAMA_BASE_URL` | Ollama HTTP base (default `http://127.0.0.1:11434`). |
-| `OLLAMA_GENERATE_TIMEOUT` | Request timeout in seconds (default `120`). |
-| `GOAT_MAX_UPLOAD_MB` | Max upload size; keep in sync with `.streamlit/config.toml` `maxUploadSize`. |
-| `GOAT_MAX_DATAFRAME_ROWS` | Max rows after load (default `50000`). |
-| `GOAT_USE_CHAT_API` | `true` → `/api/chat` (multi-turn); `false` → `/api/generate` with transcript. |
-| `GOAT_SYSTEM_PROMPT` | Optional full system prompt override. |
-| `GOAT_SYSTEM_PROMPT_FILE` | Optional path to UTF-8 file containing system prompt. |
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `GOAT_OLLAMA_BASE_URL` | Ollama HTTP base URL | `http://127.0.0.1:11434` |
+| `GOAT_GENERATE_TIMEOUT` | Request timeout in seconds | `120` |
+| `GOAT_MAX_UPLOAD_MB` | Max file upload size (MB) | `25` |
+| `GOAT_MAX_DATAFRAME_ROWS` | Max rows loaded from CSV/XLSX | `50000` |
+| `GOAT_SYSTEM_PROMPT` | Optional system prompt override | _(built-in default)_ |
+| `GOAT_SYSTEM_PROMPT_FILE` | Path to UTF-8 file with system prompt | _(none)_ |
+| `GOAT_CORS_ORIGINS` | Comma-separated CORS allow-origins | `http://localhost:3000` |
 
-## Reverse proxy (school host)
+---
 
-Typical pattern: public `https://…/mingzhi/` → `http://127.0.0.1:62606/`.
+## Health check
 
-- WebSocket support is required for Streamlit; configure your proxy accordingly (upgrade headers, long timeouts).
-- Keep Ollama on **localhost** unless the network is trusted and access-controlled.
+```bash
+curl -sf http://127.0.0.1:8002/api/health
+# → {"status":"ok","version":"1.0.0"}
+```
+
+---
+
+## API endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/health` | Liveness probe |
+| `GET` | `/api/models` | List Ollama model names |
+| `POST` | `/api/chat` | SSE streaming chat completion |
+| `POST` | `/api/upload` | SSE streaming CSV/XLSX analysis |
+
+**SSE format** (chat & upload):
+```
+data: "token"\n\n   ← each token is a JSON-encoded string
+data: "[DONE]"\n\n  ← stream terminator
+data: "[ERROR] …"\n\n followed by "[DONE]" on Ollama errors
+```
+
+---
+
+## Frontend stack (Phase 2)
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Vite | 5 | Build tool + dev server |
+| React | 18 | UI framework |
+| TypeScript | 5 (strict) | Type safety |
+| Tailwind CSS | 3.4 | Utility-first styling |
+| react-markdown | 9 | Markdown rendering in chat |
+| remark-gfm | 4 | GFM tables, strikethrough, task lists |
+
+---
 
 ## Data handling
 
-Uploaded CSV/XLSX is held **in memory** for the session only; nothing is written to disk for persistence unless you change the app.
+Uploaded CSV/XLSX is read into memory for the request only; nothing is persisted to disk.
 
-## Agentic behavior (report)
+---
 
-The app follows a simple loop: **perceive** (user message + optional dataframe summary via `describe_dataframe`) → **act** (Ollama `/api/chat` or generate) → **verify** (prompt asks the model to cite shape/columns when data is present). Tool-style logic is plain Python functions, not a separate agent framework.
+## Reverse proxy (school host)
+
+Nginx or Apache: proxy `https://…/` → `http://127.0.0.1:8002/`. Standard proxy headers required:
+
+```nginx
+proxy_set_header Connection '';
+proxy_http_version 1.1;
+proxy_buffering off;      # required for SSE
+proxy_cache off;
+proxy_set_header X-Accel-Buffering no;
+```

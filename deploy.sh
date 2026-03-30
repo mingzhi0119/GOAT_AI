@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# GOAT AI — one-shot server deploy (Streamlit only)
-# Usage: ./deploy.sh   OR (no +x yet): bash deploy.sh
-# Override branch if needed, e.g.: GIT_BRANCH=python_version ./deploy.sh
+# GOAT AI — production deploy (FastAPI + React on :8002, Streamlit fallback on :8501)
+# Usage:
+#   bash deploy.sh              # full deploy (git pull → build → restart)
+#   SKIP_BUILD=1 bash deploy.sh # skip npm build (use existing dist/)
+#   SKIP_STREAMLIT=1 bash deploy.sh # skip Streamlit fallback
+#
+# Override any variable before running, e.g.:
+#   PORT_API=8003 bash deploy.sh
 
-# Make this script executable for the next run (works when you start with: bash deploy.sh)
 _DEPLOY_SCRIPT="${BASH_SOURCE[0]:-$0}"
 if [[ -f "$_DEPLOY_SCRIPT" ]]; then
   chmod +x "$_DEPLOY_SCRIPT" 2>/dev/null || true
@@ -12,115 +16,165 @@ unset _DEPLOY_SCRIPT
 
 set -euo pipefail
 
-# --- Configuration Section ---
+# ── Configuration ────────────────────────────────────────────────────────────
 REPO_URL="${REPO_URL:-https://github.com/mingzhi0119/GOAT_AI.git}"
 PROJECT_DIR="${PROJECT_DIR:-$HOME/GOAT_AI}"
-# Default tracking branch for deploy (matches GitHub default)
 GIT_BRANCH="${GIT_BRANCH:-main}"
-PORT="${PORT:-62606}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 VENV_DIR="${VENV_DIR:-$PROJECT_DIR/.venv}"
-APP_FILE="${APP_FILE:-app.py}"
-# Optional: export OLLAMA_BASE_URL before running if Ollama is not on localhost:11434
-#
-# If manual `git pull` fails (e.g. local package-lock.json edits), sync to remote with:
-#   git fetch origin && git reset --hard "origin/${GIT_BRANCH:-main}"
 
-echo "🛠️ Starting Deployment Sequence for GOAT AI..."
+PORT_API="${PORT_API:-8002}"           # FastAPI + React SPA
+PORT_STREAMLIT="${PORT_STREAMLIT:-8501}"  # Streamlit fallback
 
+SKIP_BUILD="${SKIP_BUILD:-0}"
+SKIP_STREAMLIT="${SKIP_STREAMLIT:-0}"
+
+echo "🛠️  GOAT AI — Deploy starting (branch: ${GIT_BRANCH})"
+
+# ── Helper: free a TCP port ───────────────────────────────────────────────────
 free_port() {
   local p="$1"
   if command -v fuser >/dev/null 2>&1; then
     fuser -k "${p}/tcp" 2>/dev/null || true
+  elif command -v lsof >/dev/null 2>&1; then
+    local pids
+    pids=$(lsof -ti ":${p}" 2>/dev/null || true)
+    [ -n "$pids" ] && echo "$pids" | xargs -r kill -9 2>/dev/null || true
   fi
-  if command -v lsof >/dev/null 2>&1; then
-    if lsof -ti ":${p}" >/dev/null 2>&1; then
-      lsof -ti ":${p}" | xargs -r kill -9 2>/dev/null || true
-    fi
-  fi
+  sleep 1
 }
 
-# 1. Environment Synchronization
-if [ ! -d "$PROJECT_DIR/.git" ]; then
-  echo "📂 Directory not found. Executing initial git clone..."
+# ── 1. Git sync ───────────────────────────────────────────────────────────────
+if [ ! -d "${PROJECT_DIR}/.git" ]; then
+  echo "📂 Cloning repository…"
   git clone "$REPO_URL" "$PROJECT_DIR"
 fi
 
-echo "🔄 Pulling latest from origin (branch: $GIT_BRANCH)..."
+echo "🔄 Syncing to origin/${GIT_BRANCH}…"
 cd "$PROJECT_DIR"
 git fetch --all --prune
 git checkout "$GIT_BRANCH"
-# Match remote exactly (same effect as a clean pull when deploy machine should not keep local commits)
 git reset --hard "origin/${GIT_BRANCH}"
-echo "✅ Repository is up to date with origin/${GIT_BRANCH}"
+echo "✅ Repository up to date."
 
-# 2. Python virtualenv and dependencies
-if [ ! -x "$VENV_DIR/bin/python" ]; then
-  echo "🐍 Creating virtualenv at $VENV_DIR..."
+# ── 2. Python virtualenv + deps ───────────────────────────────────────────────
+if [ ! -x "${VENV_DIR}/bin/python" ]; then
+  echo "🐍 Creating virtualenv at ${VENV_DIR}…"
   "$PYTHON_BIN" -m venv "$VENV_DIR"
 fi
 
-echo "📦 Installing Python dependencies..."
-"$VENV_DIR/bin/pip" install --upgrade pip
-if [ -f requirements.txt ]; then
-  "$VENV_DIR/bin/pip" install -r requirements.txt
+echo "📦 Installing Python dependencies…"
+"${VENV_DIR}/bin/pip" install --upgrade pip --quiet
+"${VENV_DIR}/bin/pip" install -r requirements.txt --quiet
+echo "✅ Python deps installed."
+
+# ── 3. Node / npm deps + React build ─────────────────────────────────────────
+FRONTEND_DIR="${PROJECT_DIR}/frontend"
+NODE_MODULES="${FRONTEND_DIR}/node_modules"
+
+if [ ! -d "$NODE_MODULES" ]; then
+  echo "📦 Installing Node dependencies (npm ci)…"
+  (cd "$FRONTEND_DIR" && npm ci --silent)
+fi
+
+if [ "${SKIP_BUILD}" = "1" ] && [ -d "${FRONTEND_DIR}/dist" ]; then
+  echo "⚡ Skipping npm build (SKIP_BUILD=1, dist/ exists)."
 else
-  echo "⚠️  requirements.txt not found; skipping pip install."
+  echo "⚙️  Building React frontend…"
+  (cd "$FRONTEND_DIR" && npm run build)
+  echo "✅ Frontend built → ${FRONTEND_DIR}/dist/"
 fi
 
-# 3. Process cleanup on deployment port
-echo "🧹 Freeing port $PORT..."
-free_port "$PORT"
+# ── 4. Start FastAPI (uvicorn) on PORT_API ────────────────────────────────────
+API_LOG="${PROJECT_DIR}/fastapi.log"
+API_PID="${PROJECT_DIR}/fastapi.pid"
 
-# 4. Launch Streamlit (project root: app.py)
-LOG_FILE="${PROJECT_DIR}/streamlit.log"
-STREAMLIT_BIN="$VENV_DIR/bin/streamlit"
-if [ ! -x "$STREAMLIT_BIN" ]; then
-  echo "❌ streamlit not found in venv. Ensure requirements.txt includes streamlit."
-  exit 1
-fi
+echo "🧹 Freeing port ${PORT_API}…"
+free_port "$PORT_API"
 
-echo "🚀 Starting Streamlit on 0.0.0.0:$PORT (log: $LOG_FILE)..."
-nohup "$STREAMLIT_BIN" run "$APP_FILE" \
-  --server.port "$PORT" \
-  --server.address 0.0.0.0 \
-  --server.headless true \
-  >> "$LOG_FILE" 2>&1 &
-echo $! > "${PROJECT_DIR}/streamlit.pid"
-
-# 5. Deployment verification
-sleep 3
-HEALTH_URL="http://127.0.0.1:${PORT}/_stcore/health"
-BASE_URL="http://127.0.0.1:${PORT}/"
-LISTEN_OK=false
-if command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q ":${PORT}"; then
-  LISTEN_OK=true
-elif command -v netstat >/dev/null 2>&1 && netstat -tln 2>/dev/null | grep -q ":${PORT}"; then
-  LISTEN_OK=true
-fi
-
-PID_OK=false
-if [ -f "${PROJECT_DIR}/streamlit.pid" ]; then
-  SPID="$(cat "${PROJECT_DIR}/streamlit.pid" 2>/dev/null || true)"
-  if [ -n "$SPID" ] && kill -0 "$SPID" 2>/dev/null; then
-    PID_OK=true
+# Also stop any previous PID-file process
+if [ -f "$API_PID" ]; then
+  OLD_PID="$(cat "$API_PID" 2>/dev/null || true)"
+  if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+    kill "$OLD_PID" 2>/dev/null || true
+    sleep 1
   fi
+  rm -f "$API_PID"
 fi
 
-if curl -sf "$HEALTH_URL" >/dev/null 2>&1; then
-  echo "✅ GOAT AI is responding (Streamlit health check OK)."
-elif curl -sf "$BASE_URL" >/dev/null 2>&1; then
-  echo "✅ App answered on port $PORT (HTTP OK)."
-elif [ "$LISTEN_OK" = true ] || [ "$PID_OK" = true ]; then
-  echo "✅ Streamlit appears to be up (port or PID check). If the browser fails, check $LOG_FILE and the reverse proxy."
+echo "🚀 Starting FastAPI on 0.0.0.0:${PORT_API} (log: ${API_LOG})…"
+nohup "${VENV_DIR}/bin/python" -m uvicorn server:app \
+  --host 0.0.0.0 \
+  --port "$PORT_API" \
+  --workers 2 \
+  >> "$API_LOG" 2>&1 &
+echo $! > "$API_PID"
+echo "   PID: $(cat "$API_PID")"
+
+# ── 5. Health check — FastAPI ─────────────────────────────────────────────────
+echo "⏳ Waiting for FastAPI to come up…"
+for i in {1..15}; do
+  if curl -sf "http://127.0.0.1:${PORT_API}/api/health" >/dev/null 2>&1; then
+    echo "✅ FastAPI health check passed."
+    break
+  fi
+  sleep 1
+  if [ "$i" -eq 15 ]; then
+    echo "❌ FastAPI did not respond within 15 s. Check ${API_LOG}"
+    exit 1
+  fi
+done
+
+# ── 6. Streamlit fallback on PORT_STREAMLIT (optional) ────────────────────────
+if [ "${SKIP_STREAMLIT}" != "1" ]; then
+  STREAMLIT_BIN="${VENV_DIR}/bin/streamlit"
+  if [ -x "$STREAMLIT_BIN" ]; then
+    SL_LOG="${PROJECT_DIR}/streamlit.log"
+    SL_PID="${PROJECT_DIR}/streamlit.pid"
+
+    echo "🧹 Freeing port ${PORT_STREAMLIT}…"
+    free_port "$PORT_STREAMLIT"
+
+    if [ -f "$SL_PID" ]; then
+      OLD_PID="$(cat "$SL_PID" 2>/dev/null || true)"
+      if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+        kill "$OLD_PID" 2>/dev/null || true
+        sleep 1
+      fi
+      rm -f "$SL_PID"
+    fi
+
+    echo "🚀 Starting Streamlit fallback on 0.0.0.0:${PORT_STREAMLIT} (log: ${SL_LOG})…"
+    nohup "$STREAMLIT_BIN" run app.py \
+      --server.port "$PORT_STREAMLIT" \
+      --server.address 0.0.0.0 \
+      --server.headless true \
+      >> "$SL_LOG" 2>&1 &
+    echo $! > "$SL_PID"
+    echo "   Streamlit PID: $(cat "$SL_PID")"
+  else
+    echo "⚠️  streamlit not found in venv; skipping fallback."
+  fi
 else
-  echo "❌ Deployment may have failed. Check $LOG_FILE (and that python/venv paths are correct)."
-  exit 1
+  echo "⏭️  Skipping Streamlit (SKIP_STREAMLIT=1)."
 fi
 
-echo "🔗 Local URL: http://127.0.0.1:${PORT}/"
-echo "   (Public URL depends on your reverse proxy, e.g. https://ai.simonbb.com/mingzhi/)"
+# ── 7. Summary ────────────────────────────────────────────────────────────────
 echo ""
-echo "🛑 To stop: kill \$(cat ${PROJECT_DIR}/streamlit.pid)   (or: kill <pid> from ps)"
-echo "📄 Logs: tail -f ${PROJECT_DIR}/streamlit.log"
-echo "❤️  Health: curl -sf http://127.0.0.1:${PORT}/_stcore/health"
+echo "════════════════════════════════════════════"
+echo "  GOAT AI — Deployment Complete"
+echo "════════════════════════════════════════════"
+echo ""
+echo "  🌐 React UI  → http://128.151.203.65:${PORT_API}/"
+echo "  🔌 API health→ http://127.0.0.1:${PORT_API}/api/health"
+if [ "${SKIP_STREAMLIT}" != "1" ]; then
+  echo "  📊 Streamlit → http://128.151.203.65:${PORT_STREAMLIT}/ (fallback)"
+fi
+echo ""
+echo "  📄 FastAPI log:    tail -f ${API_LOG}"
+echo "  🛑 Stop FastAPI:   kill \$(cat ${API_PID})"
+if [ "${SKIP_STREAMLIT}" != "1" ]; then
+  echo "  📄 Streamlit log:  tail -f ${PROJECT_DIR}/streamlit.log"
+  echo "  🛑 Stop Streamlit: kill \$(cat ${PROJECT_DIR}/streamlit.pid)"
+fi
+echo ""
