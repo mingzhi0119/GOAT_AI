@@ -11,4 +11,14 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    proxy: {
+      // Browser → same-origin /ollama → Ollama (avoids CORS during `npm run dev`)
+      "/ollama": {
+        target: "http://127.0.0.1:11434",
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/ollama/, ""),
+      },
+    },
+  },
 })
