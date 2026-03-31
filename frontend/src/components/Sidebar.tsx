@@ -105,7 +105,10 @@ const Sidebar: FC<Props> = ({
           <h1 className="font-extrabold text-lg leading-tight" style={{ color: 'var(--gold)' }}>
             GOAT AI
           </h1>
-          <p className="text-xs leading-tight" style={{ color: 'rgba(255,255,255,0.5)' }}>
+          <p
+            className="text-xs leading-tight select-none cursor-default"
+            style={{ color: 'rgba(255,255,255,0.5)' }}
+          >
             Simon Business School
           </p>
         </div>
@@ -117,7 +120,7 @@ const Sidebar: FC<Props> = ({
         {/* Your name (optional) */}
         <section>
           <p
-            className="text-xs font-semibold uppercase tracking-wider mb-2"
+            className="text-xs font-semibold uppercase tracking-wider mb-2 select-none cursor-default"
             style={{ color: 'rgba(255,255,255,0.45)' }}
           >
             Your Name
@@ -193,7 +196,7 @@ const Sidebar: FC<Props> = ({
         <section className="space-y-1">
           <div className="flex items-center justify-between mb-2">
             <p
-              className="text-xs font-semibold uppercase tracking-wider"
+              className="text-xs font-semibold uppercase tracking-wider select-none cursor-default"
               style={{ color: 'rgba(255,255,255,0.45)' }}
             >
               History
@@ -253,7 +256,7 @@ const Sidebar: FC<Props> = ({
         {/* Action buttons */}
         <section className="space-y-1">
           <p
-            className="text-xs font-semibold uppercase tracking-wider mb-2"
+            className="text-xs font-semibold uppercase tracking-wider mb-2 select-none cursor-default"
             style={{ color: 'rgba(255,255,255,0.45)' }}
           >
             Actions
@@ -289,7 +292,7 @@ const Sidebar: FC<Props> = ({
         {/* File Upload */}
         <section>
           <p
-            className="text-xs font-semibold uppercase tracking-wider mb-2"
+            className="text-xs font-semibold uppercase tracking-wider mb-2 select-none cursor-default"
             style={{ color: 'rgba(255,255,255,0.45)' }}
           >
             Analyze File
@@ -331,7 +334,10 @@ const Sidebar: FC<Props> = ({
           }}
         />
 
-        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.38)' }}>
+        <p
+          className="text-xs select-none cursor-default"
+          style={{ color: 'rgba(255,255,255,0.38)' }}
+        >
           Powered by{' '}
           <span style={{ color: 'var(--gold)' }}>Mingzhi Hu</span>
         </p>

@@ -43,3 +43,7 @@ dist-ssr
 # Build
 frontend/dist
 frontend/node_modules
+
+# Selenium automation profile (may contain session cookies)
+scripts/.selenium_chrome_profile/
+scripts/open_close_url_loop.py
