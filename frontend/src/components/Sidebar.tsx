@@ -5,8 +5,6 @@ import type { HistorySessionItem } from '../api/history'
 import type { ChartSpec } from '../api/types'
 import type { FileContext } from '../hooks/useFileContext'
 import {
-  sidebarBrandSubtitleClass,
-  sidebarBrandTitleClass,
   sidebarErrorTextClass,
   sidebarFileChipNameClass,
   sidebarFooterAttributionClass,
@@ -93,23 +91,21 @@ const Sidebar: FC<Props> = ({
 
   return (
     <aside
-      className="flex flex-col w-64 flex-shrink-0 h-full min-h-0 overflow-x-hidden"
+      className="flex flex-col w-64 flex-shrink-0 h-screen min-h-0 overflow-x-hidden"
       style={{ background: 'var(--bg-sidebar)' }}
     >
-      {/* ── Logo ─────────────────────────────────────────────────── */}
+      {/* ── Logo (height matches TopBar h-12) ───────────────────── */}
       <div
-        className="flex items-center gap-3 px-5 pt-6 pb-5"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}
+        className="flex h-12 flex-shrink-0 items-center gap-2.5 px-4 border-b"
+        style={{ borderColor: 'rgba(255,255,255,0.1)' }}
       >
-        <GoatIcon size={38} />
-        <div>
-          <h1 className={sidebarBrandTitleClass} style={{ color: 'var(--gold)' }}>
-            GOAT AI
-          </h1>
-          <p className={sidebarBrandSubtitleClass} style={{ color: 'rgba(255,255,255,0.5)' }}>
-            Simon Business School
-          </p>
-        </div>
+        <GoatIcon size={28} />
+        <h1
+          className="text-base font-extrabold leading-none select-none cursor-default"
+          style={{ color: 'var(--gold)' }}
+        >
+          GOAT AI
+        </h1>
       </div>
 
       {/* ── Scrollable body ──────────────────────────────────────── */}

@@ -7,7 +7,7 @@ interface Props {
   onToggleTheme: () => void
 }
 
-/** Full-width shell header: empty left, centered session title, settings (theme) on the right. */
+/** Header for the chat column only (not above sidebar): session title + settings. Uses chat surface colors for light/dark contrast. */
 const TopBar: FC<Props> = ({ sessionTitle, theme, onToggleTheme }) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -25,7 +25,7 @@ const TopBar: FC<Props> = ({ sessionTitle, theme, onToggleTheme }) => {
       className="flex-shrink-0 flex items-center h-12 px-3 border-b z-20"
       style={{
         borderColor: 'var(--border-color)',
-        background: 'var(--bg-sidebar)',
+        background: 'var(--bg-chat)',
       }}
     >
       <div className="flex-1 min-w-0" aria-hidden="true" />
@@ -44,8 +44,8 @@ const TopBar: FC<Props> = ({ sessionTitle, theme, onToggleTheme }) => {
         <div className="relative">
           <button
             type="button"
-            className="p-2 rounded-lg transition-colors"
-            style={{ color: 'var(--text-sidebar)' }}
+            className="p-2 rounded-lg transition-colors hover:opacity-80"
+            style={{ color: 'var(--text-main)' }}
             aria-label="Settings"
             aria-expanded={menuOpen}
             aria-haspopup="true"
@@ -60,9 +60,9 @@ const TopBar: FC<Props> = ({ sessionTitle, theme, onToggleTheme }) => {
             <div
               className="absolute right-0 mt-1 py-1 rounded-lg shadow-lg min-w-[10rem] border text-sm z-50"
               style={{
-                background: 'var(--bg-sidebar)',
-                borderColor: 'rgba(255,255,255,0.15)',
-                color: 'var(--text-sidebar)',
+                background: 'var(--bg-asst-bubble)',
+                borderColor: 'var(--border-color)',
+                color: 'var(--text-main)',
               }}
               role="menu"
             >

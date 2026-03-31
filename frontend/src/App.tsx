@@ -53,38 +53,38 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
-      <TopBar sessionTitle={sessionTitleForTopBar} theme={theme} onToggleTheme={toggleTheme} />
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <Sidebar
-          models={models.models}
-          selectedModel={models.selectedModel}
-          onModelChange={models.setSelectedModel}
-          onRefreshModels={models.refresh}
-          onClearChat={chat.clearMessages}
-          isLoadingModels={models.isLoading}
-          modelsError={models.error}
-          onStream={chat.streamToChat}
-          userName={userName}
-          onUserNameChange={setUserName}
-          historySessions={history.sessions}
-          isLoadingHistory={history.isLoading}
-          historyError={history.error}
-          onRefreshHistory={() => void history.refresh()}
-          onDeleteAllHistory={handleDeleteAllHistory}
-          onLoadHistorySession={sessionId => {
-            void history.loadSession(sessionId).then(session => {
-              chat.loadSession(session.id, session.messages)
-            })
-          }}
-          onDeleteHistorySession={sessionId => {
-            void history.deleteSession(sessionId)
-          }}
-          fileContext={fileContext}
-          onFileContext={setFileContext}
-          onChartSpec={setChartSpec}
-          onClearFileContext={clearFileContext}
-        />
+    <div className="flex h-screen overflow-hidden">
+      <Sidebar
+        models={models.models}
+        selectedModel={models.selectedModel}
+        onModelChange={models.setSelectedModel}
+        onRefreshModels={models.refresh}
+        onClearChat={chat.clearMessages}
+        isLoadingModels={models.isLoading}
+        modelsError={models.error}
+        onStream={chat.streamToChat}
+        userName={userName}
+        onUserNameChange={setUserName}
+        historySessions={history.sessions}
+        isLoadingHistory={history.isLoading}
+        historyError={history.error}
+        onRefreshHistory={() => void history.refresh()}
+        onDeleteAllHistory={handleDeleteAllHistory}
+        onLoadHistorySession={sessionId => {
+          void history.loadSession(sessionId).then(session => {
+            chat.loadSession(session.id, session.messages)
+          })
+        }}
+        onDeleteHistorySession={sessionId => {
+          void history.deleteSession(sessionId)
+        }}
+        fileContext={fileContext}
+        onFileContext={setFileContext}
+        onChartSpec={setChartSpec}
+        onClearFileContext={clearFileContext}
+      />
+      <div className="flex flex-col flex-1 min-w-0 min-h-0">
+        <TopBar sessionTitle={sessionTitleForTopBar} theme={theme} onToggleTheme={toggleTheme} />
         <ErrorBoundary>
           <ChatWindow
             messages={chat.messages}
