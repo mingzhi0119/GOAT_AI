@@ -2,6 +2,7 @@ import { useState, type FC } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Message } from '../api/types'
+import GoatIcon from './GoatIcon'
 
 interface Props {
   message: Message
@@ -38,15 +39,11 @@ const MessageBubble: FC<Props> = ({ message }) => {
 
   return (
     <div className={`flex items-end gap-2 group ${isUser ? 'justify-end' : 'justify-start'}`}>
-      {/* Assistant avatar */}
+      {/* Assistant avatar — same golden goat mark as sidebar / welcome */}
       {!isUser && (
-        <div
-          className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold select-none"
-          style={{ background: 'var(--navy)', color: 'var(--gold)' }}
-          aria-hidden="true"
-        >
-          G
-        </div>
+        <span className="flex-shrink-0 inline-flex" aria-label="GOAT AI">
+          <GoatIcon size={28} />
+        </span>
       )}
 
       {/* Bubble + copy button wrapper */}
@@ -128,11 +125,11 @@ const MessageBubble: FC<Props> = ({ message }) => {
       {/* User avatar */}
       {isUser && (
         <div
-          className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold select-none"
+          className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xl leading-none select-none"
           style={{ background: 'var(--gold)', color: 'var(--navy)' }}
           aria-hidden="true"
         >
-          U
+          🧑‍💼
         </div>
       )}
     </div>
