@@ -44,6 +44,7 @@ class Settings:
     system_prompt: str
     app_root: Path
     logo_svg: Path
+    log_db_path: Path
 
     @property
     def user_facing_error(self) -> str:
@@ -53,6 +54,7 @@ class Settings:
 def load_settings() -> Settings:
     base = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
     max_mb = int(os.environ.get("GOAT_MAX_UPLOAD_MB", "20"))
+    _default_log_db = str(APP_ROOT / "chat_logs.db")
     return Settings(
         ollama_base_url=base,
         generate_timeout=int(os.environ.get("OLLAMA_GENERATE_TIMEOUT", "120")),
@@ -63,4 +65,5 @@ def load_settings() -> Settings:
         system_prompt=_read_system_prompt(),
         app_root=APP_ROOT,
         logo_svg=APP_ROOT / "static" / "urochester_simon_business_horizontal.svg",
+        log_db_path=Path(os.environ.get("GOAT_LOG_PATH", _default_log_db)),
     )

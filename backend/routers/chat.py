@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
 from backend.config import get_settings
@@ -25,6 +25,7 @@ _SSE_HEADERS = {
 
 @router.post("/chat")
 def chat_stream(
+    request: Request,
     req: ChatRequest,
     llm: LLMClient = Depends(get_llm_client),
     settings: Settings = Depends(get_settings),
@@ -35,12 +36,15 @@ def chat_stream(
     The final event is ``data: "[DONE]"\\n\\n``.
     The client reads events with the native ``EventSource`` API or a fetch+ReadableStream.
     """
+    client_ip: str = request.client.host if request.client else "unknown"
     return StreamingResponse(
         stream_chat_sse(
             llm=llm,
             model=req.model,
             messages=req.messages,
             system_prompt=settings.system_prompt,
+            ip=client_ip,
+            log_db_path=settings.log_db_path,
         ),
         media_type="text/event-stream",
         headers=_SSE_HEADERS,

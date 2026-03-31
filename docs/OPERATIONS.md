@@ -67,6 +67,7 @@ bash deploy.sh
 | `GOAT_SYSTEM_PROMPT` | Optional system prompt override | _(built-in default)_ |
 | `GOAT_SYSTEM_PROMPT_FILE` | Path to UTF-8 file with system prompt | _(none)_ |
 | `GOAT_CORS_ORIGINS` | Comma-separated CORS allow-origins | `http://localhost:3000` |
+| `GOAT_LOG_PATH` | Path to SQLite chat log database | `<project_root>/chat_logs.db` |
 
 ---
 
@@ -114,6 +115,45 @@ data: "[ERROR] …"\n\n followed by "[DONE]" on Ollama errors
 | Tailwind CSS | 3.4 | Utility-first styling |
 | react-markdown | 9 | Markdown rendering in chat |
 | remark-gfm | 4 | GFM tables, strikethrough, task lists |
+
+---
+
+## Chat logs
+
+Every completed chat request is appended to a local SQLite database (`chat_logs.db` in the project root by default).
+
+### Schema
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | INTEGER | Auto-increment primary key |
+| `created_at` | TEXT | ISO-8601 UTC timestamp |
+| `ip` | TEXT | Client IP address |
+| `model` | TEXT | Ollama model name used |
+| `turn_count` | INTEGER | Number of messages in the request history |
+| `user_message` | TEXT | The last user message |
+| `assistant_response` | TEXT | Full assembled assistant response |
+| `response_ms` | INTEGER | Elapsed time from first token to `[DONE]` |
+
+### Querying (SSH to server)
+
+```bash
+# Most recent 20 conversations
+sqlite3 ~/GOAT_AI/chat_logs.db \
+  "SELECT created_at, ip, model, user_message FROM conversations ORDER BY id DESC LIMIT 20;"
+
+# Daily usage counts
+sqlite3 ~/GOAT_AI/chat_logs.db \
+  "SELECT date(created_at) AS day, COUNT(*) AS cnt FROM conversations GROUP BY day ORDER BY day DESC;"
+
+# Export everything to CSV
+sqlite3 -csv -header ~/GOAT_AI/chat_logs.db \
+  "SELECT * FROM conversations;" > ~/goat_logs_export.csv
+
+# Search by keyword
+sqlite3 ~/GOAT_AI/chat_logs.db \
+  "SELECT created_at, user_message FROM conversations WHERE user_message LIKE '%Porter%';"
+```
 
 ---
 
