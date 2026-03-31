@@ -67,7 +67,8 @@ class LogServiceTests(unittest.TestCase):
                 "SELECT COUNT(*) FROM conversations WHERE session_id = ?",
                 (session_id,),
             ).fetchone()[0]
-        self.assertEqual(0, count)
+        # Sidebar delete removes ``sessions`` only; per-turn audit rows stay.
+        self.assertEqual(1, count)
 
 
 if __name__ == "__main__":

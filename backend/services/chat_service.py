@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Generator
 
+import requests
+
 from backend.models.chat import ChatMessage
 from backend.services import log_service
 from goat_ai.exceptions import OllamaUnavailable
@@ -44,13 +46,77 @@ def _build_system_prompt(base_prompt: str, user_name: str) -> str:
     return f"{base_prompt}\n\nThe student's name is {user_name}. Feel free to address them by name."
 
 
-def _build_session_title(messages: list[ChatMessage]) -> str:
-    """Build a short sidebar title from the first user message."""
+def _build_session_title_fallback(messages: list[ChatMessage]) -> str:
+    """Fallback title from the first user message (no LLM)."""
     for msg in messages:
         if msg.role == "user":
             text = msg.content.strip().replace("\n", " ")
             return text[:80] if len(text) > 80 else text
     return "New Chat"
+
+
+def _ollama_generate_session_title(
+    ollama_base_url: str,
+    timeout_sec: int,
+    model: str,
+    user_text: str,
+    assistant_text: str,
+) -> str | None:
+    """Ask Ollama for a one-line summary title after the first Q&A; returns None on failure."""
+    base = ollama_base_url.rstrip("/")
+    prompt = (
+        "Write ONE short line (maximum 12 words) summarizing this exchange for a chat sidebar title. "
+        "Output only the title text, no quotes, no role labels.\n\n"
+        f"User: {user_text[:4000]}\n\nAssistant: {assistant_text[:4000]}"
+    )
+    try:
+        r = requests.post(
+            f"{base}/api/generate",
+            json={"model": model, "prompt": prompt, "stream": False},
+            timeout=float(min(max(timeout_sec, 5), 90)),
+        )
+        r.raise_for_status()
+        data = r.json()
+        text = (data.get("response") or "").strip()
+        one_line = " ".join(text.splitlines()).strip()
+        if not one_line:
+            return None
+        return one_line[:120] if len(one_line) > 120 else one_line
+    except Exception:
+        logger.exception("Ollama session title generation failed")
+        return None
+
+
+def _session_title_for_upsert(
+    *,
+    messages: list[ChatMessage],
+    assistant_text: str,
+    session_id: str | None,
+    log_db_path: Path,
+    ollama_base_url: str,
+    generate_timeout: int,
+    model: str,
+) -> str:
+    """Sidebar title: after first complete exchange, LLM summary of Q+A; else keep prior or fallback."""
+    existing = (
+        log_service.get_session(db_path=log_db_path, session_id=session_id)
+        if session_id
+        else None
+    )
+    is_first_exchange = len(messages) == 1 and messages[0].role == "user"
+    if is_first_exchange and assistant_text.strip() and ollama_base_url.strip():
+        gen = _ollama_generate_session_title(
+            ollama_base_url,
+            generate_timeout,
+            model,
+            messages[0].content,
+            assistant_text,
+        )
+        if gen:
+            return gen
+    if existing and str(existing.get("title", "")).strip():
+        return str(existing["title"])
+    return _build_session_title_fallback(messages)
 
 
 def stream_chat_sse(
@@ -64,6 +130,8 @@ def stream_chat_sse(
     user_name: str = "",
     session_id: str | None = None,
     all_messages: list[ChatMessage] | None = None,
+    ollama_base_url: str = "",
+    generate_timeout: int = 120,
 ) -> Generator[str, None, None]:
     """Yield SSE-formatted events for a chat completion.
 
@@ -103,15 +171,28 @@ def stream_chat_sse(
         )
         if session_id:
             final_messages = all_messages if all_messages is not None else messages
+            assistant_content = "".join(buf)
+            stored_messages = list(final_messages) + [
+                ChatMessage(role="assistant", content=assistant_content),
+            ]
             now_iso = datetime.now(timezone.utc).isoformat()
             existing = log_service.get_session(db_path=log_db_path, session_id=session_id)
             created_at = existing["created_at"] if existing else now_iso
+            title = _session_title_for_upsert(
+                messages=final_messages,
+                assistant_text=assistant_content,
+                session_id=session_id,
+                log_db_path=log_db_path,
+                ollama_base_url=ollama_base_url,
+                generate_timeout=generate_timeout,
+                model=model,
+            )
             log_service.upsert_session(
                 db_path=log_db_path,
                 session_id=session_id,
-                title=_build_session_title(final_messages),
+                title=title,
                 model=model,
-                messages=[{"role": m.role, "content": m.content} for m in final_messages],
+                messages=[{"role": m.role, "content": m.content} for m in stored_messages],
                 created_at=created_at,
                 updated_at=now_iso,
             )

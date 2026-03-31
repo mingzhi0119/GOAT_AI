@@ -97,4 +97,6 @@ def stream_upload_analysis_sse(
         system_prompt=settings.system_prompt,
         ip="upload",
         log_db_path=settings.log_db_path,
+        ollama_base_url=settings.ollama_base_url,
+        generate_timeout=settings.generate_timeout,
     )

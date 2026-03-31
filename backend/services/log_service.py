@@ -186,20 +186,22 @@ def get_session(*, db_path: Path, session_id: str) -> dict[str, Any] | None:
 
 
 def delete_session(*, db_path: Path, session_id: str) -> None:
-    """Delete a persisted session and related conversation rows."""
+    """Remove one sidebar session row only.
+
+    Rows in ``conversations`` (per-turn audit log) are **not** deleted so operators
+    retain Q&A history in SQLite even after a user clears sidebar history.
+    """
     try:
         with sqlite3.connect(db_path) as conn:
             conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
-            conn.execute("DELETE FROM conversations WHERE session_id = ?", (session_id,))
     except Exception:
         logger.exception("Failed to delete session %s from %s", session_id, db_path)
 
 
 def delete_all_sessions(*, db_path: Path) -> None:
-    """Remove every persisted session and conversation rows linked to a session."""
+    """Remove all rows from ``sessions`` only; ``conversations`` audit rows remain."""
     try:
         with sqlite3.connect(db_path) as conn:
-            conn.execute("DELETE FROM conversations WHERE session_id IS NOT NULL")
             conn.execute("DELETE FROM sessions")
     except Exception:
         logger.exception("Failed to delete all sessions from %s", db_path)

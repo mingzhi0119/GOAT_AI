@@ -63,6 +63,26 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
+/* ─── GPU status dot (breathing) ───────────────────────────────────────── */
+@keyframes gpu-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.92);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--gpu-dot-fill, #22c55e) 35%, transparent);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 10px 3px color-mix(in srgb, var(--gpu-dot-fill, #22c55e) 45%, transparent);
+  }
+}
+.gpu-status-breathe {
+  animation: gpu-breathe 2.4s ease-in-out infinite;
+  transform-origin: center center;
+  will-change: transform, opacity;
+}
+
 /* ─── Streaming cursor ───────────────────────────────────────────────────── */
 @keyframes blink {
   0%, 100% { opacity: 1; }

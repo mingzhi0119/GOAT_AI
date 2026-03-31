@@ -20,7 +20,7 @@ export default function App() {
   const { userName, setUserName } = useUserName()
   const history = useHistory()
   const { fileContext, setFileContext, clearFileContext } = useFileContext()
-  const gpu = useGpuStatus()
+  const gpu = useGpuStatus(chat.isStreaming)
   const [chartSpec, setChartSpec] = useState<ChartSpec | null>(null)
 
   /** Title for top bar: server session title after save, else first user line (optimistic). */

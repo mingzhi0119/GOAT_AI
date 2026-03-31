@@ -135,7 +135,7 @@ const ChatWindow: FC<Props> = ({
         className="flex-shrink-0 px-4 py-3 border-t"
         style={{ borderColor: 'var(--border-color)', background: 'var(--bg-chat)' }}
       >
-        <div className="flex items-end gap-2 max-w-4xl mx-auto">
+        <div className="flex items-center gap-2 max-w-4xl mx-auto">
           <GpuStatusDot gpuStatus={gpuStatus} gpuError={gpuError} />
           <textarea
             ref={textareaRef}

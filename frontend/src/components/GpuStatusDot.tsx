@@ -1,4 +1,4 @@
-import { useId, useState, type FC } from 'react'
+import { useId, useState, type CSSProperties, type FC } from 'react'
 import type { GPUStatus } from '../api/system'
 
 /** Map GPU utilization to traffic-light colors (green / yellow / red). */
@@ -9,19 +9,25 @@ export function utilizationTierColor(utilization: number | null, available: bool
   return '#ef4444'
 }
 
+function formatVramGb(usedMb: number | null, totalMb: number | null): string {
+  const u = (usedMb ?? 0) / 1024
+  const t = (totalMb ?? 0) / 1024
+  const fmt = (n: number) => (Number.isFinite(n) ? n.toFixed(n >= 100 ? 0 : 1) : '0')
+  return `VRAM ${fmt(u)}GB/${fmt(t)}GB`
+}
+
 function buildTooltipLines(status: GPUStatus | null, gpuError: string | null): string[] {
   if (gpuError) return [`Error: ${gpuError}`]
   if (!status) return ['GPU telemetry unavailable']
   if (!status.available) return [status.message || 'GPU telemetry unavailable']
   const u = Math.round(status.utilization_gpu ?? 0)
-  const name = status.name || 'GPU'
-  const vramUsed = Math.round(status.memory_used_mb ?? 0)
-  const vramTotal = Math.round(status.memory_total_mb ?? 0)
+  const engineState = status.active ? 'Active' : 'Idle'
   return [
-    `${name}: Active (${u}% GPU)`,
-    `Latency: live | VRAM ${vramUsed}/${vramTotal} MB`,
-    status.message ? status.message : '',
-  ].filter(Boolean)
+    `Active(${u}% GPU)`,
+    'Latency: Live',
+    formatVramGb(status.memory_used_mb, status.memory_total_mb),
+    `A100 Engine: ${engineState}`,
+  ]
 }
 
 interface Props {
@@ -45,7 +51,7 @@ const GpuStatusDot: FC<Props> = ({ gpuStatus, gpuError }) => {
         : 'GPU telemetry unavailable'
 
   return (
-    <div className="relative flex-shrink-0 self-end pb-0.5">
+    <div className="relative flex-shrink-0 self-center -translate-x-1">
       <button
         type="button"
         className="rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--bg-chat)] focus:ring-yellow-500"
@@ -57,15 +63,20 @@ const GpuStatusDot: FC<Props> = ({ gpuStatus, gpuError }) => {
         onBlur={() => setOpen(false)}
       >
         <span
-          className="block w-3 h-3 rounded-full border border-white/30 shadow-sm"
-          style={{ backgroundColor: fill }}
+          className="gpu-status-breathe block w-3 h-3 rounded-full border border-white/30 shadow-sm"
+          style={
+            {
+              backgroundColor: fill,
+              '--gpu-dot-fill': fill,
+            } as CSSProperties
+          }
         />
       </button>
       {open && (
         <div
           id={tipId}
           role="tooltip"
-          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-md text-xs max-w-[min(90vw,18rem)] whitespace-pre-line text-left z-30 pointer-events-none shadow-lg border"
+          className="absolute bottom-full left-0 mb-2 px-3 py-2 rounded-md text-xs text-left z-30 pointer-events-none shadow-lg border min-w-[17rem] whitespace-normal leading-snug"
           style={{
             background: 'var(--bg-asst-bubble)',
             borderColor: 'var(--border-color)',
@@ -73,7 +84,7 @@ const GpuStatusDot: FC<Props> = ({ gpuStatus, gpuError }) => {
           }}
         >
           {lines.map((line, i) => (
-            <p key={i} className={i > 0 ? 'mt-0.5 opacity-90' : ''}>
+            <p key={i} className={i > 0 ? 'mt-1' : ''}>
               {line}
             </p>
           ))}
