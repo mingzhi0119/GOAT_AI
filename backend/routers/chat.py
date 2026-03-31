@@ -37,6 +37,7 @@ def chat_stream(
     The client reads events with the native ``EventSource`` API or a fetch+ReadableStream.
     """
     client_ip: str = request.client.host if request.client else "unknown"
+    user_name: str = request.headers.get("x-user-name", "").strip()
     return StreamingResponse(
         stream_chat_sse(
             llm=llm,
@@ -45,6 +46,7 @@ def chat_stream(
             system_prompt=settings.system_prompt,
             ip=client_ip,
             log_db_path=settings.log_db_path,
+            user_name=user_name,
         ),
         media_type="text/event-stream",
         headers=_SSE_HEADERS,

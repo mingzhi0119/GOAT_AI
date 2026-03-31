@@ -14,10 +14,11 @@ interface Props {
   isStreaming: boolean
   selectedModel: string
   onSendMessage: (content: string) => void
+  onStop: () => void
 }
 
 /** Main chat panel: message list + auto-scroll + input area. */
-const ChatWindow: FC<Props> = ({ messages, isStreaming, selectedModel, onSendMessage }) => {
+const ChatWindow: FC<Props> = ({ messages, isStreaming, selectedModel, onSendMessage, onStop }) => {
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -140,22 +141,15 @@ const ChatWindow: FC<Props> = ({ messages, isStreaming, selectedModel, onSendMes
           />
           <button
             type="button"
-            onClick={handleSubmit}
-            disabled={!canSend}
+            onClick={isStreaming ? onStop : handleSubmit}
+            disabled={!isStreaming && !canSend}
             className="flex-shrink-0 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
             style={{
-              background: canSend ? 'var(--navy)' : 'var(--border-color)',
-              color: canSend ? '#fff' : 'var(--text-muted)',
+              background: isStreaming ? '#dc2626' : (canSend ? 'var(--navy)' : 'var(--border-color)'),
+              color: (isStreaming || canSend) ? '#fff' : 'var(--text-muted)',
             }}
           >
-            {isStreaming ? (
-              <span className="flex items-center gap-1">
-                <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ background: 'var(--gold)' }} />
-                …
-              </span>
-            ) : (
-              'Send'
-            )}
+            {isStreaming ? 'Stop' : 'Send'}
           </button>
         </div>
         <p className="text-center text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>

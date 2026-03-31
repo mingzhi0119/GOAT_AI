@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS conversations (
     turn_count         INTEGER NOT NULL,
     user_message       TEXT    NOT NULL,
     assistant_response TEXT    NOT NULL,
-    response_ms        INTEGER
+    response_ms        INTEGER,
+    user_name          TEXT    NOT NULL DEFAULT ''
 );
 """
 
@@ -33,13 +34,21 @@ CREATE TABLE IF NOT EXISTS conversations (
 def init_db(db_path: Path) -> None:
     """Create the conversations table if it does not already exist.
 
-    Called once at application startup; safe to call multiple times (idempotent).
+    Also applies incremental schema migrations (idempotent).
+    Called once at application startup; safe to call multiple times.
     """
     try:
         db_path.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(db_path) as conn:
             conn.execute("PRAGMA journal_mode=WAL;")
             conn.executescript(_DDL)
+            # Migration: add user_name column to existing databases
+            try:
+                conn.execute(
+                    "ALTER TABLE conversations ADD COLUMN user_name TEXT NOT NULL DEFAULT ''"
+                )
+            except sqlite3.OperationalError:
+                pass  # column already exists
         logger.info("Chat log DB ready: %s", db_path)
     except Exception:
         logger.exception("Failed to initialise chat log DB at %s", db_path)
@@ -54,6 +63,7 @@ def log_conversation(
     user_message: str,
     assistant_response: str,
     response_ms: int | None,
+    user_name: str = "",
 ) -> None:
     """Append one conversation record to the SQLite database.
 
@@ -66,10 +76,10 @@ def log_conversation(
             conn.execute(
                 """
                 INSERT INTO conversations
-                    (created_at, ip, model, turn_count, user_message, assistant_response, response_ms)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                    (created_at, ip, model, turn_count, user_message, assistant_response, response_ms, user_name)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (created_at, ip, model, turn_count, user_message, assistant_response, response_ms),
+                (created_at, ip, model, turn_count, user_message, assistant_response, response_ms, user_name),
             )
     except Exception:
         logger.exception("Failed to log conversation to %s", db_path)

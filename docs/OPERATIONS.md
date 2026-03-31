@@ -47,12 +47,40 @@ FastAPI auto-detects `frontend/dist/` and mounts it as a static file server (see
 ## Deploy (A100 server)
 
 ```bash
-bash deploy.sh
+bash deploy.sh              # full deploy
+QUICK=1 bash deploy.sh      # git pull + npm build + restart only
 ```
 
 - **Logs:** `fastapi.log` in the project root.
-- **PID:** `fastapi.pid`
-- **Stop:** `kill "$(cat fastapi.pid)"`
+- **PID:** `fastapi.pid` (nohup mode only)
+- **Stop (nohup):** `kill "$(cat fastapi.pid)"`
+- **Stop (systemd):** `systemctl --user stop goat-ai`
+
+---
+
+## Process supervisor (one-time setup, recommended)
+
+Sets up `systemd --user` so the server restarts automatically after crashes or reboots.
+Run these commands once on the A100 server:
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp ~/GOAT_AI/goat-ai.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable goat-ai
+systemctl --user start goat-ai
+loginctl enable-linger $USER   # keep service running when not logged in
+```
+
+After this, `bash deploy.sh` automatically uses `systemctl --user restart goat-ai` instead of nohup.
+
+Useful commands:
+
+```bash
+systemctl --user status goat-ai        # check if running
+systemctl --user restart goat-ai       # manual restart
+journalctl --user -u goat-ai -f        # live logs (alternative to tail -f fastapi.log)
+```
 
 ---
 

@@ -104,27 +104,35 @@ fi
 API_LOG="${PROJECT_DIR}/fastapi.log"
 API_PID="${PROJECT_DIR}/fastapi.pid"
 
-echo "🧹 Freeing port ${PORT_API}…"
-free_port "$PORT_API"
+if systemctl --user is-enabled goat-ai >/dev/null 2>&1; then
+  # ── systemd path (preferred after one-time setup) ────────────────────────
+  echo "🚀 Restarting FastAPI via systemd (goat-ai.service)…"
+  systemctl --user restart goat-ai
+  sleep 2
+  echo "   MainPID: $(systemctl --user show goat-ai --property=MainPID --value 2>/dev/null || echo '?')"
+else
+  # ── nohup fallback (works without systemd setup) ─────────────────────────
+  echo "🧹 Freeing port ${PORT_API}…"
+  free_port "$PORT_API"
 
-# Also stop any previous PID-file process
-if [ -f "$API_PID" ]; then
-  OLD_PID="$(cat "$API_PID" 2>/dev/null || true)"
-  if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
-    kill "$OLD_PID" 2>/dev/null || true
-    sleep 1
+  if [ -f "$API_PID" ]; then
+    OLD_PID="$(cat "$API_PID" 2>/dev/null || true)"
+    if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+      kill "$OLD_PID" 2>/dev/null || true
+      sleep 1
+    fi
+    rm -f "$API_PID"
   fi
-  rm -f "$API_PID"
-fi
 
-echo "🚀 Starting FastAPI on 0.0.0.0:${PORT_API} (log: ${API_LOG})…"
-nohup "${VENV_DIR}/bin/python" -m uvicorn server:app \
-  --host 0.0.0.0 \
-  --port "$PORT_API" \
-  --workers 2 \
-  >> "$API_LOG" 2>&1 &
-echo $! > "$API_PID"
-echo "   PID: $(cat "$API_PID")"
+  echo "🚀 Starting FastAPI on 0.0.0.0:${PORT_API} (log: ${API_LOG})…"
+  nohup "${VENV_DIR}/bin/python" -m uvicorn server:app \
+    --host 0.0.0.0 \
+    --port "$PORT_API" \
+    --workers 2 \
+    >> "$API_LOG" 2>&1 &
+  echo $! > "$API_PID"
+  echo "   PID: $(cat "$API_PID")"
+fi
 
 # ── 5. Health check — FastAPI ─────────────────────────────────────────────────
 echo "⏳ Waiting for FastAPI to come up…"

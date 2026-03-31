@@ -1,6 +1,7 @@
 import { useChat } from './hooks/useChat'
 import { useModels } from './hooks/useModels'
 import { useTheme } from './hooks/useTheme'
+import { useUserName } from './hooks/useUserName'
 import ChatWindow from './components/ChatWindow'
 import Sidebar from './components/Sidebar'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -10,6 +11,7 @@ export default function App() {
   const { theme, toggleTheme } = useTheme()
   const models = useModels()
   const chat = useChat()
+  const { userName, setUserName } = useUserName()
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -24,13 +26,16 @@ export default function App() {
         onStream={chat.streamToChat}
         theme={theme}
         onToggleTheme={toggleTheme}
+        userName={userName}
+        onUserNameChange={setUserName}
       />
       <ErrorBoundary>
         <ChatWindow
           messages={chat.messages}
           isStreaming={chat.isStreaming}
           selectedModel={models.selectedModel}
-          onSendMessage={content => void chat.sendMessage(content, models.selectedModel)}
+          onSendMessage={content => void chat.sendMessage(content, models.selectedModel, userName)}
+          onStop={chat.stopStreaming}
         />
       </ErrorBoundary>
     </div>

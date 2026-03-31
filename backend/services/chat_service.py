@@ -36,6 +36,13 @@ def _last_user_message(messages: list[ChatMessage]) -> str:
     return ""
 
 
+def _build_system_prompt(base_prompt: str, user_name: str) -> str:
+    """Append a personalisation hint to the system prompt when a name is provided."""
+    if not user_name:
+        return base_prompt
+    return f"{base_prompt}\n\nThe student's name is {user_name}. Feel free to address them by name."
+
+
 def stream_chat_sse(
     *,
     llm: LLMClient,
@@ -44,6 +51,7 @@ def stream_chat_sse(
     system_prompt: str,
     ip: str,
     log_db_path: Path,
+    user_name: str = "",
 ) -> Generator[str, None, None]:
     """Yield SSE-formatted events for a chat completion.
 
@@ -53,11 +61,12 @@ def stream_chat_sse(
     After the stream completes the full conversation is appended to the log DB.
     """
     turns = _to_chat_turns(messages)
+    effective_prompt = _build_system_prompt(system_prompt, user_name)
     buf: list[str] = []
     t_start = time.monotonic()
 
     try:
-        for token in llm.stream_tokens(model, turns, system_prompt):
+        for token in llm.stream_tokens(model, turns, effective_prompt):
             buf.append(token)
             yield sse_event(token)
     except OllamaUnavailable as exc:
@@ -77,4 +86,5 @@ def stream_chat_sse(
             user_message=_last_user_message(messages),
             assistant_response="".join(buf),
             response_ms=elapsed_ms,
+            user_name=user_name,
         )

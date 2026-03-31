@@ -13,6 +13,8 @@ interface Props {
   onStream: (gen: AsyncGenerator<string>) => Promise<void>
   theme: 'light' | 'dark'
   onToggleTheme: () => void
+  userName: string
+  onUserNameChange: (name: string) => void
 }
 
 /** Hover helper: avoids inlining repeated mouse-event handlers */
@@ -59,6 +61,8 @@ const Sidebar: FC<Props> = ({
   onStream,
   theme,
   onToggleTheme,
+  userName,
+  onUserNameChange,
 }) => {
   return (
     <aside
@@ -83,6 +87,29 @@ const Sidebar: FC<Props> = ({
 
       {/* ── Scrollable body ──────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+
+        {/* Your name (optional) */}
+        <section>
+          <p
+            className="text-xs font-semibold uppercase tracking-wider mb-2"
+            style={{ color: 'rgba(255,255,255,0.45)' }}
+          >
+            Your Name
+          </p>
+          <input
+            type="text"
+            value={userName}
+            onChange={e => onUserNameChange(e.target.value)}
+            placeholder="Optional — AI will address you"
+            maxLength={40}
+            className="w-full rounded-lg px-2.5 py-2 text-xs focus:outline-none"
+            style={{
+              background: 'rgba(255,255,255,0.1)',
+              color: 'var(--text-sidebar)',
+              border: '1px solid rgba(255,255,255,0.18)',
+            }}
+          />
+        </section>
 
         {/* Model selector */}
         <section>
