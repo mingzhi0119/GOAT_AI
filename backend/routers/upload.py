@@ -28,6 +28,7 @@ _MAX_READ_BYTES = 25 * 1024 * 1024  # hard cap before hitting service logic
 async def upload_and_analyze(
     file: UploadFile,
     model: str = Form("llama3:latest"),
+    system_instruction: str | None = Form(None),
     llm: LLMClient = Depends(get_llm_client),
     settings: Settings = Depends(get_settings),
 ) -> StreamingResponse:
@@ -44,6 +45,8 @@ async def upload_and_analyze(
 
     content = await file.read(_MAX_READ_BYTES)
 
+    extra = (system_instruction or "").strip()[:8000]
+
     return StreamingResponse(
         stream_upload_analysis_sse(
             llm=llm,
@@ -51,6 +54,7 @@ async def upload_and_analyze(
             content=content,
             filename=file.filename,
             settings=settings,
+            system_instruction=extra,
         ),
         media_type="text/event-stream",
         headers=_SSE_HEADERS,

@@ -39,11 +39,19 @@ def _last_user_message(messages: list[ChatMessage]) -> str:
     return ""
 
 
-def _build_system_prompt(base_prompt: str, user_name: str) -> str:
-    """Append a personalisation hint to the system prompt when a name is provided."""
-    if not user_name:
-        return base_prompt
-    return f"{base_prompt}\n\nThe student's name is {user_name}. Feel free to address them by name."
+def _compose_system_prompt(base_prompt: str, user_name: str, system_instruction: str) -> str:
+    """Merge base GOAT prompt, optional name, and optional user system instruction."""
+    parts: list[str] = [base_prompt]
+    if user_name.strip():
+        parts.append(
+            f"The student's name is {user_name.strip()}. Feel free to address them by name."
+        )
+    extra = system_instruction.strip()
+    if extra:
+        parts.append(
+            "Additional instructions from the user (apply consistently):\n" + extra
+        )
+    return "\n\n".join(parts)
 
 
 def _build_session_title_fallback(messages: list[ChatMessage]) -> str:
@@ -132,6 +140,7 @@ def stream_chat_sse(
     all_messages: list[ChatMessage] | None = None,
     ollama_base_url: str = "",
     generate_timeout: int = 120,
+    system_instruction: str = "",
 ) -> Generator[str, None, None]:
     """Yield SSE-formatted events for a chat completion.
 
@@ -141,7 +150,7 @@ def stream_chat_sse(
     After the stream completes the full conversation is appended to the log DB.
     """
     turns = _to_chat_turns(messages)
-    effective_prompt = _build_system_prompt(system_prompt, user_name)
+    effective_prompt = _compose_system_prompt(system_prompt, user_name, system_instruction)
     buf: list[str] = []
     t_start = time.monotonic()
 

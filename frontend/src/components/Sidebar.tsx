@@ -37,6 +37,8 @@ interface Props {
   onFileContext: (ctx: { type: 'file_context'; filename: string; prompt: string }) => void
   onChartSpec: (spec: ChartSpec) => void
   onClearFileContext: () => void
+  /** Same optional system instruction as TopBar settings; applied to upload analysis. */
+  systemInstruction: string
 }
 
 /** Hover helper: avoids inlining repeated mouse-event handlers */
@@ -82,6 +84,7 @@ const Sidebar: FC<Props> = ({
   onFileContext,
   onChartSpec,
   onClearFileContext,
+  systemInstruction,
 }) => {
   const fmtDate = (value: string) => {
     const d = new Date(value)
@@ -281,6 +284,7 @@ const Sidebar: FC<Props> = ({
           </p>
           <FileUpload
             model={selectedModel}
+            systemInstruction={systemInstruction}
             onStream={onStream}
             onFileContext={onFileContext}
             onChartSpec={event => onChartSpec(event.chart)}

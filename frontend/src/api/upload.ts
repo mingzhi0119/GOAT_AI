@@ -16,10 +16,15 @@ export type UploadStreamEvent = string | UploadFileContextEvent | UploadChartSpe
 export async function* streamUpload(
   file: File,
   model: string,
+  systemInstruction?: string,
 ): AsyncGenerator<UploadStreamEvent> {
   const form = new FormData()
   form.append('file', file)
   form.append('model', model)
+  const extra = systemInstruction?.trim()
+  if (extra) {
+    form.append('system_instruction', extra)
+  }
 
   const resp = await fetch('./api/upload', { method: 'POST', body: form })
   if (!resp.ok) throw new Error(`Upload API: HTTP ${resp.status}`)

@@ -9,6 +9,8 @@ export interface ChatRequest {
   model: string
   messages: ChatMessage[]
   session_id?: string
+  /** Optional user-defined instructions merged into the server system prompt. */
+  system_instruction?: string
 }
 
 export interface ModelsResponse {

@@ -21,7 +21,13 @@ function loadMessages(): Message[] {
 export interface UseChatReturn {
   messages: Message[]
   isStreaming: boolean
-  sendMessage: (content: string, model: string, userName?: string, fileContextPrompt?: string) => Promise<void>
+  sendMessage: (
+    content: string,
+    model: string,
+    userName?: string,
+    fileContextPrompt?: string,
+    systemInstruction?: string,
+  ) => Promise<void>
   streamToChat: (gen: AsyncGenerator<string>) => Promise<void>
   clearMessages: () => void
   stopStreaming: () => void
@@ -111,7 +117,13 @@ export function useChat(): UseChatReturn {
   )
 
   const sendMessage = useCallback(
-    async (content: string, model: string, userName?: string, fileContextPrompt?: string) => {
+    async (
+      content: string,
+      model: string,
+      userName?: string,
+      fileContextPrompt?: string,
+      systemInstruction?: string,
+    ) => {
       if (isStreaming) return
 
       const activeSessionId = sessionId ?? crypto.randomUUID()
@@ -142,7 +154,14 @@ export function useChat(): UseChatReturn {
       try {
         await _startStream(
           streamChat(
-            { model, messages: history, session_id: activeSessionId },
+            {
+              model,
+              messages: history,
+              session_id: activeSessionId,
+              ...(systemInstruction?.trim()
+                ? { system_instruction: systemInstruction.trim() }
+                : {}),
+            },
             { signal: ctrl.signal, userName },
           ),
           [...messagesRef.current, userMsg],

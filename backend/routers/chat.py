@@ -51,6 +51,7 @@ def chat_stream(
             all_messages=req.messages,
             ollama_base_url=settings.ollama_base_url,
             generate_timeout=settings.generate_timeout,
+            system_instruction=(req.system_instruction or "").strip(),
         ),
         media_type="text/event-stream",
         headers=_SSE_HEADERS,

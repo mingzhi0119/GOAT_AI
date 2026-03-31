@@ -3,13 +3,20 @@ import { streamUpload, type UploadChartSpecEvent, type UploadFileContextEvent } 
 
 interface Props {
   model: string
+  systemInstruction?: string
   onStream: (gen: AsyncGenerator<string>) => Promise<void>
   onFileContext: (ctx: UploadFileContextEvent) => void
   onChartSpec: (event: UploadChartSpecEvent) => void
 }
 
 /** Drag-and-drop / click-to-browse upload area for CSV and XLSX files. */
-const FileUpload: FC<Props> = ({ model, onStream, onFileContext, onChartSpec }) => {
+const FileUpload: FC<Props> = ({
+  model,
+  systemInstruction = '',
+  onStream,
+  onFileContext,
+  onChartSpec,
+}) => {
   const [isDragging, setIsDragging] = useState(false)
   const [status, setStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle')
   const [fileName, setFileName] = useState<string | null>(null)
@@ -22,7 +29,7 @@ const FileUpload: FC<Props> = ({ model, onStream, onFileContext, onChartSpec }) 
       setErrorMsg(null)
       setStatus('uploading')
       try {
-        const source = streamUpload(file, model)
+        const source = streamUpload(file, model, systemInstruction)
         async function* tokenOnly(): AsyncGenerator<string> {
           for await (const event of source) {
             if (typeof event === 'string') {
@@ -41,7 +48,7 @@ const FileUpload: FC<Props> = ({ model, onStream, onFileContext, onChartSpec }) 
         setStatus('error')
       }
     },
-    [model, onChartSpec, onFileContext, onStream],
+    [model, onChartSpec, onFileContext, onStream, systemInstruction],
   )
 
   const handleDrop = useCallback(

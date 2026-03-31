@@ -5,6 +5,7 @@ import { useUserName } from './hooks/useUserName'
 import { useHistory } from './hooks/useHistory'
 import { useFileContext } from './hooks/useFileContext'
 import { useGpuStatus } from './hooks/useGpuStatus'
+import { useSystemInstruction } from './hooks/useSystemInstruction'
 import type { ChartSpec } from './api/types'
 import ChatWindow from './components/ChatWindow'
 import Sidebar from './components/Sidebar'
@@ -20,6 +21,7 @@ export default function App() {
   const { userName, setUserName } = useUserName()
   const history = useHistory()
   const { fileContext, setFileContext, clearFileContext } = useFileContext()
+  const { systemInstruction, setSystemInstruction } = useSystemInstruction()
   const gpu = useGpuStatus(chat.isStreaming)
   const [chartSpec, setChartSpec] = useState<ChartSpec | null>(null)
 
@@ -82,9 +84,16 @@ export default function App() {
         onFileContext={setFileContext}
         onChartSpec={setChartSpec}
         onClearFileContext={clearFileContext}
+        systemInstruction={systemInstruction}
       />
       <div className="flex flex-col flex-1 min-w-0 min-h-0">
-        <TopBar sessionTitle={sessionTitleForTopBar} theme={theme} onToggleTheme={toggleTheme} />
+        <TopBar
+          sessionTitle={sessionTitleForTopBar}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          systemInstruction={systemInstruction}
+          onSystemInstructionChange={setSystemInstruction}
+        />
         <ErrorBoundary>
           <ChatWindow
             messages={chat.messages}
@@ -93,7 +102,13 @@ export default function App() {
             selectedModel={models.selectedModel}
             onSendMessage={content => {
               void chat
-                .sendMessage(content, models.selectedModel, userName, fileContext?.prompt)
+                .sendMessage(
+                  content,
+                  models.selectedModel,
+                  userName,
+                  fileContext?.prompt,
+                  systemInstruction,
+                )
                 .then(() => history.refresh())
             }}
             onStop={chat.stopStreaming}

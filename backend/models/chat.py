@@ -17,6 +17,11 @@ class ChatRequest(BaseModel):
     model: str = Field("llama3:latest", min_length=1)
     messages: list[ChatMessage] = Field(..., min_length=1)
     session_id: str | None = None
+    system_instruction: str | None = Field(
+        default=None,
+        max_length=8000,
+        description="Optional user instructions merged after the base system prompt.",
+    )
 
 
 class ModelsResponse(BaseModel):

@@ -5,10 +5,21 @@ interface Props {
   sessionTitle: string | null
   theme: 'light' | 'dark'
   onToggleTheme: () => void
+  /** Optional text merged into the server system prompt (persisted in localStorage by caller). */
+  systemInstruction: string
+  onSystemInstructionChange: (value: string) => void
 }
 
 /** Header for the chat column only (not above sidebar): session title + settings. Uses chat surface colors for light/dark contrast. */
-const TopBar: FC<Props> = ({ sessionTitle, theme, onToggleTheme }) => {
+const MAX_INSTRUCTION_LEN = 8000
+
+const TopBar: FC<Props> = ({
+  sessionTitle,
+  theme,
+  onToggleTheme,
+  systemInstruction,
+  onSystemInstructionChange,
+}) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
 
@@ -58,17 +69,44 @@ const TopBar: FC<Props> = ({ sessionTitle, theme, onToggleTheme }) => {
           </button>
           {menuOpen && (
             <div
-              className="absolute right-0 mt-1 py-1 rounded-lg shadow-lg min-w-[10rem] border text-sm z-50"
+              className="absolute right-0 mt-1 py-2 rounded-lg shadow-lg w-[min(90vw,20rem)] border text-sm z-50"
               style={{
                 background: 'var(--bg-asst-bubble)',
                 borderColor: 'var(--border-color)',
                 color: 'var(--text-main)',
               }}
               role="menu"
+              onClick={e => e.stopPropagation()}
             >
+              <div className="px-3 pb-2 border-b" style={{ borderColor: 'var(--border-color)' }}>
+                <label
+                  htmlFor="goat-system-instruction"
+                  className="block text-xs font-medium mb-1"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  System instruction
+                </label>
+                <textarea
+                  id="goat-system-instruction"
+                  rows={4}
+                  maxLength={MAX_INSTRUCTION_LEN}
+                  value={systemInstruction}
+                  onChange={e => onSystemInstructionChange(e.target.value)}
+                  placeholder="Optional: tone, format, or constraints for the model…"
+                  className="w-full rounded-md px-2 py-1.5 text-xs resize-y min-h-[4.5rem] focus:outline-none focus:ring-2 focus:ring-navy/40"
+                  style={{
+                    background: 'var(--input-bg)',
+                    border: '1px solid var(--input-border)',
+                    color: 'var(--text-main)',
+                  }}
+                />
+                <p className="text-[10px] mt-1 text-right" style={{ color: 'var(--text-muted)' }}>
+                  {systemInstruction.length}/{MAX_INSTRUCTION_LEN}
+                </p>
+              </div>
               <button
                 type="button"
-                className="w-full text-left px-3 py-2 hover:opacity-90 flex items-center gap-2"
+                className="w-full text-left px-3 py-2 mt-1 hover:opacity-90 flex items-center gap-2"
                 style={{ background: 'transparent' }}
                 role="menuitem"
                 onClick={() => {
