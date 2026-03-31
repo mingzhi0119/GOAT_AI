@@ -141,6 +141,7 @@ def stream_chat_sse(
     ollama_base_url: str = "",
     generate_timeout: int = 120,
     system_instruction: str = "",
+    ollama_options: dict[str, float | int] | None = None,
 ) -> Generator[str, None, None]:
     """Yield SSE-formatted events for a chat completion.
 
@@ -155,7 +156,9 @@ def stream_chat_sse(
     t_start = time.monotonic()
 
     try:
-        for token in llm.stream_tokens(model, turns, effective_prompt):
+        for token in llm.stream_tokens(
+            model, turns, effective_prompt, ollama_options=ollama_options
+        ):
             buf.append(token)
             yield sse_event(token)
     except OllamaUnavailable as exc:

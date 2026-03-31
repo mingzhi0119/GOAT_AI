@@ -11,7 +11,7 @@ from goat_ai.config import Settings
 
 
 class _FakeLLMClient:
-    def stream_tokens(self, model, messages, system_prompt):
+    def stream_tokens(self, model, messages, system_prompt, *, ollama_options=None):
         yield "token-A"
         yield "token-B"
 

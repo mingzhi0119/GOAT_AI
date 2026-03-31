@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 
 from backend.config import get_settings
 from backend.dependencies import get_llm_client
+from backend.routers.chat_options import build_ollama_options
 from backend.services.upload_service import stream_upload_analysis_sse
 from goat_ai.config import Settings
 from goat_ai.ollama_client import LLMClient
@@ -29,6 +30,9 @@ async def upload_and_analyze(
     file: UploadFile,
     model: str = Form("llama3:latest"),
     system_instruction: str | None = Form(None),
+    temperature: float | None = Form(None),
+    max_tokens: int | None = Form(None),
+    top_p: float | None = Form(None),
     llm: LLMClient = Depends(get_llm_client),
     settings: Settings = Depends(get_settings),
 ) -> StreamingResponse:
@@ -46,6 +50,11 @@ async def upload_and_analyze(
     content = await file.read(_MAX_READ_BYTES)
 
     extra = (system_instruction or "").strip()[:8000]
+    o_opts = build_ollama_options(
+        temperature=temperature,
+        max_tokens=max_tokens,
+        top_p=top_p,
+    )
 
     return StreamingResponse(
         stream_upload_analysis_sse(
@@ -55,6 +64,7 @@ async def upload_and_analyze(
             filename=file.filename,
             settings=settings,
             system_instruction=extra,
+            ollama_options=o_opts,
         ),
         media_type="text/event-stream",
         headers=_SSE_HEADERS,

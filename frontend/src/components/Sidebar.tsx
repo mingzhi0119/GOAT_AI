@@ -4,6 +4,7 @@ import GoatIcon from './GoatIcon'
 import type { HistorySessionItem } from '../api/history'
 import type { ChartSpec } from '../api/types'
 import type { FileContext } from '../hooks/useFileContext'
+import type { OllamaOptionsPayload } from '../api/types'
 import {
   sidebarErrorTextClass,
   sidebarFileChipNameClass,
@@ -39,6 +40,7 @@ interface Props {
   onClearFileContext: () => void
   /** Same optional system instruction as TopBar settings; applied to upload analysis. */
   systemInstruction: string
+  getOllamaOptions: () => OllamaOptionsPayload
 }
 
 /** Hover helper: avoids inlining repeated mouse-event handlers */
@@ -85,6 +87,7 @@ const Sidebar: FC<Props> = ({
   onChartSpec,
   onClearFileContext,
   systemInstruction,
+  getOllamaOptions,
 }) => {
   const fmtDate = (value: string) => {
     const d = new Date(value)
@@ -285,6 +288,7 @@ const Sidebar: FC<Props> = ({
           <FileUpload
             model={selectedModel}
             systemInstruction={systemInstruction}
+            getOllamaOptions={getOllamaOptions}
             onStream={onStream}
             onFileContext={onFileContext}
             onChartSpec={event => onChartSpec(event.chart)}

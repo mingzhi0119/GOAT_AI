@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { streamChat } from '../api/chat'
-import type { ChatMessage, Message } from '../api/types'
+import type { ChatMessage, Message, OllamaOptionsPayload } from '../api/types'
 
 const MESSAGES_KEY = 'goat-ai-messages'
 const SESSION_KEY = 'goat-ai-session-id'
@@ -27,6 +27,7 @@ export interface UseChatReturn {
     userName?: string,
     fileContextPrompt?: string,
     systemInstruction?: string,
+    ollamaOptions?: OllamaOptionsPayload,
   ) => Promise<void>
   streamToChat: (gen: AsyncGenerator<string>) => Promise<void>
   clearMessages: () => void
@@ -123,6 +124,7 @@ export function useChat(): UseChatReturn {
       userName?: string,
       fileContextPrompt?: string,
       systemInstruction?: string,
+      ollamaOptions?: OllamaOptionsPayload,
     ) => {
       if (isStreaming) return
 
@@ -160,6 +162,13 @@ export function useChat(): UseChatReturn {
               session_id: activeSessionId,
               ...(systemInstruction?.trim()
                 ? { system_instruction: systemInstruction.trim() }
+                : {}),
+              ...(ollamaOptions
+                ? {
+                    temperature: ollamaOptions.temperature,
+                    max_tokens: ollamaOptions.max_tokens,
+                    top_p: ollamaOptions.top_p,
+                  }
                 : {}),
             },
             { signal: ctrl.signal, userName },

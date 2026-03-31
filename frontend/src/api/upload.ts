@@ -1,4 +1,6 @@
 /** Stream CSV/XLSX upload analysis as tokens via Server-Sent Events. */
+import type { OllamaOptionsPayload } from './types'
+
 export interface UploadFileContextEvent {
   type: 'file_context'
   filename: string
@@ -17,6 +19,7 @@ export async function* streamUpload(
   file: File,
   model: string,
   systemInstruction?: string,
+  ollamaOptions?: OllamaOptionsPayload,
 ): AsyncGenerator<UploadStreamEvent> {
   const form = new FormData()
   form.append('file', file)
@@ -24,6 +27,11 @@ export async function* streamUpload(
   const extra = systemInstruction?.trim()
   if (extra) {
     form.append('system_instruction', extra)
+  }
+  if (ollamaOptions) {
+    form.append('temperature', String(ollamaOptions.temperature))
+    form.append('max_tokens', String(ollamaOptions.max_tokens))
+    form.append('top_p', String(ollamaOptions.top_p))
   }
 
   const resp = await fetch('./api/upload', { method: 'POST', body: form })

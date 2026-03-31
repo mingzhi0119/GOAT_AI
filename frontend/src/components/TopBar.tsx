@@ -8,6 +8,15 @@ interface Props {
   /** Optional text merged into the server system prompt (persisted in localStorage by caller). */
   systemInstruction: string
   onSystemInstructionChange: (value: string) => void
+  onExportMarkdown: () => void
+  advancedOpen: boolean
+  onAdvancedOpenChange: (open: boolean) => void
+  temperature: number
+  onTemperatureChange: (v: number) => void
+  maxTokens: number
+  onMaxTokensChange: (v: number) => void
+  topP: number
+  onTopPChange: (v: number) => void
 }
 
 /** Header for the chat column only (not above sidebar): session title + settings. Uses chat surface colors for light/dark contrast. */
@@ -19,6 +28,15 @@ const TopBar: FC<Props> = ({
   onToggleTheme,
   systemInstruction,
   onSystemInstructionChange,
+  onExportMarkdown,
+  advancedOpen,
+  onAdvancedOpenChange,
+  temperature,
+  onTemperatureChange,
+  maxTokens,
+  onMaxTokensChange,
+  topP,
+  onTopPChange,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -30,6 +48,9 @@ const TopBar: FC<Props> = ({
     document.addEventListener('click', close)
     return () => document.removeEventListener('click', close)
   }, [])
+
+  const inputCls =
+    'w-full rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-navy/40'
 
   return (
     <header
@@ -69,7 +90,7 @@ const TopBar: FC<Props> = ({
           </button>
           {menuOpen && (
             <div
-              className="absolute right-0 mt-1 py-2 rounded-lg shadow-lg w-[min(90vw,20rem)] border text-sm z-50"
+              className="absolute right-0 mt-1 py-2 rounded-lg shadow-lg w-[min(92vw,21rem)] max-h-[min(85vh,32rem)] overflow-y-auto border text-sm z-50"
               style={{
                 background: 'var(--bg-asst-bubble)',
                 borderColor: 'var(--border-color)',
@@ -78,14 +99,34 @@ const TopBar: FC<Props> = ({
               role="menu"
               onClick={e => e.stopPropagation()}
             >
-              <div className="px-3 pb-2 border-b" style={{ borderColor: 'var(--border-color)' }}>
-                <label
-                  htmlFor="goat-system-instruction"
-                  className="block text-xs font-medium mb-1"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  System instruction
-                </label>
+              <p
+                className="px-3 pb-2 text-[11px] leading-snug border-b"
+                style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
+              >
+                Enter sends the message. Shift+Enter inserts a new line.
+              </p>
+
+              <div className="px-3 pt-2 pb-2 border-b" style={{ borderColor: 'var(--border-color)' }}>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <label
+                    htmlFor="goat-system-instruction"
+                    className="block text-xs font-medium"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    System instruction
+                  </label>
+                  <button
+                    type="button"
+                    className="text-[10px] px-1.5 py-0.5 rounded border"
+                    style={{
+                      borderColor: 'var(--border-color)',
+                      color: 'var(--text-muted)',
+                    }}
+                    onClick={() => onSystemInstructionChange('')}
+                  >
+                    Clear
+                  </button>
+                </div>
                 <textarea
                   id="goat-system-instruction"
                   rows={4}
@@ -93,7 +134,7 @@ const TopBar: FC<Props> = ({
                   value={systemInstruction}
                   onChange={e => onSystemInstructionChange(e.target.value)}
                   placeholder="Optional: tone, format, or constraints for the model…"
-                  className="w-full rounded-md px-2 py-1.5 text-xs resize-y min-h-[4.5rem] focus:outline-none focus:ring-2 focus:ring-navy/40"
+                  className={`${inputCls} resize-y min-h-[4.5rem]`}
                   style={{
                     background: 'var(--input-bg)',
                     border: '1px solid var(--input-border)',
@@ -104,6 +145,106 @@ const TopBar: FC<Props> = ({
                   {systemInstruction.length}/{MAX_INSTRUCTION_LEN}
                 </p>
               </div>
+
+              <div className="px-3 py-1 border-b" style={{ borderColor: 'var(--border-color)' }}>
+                <button
+                  type="button"
+                  className="w-full text-left px-2 py-2 rounded-md text-xs hover:opacity-90"
+                  style={{ background: 'var(--input-bg)', color: 'var(--text-main)' }}
+                  onClick={() => {
+                    onExportMarkdown()
+                    setMenuOpen(false)
+                  }}
+                >
+                  Export conversation as Markdown
+                </button>
+              </div>
+
+              <div className="px-3 pt-2 pb-1 border-b" style={{ borderColor: 'var(--border-color)' }}>
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between text-left text-xs font-medium py-1"
+                  style={{ color: 'var(--text-main)' }}
+                  aria-expanded={advancedOpen}
+                  onClick={() => onAdvancedOpenChange(!advancedOpen)}
+                >
+                  <span>Advanced settings</span>
+                  <span className="text-[10px]" aria-hidden="true">
+                    {advancedOpen ? '▼' : '▶'}
+                  </span>
+                </button>
+                {advancedOpen && (
+                  <div className="space-y-2 pt-1 pb-2">
+                    <div>
+                      <label className="block text-[10px] mb-0.5" style={{ color: 'var(--text-muted)' }}>
+                        Temperature
+                      </label>
+                      <input
+                        type="number"
+                        step={0.05}
+                        min={0}
+                        max={2}
+                        value={temperature}
+                        onChange={e => {
+                          const v = parseFloat(e.target.value)
+                          if (!Number.isNaN(v)) onTemperatureChange(Math.min(2, Math.max(0, v)))
+                        }}
+                        className={inputCls}
+                        style={{
+                          background: 'var(--input-bg)',
+                          border: '1px solid var(--input-border)',
+                          color: 'var(--text-main)',
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] mb-0.5" style={{ color: 'var(--text-muted)' }}>
+                        Max tokens
+                      </label>
+                      <input
+                        type="number"
+                        step={1}
+                        min={1}
+                        max={131072}
+                        value={maxTokens}
+                        onChange={e => {
+                          const v = parseInt(e.target.value, 10)
+                          if (!Number.isNaN(v)) onMaxTokensChange(Math.min(131072, Math.max(1, v)))
+                        }}
+                        className={inputCls}
+                        style={{
+                          background: 'var(--input-bg)',
+                          border: '1px solid var(--input-border)',
+                          color: 'var(--text-main)',
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] mb-0.5" style={{ color: 'var(--text-muted)' }}>
+                        Top P
+                      </label>
+                      <input
+                        type="number"
+                        step={0.05}
+                        min={0}
+                        max={1}
+                        value={topP}
+                        onChange={e => {
+                          const v = parseFloat(e.target.value)
+                          if (!Number.isNaN(v)) onTopPChange(Math.min(1, Math.max(0, v)))
+                        }}
+                        className={inputCls}
+                        style={{
+                          background: 'var(--input-bg)',
+                          border: '1px solid var(--input-border)',
+                          color: 'var(--text-main)',
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <button
                 type="button"
                 className="w-full text-left px-3 py-2 mt-1 hover:opacity-90 flex items-center gap-2"

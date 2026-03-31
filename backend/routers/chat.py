@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from backend.config import get_settings
 from backend.dependencies import get_llm_client
 from backend.models.chat import ChatRequest
+from backend.routers.chat_options import ollama_options_from_chat_request
 from backend.services.chat_service import stream_chat_sse
 from goat_ai.config import Settings
 from goat_ai.ollama_client import LLMClient
@@ -38,6 +39,7 @@ def chat_stream(
     """
     client_ip: str = request.client.host if request.client else "unknown"
     user_name: str = request.headers.get("x-user-name", "").strip()
+    o_opts = ollama_options_from_chat_request(req)
     return StreamingResponse(
         stream_chat_sse(
             llm=llm,
@@ -52,6 +54,7 @@ def chat_stream(
             ollama_base_url=settings.ollama_base_url,
             generate_timeout=settings.generate_timeout,
             system_instruction=(req.system_instruction or "").strip(),
+            ollama_options=o_opts,
         ),
         media_type="text/event-stream",
         headers=_SSE_HEADERS,

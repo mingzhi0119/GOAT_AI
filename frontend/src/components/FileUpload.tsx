@@ -1,9 +1,15 @@
 import { useCallback, useRef, useState, type DragEvent, type FC } from 'react'
-import { streamUpload, type UploadChartSpecEvent, type UploadFileContextEvent } from '../api/upload'
+import {
+  streamUpload,
+  type UploadChartSpecEvent,
+  type UploadFileContextEvent,
+} from '../api/upload'
+import type { OllamaOptionsPayload } from '../api/types'
 
 interface Props {
   model: string
   systemInstruction?: string
+  getOllamaOptions: () => OllamaOptionsPayload
   onStream: (gen: AsyncGenerator<string>) => Promise<void>
   onFileContext: (ctx: UploadFileContextEvent) => void
   onChartSpec: (event: UploadChartSpecEvent) => void
@@ -13,6 +19,7 @@ interface Props {
 const FileUpload: FC<Props> = ({
   model,
   systemInstruction = '',
+  getOllamaOptions,
   onStream,
   onFileContext,
   onChartSpec,
@@ -29,7 +36,7 @@ const FileUpload: FC<Props> = ({
       setErrorMsg(null)
       setStatus('uploading')
       try {
-        const source = streamUpload(file, model, systemInstruction)
+        const source = streamUpload(file, model, systemInstruction, getOllamaOptions())
         async function* tokenOnly(): AsyncGenerator<string> {
           for await (const event of source) {
             if (typeof event === 'string') {
@@ -48,7 +55,7 @@ const FileUpload: FC<Props> = ({
         setStatus('error')
       }
     },
-    [model, onChartSpec, onFileContext, onStream, systemInstruction],
+    [model, onChartSpec, onFileContext, onStream, systemInstruction, getOllamaOptions],
   )
 
   const handleDrop = useCallback(

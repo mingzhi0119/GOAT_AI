@@ -22,6 +22,24 @@ class ChatRequest(BaseModel):
         max_length=8000,
         description="Optional user instructions merged after the base system prompt.",
     )
+    temperature: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=2.0,
+        description="Ollama sampling temperature (optional).",
+    )
+    max_tokens: int | None = Field(
+        default=None,
+        ge=1,
+        le=131072,
+        description="Max tokens to generate (Ollama num_predict).",
+    )
+    top_p: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Ollama top_p nucleus sampling.",
+    )
 
 
 class ModelsResponse(BaseModel):

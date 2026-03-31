@@ -6,6 +6,8 @@ import { useHistory } from './hooks/useHistory'
 import { useFileContext } from './hooks/useFileContext'
 import { useGpuStatus } from './hooks/useGpuStatus'
 import { useSystemInstruction } from './hooks/useSystemInstruction'
+import { useAdvancedSettings } from './hooks/useAdvancedSettings'
+import { downloadChatAsMarkdown } from './utils/exportChatMarkdown'
 import type { ChartSpec } from './api/types'
 import ChatWindow from './components/ChatWindow'
 import Sidebar from './components/Sidebar'
@@ -22,6 +24,7 @@ export default function App() {
   const history = useHistory()
   const { fileContext, setFileContext, clearFileContext } = useFileContext()
   const { systemInstruction, setSystemInstruction } = useSystemInstruction()
+  const advanced = useAdvancedSettings()
   const gpu = useGpuStatus(chat.isStreaming)
   const [chartSpec, setChartSpec] = useState<ChartSpec | null>(null)
 
@@ -85,6 +88,7 @@ export default function App() {
         onChartSpec={setChartSpec}
         onClearFileContext={clearFileContext}
         systemInstruction={systemInstruction}
+        getOllamaOptions={advanced.getOptionsForRequest}
       />
       <div className="flex flex-col flex-1 min-w-0 min-h-0">
         <TopBar
@@ -93,6 +97,17 @@ export default function App() {
           onToggleTheme={toggleTheme}
           systemInstruction={systemInstruction}
           onSystemInstructionChange={setSystemInstruction}
+          onExportMarkdown={() =>
+            downloadChatAsMarkdown(chat.messages, sessionTitleForTopBar)
+          }
+          advancedOpen={advanced.advancedOpen}
+          onAdvancedOpenChange={advanced.setAdvancedOpen}
+          temperature={advanced.temperature}
+          onTemperatureChange={advanced.setTemperature}
+          maxTokens={advanced.maxTokens}
+          onMaxTokensChange={advanced.setMaxTokens}
+          topP={advanced.topP}
+          onTopPChange={advanced.setTopP}
         />
         <ErrorBoundary>
           <ChatWindow
@@ -108,6 +123,7 @@ export default function App() {
                   userName,
                   fileContext?.prompt,
                   systemInstruction,
+                  advanced.getOptionsForRequest(),
                 )
                 .then(() => history.refresh())
             }}

@@ -11,10 +11,21 @@ export interface ChatRequest {
   session_id?: string
   /** Optional user-defined instructions merged into the server system prompt. */
   system_instruction?: string
+  /** Ollama sampling options (optional; sent when set from Advanced settings). */
+  temperature?: number
+  max_tokens?: number
+  top_p?: number
 }
 
 export interface ModelsResponse {
   models: string[]
+}
+
+/** Ollama sampling options (Advanced settings); maps to backend ChatRequest fields. */
+export interface OllamaOptionsPayload {
+  temperature: number
+  max_tokens: number
+  top_p: number
 }
 
 export interface ChartSeries {

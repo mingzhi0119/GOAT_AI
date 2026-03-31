@@ -69,6 +69,7 @@ def stream_upload_analysis_sse(
     filename: str,
     settings: Settings,
     system_instruction: str = "",
+    ollama_options: dict[str, float | int] | None = None,
 ) -> Generator[str, None, None]:
     """Parse the uploaded file then stream an LLM analysis as SSE events.
 
@@ -101,4 +102,5 @@ def stream_upload_analysis_sse(
         ollama_base_url=settings.ollama_base_url,
         generate_timeout=settings.generate_timeout,
         system_instruction=system_instruction.strip(),
+        ollama_options=ollama_options,
     )

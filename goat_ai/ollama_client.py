@@ -37,6 +37,8 @@ class LLMClient(Protocol):
         model: str,
         messages: list[ChatTurn],
         system_prompt: str,
+        *,
+        ollama_options: dict[str, float | int] | None = None,
     ) -> Generator[str, None, None]: ...
 
 
@@ -59,13 +61,24 @@ class OllamaService:
 
     # ── SSE / generator streaming (FastAPI) ───────────────────────────────────
     def yield_chat_tokens(
-        self, model: str, api_messages: list[dict[str, str]]
+        self,
+        model: str,
+        api_messages: list[dict[str, str]],
+        *,
+        ollama_options: dict[str, float | int] | None = None,
     ) -> Generator[str, None, None]:
         """Yield raw token strings from /api/chat (for SSE)."""
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": api_messages,
+            "stream": True,
+        }
+        if ollama_options:
+            payload["options"] = ollama_options
         try:
             res = requests.post(
                 f"{self._s.ollama_base_url}/api/chat",
-                json={"model": model, "messages": api_messages, "stream": True},
+                json=payload,
                 stream=True,
                 timeout=self._s.generate_timeout,
             )
@@ -80,13 +93,20 @@ class OllamaService:
                     yield token
 
     def yield_generate_tokens(
-        self, model: str, prompt: str
+        self,
+        model: str,
+        prompt: str,
+        *,
+        ollama_options: dict[str, float | int] | None = None,
     ) -> Generator[str, None, None]:
         """Yield raw token strings from /api/generate (for SSE)."""
+        payload: dict[str, Any] = {"model": model, "prompt": prompt, "stream": True}
+        if ollama_options:
+            payload["options"] = ollama_options
         try:
             res = requests.post(
                 f"{self._s.ollama_base_url}/api/generate",
-                json={"model": model, "prompt": prompt, "stream": True},
+                json=payload,
                 stream=True,
                 timeout=self._s.generate_timeout,
             )
@@ -105,15 +125,21 @@ class OllamaService:
         model: str,
         messages: list[ChatTurn],
         system_prompt: str,
+        *,
+        ollama_options: dict[str, float | int] | None = None,
     ) -> Generator[str, None, None]:
         """Unified token stream for the FastAPI layer (satisfies LLMClient Protocol)."""
         if self._s.use_chat_api:
             api_messages = messages_for_ollama(messages, system_prompt)
-            yield from self.yield_chat_tokens(model, api_messages)
+            yield from self.yield_chat_tokens(
+                model, api_messages, ollama_options=ollama_options
+            )
         else:
             transcript = conversation_transcript(messages)
             prompt = f"{system_prompt}\n\n{transcript}"
-            yield from self.yield_generate_tokens(model, prompt)
+            yield from self.yield_generate_tokens(
+                model, prompt, ollama_options=ollama_options
+            )
 
     # ── Streamlit placeholder streaming (kept for backward compat) ────────────
     def stream_chat(
@@ -123,7 +149,7 @@ class OllamaService:
         placeholder: _StreamPlaceholder,
     ) -> str:
         full_response = ""
-        for token in self.yield_chat_tokens(model, api_messages):
+        for token in self.yield_chat_tokens(model, api_messages, ollama_options=None):
             full_response += token
             placeholder.markdown(full_response + "▌")
         placeholder.markdown(full_response)
@@ -133,7 +159,7 @@ class OllamaService:
         self, model: str, prompt: str, placeholder: _StreamPlaceholder
     ) -> str:
         full_response = ""
-        for token in self.yield_generate_tokens(model, prompt):
+        for token in self.yield_generate_tokens(model, prompt, ollama_options=None):
             full_response += token
             placeholder.markdown(full_response + "▌")
         placeholder.markdown(full_response)
