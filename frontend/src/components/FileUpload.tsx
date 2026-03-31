@@ -1,13 +1,14 @@
 import { useCallback, useRef, useState, type DragEvent, type FC } from 'react'
-import { streamUpload } from '../api/upload'
+import { streamUpload, type UploadFileContextEvent } from '../api/upload'
 
 interface Props {
   model: string
   onStream: (gen: AsyncGenerator<string>) => Promise<void>
+  onFileContext: (ctx: UploadFileContextEvent) => void
 }
 
 /** Drag-and-drop / click-to-browse upload area for CSV and XLSX files. */
-const FileUpload: FC<Props> = ({ model, onStream }) => {
+const FileUpload: FC<Props> = ({ model, onStream, onFileContext }) => {
   const [isDragging, setIsDragging] = useState(false)
   const [status, setStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle')
   const [fileName, setFileName] = useState<string | null>(null)
@@ -20,14 +21,24 @@ const FileUpload: FC<Props> = ({ model, onStream }) => {
       setErrorMsg(null)
       setStatus('uploading')
       try {
-        await onStream(streamUpload(file, model))
+        const source = streamUpload(file, model)
+        async function* tokenOnly(): AsyncGenerator<string> {
+          for await (const event of source) {
+            if (typeof event === 'string') {
+              yield event
+            } else if (event.type === 'file_context') {
+              onFileContext(event)
+            }
+          }
+        }
+        await onStream(tokenOnly())
         setStatus('done')
       } catch (err) {
         setErrorMsg(err instanceof Error ? err.message : 'Upload failed')
         setStatus('error')
       }
     },
-    [model, onStream],
+    [model, onFileContext, onStream],
   )
 
   const handleDrop = useCallback(

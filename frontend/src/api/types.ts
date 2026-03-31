@@ -8,6 +8,7 @@ export interface ChatMessage {
 export interface ChatRequest {
   model: string
   messages: ChatMessage[]
+  session_id?: string
 }
 
 export interface ModelsResponse {

@@ -2,6 +2,8 @@ import { useChat } from './hooks/useChat'
 import { useModels } from './hooks/useModels'
 import { useTheme } from './hooks/useTheme'
 import { useUserName } from './hooks/useUserName'
+import { useHistory } from './hooks/useHistory'
+import { useFileContext } from './hooks/useFileContext'
 import ChatWindow from './components/ChatWindow'
 import Sidebar from './components/Sidebar'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -12,6 +14,8 @@ export default function App() {
   const models = useModels()
   const chat = useChat()
   const { userName, setUserName } = useUserName()
+  const history = useHistory()
+  const { fileContext, setFileContext, clearFileContext } = useFileContext()
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -28,13 +32,32 @@ export default function App() {
         onToggleTheme={toggleTheme}
         userName={userName}
         onUserNameChange={setUserName}
+        historySessions={history.sessions}
+        isLoadingHistory={history.isLoading}
+        historyError={history.error}
+        onRefreshHistory={() => void history.refresh()}
+        onLoadHistorySession={sessionId => {
+          void history.loadSession(sessionId).then(session => {
+            chat.loadSession(session.id, session.messages)
+          })
+        }}
+        onDeleteHistorySession={sessionId => {
+          void history.deleteSession(sessionId)
+        }}
+        fileContext={fileContext}
+        onFileContext={setFileContext}
+        onClearFileContext={clearFileContext}
       />
       <ErrorBoundary>
         <ChatWindow
           messages={chat.messages}
           isStreaming={chat.isStreaming}
           selectedModel={models.selectedModel}
-          onSendMessage={content => void chat.sendMessage(content, models.selectedModel, userName)}
+          onSendMessage={content => {
+            void chat
+              .sendMessage(content, models.selectedModel, userName, fileContext?.prompt)
+              .then(() => history.refresh())
+          }}
           onStop={chat.stopStreaming}
         />
       </ErrorBoundary>

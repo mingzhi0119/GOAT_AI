@@ -16,6 +16,7 @@ class ChatRequest(BaseModel):
 
     model: str = Field("llama3:latest", min_length=1)
     messages: list[ChatMessage] = Field(..., min_length=1)
+    session_id: str | None = None
 
 
 class ModelsResponse(BaseModel):

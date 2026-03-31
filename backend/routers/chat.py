@@ -47,6 +47,8 @@ def chat_stream(
             ip=client_ip,
             log_db_path=settings.log_db_path,
             user_name=user_name,
+            session_id=req.session_id,
+            all_messages=req.messages,
         ),
         media_type="text/event-stream",
         headers=_SSE_HEADERS,

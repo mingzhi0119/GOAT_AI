@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from backend.config import CORS_ORIGINS, get_settings
-from backend.routers import chat, models, upload
+from backend.routers import chat, history, models, upload
 from backend.services import log_service
 from goat_ai.logging_config import configure_logging
 
@@ -50,6 +50,7 @@ def create_app() -> FastAPI:
     app.include_router(models.router, prefix="/api", tags=["models"])
     app.include_router(chat.router,   prefix="/api", tags=["chat"])
     app.include_router(upload.router, prefix="/api", tags=["upload"])
+    app.include_router(history.router, prefix="/api", tags=["history"])
 
     # ── Health probe (quick liveness check, no deps) ──────────────────────────
     @app.get("/api/health", tags=["system"])

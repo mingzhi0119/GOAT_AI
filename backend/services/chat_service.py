@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Generator
 
@@ -43,6 +44,15 @@ def _build_system_prompt(base_prompt: str, user_name: str) -> str:
     return f"{base_prompt}\n\nThe student's name is {user_name}. Feel free to address them by name."
 
 
+def _build_session_title(messages: list[ChatMessage]) -> str:
+    """Build a short sidebar title from the first user message."""
+    for msg in messages:
+        if msg.role == "user":
+            text = msg.content.strip().replace("\n", " ")
+            return text[:80] if len(text) > 80 else text
+    return "New Chat"
+
+
 def stream_chat_sse(
     *,
     llm: LLMClient,
@@ -52,6 +62,8 @@ def stream_chat_sse(
     ip: str,
     log_db_path: Path,
     user_name: str = "",
+    session_id: str | None = None,
+    all_messages: list[ChatMessage] | None = None,
 ) -> Generator[str, None, None]:
     """Yield SSE-formatted events for a chat completion.
 
@@ -87,4 +99,19 @@ def stream_chat_sse(
             assistant_response="".join(buf),
             response_ms=elapsed_ms,
             user_name=user_name,
+            session_id=session_id,
         )
+        if session_id:
+            final_messages = all_messages if all_messages is not None else messages
+            now_iso = datetime.now(timezone.utc).isoformat()
+            existing = log_service.get_session(db_path=log_db_path, session_id=session_id)
+            created_at = existing["created_at"] if existing else now_iso
+            log_service.upsert_session(
+                db_path=log_db_path,
+                session_id=session_id,
+                title=_build_session_title(final_messages),
+                model=model,
+                messages=[{"role": m.role, "content": m.content} for m in final_messages],
+                created_at=created_at,
+                updated_at=now_iso,
+            )

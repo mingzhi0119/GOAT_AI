@@ -3,6 +3,7 @@ import { streamChat } from '../api/chat'
 import type { ChatMessage, Message } from '../api/types'
 
 const MESSAGES_KEY = 'goat-ai-messages'
+const SESSION_KEY = 'goat-ai-session-id'
 const MAX_STORED = 100
 
 function loadMessages(): Message[] {
@@ -20,10 +21,12 @@ function loadMessages(): Message[] {
 export interface UseChatReturn {
   messages: Message[]
   isStreaming: boolean
-  sendMessage: (content: string, model: string, userName?: string) => Promise<void>
+  sendMessage: (content: string, model: string, userName?: string, fileContextPrompt?: string) => Promise<void>
   streamToChat: (gen: AsyncGenerator<string>) => Promise<void>
   clearMessages: () => void
   stopStreaming: () => void
+  sessionId: string | null
+  loadSession: (sessionId: string, messages: ChatMessage[]) => void
 }
 
 /** Stream a generator's tokens into an existing assistant message slot. */
@@ -70,6 +73,7 @@ function useStreamIntoMessage() {
  */
 export function useChat(): UseChatReturn {
   const [messages, setMessages] = useState<Message[]>(loadMessages)
+  const [sessionId, setSessionId] = useState<string | null>(() => localStorage.getItem(SESSION_KEY))
   const [isStreaming, setIsStreaming] = useState(false)
 
   const messagesRef = useRef<Message[]>([])
@@ -88,6 +92,11 @@ export function useChat(): UseChatReturn {
     }
   }, [messages])
 
+  useEffect(() => {
+    if (sessionId) localStorage.setItem(SESSION_KEY, sessionId)
+    else localStorage.removeItem(SESSION_KEY)
+  }, [sessionId])
+
   const _startStream = useCallback(
     async (gen: AsyncGenerator<string>, prependMessages?: Message[]) => {
       const asstId = crypto.randomUUID()
@@ -102,11 +111,28 @@ export function useChat(): UseChatReturn {
   )
 
   const sendMessage = useCallback(
-    async (content: string, model: string, userName?: string) => {
+    async (content: string, model: string, userName?: string, fileContextPrompt?: string) => {
       if (isStreaming) return
 
+      const activeSessionId = sessionId ?? crypto.randomUUID()
+      if (!sessionId) setSessionId(activeSessionId)
+
+      let baseHistory: ChatMessage[] = messagesRef.current.map(m => ({
+        role: m.role,
+        content: m.content,
+      }))
+      if (
+        fileContextPrompt &&
+        !baseHistory.some(m => m.role === 'user' && m.content === fileContextPrompt)
+      ) {
+        baseHistory = [
+          { role: 'user', content: fileContextPrompt },
+          { role: 'assistant', content: 'I have loaded the file context.' },
+          ...baseHistory,
+        ]
+      }
       const history: ChatMessage[] = [
-        ...messagesRef.current.map(m => ({ role: m.role, content: m.content })),
+        ...baseHistory,
         { role: 'user' as const, content },
       ]
       const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content }
@@ -115,14 +141,17 @@ export function useChat(): UseChatReturn {
       abortControllerRef.current = ctrl
       try {
         await _startStream(
-          streamChat({ model, messages: history }, { signal: ctrl.signal, userName }),
+          streamChat(
+            { model, messages: history, session_id: activeSessionId },
+            { signal: ctrl.signal, userName },
+          ),
           [...messagesRef.current, userMsg],
         )
       } finally {
         abortControllerRef.current = null
       }
     },
-    [isStreaming, _startStream],
+    [isStreaming, sessionId, _startStream],
   )
 
   const streamToChat = useCallback(
@@ -135,12 +164,37 @@ export function useChat(): UseChatReturn {
 
   const clearMessages = useCallback(() => {
     setMessages([])
+    setSessionId(null)
     localStorage.removeItem(MESSAGES_KEY)
+  }, [])
+
+  const loadSession = useCallback((nextSessionId: string, sessionMessages: ChatMessage[]) => {
+    setSessionId(nextSessionId)
+    const isUiMessage = (m: ChatMessage): m is ChatMessage & { role: Message['role'] } =>
+      m.role === 'user' || m.role === 'assistant'
+    setMessages(
+      sessionMessages
+        .filter(isUiMessage)
+        .map(m => ({
+          id: crypto.randomUUID(),
+          role: m.role,
+          content: m.content,
+        })),
+    )
   }, [])
 
   const stopStreaming = useCallback(() => {
     abortControllerRef.current?.abort()
   }, [])
 
-  return { messages, isStreaming, sendMessage, streamToChat, clearMessages, stopStreaming }
+  return {
+    messages,
+    isStreaming,
+    sendMessage,
+    streamToChat,
+    clearMessages,
+    stopStreaming,
+    sessionId,
+    loadSession,
+  }
 }

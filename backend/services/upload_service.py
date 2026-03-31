@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import json
 import logging
 from typing import Generator
 
@@ -52,14 +53,16 @@ def stream_upload_analysis_sse(
 
     assert result.dataframe is not None  # parse_upload guarantees this when no user_error
     analysis_prompt = build_analysis_user_message(result.dataframe)
-    messages = [{"role": "user", "content": analysis_prompt}]
+    # Emit structured context so frontend can persist uploaded-file context.
+    yield f'data: {json.dumps({"type": "file_context", "filename": filename, "prompt": analysis_prompt})}\n\n'
 
     from backend.models.chat import ChatMessage  # local import avoids circular dep
-
     chat_messages = [ChatMessage(role="user", content=analysis_prompt)]
     yield from stream_chat_sse(
         llm=llm,
         model=model,
         messages=chat_messages,
         system_prompt=settings.system_prompt,
+        ip="upload",
+        log_db_path=settings.log_db_path,
     )

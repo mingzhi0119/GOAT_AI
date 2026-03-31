@@ -1,6 +1,8 @@
 import { type FC, type MouseEvent } from 'react'
 import FileUpload from './FileUpload'
 import GoatIcon from './GoatIcon'
+import type { HistorySessionItem } from '../api/history'
+import type { FileContext } from '../hooks/useFileContext'
 
 interface Props {
   models: string[]
@@ -15,6 +17,15 @@ interface Props {
   onToggleTheme: () => void
   userName: string
   onUserNameChange: (name: string) => void
+  historySessions: HistorySessionItem[]
+  isLoadingHistory: boolean
+  historyError: string | null
+  onLoadHistorySession: (sessionId: string) => void
+  onDeleteHistorySession: (sessionId: string) => void
+  onRefreshHistory: () => void
+  fileContext: FileContext | null
+  onFileContext: (ctx: { type: 'file_context'; filename: string; prompt: string }) => void
+  onClearFileContext: () => void
 }
 
 /** Hover helper: avoids inlining repeated mouse-event handlers */
@@ -63,7 +74,22 @@ const Sidebar: FC<Props> = ({
   onToggleTheme,
   userName,
   onUserNameChange,
+  historySessions,
+  isLoadingHistory,
+  historyError,
+  onLoadHistorySession,
+  onDeleteHistorySession,
+  onRefreshHistory,
+  fileContext,
+  onFileContext,
+  onClearFileContext,
 }) => {
+  const fmtDate = (value: string) => {
+    const d = new Date(value)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleString()
+  }
+
   return (
     <aside
       className="flex flex-col w-64 flex-shrink-0 h-screen overflow-x-hidden"
@@ -165,6 +191,67 @@ const Sidebar: FC<Props> = ({
 
         {/* Action buttons */}
         <section className="space-y-1">
+          <div className="flex items-center justify-between mb-2">
+            <p
+              className="text-xs font-semibold uppercase tracking-wider"
+              style={{ color: 'rgba(255,255,255,0.45)' }}
+            >
+              History
+            </p>
+            <button
+              type="button"
+              onClick={onRefreshHistory}
+              className="text-xs px-2 py-0.5 rounded-md transition-all"
+              style={{ color: 'var(--text-sidebar)', background: 'rgba(255,255,255,0.08)' }}
+            >
+              Refresh
+            </button>
+          </div>
+          {historyError && (
+            <p className="text-xs mb-1" style={{ color: '#f87171' }}>
+              {historyError}
+            </p>
+          )}
+          {isLoadingHistory && (
+            <p className="text-xs mb-1" style={{ color: 'rgba(255,255,255,0.6)' }}>
+              Loading history...
+            </p>
+          )}
+          {!isLoadingHistory && historySessions.length === 0 && (
+            <p className="text-xs mb-1" style={{ color: 'rgba(255,255,255,0.6)' }}>
+              No saved conversations
+            </p>
+          )}
+          {historySessions.slice(0, 20).map(item => (
+            <div key={item.id} className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onLoadHistorySession(item.id)}
+                title={item.title || 'New Chat'}
+                className="flex-1 min-w-0 text-left px-2.5 py-2 rounded-lg text-xs transition-all"
+                style={{ color: 'var(--text-sidebar)', background: 'rgba(255,255,255,0.06)' }}
+                {...hoverHandlers('rgba(255,255,255,0.12)', 'rgba(255,255,255,0.06)')}
+              >
+                <p className="truncate">{item.title || 'New Chat'}</p>
+                <p style={{ color: 'rgba(255,255,255,0.5)' }} className="truncate">
+                  {fmtDate(item.updated_at)}
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => onDeleteHistorySession(item.id)}
+                className="px-2 py-1 rounded-md text-xs"
+                style={{ color: '#fca5a5', background: 'rgba(255,255,255,0.08)' }}
+                title="Delete conversation"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </section>
+
+        {/* Action buttons */}
+        <section className="space-y-1">
           <p
             className="text-xs font-semibold uppercase tracking-wider mb-2"
             style={{ color: 'rgba(255,255,255,0.45)' }}
@@ -207,7 +294,24 @@ const Sidebar: FC<Props> = ({
           >
             Analyze File
           </p>
-          <FileUpload model={selectedModel} onStream={onStream} />
+          <FileUpload model={selectedModel} onStream={onStream} onFileContext={onFileContext} />
+          {fileContext && (
+            <div
+              className="mt-2 text-xs px-2 py-1.5 rounded-lg flex items-center justify-between gap-2"
+              style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--text-sidebar)' }}
+            >
+              <span className="truncate">{fileContext.filename}</span>
+              <button
+                type="button"
+                onClick={onClearFileContext}
+                className="px-1 rounded"
+                style={{ color: '#fca5a5' }}
+                title="Clear file context"
+              >
+                ×
+              </button>
+            </div>
+          )}
         </section>
       </div>
 
