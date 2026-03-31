@@ -29,6 +29,8 @@ export interface UseAdvancedSettingsReturn {
   setMaxTokens: (v: number) => void
   topP: number
   setTopP: (v: number) => void
+  /** Restore temperature / max tokens / top_p to defaults and persist. */
+  resetAdvancedToDefaults: () => void
   getOptionsForRequest: () => OllamaOptionsPayload
 }
 
@@ -73,6 +75,12 @@ export function useAdvancedSettings(): UseAdvancedSettingsReturn {
     }
   }, [])
 
+  const resetAdvancedToDefaults = useCallback(() => {
+    setTemperature(DEFAULT_TEMP)
+    setMaxTokens(DEFAULT_MAX_TOKENS)
+    setTopP(DEFAULT_TOP_P)
+  }, [setTemperature, setMaxTokens, setTopP])
+
   const getOptionsForRequest = useCallback((): OllamaOptionsPayload => {
     return {
       temperature,
@@ -90,6 +98,7 @@ export function useAdvancedSettings(): UseAdvancedSettingsReturn {
     setMaxTokens,
     topP,
     setTopP,
+    resetAdvancedToDefaults,
     getOptionsForRequest,
   }
 }

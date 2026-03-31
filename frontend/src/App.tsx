@@ -108,6 +108,7 @@ export default function App() {
           onMaxTokensChange={advanced.setMaxTokens}
           topP={advanced.topP}
           onTopPChange={advanced.setTopP}
+          onResetAdvanced={advanced.resetAdvancedToDefaults}
         />
         <ErrorBoundary>
           <ChatWindow
