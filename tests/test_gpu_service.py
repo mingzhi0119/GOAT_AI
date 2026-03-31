@@ -41,6 +41,38 @@ class GPUServiceTests(unittest.TestCase):
         self.assertFalse(status.available)
         self.assertIn("nvidia-smi", status.message)
 
+    def test_read_gpu_status_passes_uuid_to_nvidia_smi(self) -> None:
+        captured: dict[str, list[str]] = {}
+
+        def fake_run(cmd: list[str], **kwargs: object) -> object:
+            captured["args"] = cmd
+
+            class _Result:
+                returncode = 0
+                stdout = "NVIDIA A100, GPU-test-uuid, 1, 100, 80000, 40, 50.0\n"
+                stderr = ""
+
+            return _Result()
+
+        s = self._settings()
+        with_uuid = Settings(
+            ollama_base_url=s.ollama_base_url,
+            generate_timeout=s.generate_timeout,
+            max_upload_mb=s.max_upload_mb,
+            max_upload_bytes=s.max_upload_bytes,
+            max_dataframe_rows=s.max_dataframe_rows,
+            use_chat_api=s.use_chat_api,
+            system_prompt=s.system_prompt,
+            app_root=s.app_root,
+            logo_svg=s.logo_svg,
+            log_db_path=s.log_db_path,
+            gpu_target_uuid="GPU-test-uuid",
+            gpu_target_index=99,
+        )
+        with patch("backend.services.gpu_service.subprocess.run", side_effect=fake_run):
+            read_gpu_status(with_uuid)
+        self.assertEqual(captured["args"][1], "--id=GPU-test-uuid")
+
 
 if __name__ == "__main__":
     unittest.main()

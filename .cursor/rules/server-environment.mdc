@@ -1,0 +1,23 @@
+---
+description: Production A100 / JupyterHub host constraints (no root, deploy fallbacks)
+globs: deploy.sh, docs/OPERATIONS.md, docs/PROJECT_STATUS.md, goat-ai.service, scripts/rotate_fastapi_log.py, scripts/backup_chat_db.py, scripts/healthcheck.sh, scripts/watchdog.sh
+alwaysApply: false
+---
+
+# GOAT AI — Production server environment (snapshot)
+
+Use this when changing deploy, process management, nginx, or host-only docs.
+
+## Facts (verified 2026-03-31, user `jupyter-mhu29@simon.roches-bde1e`)
+
+- **No sudo / root:** `sudo` is blocked (*no new privileges*). Do not document or assume `apt`, system `systemctl`, `/etc/logrotate.d`, or `nginx -s reload`.
+- **systemd --user:** May fail in SSH with `Failed to connect to bus: No medium found`. `~/.config/systemd/user` can still be writable; **test** `systemctl --user status` before recommending user units. `deploy.sh` must keep **nohup + `fastapi.pid`** fallback.
+- **Supervisor:** Not installed; installing needs admin.
+- **App process:** Uvicorn on **`0.0.0.0:62606`** is valid for this user.
+- **GPU:** `nvidia-smi` works. Prefer **`GOAT_GPU_UUID=GPU-fb2cf8f7-e9bf-f136-a3bb-e150426598e8`** for the A100 (index **0**); index **1** is a GT 1030 on the same host — do not default metrics to the wrong GPU.
+
+## Doc source of truth
+
+- Full table: `docs/OPERATIONS.md` → section **Shared host permissions (JupyterHub / unprivileged user)**.
+- Short snapshot: `docs/PROJECT_STATUS.md` → **8b. Server permissions snapshot**.
+- User-space log backup / health: `docs/OPERATIONS.md` → **User-space ops (no root)** (`scripts/rotate_fastapi_log.py`, `scripts/backup_chat_db.py`, `scripts/healthcheck.sh`, `scripts/watchdog.sh`).

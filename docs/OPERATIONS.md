@@ -58,10 +58,30 @@ QUICK=1 bash deploy.sh      # git pull + npm ci + npm build + restart (npm ci en
 
 ---
 
+## Shared host permissions (JupyterHub / unprivileged user)
+
+Verified on **2026-03-31** for user `jupyter-mhu29@simon.roches-bde1e` on the school A100 host (`simon.roches-bde1e`). Other accounts may differ; re-run the probes in [PROJECT_STATUS.md](PROJECT_STATUS.md) if unsure.
+
+| Capability | Status | Notes |
+|------------|--------|--------|
+| **sudo / root** | **No** | `sudo` fails with *The "no new privileges" flag is set* — typical of containerized JupyterHub; no `apt`, no system `systemctl`, no editing `/etc`. |
+| **systemd (system)** | Read-only visibility | Can list units; **cannot** enable/start system services (e.g. `nginx.service` was inactive). |
+| **systemd --user** | **Unreliable in SSH** | `~/.config/systemd/user` is writable, but `systemctl --user` may return `Failed to connect to bus: No medium found` (no user session D-Bus in this shell). **Do not assume** `goat-ai` user units work until `systemctl --user status` succeeds. |
+| **loginctl linger** | **Yes** (`Linger=yes`) | Helps user services *if* the user bus is available elsewhere (e.g. graphical session). |
+| **Supervisor** | Not available | `supervisorctl` not installed; install needs admin. |
+| **logrotate (system)** | **No** | `/etc/logrotate.d` not writable; use app-level or user-space log rotation (truncate/copy under `$HOME`), or ask IT. |
+| **nginx** | **Read config / no reload** | `/etc/nginx/nginx.conf` may be readable; `nginx` binary is often under `/usr/sbin` (not always on `PATH`). **Reloading** nginx requires root — school IT. |
+| **Bind port / app** | **Yes** | Uvicorn on `0.0.0.0:62606` confirmed listening; process runs as the Jupyter user. |
+| **GPU telemetry** | **Yes** | `nvidia-smi` works. On this host: GPU **0** = A100 (`UUID: GPU-fb2cf8f7-e9bf-f136-a3bb-e150426598e8`), GPU **1** = GeForce GT 1030 — set `GOAT_GPU_UUID` to the A100 UUID to avoid binding metrics to the wrong card. |
+
+**Practical implication:** `deploy.sh` falls back to **nohup + `fastapi.pid`** when `systemctl --user` is not enabled for `goat-ai`. On hosts where the user bus is broken, that nohup path is the supported option until IT fixes the session or provides another supervisor.
+
+---
+
 ## Process supervisor (one-time setup, recommended)
 
 Sets up `systemd --user` so the server restarts automatically after crashes or reboots.
-Run these commands once on the A100 server:
+Run these commands once on the A100 server **only if** `systemctl --user status` works (no D-Bus error):
 
 ```bash
 mkdir -p ~/.config/systemd/user
@@ -74,6 +94,8 @@ loginctl enable-linger $USER   # keep service running when not logged in
 
 After this, `bash deploy.sh` automatically uses `systemctl --user restart goat-ai` instead of nohup.
 
+If `systemctl --user` shows **Failed to connect to bus**, skip this block and rely on **nohup** (see deploy script fallback).
+
 Useful commands:
 
 ```bash
@@ -81,6 +103,46 @@ systemctl --user status goat-ai        # check if running
 systemctl --user restart goat-ai       # manual restart
 journalctl --user -u goat-ai -f        # live logs (alternative to tail -f fastapi.log)
 ```
+
+---
+
+## User-space ops (no root)
+
+On JupyterHub-style hosts without `logrotate` or reliable `systemctl --user`, use the scripts under [`scripts/`](../scripts/) from the repo root (`GOAT_AI_ROOT`, usually `~/GOAT_AI`). They match `deploy.sh` paths: **`fastapi.log`** in the project root, **`chat_logs.db`** from `GOAT_LOG_PATH` (see [`goat_ai/config.py`](../goat_ai/config.py)).
+
+| Script | Role |
+|--------|------|
+| `scripts/rotate_fastapi_log.py` | When `fastapi.log` exceeds **`GOAT_LOG_MAX_MB`** (default `50`), copies to `logs/archive/fastapi_UTCtimestamp.log` and **truncates** the live file (same inode — safe for nohup `>>`). Prunes old archives past **`GOAT_LOG_KEEP_ARCHIVES`** (default `14`). |
+| `scripts/backup_chat_db.py` | **`sqlite3` online backup** of the chat DB to `backups/chat_logs_UTCtimestamp.db`; prunes past **`GOAT_BACKUP_MAX_FILES`** (default `14`). |
+| `scripts/healthcheck.sh` | `curl -sf` **`GOAT_HEALTH_URL`** (default `http://127.0.0.1:62606/api/health`); exit `1` on failure. |
+| `scripts/watchdog.sh` | Loop: sleep → healthcheck; after **`GOAT_WATCHDOG_FAIL_THRESHOLD`** consecutive failures, optionally runs **`QUICK=1 bash deploy.sh`** if **`GOAT_WATCHDOG_RESTART=1`**. Logs to **`GOAT_WATCHDOG_LOG`** (default `~/GOAT_AI/watchdog.log`). **Run inside tmux** so you can attach and inspect. |
+
+**tmux (recommended on shared servers):**
+
+```bash
+tmux new -s goat
+cd ~/GOAT_AI && tail -f fastapi.log
+# Ctrl+B then D to detach; tmux attach -t goat to reattach
+```
+
+Optional watchdog session:
+
+```bash
+tmux new -s goat-watchdog
+cd ~/GOAT_AI && bash scripts/watchdog.sh
+```
+
+**Example crontab** (adjust paths; use the venv’s Python):
+
+```bash
+*/30 * * * * cd "$HOME/GOAT_AI" && .venv/bin/python scripts/rotate_fastapi_log.py >>logs/cron-rotate.log 2>&1
+0 * * * * cd "$HOME/GOAT_AI" && .venv/bin/python scripts/backup_chat_db.py >>logs/cron-backup.log 2>&1
+*/5 * * * * "$HOME/GOAT_AI/scripts/healthcheck.sh" || true
+```
+
+Create `logs/` first if you log cron stdout: `mkdir -p ~/GOAT_AI/logs`.
+
+Do not enable **`GOAT_WATCHDOG_RESTART=1`** until you trust `deploy.sh` is safe to run unattended.
 
 ---
 
@@ -98,6 +160,18 @@ journalctl --user -u goat-ai -f        # live logs (alternative to tail -f fasta
 | `GOAT_LOG_PATH` | Path to SQLite chat log database | `<project_root>/chat_logs.db` |
 | `GOAT_GPU_UUID` | Optional GPU UUID lock for `/api/system/gpu` (overrides index) | _(empty)_ |
 | `GOAT_GPU_INDEX` | GPU index for `/api/system/gpu` when UUID not set | `0` |
+| `GOAT_AI_ROOT` | Repo root for ops scripts (`rotate_*`, `backup_*`) when not inferred | parent of `scripts/` |
+| `GOAT_FASTAPI_LOG` | Path to `fastapi.log` for rotation | `<project_root>/fastapi.log` |
+| `GOAT_LOG_ARCHIVE_DIR` | Rotated log archive directory | `<project_root>/logs/archive` |
+| `GOAT_LOG_MAX_MB` | Rotate when log file exceeds this size (MB) | `50` |
+| `GOAT_LOG_KEEP_ARCHIVES` | Max rotated `fastapi_*.log` files to keep | `14` |
+| `GOAT_BACKUP_DIR` | SQLite backup output directory | `<project_root>/backups` |
+| `GOAT_BACKUP_MAX_FILES` | Max `chat_logs_*.db` backup files to keep | `14` |
+| `GOAT_HEALTH_URL` | URL for `scripts/healthcheck.sh` | `http://127.0.0.1:62606/api/health` |
+| `GOAT_WATCHDOG_FAIL_THRESHOLD` | Consecutive failures before optional restart | `3` |
+| `GOAT_WATCHDOG_SLEEP_SEC` | Seconds between health checks in `watchdog.sh` | `60` |
+| `GOAT_WATCHDOG_LOG` | Watchdog log file path | `<project_root>/watchdog.log` |
+| `GOAT_WATCHDOG_RESTART` | Set `1` to run `QUICK=1 bash deploy.sh` after threshold | `0` |
 
 ---
 

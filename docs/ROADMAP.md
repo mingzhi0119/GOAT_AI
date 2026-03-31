@@ -1,6 +1,7 @@
 # GOAT AI — Roadmap
 
-> Last updated: 2026-03-31 · Current release: **v1.1.0**
+> Last updated: 2026-03-31 · Current release: **v1.1.0**  
+> **Compact snapshot (APIs, SSE, deploy, tests):** [PROJECT_STATUS.md](PROJECT_STATUS.md)
 
 ---
 
@@ -34,6 +35,8 @@
 ---
 
 ## 🔜 Phase 8 — Demo Power Features
+
+**Shipped (initial):** upload `chart_spec` + Recharts `ChartCard`; `GET /api/system/gpu` + sidebar strip; `deploy.sh` always `npm ci` before build. **Still open:** richer chart contracts from LLM text, rolling inference latency in UI, polish.
 
 | Feature | Value |
 |---------|-------|

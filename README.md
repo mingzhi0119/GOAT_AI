@@ -4,7 +4,8 @@
 
 - Public URL: <https://ai.simonbb.com/mingzhi/>
 - Repo: <https://github.com/mingzhi0119/GOAT_AI> · branch `main`
-- Version: **v1.0.0 MVP** (Phase 0–4 complete)
+- **Current snapshot (features, APIs, deploy pitfalls):** [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md)
+- Version line in this README may lag; trust **PROJECT_STATUS** + **ROADMAP** for “what shipped”.
 
 ---
 
