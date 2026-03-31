@@ -1,0 +1,17 @@
+"""System router — telemetry endpoints."""
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends
+
+from backend.config import get_settings
+from backend.models.system import GPUStatusResponse
+from backend.services.gpu_service import read_gpu_status
+from goat_ai.config import Settings
+
+router = APIRouter()
+
+
+@router.get("/system/gpu", response_model=GPUStatusResponse)
+def get_gpu_status(settings: Settings = Depends(get_settings)) -> GPUStatusResponse:
+    """Return real-time GPU telemetry used by frontend status strip."""
+    return read_gpu_status(settings)

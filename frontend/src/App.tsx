@@ -4,9 +4,12 @@ import { useTheme } from './hooks/useTheme'
 import { useUserName } from './hooks/useUserName'
 import { useHistory } from './hooks/useHistory'
 import { useFileContext } from './hooks/useFileContext'
+import { useGpuStatus } from './hooks/useGpuStatus'
+import type { ChartSpec } from './api/types'
 import ChatWindow from './components/ChatWindow'
 import Sidebar from './components/Sidebar'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { useState } from 'react'
 
 /** Root application — orchestrates hooks and wires state down to leaf components. */
 export default function App() {
@@ -16,6 +19,8 @@ export default function App() {
   const { userName, setUserName } = useUserName()
   const history = useHistory()
   const { fileContext, setFileContext, clearFileContext } = useFileContext()
+  const gpu = useGpuStatus()
+  const [chartSpec, setChartSpec] = useState<ChartSpec | null>(null)
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -46,11 +51,15 @@ export default function App() {
         }}
         fileContext={fileContext}
         onFileContext={setFileContext}
+        onChartSpec={setChartSpec}
         onClearFileContext={clearFileContext}
+        gpuStatus={gpu.status}
+        gpuError={gpu.error}
       />
       <ErrorBoundary>
         <ChatWindow
           messages={chat.messages}
+          chartSpec={chartSpec}
           isStreaming={chat.isStreaming}
           selectedModel={models.selectedModel}
           onSendMessage={content => {

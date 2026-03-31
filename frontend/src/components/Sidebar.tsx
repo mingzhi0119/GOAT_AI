@@ -2,7 +2,21 @@ import { type FC, type MouseEvent } from 'react'
 import FileUpload from './FileUpload'
 import GoatIcon from './GoatIcon'
 import type { HistorySessionItem } from '../api/history'
+import type { GPUStatus } from '../api/system'
+import type { ChartSpec } from '../api/types'
 import type { FileContext } from '../hooks/useFileContext'
+import {
+  sidebarBrandSubtitleClass,
+  sidebarBrandTitleClass,
+  sidebarErrorTextClass,
+  sidebarFileChipNameClass,
+  sidebarFooterAttributionClass,
+  sidebarFooterHighlightClass,
+  sidebarHelperMutedClass,
+  sidebarSectionLabelClass,
+  sidebarSectionLabelRowClass,
+  sidebarStaticBaseClass,
+} from './sidebarStaticText'
 
 interface Props {
   models: string[]
@@ -25,7 +39,10 @@ interface Props {
   onRefreshHistory: () => void
   fileContext: FileContext | null
   onFileContext: (ctx: { type: 'file_context'; filename: string; prompt: string }) => void
+  onChartSpec: (spec: ChartSpec) => void
   onClearFileContext: () => void
+  gpuStatus: GPUStatus | null
+  gpuError: string | null
 }
 
 /** Hover helper: avoids inlining repeated mouse-event handlers */
@@ -82,7 +99,10 @@ const Sidebar: FC<Props> = ({
   onRefreshHistory,
   fileContext,
   onFileContext,
+  onChartSpec,
   onClearFileContext,
+  gpuStatus,
+  gpuError,
 }) => {
   const fmtDate = (value: string) => {
     const d = new Date(value)
@@ -102,13 +122,10 @@ const Sidebar: FC<Props> = ({
       >
         <GoatIcon size={38} />
         <div>
-          <h1 className="font-extrabold text-lg leading-tight" style={{ color: 'var(--gold)' }}>
+          <h1 className={sidebarBrandTitleClass} style={{ color: 'var(--gold)' }}>
             GOAT AI
           </h1>
-          <p
-            className="text-xs leading-tight select-none cursor-default"
-            style={{ color: 'rgba(255,255,255,0.5)' }}
-          >
+          <p className={sidebarBrandSubtitleClass} style={{ color: 'rgba(255,255,255,0.5)' }}>
             Simon Business School
           </p>
         </div>
@@ -119,10 +136,7 @@ const Sidebar: FC<Props> = ({
 
         {/* Your name (optional) */}
         <section>
-          <p
-            className="text-xs font-semibold uppercase tracking-wider mb-2 select-none cursor-default"
-            style={{ color: 'rgba(255,255,255,0.45)' }}
-          >
+          <p className={sidebarSectionLabelClass} style={{ color: 'rgba(255,255,255,0.45)' }}>
             Your Name
           </p>
           <input
@@ -142,10 +156,7 @@ const Sidebar: FC<Props> = ({
 
         {/* Model selector */}
         <section>
-          <p
-            className="text-xs font-semibold uppercase tracking-wider mb-2"
-            style={{ color: 'rgba(255,255,255,0.45)' }}
-          >
+          <p className={sidebarSectionLabelClass} style={{ color: 'rgba(255,255,255,0.45)' }}>
             Model
           </p>
           <div className="flex gap-1.5 min-w-0">
@@ -153,7 +164,7 @@ const Sidebar: FC<Props> = ({
               value={selectedModel}
               onChange={e => onModelChange(e.target.value)}
               disabled={isLoadingModels || models.length === 0}
-              className="flex-1 min-w-0 rounded-lg px-2.5 py-2 text-xs focus:outline-none truncate"
+              className="flex-1 min-w-0 rounded-lg px-2.5 py-2 text-xs focus:outline-none truncate cursor-pointer"
               style={{
                 background: 'rgba(255,255,255,0.1)',
                 color: 'var(--text-sidebar)',
@@ -166,7 +177,7 @@ const Sidebar: FC<Props> = ({
                 <option>No models found</option>
               )}
               {models.map(m => (
-                <option key={m} value={m} style={{ background: '#001e3c' }}>
+                <option key={m} value={m} style={{ background: '#001e3c', cursor: 'default' }}>
                   {m}
                 </option>
               ))}
@@ -177,7 +188,7 @@ const Sidebar: FC<Props> = ({
               onClick={onRefreshModels}
               disabled={isLoadingModels}
               title="Refresh model list"
-              className="flex-shrink-0 px-2.5 py-2 rounded-lg text-sm transition-all disabled:opacity-40"
+              className="flex-shrink-0 px-2.5 py-2 rounded-lg text-sm transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
               style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--text-sidebar)' }}
               {...hoverHandlers('rgba(255,255,255,0.18)', 'rgba(255,255,255,0.1)')}
             >
@@ -186,7 +197,7 @@ const Sidebar: FC<Props> = ({
           </div>
 
           {modelsError && (
-            <p className="text-xs mt-1" style={{ color: '#f87171' }}>
+            <p className={sidebarErrorTextClass} style={{ color: '#f87171' }}>
               {modelsError}
             </p>
           )}
@@ -195,10 +206,7 @@ const Sidebar: FC<Props> = ({
         {/* Action buttons */}
         <section className="space-y-1">
           <div className="flex items-center justify-between mb-2">
-            <p
-              className="text-xs font-semibold uppercase tracking-wider select-none cursor-default"
-              style={{ color: 'rgba(255,255,255,0.45)' }}
-            >
+            <p className={sidebarSectionLabelRowClass} style={{ color: 'rgba(255,255,255,0.45)' }}>
               History
             </p>
             <button
@@ -211,17 +219,17 @@ const Sidebar: FC<Props> = ({
             </button>
           </div>
           {historyError && (
-            <p className="text-xs mb-1" style={{ color: '#f87171' }}>
+            <p className={sidebarHelperMutedClass} style={{ color: '#f87171' }}>
               {historyError}
             </p>
           )}
           {isLoadingHistory && (
-            <p className="text-xs mb-1" style={{ color: 'rgba(255,255,255,0.6)' }}>
+            <p className={sidebarHelperMutedClass} style={{ color: 'rgba(255,255,255,0.6)' }}>
               Loading history...
             </p>
           )}
           {!isLoadingHistory && historySessions.length === 0 && (
-            <p className="text-xs mb-1" style={{ color: 'rgba(255,255,255,0.6)' }}>
+            <p className={sidebarHelperMutedClass} style={{ color: 'rgba(255,255,255,0.6)' }}>
               No saved conversations
             </p>
           )}
@@ -235,8 +243,11 @@ const Sidebar: FC<Props> = ({
                 style={{ color: 'var(--text-sidebar)', background: 'rgba(255,255,255,0.06)' }}
                 {...hoverHandlers('rgba(255,255,255,0.12)', 'rgba(255,255,255,0.06)')}
               >
-                <p className="truncate">{item.title || 'New Chat'}</p>
-                <p style={{ color: 'rgba(255,255,255,0.5)' }} className="truncate">
+                <p className={`truncate ${sidebarStaticBaseClass}`}>{item.title || 'New Chat'}</p>
+                <p
+                  className={`truncate ${sidebarStaticBaseClass}`}
+                  style={{ color: 'rgba(255,255,255,0.5)' }}
+                >
                   {fmtDate(item.updated_at)}
                 </p>
               </button>
@@ -255,10 +266,7 @@ const Sidebar: FC<Props> = ({
 
         {/* Action buttons */}
         <section className="space-y-1">
-          <p
-            className="text-xs font-semibold uppercase tracking-wider mb-2 select-none cursor-default"
-            style={{ color: 'rgba(255,255,255,0.45)' }}
-          >
+          <p className={sidebarSectionLabelClass} style={{ color: 'rgba(255,255,255,0.45)' }}>
             Actions
           </p>
 
@@ -272,7 +280,7 @@ const Sidebar: FC<Props> = ({
             <span className="flex-shrink-0 flex items-center justify-center w-4">
               <TrashIcon />
             </span>
-            <span>Clear Chat</span>
+            <span className={sidebarStaticBaseClass}>Clear Chat</span>
           </button>
 
           <button
@@ -285,25 +293,51 @@ const Sidebar: FC<Props> = ({
             <span className="flex-shrink-0 flex items-center justify-center w-4">
               {theme === 'light' ? <MoonIcon /> : <SunIcon />}
             </span>
-            <span>{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
+            <span className={sidebarStaticBaseClass}>
+              {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+            </span>
           </button>
+
+          <div
+            className="mt-2 rounded-lg px-3 py-2 text-xs border"
+            style={{
+              borderColor: 'rgba(255,255,255,0.18)',
+              background: 'rgba(255,255,255,0.06)',
+              color: 'var(--text-sidebar)',
+            }}
+          >
+            <p className={sidebarStaticBaseClass}>
+              {gpuStatus?.available
+                ? `A100 Inference Engine: Active (${Math.round(gpuStatus.utilization_gpu ?? 0)}% GPU)`
+                : 'A100 Inference Engine: Telemetry unavailable'}
+            </p>
+            {gpuStatus?.available && (
+              <p className={`${sidebarStaticBaseClass} opacity-80`}>
+                Latency: live | VRAM {Math.round(gpuStatus.memory_used_mb ?? 0)}/
+                {Math.round(gpuStatus.memory_total_mb ?? 0)} MB
+              </p>
+            )}
+            {gpuError && <p className={`${sidebarStaticBaseClass} opacity-70`}>{gpuError}</p>}
+          </div>
         </section>
 
         {/* File Upload */}
         <section>
-          <p
-            className="text-xs font-semibold uppercase tracking-wider mb-2 select-none cursor-default"
-            style={{ color: 'rgba(255,255,255,0.45)' }}
-          >
+          <p className={sidebarSectionLabelClass} style={{ color: 'rgba(255,255,255,0.45)' }}>
             Analyze File
           </p>
-          <FileUpload model={selectedModel} onStream={onStream} onFileContext={onFileContext} />
+          <FileUpload
+            model={selectedModel}
+            onStream={onStream}
+            onFileContext={onFileContext}
+            onChartSpec={event => onChartSpec(event.chart)}
+          />
           {fileContext && (
             <div
               className="mt-2 text-xs px-2 py-1.5 rounded-lg flex items-center justify-between gap-2"
               style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--text-sidebar)' }}
             >
-              <span className="truncate">{fileContext.filename}</span>
+              <span className={sidebarFileChipNameClass}>{fileContext.filename}</span>
               <button
                 type="button"
                 onClick={onClearFileContext}
@@ -334,12 +368,11 @@ const Sidebar: FC<Props> = ({
           }}
         />
 
-        <p
-          className="text-xs select-none cursor-default"
-          style={{ color: 'rgba(255,255,255,0.38)' }}
-        >
+        <p className={sidebarFooterAttributionClass} style={{ color: 'rgba(255,255,255,0.38)' }}>
           Powered by{' '}
-          <span style={{ color: 'var(--gold)' }}>Mingzhi Hu</span>
+          <span className={sidebarFooterHighlightClass} style={{ color: 'var(--gold)' }}>
+            Mingzhi Hu
+          </span>
         </p>
       </div>
     </aside>

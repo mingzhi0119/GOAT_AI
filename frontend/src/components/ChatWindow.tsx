@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FC, type KeyboardEvent } from 'react'
-import type { Message } from '../api/types'
+import type { ChartSpec, Message } from '../api/types'
 import MessageBubble from './MessageBubble'
+import ChartCard from './ChartCard'
 
 const STARTER_PROMPTS = [
   'Summarize key trends in consumer behavior',
@@ -11,6 +12,7 @@ const STARTER_PROMPTS = [
 
 interface Props {
   messages: Message[]
+  chartSpec: ChartSpec | null
   isStreaming: boolean
   selectedModel: string
   onSendMessage: (content: string) => void
@@ -18,7 +20,7 @@ interface Props {
 }
 
 /** Main chat panel: message list + auto-scroll + input area. */
-const ChatWindow: FC<Props> = ({ messages, isStreaming, selectedModel, onSendMessage, onStop }) => {
+const ChatWindow: FC<Props> = ({ messages, chartSpec, isStreaming, selectedModel, onSendMessage, onStop }) => {
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -61,6 +63,7 @@ const ChatWindow: FC<Props> = ({ messages, isStreaming, selectedModel, onSendMes
     >
       {/* ── Messages area ─────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+        {chartSpec && <ChartCard spec={chartSpec} />}
         {messages.length === 0 ? (
           /* Empty state */
           <div className="flex flex-col items-center justify-center h-full gap-5 text-center px-4">

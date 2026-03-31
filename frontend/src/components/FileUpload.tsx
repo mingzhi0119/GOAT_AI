@@ -1,14 +1,15 @@
 import { useCallback, useRef, useState, type DragEvent, type FC } from 'react'
-import { streamUpload, type UploadFileContextEvent } from '../api/upload'
+import { streamUpload, type UploadChartSpecEvent, type UploadFileContextEvent } from '../api/upload'
 
 interface Props {
   model: string
   onStream: (gen: AsyncGenerator<string>) => Promise<void>
   onFileContext: (ctx: UploadFileContextEvent) => void
+  onChartSpec: (event: UploadChartSpecEvent) => void
 }
 
 /** Drag-and-drop / click-to-browse upload area for CSV and XLSX files. */
-const FileUpload: FC<Props> = ({ model, onStream, onFileContext }) => {
+const FileUpload: FC<Props> = ({ model, onStream, onFileContext, onChartSpec }) => {
   const [isDragging, setIsDragging] = useState(false)
   const [status, setStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle')
   const [fileName, setFileName] = useState<string | null>(null)
@@ -28,6 +29,8 @@ const FileUpload: FC<Props> = ({ model, onStream, onFileContext }) => {
               yield event
             } else if (event.type === 'file_context') {
               onFileContext(event)
+            } else if (event.type === 'chart_spec') {
+              onChartSpec(event)
             }
           }
         }
@@ -38,7 +41,7 @@ const FileUpload: FC<Props> = ({ model, onStream, onFileContext }) => {
         setStatus('error')
       }
     },
-    [model, onFileContext, onStream],
+    [model, onChartSpec, onFileContext, onStream],
   )
 
   const handleDrop = useCallback(

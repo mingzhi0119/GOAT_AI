@@ -45,6 +45,8 @@ class Settings:
     app_root: Path
     logo_svg: Path
     log_db_path: Path
+    gpu_target_uuid: str = ""
+    gpu_target_index: int = 0
 
     @property
     def user_facing_error(self) -> str:
@@ -66,4 +68,6 @@ def load_settings() -> Settings:
         app_root=APP_ROOT,
         logo_svg=APP_ROOT / "static" / "urochester_simon_business_horizontal.svg",
         log_db_path=Path(os.environ.get("GOAT_LOG_PATH", _default_log_db)),
+        gpu_target_uuid=os.environ.get("GOAT_GPU_UUID", "").strip(),
+        gpu_target_index=int(os.environ.get("GOAT_GPU_INDEX", "0")),
     )

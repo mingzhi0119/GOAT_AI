@@ -96,6 +96,8 @@ journalctl --user -u goat-ai -f        # live logs (alternative to tail -f fasta
 | `GOAT_SYSTEM_PROMPT_FILE` | Path to UTF-8 file with system prompt | _(none)_ |
 | `GOAT_CORS_ORIGINS` | Comma-separated CORS allow-origins | `http://localhost:3000` |
 | `GOAT_LOG_PATH` | Path to SQLite chat log database | `<project_root>/chat_logs.db` |
+| `GOAT_GPU_UUID` | Optional GPU UUID lock for `/api/system/gpu` (overrides index) | _(empty)_ |
+| `GOAT_GPU_INDEX` | GPU index for `/api/system/gpu` when UUID not set | `0` |
 
 ---
 
@@ -105,6 +107,43 @@ journalctl --user -u goat-ai -f        # live logs (alternative to tail -f fasta
 |-----|-------------|
 | `https://ai.simonbb.com/mingzhi/` | **Public URL** — nginx proxies to FastAPI on :62606 |
 | `http://127.0.0.1:62606/api/health` | Internal health check |
+
+---
+
+## GPU telemetry (A100) for UI status strip
+
+These checks confirm the server can provide **real** GPU stats for a sidebar status indicator.
+
+### One-shot probe (A100 only)
+
+```bash
+nvidia-smi --id=0 \
+  --query-gpu=name,uuid,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw \
+  --format=csv,noheader,nounits
+```
+
+Expected: one line for `NVIDIA A100-SXM4-80GB`.
+
+### Real-time probe (1 Hz)
+
+```bash
+nvidia-smi --id=0 \
+  --query-gpu=timestamp,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw \
+  --format=csv,noheader,nounits -l 1
+```
+
+Press `Ctrl+C` to stop before entering the next command.
+
+### Permissions sanity check
+
+```bash
+which nvidia-smi
+ls -l /dev/nvidia0 /dev/nvidiactl
+id
+groups
+```
+
+If these fail, do not show fake GPU values in UI; return a graceful "Telemetry unavailable".
 
 ## Health check
 
@@ -123,6 +162,7 @@ curl -sf http://127.0.0.1:62606/api/health
 | `GET` | `/api/models` | List Ollama model names |
 | `POST` | `/api/chat` | SSE streaming chat completion |
 | `POST` | `/api/upload` | SSE streaming CSV/XLSX analysis |
+| `GET` | `/api/system/gpu` | GPU telemetry JSON for sidebar status strip |
 
 **SSE format** (chat & upload):
 ```

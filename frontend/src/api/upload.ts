@@ -5,7 +5,12 @@ export interface UploadFileContextEvent {
   prompt: string
 }
 
-export type UploadStreamEvent = string | UploadFileContextEvent
+export interface UploadChartSpecEvent {
+  type: 'chart_spec'
+  chart: import('./types').ChartSpec
+}
+
+export type UploadStreamEvent = string | UploadFileContextEvent | UploadChartSpecEvent
 
 /** Stream CSV/XLSX upload analysis events via Server-Sent Events. */
 export async function* streamUpload(
@@ -47,6 +52,17 @@ export async function* streamUpload(
         ) {
           const event = payload as UploadFileContextEvent
           if (typeof event.filename === 'string' && typeof event.prompt === 'string') {
+            yield event
+          }
+          continue
+        }
+        if (
+          typeof payload === 'object' &&
+          payload !== null &&
+          (payload as { type?: string }).type === 'chart_spec'
+        ) {
+          const event = payload as UploadChartSpecEvent
+          if (event.chart && typeof event.chart === 'object') {
             yield event
           }
         }
