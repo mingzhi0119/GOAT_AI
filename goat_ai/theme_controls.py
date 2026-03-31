@@ -2,6 +2,9 @@
 
 Uses onclick handlers (main-page context) to write Streamlit's own localStorage
 key and reload, which is identical to what the built-in Settings → Theme menu does.
+
+Inject via ``st.html(..., unsafe_allow_javascript=True)`` — not ``st.markdown``, or
+onclick is misparsed and markup leaks as visible text at the top of the page.
 """
 
 from __future__ import annotations

@@ -29,8 +29,8 @@ def _init_session_state() -> None:
 def _inject_styles() -> None:
     """Inject base branding CSS and floating theme-switcher buttons."""
     st.markdown(SIMON_APP_CSS, unsafe_allow_html=True)
-    # Floating Light / Dark buttons in the top-right header bar
-    st.markdown(FLOATING_THEME_HTML, unsafe_allow_html=True)
+    # st.markdown misparses complex onclick attributes and leaks trailing markup as visible text.
+    st.html(FLOATING_THEME_HTML, width="content", unsafe_allow_javascript=True)
 
 
 def _stream_assistant_turn(ollama: OllamaService, model: str, *, failure_log: str) -> str:
