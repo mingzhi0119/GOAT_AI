@@ -42,7 +42,7 @@ const MessageBubble: FC<Props> = ({ message }) => {
       {/* Assistant avatar — same golden goat mark as sidebar / welcome */}
       {!isUser && (
         <span className="flex-shrink-0 inline-flex" aria-label="GOAT AI">
-          <GoatIcon size={28} />
+          <GoatIcon size={28} variant="circle" />
         </span>
       )}
 
@@ -126,7 +126,7 @@ const MessageBubble: FC<Props> = ({ message }) => {
       {isUser && (
         <div
           className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xl leading-none select-none"
-          style={{ background: 'var(--gold)', color: 'var(--navy)' }}
+          style={{ background: 'var(--navy)', color: '#ffffff' }}
           aria-hidden="true"
         >
           🧑‍💼
