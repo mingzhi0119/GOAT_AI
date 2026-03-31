@@ -76,7 +76,7 @@ const GpuStatusDot: FC<Props> = ({ gpuStatus, gpuError }) => {
         <div
           id={tipId}
           role="tooltip"
-          className="absolute bottom-full left-0 mb-2 px-3 py-2 rounded-md text-xs text-left z-30 pointer-events-none shadow-lg border min-w-[17rem] whitespace-normal leading-snug"
+          className="absolute bottom-full left-0 mb-2 px-2.5 py-2 rounded-md text-xs text-left z-30 pointer-events-none shadow-lg border w-max max-w-[11rem] whitespace-normal leading-snug"
           style={{
             background: 'var(--bg-asst-bubble)',
             borderColor: 'var(--border-color)',
