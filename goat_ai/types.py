@@ -1,4 +1,4 @@
-"""Shared typing for chat turns and uploads (no Streamlit imports)."""
+"""Shared typing for chat turns and uploads."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ class ChatTurn(TypedDict):
 
 
 class TabularUploadLike(Protocol):
-    """Streamlit UploadedFile–compatible surface for validation/parsing."""
+    """Minimal upload-like surface (name/size) for validation/parsing."""
 
     name: str
     size: int

@@ -55,7 +55,7 @@ backend/
     upload_service.py  # CSV/XLSX → Ollama analysis
     log_service.py     # SQLite init + log_conversation() — errors swallowed, never raise
   models/          # Pydantic schemas only, no methods
-goat_ai/           # shared: LLM client, config, uploads, tools — zero FastAPI/Streamlit imports
+goat_ai/           # shared: LLM client, config, uploads, tools — no FastAPI imports
   config.py        # @dataclass Settings + load_settings(); reads env vars once at startup
   exceptions.py    # domain exception hierarchy (OllamaUnavailable)
 ```

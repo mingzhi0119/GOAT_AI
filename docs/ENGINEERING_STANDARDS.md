@@ -114,7 +114,7 @@ STATIC_DIR = "C:\\Users\\simon\\GOAT_AI\\frontend\\dist"
 
 ### 1.6 Configuration (no magic values)
 
-- Every tunable value lives in `Settings` (env var) or a named constant in `constants.py`.
+- Every tunable value lives in `Settings` (env var) or a named constant in config / the relevant module.
 - Defaults must work on the A100 server out of the box.
 - Port numbers, base URLs, timeouts, size limits — all env vars with documented defaults.
 
@@ -142,7 +142,7 @@ backend/
 - `routers/` only: validate input, call service, return response.
 - `services/` only: orchestrate, no HTTP primitives.
 - `models/` only: data shapes, no methods beyond validators.
-- `goat_ai/` (shared): LLM client, upload parsing, tools. Zero Streamlit or FastAPI imports.
+- `goat_ai/` (shared): LLM client, upload parsing, tools. No FastAPI imports in the shared layer.
 
 ---
 

@@ -1,8 +1,0 @@
-# Default before user picks Light/Dark/System in ⋮ → Settings (app may follow OS)
-[theme]
-base = "system"
-primaryColor = "#FFCD00"
-
-# Align with app.py GOAT_MAX_UPLOAD_MB (20); Streamlit rejects huge uploads before Python runs
-[server]
-maxUploadSize = 20

@@ -38,6 +38,7 @@ Nginx  (ai.simonbb.com/mingzhi/)
   │  proxy_pass http://127.0.0.1:62606
   ▼
 FastAPI / Uvicorn  :62606  ──► React SPA (frontend/dist/ served as static files)
+  │  (deploy may also run a second Uvicorn on :8501 — same app, see deploy.sh)
   │
   ├── GET  /api/health          liveness probe
   ├── GET  /api/models          list Ollama models
@@ -63,8 +64,9 @@ FastAPI / Uvicorn  :62606  ──► React SPA (frontend/dist/ served as static 
 GOAT_AI/
 │
 ├── server.py                   Uvicorn entrypoint (re-exports backend.main:app)
-├── app.py                      Streamlit fallback entrypoint (legacy, :8501)
-├── deploy.sh                   One-command deploy script (see below)
+├── deploy.sh                   Deploy: git pull, pip, npm build; :62606 required, :8501 optional
+├── goat-ai.service             Example user systemd unit (port 62606)
+├── goat-ai-alt.service         Example user systemd unit (port 8501)
 ├── requirements.txt            Python dependencies (pinned)
 │
 ├── backend/                    FastAPI application
@@ -82,13 +84,13 @@ GOAT_AI/
 │       ├── upload_service.py   CSV/XLSX → Ollama analysis
 │       └── log_service.py      SQLite init + log_conversation()
 │
-├── goat_ai/                    Shared library (used by both FastAPI and Streamlit)
+├── goat_ai/                    Shared library (used by FastAPI)
 │   ├── config.py               Settings dataclass, load_settings(), env vars
 │   ├── ollama_client.py        LLMClient — wraps Ollama HTTP API
 │   ├── types.py                ChatTurn TypedDict
 │   ├── exceptions.py           OllamaUnavailable
 │   ├── logging_config.py       Structured logging setup
-│   └── …                       (styles, theme_controls — Streamlit only)
+│   └── …                       (tools, uploads)
 │
 ├── frontend/                   React + Vite SPA
 │   ├── src/
@@ -126,9 +128,7 @@ GOAT_AI/
 │   ├── ROADMAP.md              Shipped phases + upcoming features + decision log
 │   └── ENGINEERING_STANDARDS.md  Coding conventions
 │
-├── .env.example                All supported env vars with defaults
-├── .streamlit/config.toml      Streamlit theme (legacy fallback)
-└── deploy.sh                   Full + quick deploy script
+└── .env.example                All supported env vars with defaults
 ```
 
 ---
@@ -163,7 +163,7 @@ bash deploy.sh
 QUICK=1 bash deploy.sh
 ```
 
-See [`docs/OPERATIONS.md`](docs/OPERATIONS.md) for all options.
+See [`docs/OPERATIONS.md`](docs/OPERATIONS.md) for all options. `goat-ai.service` (62606) is required for a green deploy; `goat-ai-alt.service` (8501) is optional. Without systemd, `deploy.sh` uses `nohup` with `fastapi.pid` and attempts `fastapi-8501.pid` (8501 failure does not fail the script).
 
 ---
 

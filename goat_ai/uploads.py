@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class TabularLoadResult:
-    """Outcome of parsing an uploaded CSV/XLSX (no Streamlit dependency)."""
+    """Outcome of parsing an uploaded CSV/XLSX."""
 
     dataframe: Optional[pd.DataFrame] = None
     user_error: Optional[str] = None

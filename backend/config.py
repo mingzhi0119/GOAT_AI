@@ -1,6 +1,6 @@
 """Backend configuration — wraps goat_ai Settings and adds HTTP server options.
 
-Reads the same env vars as the Streamlit layer for full backward compatibility.
+Delegates to `goat_ai.config.Settings` for shared env vars.
 `get_settings()` is LRU-cached so env vars are read exactly once at startup.
 """
 from __future__ import annotations

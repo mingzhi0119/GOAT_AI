@@ -91,4 +91,4 @@
 | 2026-03-30 | Vite `base: './'` | Required for JupyterHub proxy and nginx sub-path compatibility |
 | 2026-03-30 | SSE over WebSocket | Simpler, works through more proxies, native browser `EventSource` |
 | 2026-03-30 | No React Router | Single-page app; routing adds complexity with no benefit |
-| 2026-03-30 | Streamlit kept on :8501 | Fallback until professor sign-off; retire in Phase 7 |
+| 2026-03-31 | Second FastAPI on :8501 | Same app as :62606; Streamlit retired |

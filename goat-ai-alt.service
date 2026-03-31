@@ -1,0 +1,18 @@
+# Secondary listener — must match deploy.sh PORT_API_ALT (default 8501).
+[Unit]
+Description=GOAT AI FastAPI server (secondary port)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/GOAT_AI
+ExecStart=%h/GOAT_AI/.venv/bin/python -m uvicorn server:app \
+    --host 0.0.0.0 --port 8501 --workers 2
+Restart=always
+RestartSec=5
+StandardOutput=append:%h/GOAT_AI/fastapi-8501.log
+StandardError=append:%h/GOAT_AI/fastapi-8501.log
+EnvironmentFile=-%h/GOAT_AI/.env
+
+[Install]
+WantedBy=default.target

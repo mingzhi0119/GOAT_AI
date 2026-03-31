@@ -1,4 +1,4 @@
-"""GOAT AI — Streamlit application package (config, services, UI wiring)."""
+"""GOAT AI — shared library (config, LLM client, uploads, tools)."""
 
 __all__ = ["__version__"]
 

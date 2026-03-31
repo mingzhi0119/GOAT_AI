@@ -1,9 +1,9 @@
-"""Ollama HTTP client — streaming APIs for both Streamlit (placeholder) and SSE (generator)."""
+"""Ollama HTTP client — streaming APIs for SSE (FastAPI)."""
 from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Generator, Protocol, Sequence
+from typing import Any, Generator, Protocol
 
 import requests
 
@@ -13,11 +13,6 @@ from goat_ai.tools import conversation_transcript, messages_for_ollama
 from goat_ai.types import ChatTurn
 
 logger = logging.getLogger(__name__)
-
-
-# ── Streamlit-side protocol (markdown placeholder) ────────────────────────────
-class _StreamPlaceholder(Protocol):
-    def markdown(self, body: str) -> Any: ...
 
 
 def _stream_line_tokens(chunk: dict) -> str:  # type: ignore[type-arg]
@@ -140,40 +135,3 @@ class OllamaService:
             yield from self.yield_generate_tokens(
                 model, prompt, ollama_options=ollama_options
             )
-
-    # ── Streamlit placeholder streaming (kept for backward compat) ────────────
-    def stream_chat(
-        self,
-        model: str,
-        api_messages: list[dict[str, str]],
-        placeholder: _StreamPlaceholder,
-    ) -> str:
-        full_response = ""
-        for token in self.yield_chat_tokens(model, api_messages, ollama_options=None):
-            full_response += token
-            placeholder.markdown(full_response + "▌")
-        placeholder.markdown(full_response)
-        return full_response
-
-    def stream_generate(
-        self, model: str, prompt: str, placeholder: _StreamPlaceholder
-    ) -> str:
-        full_response = ""
-        for token in self.yield_generate_tokens(model, prompt, ollama_options=None):
-            full_response += token
-            placeholder.markdown(full_response + "▌")
-        placeholder.markdown(full_response)
-        return full_response
-
-    def stream_from_session(
-        self,
-        model: str,
-        state_messages: Sequence[ChatTurn],
-        placeholder: _StreamPlaceholder,
-    ) -> str:
-        if self._s.use_chat_api:
-            msgs = messages_for_ollama(state_messages, self._s.system_prompt)
-            return self.stream_chat(model, msgs, placeholder)
-        transcript = conversation_transcript(state_messages)
-        combined = f"{self._s.system_prompt}\n\n{transcript}"
-        return self.stream_generate(model, combined, placeholder)
