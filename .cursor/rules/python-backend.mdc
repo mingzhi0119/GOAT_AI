@@ -22,7 +22,7 @@ def list_models(self): ...
 
 ## Pydantic for All I/O
 - FastAPI bodies: always `BaseModel` subclass.
-- Config: always `pydantic_settings.BaseSettings` with `env_prefix="GOAT_"` — validated at import.
+- Config: use `pydantic_settings.BaseSettings` for new services **or** the existing `goat_ai/config.py` pattern (`@dataclass(frozen=True)` + `load_settings()` reading `os.environ`). Both patterns validate at startup. Never read `os.environ` inside a request handler.
 - Never parse raw `request.json()` dict in a handler.
 
 ## Error Handling (layered)
@@ -46,12 +46,16 @@ raise HTTPException(status_code=503, detail="AI backend unavailable") from exc
 ## Module Layout
 ```
 backend/
-  main.py          # create_app() factory
-  config.py        # BaseSettings, validated at import
+  main.py          # create_app() factory; calls log_service.init_db() at startup
+  config.py        # server-only config (CORS, port); delegates to goat_ai/config.py
   dependencies.py  # Depends() factories
-  exceptions.py    # domain exception hierarchy
   routers/         # validate → call service → return response (no logic)
-  services/        # business logic, no HTTP primitives
+  services/
+    chat_service.py    # stream_chat_sse(): token streaming + chat logging
+    upload_service.py  # CSV/XLSX → Ollama analysis
+    log_service.py     # SQLite init + log_conversation() — errors swallowed, never raise
   models/          # Pydantic schemas only, no methods
-goat_ai/           # shared: LLM client, uploads, tools — zero FastAPI/Streamlit imports
+goat_ai/           # shared: LLM client, config, uploads, tools — zero FastAPI/Streamlit imports
+  config.py        # @dataclass Settings + load_settings(); reads env vars once at startup
+  exceptions.py    # domain exception hierarchy (OllamaUnavailable)
 ```

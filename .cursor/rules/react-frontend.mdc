@@ -43,12 +43,13 @@ const { messages, sendMessage, isStreaming } = useChat();
 ```
 frontend/src/
   api/          types.ts + one file per endpoint
-  components/   ChatWindow, MessageBubble, Sidebar, FileUpload
+  components/   ChatWindow, MessageBubble, Sidebar, FileUpload, GoatIcon, ErrorBoundary
   hooks/        useChat, useModels, useTheme
-  utils/        pure helpers (markdown, formatting)
-  styles/       theme.css (CSS vars), global.css
+  styles/       global.css (CSS variables + dark-mode overrides)
   App.tsx
 ```
 
 ## Theme
-Light/Dark via CSS variables on `<html data-theme>` — instant toggle, no page reload, no localStorage hacks.
+Light/Dark via a `.dark` CSS class toggled on `<html>` (`document.documentElement.classList.toggle('dark', ...)`).
+CSS variables in `global.css` have a `:root` (light) block and a `.dark` override block.
+`useTheme.ts` persists the preference to `localStorage` under key `goat-ai-theme` and seeds from `prefers-color-scheme` on first visit.

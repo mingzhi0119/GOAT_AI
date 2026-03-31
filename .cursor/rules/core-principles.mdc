@@ -19,7 +19,7 @@ alwaysApply: true
 - Line endings: `.gitattributes` enforces `eol=lf` — prevents CRLF breakage on Windows dev.
 - Deps: exact pins in `requirements.txt`; `package-lock.json` committed; CI uses `npm ci`.
 - Secrets: `.env` in `.gitignore`; `.env.example` committed; never in scripts or source.
-- Startup: validate all env vars at import time via `pydantic_settings.BaseSettings` — crash with a message, not at first request.
+- Startup: validate all env vars at import time — use `pydantic_settings.BaseSettings` when adding a new service, or the existing `goat_ai/config.py` `@dataclass` + `load_settings()` pattern. Either way: crash with a clear message at startup, never silently at first request.
 
 ## Commit Checklist
 - [ ] All new functions typed + one-line docstring.
@@ -27,3 +27,4 @@ alwaysApply: true
 - [ ] New logic has at least a happy-path unit test.
 - [ ] `requirements.txt` / `package-lock.json` updated if deps changed.
 - [ ] `OPERATIONS.md` updated if a new env var or startup step was added.
+- [ ] `README.md` updated if directory structure or architecture changed.

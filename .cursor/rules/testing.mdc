@@ -8,15 +8,18 @@ alwaysApply: false
 
 ## Python (pytest)
 
-**Coverage targets**: `goat_ai/tools.py` 100% · `goat_ai/uploads.py` 90% · `backend/services/` 90% · `backend/routers/` 80%
+**Coverage targets**: `goat_ai/tools.py` 100% · `goat_ai/uploads.py` 90% · `backend/services/` 90% (chat_service, upload_service, log_service) · `backend/routers/` 80%
 
 **Mock at the Protocol boundary** — inject `FakeLLMClient`; unit tests never touch real Ollama.
 
 ```python
-# ✅ fake satisfies the Protocol — no network needed
+# ✅ fake satisfies the LLMClient Protocol — no network needed
+# Protocol methods: list_model_names() + stream_tokens(model, messages, system_prompt)
 class FakeLLMClient:
-    def list_models(self) -> list[str]: return ["llama3:latest"]
-    def stream_chat(self, model: str, messages: list[ChatTurn]) -> Generator[str, None, None]:
+    def list_model_names(self) -> list[str]: return ["llama3:latest"]
+    def stream_tokens(
+        self, model: str, messages: list[ChatTurn], system_prompt: str
+    ) -> Generator[str, None, None]:
         yield "Hello"; yield " world"
 
 @pytest.fixture
