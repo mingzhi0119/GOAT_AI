@@ -85,16 +85,14 @@ fi
 
 # ── 3. Node / npm deps + React build ─────────────────────────────────────────
 FRONTEND_DIR="${PROJECT_DIR}/frontend"
-NODE_MODULES="${FRONTEND_DIR}/node_modules"
-
-if [ ! -d "$NODE_MODULES" ]; then
-  echo "📦 Installing Node dependencies (npm ci)…"
-  (cd "$FRONTEND_DIR" && npm ci --silent)
-fi
 
 if [ "${SKIP_BUILD}" = "1" ] && [ -d "${FRONTEND_DIR}/dist" ]; then
   echo "⚡ Skipping npm build (SKIP_BUILD=1, dist/ exists)."
 else
+  # Always npm ci before build when package-lock.json changes (new deps like recharts).
+  # Old behavior only ran npm ci if node_modules was missing — stale installs broke tsc.
+  echo "📦 Installing Node dependencies (npm ci)…"
+  (cd "$FRONTEND_DIR" && npm ci --silent)
   echo "⚙️  Building React frontend…"
   (cd "$FRONTEND_DIR" && npm run build)
   echo "✅ Frontend built → ${FRONTEND_DIR}/dist/"

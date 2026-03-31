@@ -48,7 +48,7 @@ FastAPI auto-detects `frontend/dist/` and mounts it as a static file server (see
 
 ```bash
 bash deploy.sh              # full deploy
-QUICK=1 bash deploy.sh      # git pull + npm build + restart only
+QUICK=1 bash deploy.sh      # git pull + npm ci + npm build + restart (npm ci ensures new frontend deps)
 ```
 
 - **Logs:** `fastapi.log` in the project root.
