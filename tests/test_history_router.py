@@ -83,6 +83,23 @@ class HistoryRouterIntegrationTests(unittest.TestCase):
         post_delete = self.client.get(f"/api/history/{session_id}")
         self.assertEqual(404, post_delete.status_code)
 
+    def test_delete_all_history_sessions(self) -> None:
+        for sid, title in (("a", "First"), ("b", "Second")):
+            log_service.upsert_session(
+                db_path=self.settings.log_db_path,
+                session_id=sid,
+                title=title,
+                model="m",
+                messages=[{"role": "user", "content": "x"}],
+                created_at="2026-01-01T00:00:00+00:00",
+                updated_at="2026-01-01T00:00:01+00:00",
+            )
+        self.assertEqual(2, len(self.client.get("/api/history").json()["sessions"]))
+
+        wipe = self.client.delete("/api/history")
+        self.assertEqual(204, wipe.status_code)
+        self.assertEqual(0, len(self.client.get("/api/history").json()["sessions"]))
+
 
 if __name__ == "__main__":
     unittest.main()

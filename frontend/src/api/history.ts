@@ -31,3 +31,8 @@ export async function deleteSession(sessionId: string): Promise<void> {
   })
   if (!resp.ok) throw new Error(`Delete history API: HTTP ${resp.status}`)
 }
+
+export async function deleteAllSessions(): Promise<void> {
+  const resp = await fetch('./api/history', { method: 'DELETE' })
+  if (!resp.ok) throw new Error(`Delete all history API: HTTP ${resp.status}`)
+}

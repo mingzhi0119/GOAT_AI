@@ -17,6 +17,13 @@ def list_history(settings: Settings = Depends(get_settings)) -> dict[str, list[d
     return {"sessions": sessions}
 
 
+@router.delete("/history", status_code=204)
+def delete_all_history(settings: Settings = Depends(get_settings)) -> Response:
+    """Delete all persisted sessions and related conversation rows."""
+    log_service.delete_all_sessions(db_path=settings.log_db_path)
+    return Response(status_code=204)
+
+
 @router.get("/history/{session_id}")
 def get_history_session(
     session_id: str,

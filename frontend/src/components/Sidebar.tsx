@@ -2,7 +2,6 @@ import { type FC, type MouseEvent } from 'react'
 import FileUpload from './FileUpload'
 import GoatIcon from './GoatIcon'
 import type { HistorySessionItem } from '../api/history'
-import type { GPUStatus } from '../api/system'
 import type { ChartSpec } from '../api/types'
 import type { FileContext } from '../hooks/useFileContext'
 import {
@@ -27,8 +26,6 @@ interface Props {
   isLoadingModels: boolean
   modelsError: string | null
   onStream: (gen: AsyncGenerator<string>) => Promise<void>
-  theme: 'light' | 'dark'
-  onToggleTheme: () => void
   userName: string
   onUserNameChange: (name: string) => void
   historySessions: HistorySessionItem[]
@@ -37,12 +34,11 @@ interface Props {
   onLoadHistorySession: (sessionId: string) => void
   onDeleteHistorySession: (sessionId: string) => void
   onRefreshHistory: () => void
+  onDeleteAllHistory: () => void
   fileContext: FileContext | null
   onFileContext: (ctx: { type: 'file_context'; filename: string; prompt: string }) => void
   onChartSpec: (spec: ChartSpec) => void
   onClearFileContext: () => void
-  gpuStatus: GPUStatus | null
-  gpuError: string | null
 }
 
 /** Hover helper: avoids inlining repeated mouse-event handlers */
@@ -65,18 +61,6 @@ const TrashIcon = () => (
   </svg>
 )
 
-const MoonIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-    <path d="M6 .278a.768.768 0 0 1 .08.858 7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278z"/>
-  </svg>
-)
-
-const SunIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-    <path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707z"/>
-  </svg>
-)
-
 /** Left sidebar: branding, model selector, actions, file upload, footer. */
 const Sidebar: FC<Props> = ({
   models,
@@ -87,8 +71,6 @@ const Sidebar: FC<Props> = ({
   isLoadingModels,
   modelsError,
   onStream,
-  theme,
-  onToggleTheme,
   userName,
   onUserNameChange,
   historySessions,
@@ -97,12 +79,11 @@ const Sidebar: FC<Props> = ({
   onLoadHistorySession,
   onDeleteHistorySession,
   onRefreshHistory,
+  onDeleteAllHistory,
   fileContext,
   onFileContext,
   onChartSpec,
   onClearFileContext,
-  gpuStatus,
-  gpuError,
 }) => {
   const fmtDate = (value: string) => {
     const d = new Date(value)
@@ -112,7 +93,7 @@ const Sidebar: FC<Props> = ({
 
   return (
     <aside
-      className="flex flex-col w-64 flex-shrink-0 h-screen overflow-x-hidden"
+      className="flex flex-col w-64 flex-shrink-0 h-full min-h-0 overflow-x-hidden"
       style={{ background: 'var(--bg-sidebar)' }}
     >
       {/* ── Logo ─────────────────────────────────────────────────── */}
@@ -205,17 +186,29 @@ const Sidebar: FC<Props> = ({
 
         {/* Action buttons */}
         <section className="space-y-1">
-          <div className="flex items-center justify-between mb-2">
-            <p className={sidebarSectionLabelRowClass} style={{ color: 'rgba(255,255,255,0.45)' }}>
+          <div className="flex items-center gap-1.5 mb-2 min-w-0">
+            <p
+              className={`${sidebarSectionLabelRowClass} flex-1 min-w-0 truncate`}
+              style={{ color: 'rgba(255,255,255,0.45)' }}
+            >
               History
             </p>
             <button
               type="button"
               onClick={onRefreshHistory}
-              className="text-xs px-2 py-0.5 rounded-md transition-all"
+              className="text-xs px-2 py-0.5 rounded-md transition-all flex-shrink-0"
               style={{ color: 'var(--text-sidebar)', background: 'rgba(255,255,255,0.08)' }}
             >
               Refresh
+            </button>
+            <button
+              type="button"
+              onClick={onDeleteAllHistory}
+              className="text-xs px-2 py-0.5 rounded-md transition-all flex-shrink-0"
+              style={{ color: '#fca5a5', background: 'rgba(248,113,113,0.12)' }}
+              title="Delete all saved conversations"
+            >
+              Delete All
             </button>
           </div>
           {historyError && (
@@ -283,42 +276,6 @@ const Sidebar: FC<Props> = ({
             <span className={sidebarStaticBaseClass}>Clear Chat</span>
           </button>
 
-          <button
-            type="button"
-            onClick={onToggleTheme}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all"
-            style={{ color: 'var(--text-sidebar)', background: 'transparent' }}
-            {...hoverHandlers('var(--sidebar-hover)')}
-          >
-            <span className="flex-shrink-0 flex items-center justify-center w-4">
-              {theme === 'light' ? <MoonIcon /> : <SunIcon />}
-            </span>
-            <span className={sidebarStaticBaseClass}>
-              {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
-            </span>
-          </button>
-
-          <div
-            className="mt-2 rounded-lg px-3 py-2 text-xs border"
-            style={{
-              borderColor: 'rgba(255,255,255,0.18)',
-              background: 'rgba(255,255,255,0.06)',
-              color: 'var(--text-sidebar)',
-            }}
-          >
-            <p className={sidebarStaticBaseClass}>
-              {gpuStatus?.available
-                ? `A100 Inference Engine: Active (${Math.round(gpuStatus.utilization_gpu ?? 0)}% GPU)`
-                : 'A100 Inference Engine: Telemetry unavailable'}
-            </p>
-            {gpuStatus?.available && (
-              <p className={`${sidebarStaticBaseClass} opacity-80`}>
-                Latency: live | VRAM {Math.round(gpuStatus.memory_used_mb ?? 0)}/
-                {Math.round(gpuStatus.memory_total_mb ?? 0)} MB
-              </p>
-            )}
-            {gpuError && <p className={`${sidebarStaticBaseClass} opacity-70`}>{gpuError}</p>}
-          </div>
         </section>
 
         {/* File Upload */}

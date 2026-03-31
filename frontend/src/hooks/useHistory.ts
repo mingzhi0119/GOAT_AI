@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
+  deleteAllSessions as deleteAllSessionsApi,
   deleteSession as deleteSessionApi,
   fetchHistory,
   fetchSession,
@@ -14,6 +15,7 @@ export interface UseHistoryReturn {
   refresh: () => Promise<void>
   loadSession: (sessionId: string) => Promise<HistorySessionDetail>
   deleteSession: (sessionId: string) => Promise<void>
+  deleteAll: () => Promise<void>
 }
 
 export function useHistory(): UseHistoryReturn {
@@ -47,5 +49,10 @@ export function useHistory(): UseHistoryReturn {
     [],
   )
 
-  return { sessions, isLoading, error, refresh, loadSession, deleteSession }
+  const deleteAll = useCallback(async () => {
+    await deleteAllSessionsApi()
+    setSessions([])
+  }, [])
+
+  return { sessions, isLoading, error, refresh, loadSession, deleteSession, deleteAll }
 }

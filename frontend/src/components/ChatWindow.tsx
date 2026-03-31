@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type FC, type KeyboardEvent } from 'react'
 import type { ChartSpec, Message } from '../api/types'
+import type { GPUStatus } from '../api/system'
+import GpuStatusDot from './GpuStatusDot'
 import MessageBubble from './MessageBubble'
 import ChartCard from './ChartCard'
 
@@ -17,10 +19,21 @@ interface Props {
   selectedModel: string
   onSendMessage: (content: string) => void
   onStop: () => void
+  gpuStatus: GPUStatus | null
+  gpuError: string | null
 }
 
 /** Main chat panel: message list + auto-scroll + input area. */
-const ChatWindow: FC<Props> = ({ messages, chartSpec, isStreaming, selectedModel, onSendMessage, onStop }) => {
+const ChatWindow: FC<Props> = ({
+  messages,
+  chartSpec,
+  isStreaming,
+  selectedModel,
+  onSendMessage,
+  onStop,
+  gpuStatus,
+  gpuError,
+}) => {
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -58,7 +71,7 @@ const ChatWindow: FC<Props> = ({ messages, chartSpec, isStreaming, selectedModel
 
   return (
     <div
-      className="flex flex-col flex-1 min-w-0 h-screen"
+      className="flex flex-col flex-1 min-w-0 min-h-0 h-full"
       style={{ background: 'var(--bg-chat)' }}
     >
       {/* ── Messages area ─────────────────────────────────────────── */}
@@ -123,6 +136,7 @@ const ChatWindow: FC<Props> = ({ messages, chartSpec, isStreaming, selectedModel
         style={{ borderColor: 'var(--border-color)', background: 'var(--bg-chat)' }}
       >
         <div className="flex items-end gap-2 max-w-4xl mx-auto">
+          <GpuStatusDot gpuStatus={gpuStatus} gpuError={gpuError} />
           <textarea
             ref={textareaRef}
             value={input}

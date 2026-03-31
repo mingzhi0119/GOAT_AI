@@ -193,3 +193,13 @@ def delete_session(*, db_path: Path, session_id: str) -> None:
             conn.execute("DELETE FROM conversations WHERE session_id = ?", (session_id,))
     except Exception:
         logger.exception("Failed to delete session %s from %s", session_id, db_path)
+
+
+def delete_all_sessions(*, db_path: Path) -> None:
+    """Remove every persisted session and conversation rows linked to a session."""
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute("DELETE FROM conversations WHERE session_id IS NOT NULL")
+            conn.execute("DELETE FROM sessions")
+    except Exception:
+        logger.exception("Failed to delete all sessions from %s", db_path)

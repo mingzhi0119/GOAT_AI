@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { deleteSession, fetchHistory, fetchSession } from '../api/history'
+import { deleteAllSessions, deleteSession, fetchHistory, fetchSession } from '../api/history'
 
 describe('history api', () => {
   afterEach(() => {
@@ -43,5 +43,13 @@ describe('history api', () => {
 
     await deleteSession('abc')
     expect(mockedFetch).toHaveBeenCalledWith('./api/history/abc', { method: 'DELETE' })
+  })
+
+  it('deletes all sessions', async () => {
+    const mockedFetch = vi.fn().mockResolvedValue({ ok: true })
+    vi.stubGlobal('fetch', mockedFetch)
+
+    await deleteAllSessions()
+    expect(mockedFetch).toHaveBeenCalledWith('./api/history', { method: 'DELETE' })
   })
 })
