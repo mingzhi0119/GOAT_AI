@@ -71,7 +71,7 @@ Verified on **2026-03-31** for user `jupyter-mhu29@simon.roches-bde1e` on the sc
 | **Supervisor** | Not available | `supervisorctl` not installed; install needs admin. |
 | **logrotate (system)** | **No** | `/etc/logrotate.d` not writable; use app-level or user-space log rotation (truncate/copy under `$HOME`), or ask IT. |
 | **nginx** | **Read config / no reload** | `/etc/nginx/nginx.conf` may be readable; `nginx` binary is often under `/usr/sbin` (not always on `PATH`). **Reloading** nginx requires root — school IT. |
-| **Bind port / app** | **Yes** | Uvicorn on `0.0.0.0:62606` is required for a successful `deploy.sh`. A second listener on `0.0.0.0:8501` is attempted when configured; deploy still succeeds if it fails. |
+| **Bind port / app** | **Yes** | Uvicorn on `0.0.0.0:62606` when `deploy.sh` runs; process runs as the Jupyter user. |
 | **GPU telemetry** | **Yes** | `nvidia-smi` works. On this host: GPU **0** = A100 (`UUID: GPU-fb2cf8f7-e9bf-f136-a3bb-e150426598e8`), GPU **1** = GeForce GT 1030 — set `GOAT_GPU_UUID` to the A100 UUID to avoid binding metrics to the wrong card. |
 
 **Practical implication:** `deploy.sh` falls back to **nohup + `fastapi.pid`** when `systemctl --user` is not enabled for `goat-ai`. On hosts where the user bus is broken, that nohup path is the supported option until IT fixes the session or provides another supervisor.
@@ -86,31 +86,29 @@ Run these commands once on the A100 server **only if** `systemctl --user status`
 ```bash
 mkdir -p ~/.config/systemd/user
 cp ~/GOAT_AI/goat-ai.service ~/.config/systemd/user/
-cp ~/GOAT_AI/goat-ai-alt.service ~/.config/systemd/user/
 systemctl --user daemon-reload
-systemctl --user enable goat-ai goat-ai-alt
-systemctl --user start goat-ai goat-ai-alt
+systemctl --user enable goat-ai
+systemctl --user start goat-ai
 loginctl enable-linger $USER   # keep service running when not logged in
 ```
 
-After this, `bash deploy.sh` automatically uses `systemctl --user restart` for each enabled unit instead of nohup. Only **`goat-ai`** (62606) is required for deploy to succeed; **`goat-ai-alt`** (8501) is optional — enable it if you want the second listener.
+After this, `bash deploy.sh` automatically uses `systemctl --user restart goat-ai` instead of nohup.
 
 If `systemctl --user` shows **Failed to connect to bus**, skip this block and rely on **nohup** (see deploy script fallback).
 
 Useful commands:
 
 ```bash
-systemctl --user status goat-ai goat-ai-alt
-systemctl --user restart goat-ai goat-ai-alt
-journalctl --user -u goat-ai -f        # primary (:62606)
-journalctl --user -u goat-ai-alt -f    # secondary (:8501)
+systemctl --user status goat-ai
+systemctl --user restart goat-ai
+journalctl --user -u goat-ai -f
 ```
 
 ---
 
 ## User-space ops (no root)
 
-On JupyterHub-style hosts without `logrotate` or reliable `systemctl --user`, use the scripts under [`scripts/`](../scripts/) from the repo root (`GOAT_AI_ROOT`, usually `~/GOAT_AI`). They match `deploy.sh` paths: **`fastapi.log`** (port 62606) and **`fastapi-8501.log`** (port 8501) in the project root, **`chat_logs.db`** from `GOAT_LOG_PATH` (see [`goat_ai/config.py`](../goat_ai/config.py)).
+On JupyterHub-style hosts without `logrotate` or reliable `systemctl --user`, use the scripts under [`scripts/`](../scripts/) from the repo root (`GOAT_AI_ROOT`, usually `~/GOAT_AI`). They match `deploy.sh` paths: **`fastapi.log`** in the project root, **`chat_logs.db`** from `GOAT_LOG_PATH` (see [`goat_ai/config.py`](../goat_ai/config.py)).
 
 | Script | Role |
 |--------|------|
@@ -182,8 +180,7 @@ Do not enable **`GOAT_WATCHDOG_RESTART=1`** until you trust `deploy.sh` is safe 
 | URL | Description |
 |-----|-------------|
 | `https://ai.simonbb.com/mingzhi/` | **Public URL** — nginx proxies to FastAPI on :62606 |
-| `http://127.0.0.1:62606/api/health` | Internal health check (primary listener) |
-| `http://127.0.0.1:8501/api/health` | Second listener (optional; same app — may be down) |
+| `http://127.0.0.1:62606/api/health` | Internal health check |
 
 ---
 

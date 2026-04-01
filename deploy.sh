@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# GOAT AI — production deploy (FastAPI + React; :62606 required, :8501 best-effort)
+# GOAT AI — production deploy (FastAPI + React on :62606)
 # Usage:
 #   bash deploy.sh              # full deploy (git pull → pip → build → restart)
 #   QUICK=1 bash deploy.sh      # quick restart: git pull → npm build → restart API only
 #   SKIP_BUILD=1 bash deploy.sh # skip npm build (use existing dist/)
 #
 # Override any variable before running, e.g.:
-#   PORT_API=8003 PORT_API_ALT=8004 bash deploy.sh
+#   PORT_API=8003 bash deploy.sh
 
 _DEPLOY_SCRIPT="${BASH_SOURCE[0]:-$0}"
 if [[ -f "$_DEPLOY_SCRIPT" ]]; then
@@ -23,16 +23,10 @@ GIT_BRANCH="${GIT_BRANCH:-main}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 VENV_DIR="${VENV_DIR:-$PROJECT_DIR/.venv}"
 
-PORT_API="${PORT_API:-62606}"          # primary (e.g. nginx / public path)
-PORT_API_ALT="${PORT_API_ALT:-8501}"   # second FastAPI listener (same app)
+PORT_API="${PORT_API:-62606}"          # FastAPI + React (e.g. nginx / public path)
 
 SKIP_BUILD="${SKIP_BUILD:-0}"
 QUICK="${QUICK:-0}"
-
-if [ "${PORT_API}" = "${PORT_API_ALT}" ]; then
-  echo "❌ PORT_API and PORT_API_ALT must differ (both are ${PORT_API})."
-  exit 1
-fi
 
 echo "🛠️  GOAT AI — Deploy starting (branch: ${GIT_BRANCH})${QUICK:+ [QUICK mode]}"
 
@@ -108,11 +102,9 @@ else
   echo "✅ Frontend built → ${FRONTEND_DIR}/dist/"
 fi
 
-# ── 4. Start FastAPI (uvicorn) on PORT_API and PORT_API_ALT ─────────────────
+# ── 4. Start FastAPI (uvicorn) on PORT_API ────────────────────────────────────
 API_LOG="${PROJECT_DIR}/fastapi.log"
 API_PID="${PROJECT_DIR}/fastapi.pid"
-API_LOG_ALT="${PROJECT_DIR}/fastapi-${PORT_API_ALT}.log"
-API_PID_ALT="${PROJECT_DIR}/fastapi-${PORT_API_ALT}.pid"
 
 _goat_systemd_restart() {
   local unit="$1"
@@ -126,18 +118,14 @@ _goat_systemd_restart() {
   return 1
 }
 
-if systemctl --user is-enabled goat-ai >/dev/null 2>&1 \
-  || systemctl --user is-enabled goat-ai-alt >/dev/null 2>&1; then
-  _goat_systemd_restart goat-ai || true
-  _goat_systemd_restart goat-ai-alt || true
+if _goat_systemd_restart goat-ai; then
+  :
 else
   # ── nohup fallback (works without systemd setup) ─────────────────────────
-  echo "🧹 Freeing ports ${PORT_API} and ${PORT_API_ALT}…"
+  echo "🧹 Freeing port ${PORT_API}…"
   free_port "$PORT_API"
-  free_port "$PORT_API_ALT"
 
   stop_pidfile "$API_PID"
-  stop_pidfile "$API_PID_ALT"
 
   echo "🚀 Starting FastAPI on 0.0.0.0:${PORT_API} (log: ${API_LOG})…"
   nohup "${VENV_DIR}/bin/python" -m uvicorn server:app \
@@ -147,18 +135,9 @@ else
     >> "$API_LOG" 2>&1 &
   echo $! > "$API_PID"
   echo "   PID: $(cat "$API_PID")"
-
-  echo "🚀 Starting FastAPI on 0.0.0.0:${PORT_API_ALT} (log: ${API_LOG_ALT})…"
-  nohup "${VENV_DIR}/bin/python" -m uvicorn server:app \
-    --host 0.0.0.0 \
-    --port "$PORT_API_ALT" \
-    --workers 2 \
-    >> "$API_LOG_ALT" 2>&1 &
-  echo $! > "$API_PID_ALT"
-  echo "   PID: $(cat "$API_PID_ALT")"
 fi
 
-# ── 5. Health check — primary required; alt optional ───────────────────────────
+# ── 5. Health check — FastAPI ─────────────────────────────────────────────────
 echo "⏳ Waiting for FastAPI on ${PORT_API}…"
 for i in {1..15}; do
   if curl -sf "http://127.0.0.1:${PORT_API}/api/health" >/dev/null 2>&1; then
@@ -172,20 +151,6 @@ for i in {1..15}; do
   fi
 done
 
-echo "⏳ Checking optional listener on ${PORT_API_ALT}…"
-ALT_OK=0
-for j in {1..8}; do
-  if curl -sf "http://127.0.0.1:${PORT_API_ALT}/api/health" >/dev/null 2>&1; then
-    echo "✅ Optional listener OK on ${PORT_API_ALT}."
-    ALT_OK=1
-    break
-  fi
-  sleep 1
-done
-if [ "$ALT_OK" != "1" ]; then
-  echo "⚠️  Optional listener not up on ${PORT_API_ALT} — ignored. See ${API_LOG_ALT} if you need it."
-fi
-
 # ── 6. Summary ────────────────────────────────────────────────────────────────
 echo ""
 echo "════════════════════════════════════════════"
@@ -194,9 +159,7 @@ echo "════════════════════════�
 echo ""
 echo "  🌐 React UI  → https://ai.simonbb.com/mingzhi/"
 echo "  🔌 API health→ http://127.0.0.1:${PORT_API}/api/health"
-echo "  🔌 API (opt) → http://127.0.0.1:${PORT_API_ALT}/api/health  (may be down)"
 echo ""
-echo "  📄 FastAPI log (${PORT_API}):    tail -f ${API_LOG}"
-echo "  📄 FastAPI log (${PORT_API_ALT}): tail -f ${API_LOG_ALT}"
-echo "  🛑 Stop: kill \$(cat ${API_PID}); optional: kill \$(cat ${API_PID_ALT})"
+echo "  📄 FastAPI log:  tail -f ${API_LOG}"
+echo "  🛑 Stop:         kill \$(cat ${API_PID})"
 echo ""

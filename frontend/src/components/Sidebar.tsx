@@ -331,9 +331,16 @@ const Sidebar: FC<Props> = ({
 
         <p className={sidebarFooterAttributionClass} style={{ color: 'rgba(255,255,255,0.38)' }}>
           Powered by{' '}
-          <span className={sidebarFooterHighlightClass} style={{ color: 'var(--gold)' }}>
+          <a
+            href="https://mingzhi0119.github.io/"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open homepage (new tab)"
+            className={sidebarFooterHighlightClass}
+            style={{ color: 'var(--gold)' }}
+          >
             Mingzhi Hu
-          </span>
+          </a>
         </p>
       </div>
     </aside>

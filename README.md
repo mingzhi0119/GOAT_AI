@@ -38,7 +38,6 @@ Nginx  (ai.simonbb.com/mingzhi/)
   │  proxy_pass http://127.0.0.1:62606
   ▼
 FastAPI / Uvicorn  :62606  ──► React SPA (frontend/dist/ served as static files)
-  │  (deploy may also run a second Uvicorn on :8501 — same app, see deploy.sh)
   │
   ├── GET  /api/health          liveness probe
   ├── GET  /api/models          list Ollama models
@@ -64,9 +63,8 @@ FastAPI / Uvicorn  :62606  ──► React SPA (frontend/dist/ served as static 
 GOAT_AI/
 │
 ├── server.py                   Uvicorn entrypoint (re-exports backend.main:app)
-├── deploy.sh                   Deploy: git pull, pip, npm build; :62606 required, :8501 optional
+├── deploy.sh                   Deploy: git pull, pip, npm build, FastAPI on :62606
 ├── goat-ai.service             Example user systemd unit (port 62606)
-├── goat-ai-alt.service         Example user systemd unit (port 8501)
 ├── requirements.txt            Python dependencies (pinned)
 │
 ├── backend/                    FastAPI application
@@ -163,7 +161,7 @@ bash deploy.sh
 QUICK=1 bash deploy.sh
 ```
 
-See [`docs/OPERATIONS.md`](docs/OPERATIONS.md) for all options. `goat-ai.service` (62606) is required for a green deploy; `goat-ai-alt.service` (8501) is optional. Without systemd, `deploy.sh` uses `nohup` with `fastapi.pid` and attempts `fastapi-8501.pid` (8501 failure does not fail the script).
+See [`docs/OPERATIONS.md`](docs/OPERATIONS.md) for all options. With systemd, install `goat-ai.service`; otherwise `deploy.sh` uses `nohup` and `fastapi.pid`.
 
 ---
 
