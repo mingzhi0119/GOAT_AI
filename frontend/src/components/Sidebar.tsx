@@ -336,7 +336,7 @@ const Sidebar: FC<Props> = ({
             target="_blank"
             rel="noopener noreferrer"
             title="Open homepage (new tab)"
-            className={sidebarFooterHighlightClass}
+            className={`${sidebarFooterHighlightClass} cursor-pointer`}
             style={{ color: 'var(--gold)' }}
           >
             Mingzhi Hu
