@@ -278,6 +278,7 @@ const Sidebar: FC<Props> = ({
             Analyze File
           </p>
           <FileUpload
+            key={fileContext?.filename ?? 'no-file'}
             onFileContext={onFileContext}
             onChartSpec={event => onChartSpec(event.chart)}
           />

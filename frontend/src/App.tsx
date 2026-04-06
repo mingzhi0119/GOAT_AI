@@ -83,6 +83,8 @@ export default function App() {
         onLoadHistorySession={sessionId => {
           void history.loadSession(sessionId).then(session => {
             chat.loadSession(session.id, session.messages)
+            clearFileContext()
+            setChartSpec(null)
           })
         }}
         onDeleteHistorySession={sessionId => {
@@ -91,7 +93,11 @@ export default function App() {
         fileContext={fileContext}
         onFileContext={setFileContext}
         onChartSpec={setChartSpec}
-        onClearFileContext={clearFileContext}
+        onClearFileContext={() => {
+          clearFileContext()
+          chat.clearMessages()
+          setChartSpec(null)
+        }}
       />
       <div className="flex flex-col flex-1 min-w-0 min-h-0">
         <TopBar
