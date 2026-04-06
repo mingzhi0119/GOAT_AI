@@ -6,6 +6,8 @@ import GoatIcon from './GoatIcon'
 
 interface Props {
   message: Message
+  /** When true, strip :::chart blocks emitted by the structured-output protocol. */
+  hasFileContext?: boolean
 }
 
 /** Copy the plain text of a message to the clipboard. */
@@ -41,14 +43,17 @@ function stripChartBlock(text: string, isStreaming: boolean): string {
 }
 
 /** Renders a single chat turn with role-based styling, Markdown, and copy button. */
-const MessageBubble: FC<Props> = ({ message }) => {
+const MessageBubble: FC<Props> = ({ message, hasFileContext = false }) => {
   const isUser = message.role === 'user'
   const isError = message.isError === true
   const [copied, setCopied] = useState(false)
 
-  const displayContent = isUser
-    ? message.content
-    : stripChartBlock(message.content, message.isStreaming ?? false)
+  // Only strip :::chart blocks when a file is loaded — avoids accidentally
+  // truncating responses that legitimately contain ":::chart" as text.
+  const displayContent =
+    isUser || !hasFileContext
+      ? message.content
+      : stripChartBlock(message.content, message.isStreaming ?? false)
 
   return (
     <div className={`flex items-end gap-2 group ${isUser ? 'justify-end' : 'justify-start'}`}>

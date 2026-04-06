@@ -155,7 +155,9 @@ const ChatWindow: FC<Props> = ({
             </div>
           </div>
         ) : (
-          messages.map(msg => <MessageBubble key={msg.id} message={msg} />)
+          messages.map(msg => (
+            <MessageBubble key={msg.id} message={msg} hasFileContext={fileContext !== null} />
+          ))
         )}
         <div ref={bottomRef} />
       </div>
