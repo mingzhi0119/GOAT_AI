@@ -82,7 +82,7 @@ python -m pytest __tests__/ -v
 cd frontend && npm test -- --run && npm run build
 ```
 
-CI: `.github/workflows/ci.yml` — `pytest` + `npm test` + `npm run build` on pushes/PRs to `main`.
+CI: `.github/workflows/ci.yml` — `pytest` + `npm test` + `npm run build` on pushes/PRs to `main` (frontend job uses **Node 20**; Vitest/jsdom need Node ≥20).
 
 Note: `test_history_router.py` may **skip** if `fastapi` is not installed in the active Python env.
 
