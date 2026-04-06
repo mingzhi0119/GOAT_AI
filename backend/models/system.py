@@ -17,3 +17,10 @@ class GPUStatusResponse(BaseModel):
     memory_total_mb: float | None = None
     temperature_c: float | None = None
     power_draw_w: float | None = None
+
+
+class InferenceLatencyResponse(BaseModel):
+    """Rolling average chat completion time (server-side, in-process)."""
+
+    chat_avg_ms: float
+    chat_sample_count: int

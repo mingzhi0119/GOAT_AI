@@ -11,8 +11,19 @@ export interface GPUStatus {
   power_draw_w: number | null
 }
 
+export interface InferenceLatency {
+  chat_avg_ms: number
+  chat_sample_count: number
+}
+
 export async function fetchGpuStatus(): Promise<GPUStatus> {
   const resp = await fetch('./api/system/gpu')
   if (!resp.ok) throw new Error(`GPU status API: HTTP ${resp.status}`)
   return (await resp.json()) as GPUStatus
+}
+
+export async function fetchInferenceLatency(): Promise<InferenceLatency> {
+  const resp = await fetch('./api/system/inference')
+  if (!resp.ok) throw new Error(`Inference latency API: HTTP ${resp.status}`)
+  return (await resp.json()) as InferenceLatency
 }

@@ -158,6 +158,7 @@ export default function App() {
             onStop={chat.stopStreaming}
             gpuStatus={gpu.status}
             gpuError={gpu.error}
+            inferenceLatency={gpu.inference}
           />
         </ErrorBoundary>
       </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchGpuStatus, type GPUStatus } from '../api/system'
+import { fetchGpuStatus, fetchInferenceLatency, type GPUStatus, type InferenceLatency } from '../api/system'
 
 /** Poll interval while the model is streaming vs idle (ms). */
 const POLL_STREAMING_MS = 1000
@@ -7,24 +7,32 @@ const POLL_IDLE_MS = 10000
 
 export interface UseGpuStatusReturn {
   status: GPUStatus | null
+  inference: InferenceLatency | null
   error: string | null
 }
 
 export function useGpuStatus(isStreaming: boolean): UseGpuStatusReturn {
   const [status, setStatus] = useState<GPUStatus | null>(null)
+  const [inference, setInference] = useState<InferenceLatency | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
     const load = async () => {
-      try {
-        const next = await fetchGpuStatus()
-        if (cancelled) return
-        setStatus(next)
+      const [gpuR, infR] = await Promise.allSettled([fetchGpuStatus(), fetchInferenceLatency()])
+      if (cancelled) return
+      if (infR.status === 'fulfilled') {
+        setInference(infR.value)
+      } else {
+        setInference(null)
+      }
+      if (gpuR.status === 'fulfilled') {
+        setStatus(gpuR.value)
         setError(null)
-      } catch (err) {
-        if (cancelled) return
-        setError(err instanceof Error ? err.message : 'Failed to fetch GPU status')
+      } else {
+        setStatus(null)
+        const reason = gpuR.reason
+        setError(reason instanceof Error ? reason.message : 'Failed to fetch GPU status')
       }
     }
     void load()
@@ -36,5 +44,5 @@ export function useGpuStatus(isStreaming: boolean): UseGpuStatusReturn {
     }
   }, [isStreaming])
 
-  return { status, error }
+  return { status, inference, error }
 }

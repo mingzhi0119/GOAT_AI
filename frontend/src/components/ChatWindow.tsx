@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FC, type KeyboardEvent } from 'react'
 import type { ChartSpec, Message } from '../api/types'
-import type { GPUStatus } from '../api/system'
+import type { GPUStatus, InferenceLatency } from '../api/system'
 import type { FileContext } from '../hooks/useFileContext'
 import GpuStatusDot from './GpuStatusDot'
 import MessageBubble from './MessageBubble'
@@ -27,6 +27,7 @@ interface Props {
   onStop: () => void
   gpuStatus: GPUStatus | null
   gpuError: string | null
+  inferenceLatency: InferenceLatency | null
 }
 
 /** Main chat panel: message list + auto-scroll + input area. */
@@ -40,6 +41,7 @@ const ChatWindow: FC<Props> = ({
   onStop,
   gpuStatus,
   gpuError,
+  inferenceLatency,
 }) => {
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -178,7 +180,11 @@ const ChatWindow: FC<Props> = ({
         style={{ borderColor: 'var(--border-color)', background: 'var(--bg-chat)' }}
       >
         <div className="flex items-center gap-2 max-w-4xl mx-auto">
-          <GpuStatusDot gpuStatus={gpuStatus} gpuError={gpuError} />
+          <GpuStatusDot
+            gpuStatus={gpuStatus}
+            gpuError={gpuError}
+            inferenceLatency={inferenceLatency}
+          />
           <textarea
             ref={textareaRef}
             value={input}

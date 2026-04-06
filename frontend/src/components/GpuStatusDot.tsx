@@ -1,5 +1,5 @@
 import { useId, useState, type CSSProperties, type FC } from 'react'
-import type { GPUStatus } from '../api/system'
+import type { GPUStatus, InferenceLatency } from '../api/system'
 
 /** Map GPU utilization to traffic-light colors (green / yellow / red). */
 export function utilizationTierColor(utilization: number | null, available: boolean): string {
@@ -16,15 +16,23 @@ function formatVramGb(usedMb: number | null, totalMb: number | null): string {
   return `VRAM ${fmt(u)}GB/${fmt(t)}GB`
 }
 
-function buildTooltipLines(status: GPUStatus | null, gpuError: string | null): string[] {
+function buildTooltipLines(
+  status: GPUStatus | null,
+  gpuError: string | null,
+  inference: InferenceLatency | null,
+): string[] {
   if (gpuError) return [`Error: ${gpuError}`]
   if (!status) return ['GPU telemetry unavailable']
   if (!status.available) return [status.message || 'GPU telemetry unavailable']
   const u = Math.round(status.utilization_gpu ?? 0)
   const engineState = status.active ? 'Active' : 'Idle'
+  const latLine =
+    inference && inference.chat_sample_count > 0
+      ? `Latency: avg ${Math.round(inference.chat_avg_ms)} ms (last ${inference.chat_sample_count})`
+      : 'Latency: —'
   return [
     `Active(${u}% GPU)`,
-    'Latency: Live',
+    latLine,
     formatVramGb(status.memory_used_mb, status.memory_total_mb),
     `A100 Engine: ${engineState}`,
   ]
@@ -33,16 +41,17 @@ function buildTooltipLines(status: GPUStatus | null, gpuError: string | null): s
 interface Props {
   gpuStatus: GPUStatus | null
   gpuError: string | null
+  inferenceLatency: InferenceLatency | null
 }
 
 /** Compact GPU status: colored dot; details only in hover/focus tooltip. */
-const GpuStatusDot: FC<Props> = ({ gpuStatus, gpuError }) => {
+const GpuStatusDot: FC<Props> = ({ gpuStatus, gpuError, inferenceLatency }) => {
   const [open, setOpen] = useState(false)
   const tipId = useId()
   const available = Boolean(gpuStatus?.available)
   const util = gpuStatus?.utilization_gpu ?? null
   const fill = utilizationTierColor(util, available && !gpuError)
-  const lines = buildTooltipLines(gpuStatus, gpuError)
+  const lines = buildTooltipLines(gpuStatus, gpuError, inferenceLatency)
   const label =
     gpuError != null && gpuError !== ''
       ? `GPU error: ${gpuError}`

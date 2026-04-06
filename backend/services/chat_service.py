@@ -15,6 +15,7 @@ import requests
 from backend.models.chat import ChatMessage
 from backend.services import log_service
 from goat_ai.exceptions import OllamaUnavailable
+from goat_ai.latency_metrics import record_chat_inference_ms
 from goat_ai.ollama_client import LLMClient
 from goat_ai.types import ChatTurn
 
@@ -252,6 +253,7 @@ def stream_chat_sse(
             yield f'data: {json.dumps({"type": "chart_spec", "chart": chart_spec})}\n\n'
         yield sse_event(_DONE_SENTINEL)
         elapsed_ms = round((time.monotonic() - t_start) * 1000)
+        record_chat_inference_ms(float(elapsed_ms))
         log_service.log_conversation(
             db_path=log_db_path,
             ip=ip,

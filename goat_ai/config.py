@@ -47,6 +47,7 @@ class Settings:
     log_db_path: Path
     gpu_target_uuid: str = ""
     gpu_target_index: int = 0
+    latency_rolling_max_samples: int = 20
 
     @property
     def user_facing_error(self) -> str:
@@ -57,6 +58,9 @@ def load_settings() -> Settings:
     base = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
     max_mb = int(os.environ.get("GOAT_MAX_UPLOAD_MB", "20"))
     _default_log_db = str(APP_ROOT / "chat_logs.db")
+    _lat_n = int(os.environ.get("GOAT_LATENCY_ROLLING_MAX_SAMPLES", "20"))
+    if _lat_n < 1:
+        raise ValueError("GOAT_LATENCY_ROLLING_MAX_SAMPLES must be >= 1")
     return Settings(
         ollama_base_url=base,
         generate_timeout=int(os.environ.get("OLLAMA_GENERATE_TIMEOUT", "120")),
@@ -70,4 +74,5 @@ def load_settings() -> Settings:
         log_db_path=Path(os.environ.get("GOAT_LOG_PATH", _default_log_db)),
         gpu_target_uuid=os.environ.get("GOAT_GPU_UUID", "").strip(),
         gpu_target_index=int(os.environ.get("GOAT_GPU_INDEX", "0")),
+        latency_rolling_max_samples=_lat_n,
     )

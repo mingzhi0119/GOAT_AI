@@ -1,6 +1,6 @@
 # GOAT AI — Roadmap
 
-> Last updated: 2026-03-31 · Current release: **v1.1.0**  
+> Last updated: 2026-04-06 · Current release: **v1.1.0**  
 > **Compact snapshot (APIs, SSE, deploy, tests):** [PROJECT_STATUS.md](PROJECT_STATUS.md)
 
 ---
@@ -23,27 +23,29 @@
 
 **Goal:** make the app production-hardened before a wider audience.
 
+**No-root production (JupyterHub / shared A100):** system `logrotate`, `supervisord`, and reliable `systemctl --user` are **not** guaranteed — see [OPERATIONS.md](OPERATIONS.md) (*Shared host permissions*, *User-space ops*). Prefer `deploy.sh` nohup + `scripts/watchdog.sh`, user crontab + [`scripts/rotate_fastapi_log.py`](../scripts/rotate_fastapi_log.py), and optional `goat-ai.service` **only after** `systemctl --user status` works on that host.
+
 | Task | Notes |
 |------|-------|
 | Loading skeleton | Pulse animation on first SSE token wait (replace blinking cursor) |
-| Process supervisor | `supervisord` or `systemd --user` so uvicorn survives server reboots |
-| Log rotation | `logrotate` config for `fastapi.log` (currently unbounded) |
-| Backend unit tests | `pytest` for `chat_service`, `upload_service`; mock Ollama via `FakeLLMClient` |
-| Frontend tests | Vitest: `useChat.test.ts`, `MessageBubble.test.tsx`, `api.test.ts` |
-| CI (GitHub Actions) | Run `pytest` + `npm test` on every push to `main` |
+| Process resilience | **Ideal:** `systemd --user` unit (`goat-ai.service`) *if* user bus works. **Fallback:** nohup + `fastapi.pid`, tmux, [`scripts/watchdog.sh`](../scripts/watchdog.sh) — see [OPERATIONS.md](OPERATIONS.md) |
+| Log rotation | **Not** system `/etc/logrotate.d` without root. Use [`scripts/rotate_fastapi_log.py`](../scripts/rotate_fastapi_log.py) (`GOAT_LOG_MAX_MB`, archive under `logs/archive/`) + cron |
+| Backend unit tests | `pytest` for services; mock Ollama via `FakeLLMClient` ([ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md)) |
+| Frontend tests | Vitest in `frontend/src/__tests__/` |
+| CI (GitHub Actions) | `pytest` + `frontend` `npm test` on push to `main` |
 
 ---
 
 ## 🔜 Phase 8 — Demo Power Features
 
-**Shipped (initial):** upload `chart_spec` + Recharts `ChartCard`; `GET /api/system/gpu` + sidebar strip; `deploy.sh` always `npm ci` before build. **Still open:** richer chart contracts from LLM text, rolling inference latency in UI, polish.
+**Shipped (initial):** upload `chart_spec` + Recharts `ChartCard`; `GET /api/system/gpu` + sidebar strip; rolling chat inference latency via `GET /api/system/inference`; Markdown export (TopBar); `deploy.sh` always `npm ci` before build. **Still open:** richer chart contracts from LLM text, polish.
 
 | Feature | Value |
 |---------|-------|
 | **Structured Data Viz (Recharts)** | CSV/XLSX analysis returns chart spec + narrative; frontend renders line/bar chart cards |
 | **A100 live status strip (real telemetry)** | Left sidebar shows real GPU utilization, memory, power, and rolling inference latency |
 | **Model info tooltip** | Show param count / context window on hover over model name |
-| **Markdown export** | Download conversation as `.md` file |
+| **Markdown export** | Download conversation as `.md` file (TopBar — client-side) |
 | **System prompt editor** | Let user override the system prompt per session |
 
 ### Phase 8 implementation strategy
@@ -77,7 +79,8 @@
 | Server | A100 Ubuntu 24.04 | same |
 | Public URL | `https://ai.simonbb.com/mingzhi/` | same (or dedicated subdomain) |
 | Port | 62606 (nginx proxy) | 62606 |
-| Process mgmt | `nohup` + PID file | supervisord / systemd --user |
+| Process mgmt | `nohup` + PID file (default on no-root hosts) | systemd --user *if* bus works; else watchdog/tmux |
+| Log files | `fastapi.log` + user-space rotation script | Same; IT logrotate only with root |
 | Node version | 18.19.1 (TLJH fixed) | 18.19.1 |
 | Python | 3.12.6 | 3.12.6 |
 

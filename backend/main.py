@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from backend.config import CORS_ORIGINS, get_settings
 from backend.routers import chat, history, models, system, upload
 from backend.services import log_service
+from goat_ai.latency_metrics import init_latency_metrics
 from goat_ai.logging_config import configure_logging
 
 configure_logging()
@@ -34,8 +35,10 @@ def create_app() -> FastAPI:
         # Hide docs in production by setting docs_url=None; keep open for now.
     )
 
-    # ── Initialise chat log DB on startup ─────────────────────────────────────
-    log_service.init_db(get_settings().log_db_path)
+    # ── Initialise chat log DB + inference metrics on startup ───────────────
+    _settings = get_settings()
+    log_service.init_db(_settings.log_db_path)
+    init_latency_metrics(_settings.latency_rolling_max_samples)
 
     # ── CORS (allows React dev server on :3000 to call the API on :8002) ──────
     app.add_middleware(

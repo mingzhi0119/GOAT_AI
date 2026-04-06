@@ -1,7 +1,7 @@
 # GOAT AI — Project status snapshot
 
 > **Purpose:** compact handoff for new chats / reviewers when context is full.  
-> **Last updated:** 2026-03-31  
+> **Last updated:** 2026-04-06  
 > **Authoritative detail:** [OPERATIONS.md](OPERATIONS.md) (run/deploy/env), [ROADMAP.md](ROADMAP.md) (phases), [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) (code rules).
 
 ---
@@ -32,6 +32,7 @@
 - **Upload:** `POST /api/upload` — parse CSV/XLSX, SSE stream; emits **`file_context`** (filename + analysis prompt for follow-up) and **`chart_spec`** (structured chart for Recharts when numeric data exists).
 - **History API:** `GET /api/history`, `GET /api/history/{id}`, `DELETE /api/history/{id}` — sidebar list / restore / delete.
 - **GPU telemetry:** `GET /api/system/gpu` — real `nvidia-smi` stats; UI polls ~5s; env **`GOAT_GPU_UUID`** (preferred) or **`GOAT_GPU_INDEX`** (default `0`).
+- **Inference latency:** `GET /api/system/inference` — rolling average duration (ms) of completed chat streams; shown in GPU dot tooltip; window size **`GOAT_LATENCY_ROLLING_MAX_SAMPLES`** (default `20`).
 - **Frontend:** Sidebar history, file-context chip, **GPU status strip** under Actions, **ChartCard** (Recharts) when `chart_spec` received; static sidebar label styles in `sidebarStaticText.ts`.
 - **Deploy fix (important):** `deploy.sh` runs **`npm ci` before every `npm run build`** so new deps (e.g. `recharts`) are never missing on servers that already had `node_modules/`.
 
@@ -49,6 +50,7 @@
 | GET | `/api/history/{session_id}` | Full session + messages JSON |
 | DELETE | `/api/history/{session_id}` | Delete session |
 | GET | `/api/system/gpu` | GPU JSON for status strip |
+| GET | `/api/system/inference` | Rolling avg chat stream ms + sample count |
 
 ---
 
@@ -73,12 +75,14 @@ Frontend parsers: `frontend/src/api/chat.ts`, `frontend/src/api/upload.ts`.
 ## 7. Tests & CI commands (local)
 
 ```bash
-# Backend
-python -m unittest discover -s __tests__ -p "test_*.py" -v
+# Backend (pytest runs unittest-style tests too)
+python -m pytest __tests__/ -v
 
 # Frontend
 cd frontend && npm test -- --run && npm run build
 ```
+
+CI: `.github/workflows/ci.yml` — `pytest` + `npm test` + `npm run build` on pushes/PRs to `main`.
 
 Note: `test_history_router.py` may **skip** if `fastapi` is not installed in the active Python env.
 

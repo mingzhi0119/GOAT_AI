@@ -1,7 +1,7 @@
 # GOAT AI — Install, run, deploy, stop
 
-> **Current architecture (Phase 2):** FastAPI backend on `:8002` + React/Vite frontend.
-> The React bundle is compiled and served as static files by FastAPI in production.
+> **Dev (local):** FastAPI on `:8002`, Vite dev server on `:3000` (proxies `/api` → `:8002`).  
+> **Production (school nginx):** Uvicorn on **`0.0.0.0:62606`** — see [PROJECT_STATUS.md](PROJECT_STATUS.md). The React `dist/` bundle is served by FastAPI when present.
 
 ---
 
@@ -160,6 +160,7 @@ Do not enable **`GOAT_WATCHDOG_RESTART=1`** until you trust `deploy.sh` is safe 
 | `GOAT_LOG_PATH` | Path to SQLite chat log database | `<project_root>/chat_logs.db` |
 | `GOAT_GPU_UUID` | Optional GPU UUID lock for `/api/system/gpu` (overrides index) | _(empty)_ |
 | `GOAT_GPU_INDEX` | GPU index for `/api/system/gpu` when UUID not set | `0` |
+| `GOAT_LATENCY_ROLLING_MAX_SAMPLES` | Max samples for rolling average in `/api/system/inference` (chat stream ms) | `20` |
 | `GOAT_AI_ROOT` | Repo root for ops scripts (`rotate_*`, `backup_*`) when not inferred | parent of `scripts/` |
 | `GOAT_FASTAPI_LOG` | Path to `fastapi.log` for rotation | `<project_root>/fastapi.log` |
 | `GOAT_LOG_ARCHIVE_DIR` | Rotated log archive directory | `<project_root>/logs/archive` |
@@ -237,6 +238,7 @@ curl -sf http://127.0.0.1:62606/api/health
 | `POST` | `/api/chat` | SSE streaming chat completion |
 | `POST` | `/api/upload` | SSE streaming CSV/XLSX analysis |
 | `GET` | `/api/system/gpu` | GPU telemetry JSON for sidebar status strip |
+| `GET` | `/api/system/inference` | Rolling average chat stream duration (ms) + sample count |
 
 **SSE format** (chat & upload):
 ```
