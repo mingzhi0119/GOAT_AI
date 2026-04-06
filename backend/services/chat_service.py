@@ -1,8 +1,10 @@
 """Chat service — orchestrates LLMClient + converts Pydantic models to goat_ai types."""
 from __future__ import annotations
 
+import io
 import json
 import logging
+import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -139,6 +141,70 @@ def _session_title_for_upsert(
     return _build_session_title_fallback(messages)
 
 
+_CHART_BLOCK_RE = re.compile(r":::chart\s*\n(\{.*?\})\s*\n:::", re.DOTALL)
+_CSV_EMBED_RE = re.compile(r"CHART_DATA_CSV:\n```\n(.*?)\n```", re.DOTALL)
+
+
+def _find_csv_in_messages(messages: list[ChatMessage]) -> "pd.DataFrame | None":
+    """Search the conversation history for an embedded CHART_DATA_CSV block."""
+    import pandas as pd  # local import — pandas only needed when a chart block is found
+
+    for msg in messages:
+        if msg.role != "user":
+            continue
+        m = _CSV_EMBED_RE.search(msg.content)
+        if m:
+            try:
+                return pd.read_csv(io.StringIO(m.group(1)))
+            except Exception:
+                logger.warning("Failed to parse embedded CSV from file-context message")
+    return None
+
+
+def _extract_chart_from_response(
+    full_text: str,
+    messages: list[ChatMessage],
+) -> tuple[dict[str, object] | None, str]:
+    """Find a :::chart JSON block in the LLM response and build a ChartSpec.
+
+    Returns (chart_spec, clean_text) where clean_text has the block stripped.
+    Returns (None, full_text) when no block is found or validation fails.
+    """
+    m = _CHART_BLOCK_RE.search(full_text)
+    if not m:
+        return None, full_text
+
+    try:
+        stub = json.loads(m.group(1))
+    except json.JSONDecodeError:
+        logger.warning("chart_service: :::chart block contained invalid JSON — skipping")
+        return None, full_text
+
+    x_key: str = stub.get("xKey", "")
+    series: list[dict[str, str]] = stub.get("series", [])
+    series_keys = [s.get("key", "") for s in series if isinstance(s, dict)]
+    chart_type: str = stub.get("type", "line")
+    title: str = stub.get("title", "")
+
+    if not x_key or not series_keys:
+        logger.warning("chart_service: :::chart block missing xKey or series — skipping")
+        return None, full_text
+
+    df = _find_csv_in_messages(messages)
+    if df is None:
+        logger.info("chart_service: no embedded CSV found in messages — skipping chart")
+        return None, full_text
+
+    from goat_ai.chart_tool import build_chart_spec_from_llm_selection
+
+    chart = build_chart_spec_from_llm_selection(df, x_key, series_keys, chart_type, title)
+    if chart is None:
+        return None, full_text
+
+    clean_text = (full_text[: m.start()].rstrip() + full_text[m.end() :]).strip()
+    return chart, clean_text
+
+
 def stream_chat_sse(
     *,
     llm: LLMClient,
@@ -180,6 +246,10 @@ def stream_chat_sse(
         logger.exception("Unexpected error during chat stream")
         yield sse_event("[ERROR] An unexpected error occurred.")
     finally:
+        full_text = "".join(buf)
+        chart_spec, clean_text = _extract_chart_from_response(full_text, messages)
+        if chart_spec is not None:
+            yield f'data: {json.dumps({"type": "chart_spec", "chart": chart_spec})}\n\n'
         yield sse_event(_DONE_SENTINEL)
         elapsed_ms = round((time.monotonic() - t_start) * 1000)
         log_service.log_conversation(
@@ -188,14 +258,14 @@ def stream_chat_sse(
             model=model,
             turn_count=len(messages),
             user_message=_last_user_message(messages),
-            assistant_response="".join(buf),
+            assistant_response=clean_text,
             response_ms=elapsed_ms,
             user_name=user_name,
             session_id=session_id,
         )
         if session_id:
             final_messages = all_messages if all_messages is not None else messages
-            assistant_content = "".join(buf)
+            assistant_content = clean_text
             stored_messages = list(final_messages) + [
                 ChatMessage(role="assistant", content=assistant_content),
             ]
@@ -204,7 +274,7 @@ def stream_chat_sse(
             created_at = existing["created_at"] if existing else now_iso
             title = _session_title_for_upsert(
                 messages=final_messages,
-                assistant_text=assistant_content,
+                assistant_text=clean_text,
                 session_id=session_id,
                 log_db_path=log_db_path,
                 ollama_base_url=ollama_base_url,

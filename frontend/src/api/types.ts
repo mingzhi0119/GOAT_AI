@@ -41,6 +41,9 @@ export interface ChartSpec {
   data: Record<string, string | number>[]
 }
 
+/** Union of events yielded by streamChat: plain token strings or a chart spec. */
+export type ChatStreamEvent = string | ChartSpec
+
 /** UI-only message shape: extends ChatMessage with a stable DOM key. */
 export interface Message {
   id: string

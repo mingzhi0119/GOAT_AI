@@ -25,17 +25,30 @@ async function copyToClipboard(text: string): Promise<void> {
   }
 }
 
+/**
+ * Strip the :::chart JSON block the LLM emits as part of the structured-output
+ * protocol.  During streaming we hide any partial block starting at :::chart;
+ * after streaming the complete block (:::chart ... :::) is removed.
+ */
+function stripChartBlock(text: string, isStreaming: boolean): string {
+  // Remove complete :::chart ... ::: blocks
+  let clean = text.replace(/:::chart[\s\S]*?:::/g, '')
+  // During streaming hide the incomplete tail starting at :::chart
+  if (isStreaming) {
+    clean = clean.replace(/:::chart[\s\S]*$/, '')
+  }
+  return clean.trimEnd()
+}
+
 /** Renders a single chat turn with role-based styling, Markdown, and copy button. */
 const MessageBubble: FC<Props> = ({ message }) => {
   const isUser = message.role === 'user'
   const isError = message.isError === true
   const [copied, setCopied] = useState(false)
 
-  const handleCopy = async () => {
-    await copyToClipboard(message.content)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
+  const displayContent = isUser
+    ? message.content
+    : stripChartBlock(message.content, message.isStreaming ?? false)
 
   return (
     <div className={`flex items-end gap-2 group ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -80,21 +93,21 @@ const MessageBubble: FC<Props> = ({ message }) => {
               </div>
             </div>
           ) : isUser ? (
-            <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+            <p className="text-sm whitespace-pre-wrap break-words">{displayContent}</p>
           ) : (
             <div className="prose-msg">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {message.content || ' '}
+                {displayContent || ' '}
               </ReactMarkdown>
             </div>
           )}
         </div>
 
         {/* Copy button — visible on group hover, hidden while streaming */}
-        {!message.isStreaming && message.content && (
+        {!message.isStreaming && displayContent && (
           <button
             type="button"
-            onClick={() => void handleCopy()}
+            onClick={() => void copyToClipboard(displayContent).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })}
             title={copied ? 'Copied!' : 'Copy message'}
             className="opacity-0 group-hover:opacity-100 transition-opacity px-2 py-0.5 rounded text-xs flex items-center gap-1"
             style={{

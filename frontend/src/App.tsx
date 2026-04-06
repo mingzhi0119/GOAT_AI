@@ -129,6 +129,7 @@ export default function App() {
                   fileContext?.prompt,
                   systemInstruction,
                   advanced.getOptionsForRequest(),
+                  setChartSpec,
                 )
                 .then(() => history.refresh())
             }}

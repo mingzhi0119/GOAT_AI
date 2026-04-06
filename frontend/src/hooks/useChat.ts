@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { streamChat } from '../api/chat'
-import type { ChatMessage, Message, OllamaOptionsPayload } from '../api/types'
+import type { ChatMessage, ChatStreamEvent, ChartSpec, Message, OllamaOptionsPayload } from '../api/types'
 
 const MESSAGES_KEY = 'goat-ai-messages'
 const SESSION_KEY = 'goat-ai-session-id'
@@ -28,6 +28,7 @@ export interface UseChatReturn {
     fileContextPrompt?: string,
     systemInstruction?: string,
     ollamaOptions?: OllamaOptionsPayload,
+    onChartSpec?: (spec: ChartSpec) => void,
   ) => Promise<void>
   streamToChat: (gen: AsyncGenerator<string>) => Promise<void>
   clearMessages: () => void
@@ -36,20 +37,26 @@ export interface UseChatReturn {
   loadSession: (sessionId: string, messages: ChatMessage[]) => void
 }
 
-/** Stream a generator's tokens into an existing assistant message slot. */
+/** Stream a mixed token/chart-spec generator into an existing assistant message slot. */
 function useStreamIntoMessage() {
   const run = useCallback(
     async (
-      gen: AsyncGenerator<string>,
+      gen: AsyncGenerator<ChatStreamEvent>,
       msgId: string,
       setMsgs: React.Dispatch<React.SetStateAction<Message[]>>,
       setStreaming: React.Dispatch<React.SetStateAction<boolean>>,
+      onChartSpec?: (spec: ChartSpec) => void,
     ) => {
       try {
-        for await (const token of gen) {
-          setMsgs(prev =>
-            prev.map(m => (m.id === msgId ? { ...m, content: m.content + token } : m)),
-          )
+        for await (const event of gen) {
+          if (typeof event === 'string') {
+            setMsgs(prev =>
+              prev.map(m => (m.id === msgId ? { ...m, content: m.content + event } : m)),
+            )
+          } else {
+            // ChartSpec object from chart_spec SSE event
+            onChartSpec?.(event)
+          }
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Streaming error'
@@ -105,14 +112,18 @@ export function useChat(): UseChatReturn {
   }, [sessionId])
 
   const _startStream = useCallback(
-    async (gen: AsyncGenerator<string>, prependMessages?: Message[]) => {
+    async (
+      gen: AsyncGenerator<ChatStreamEvent>,
+      prependMessages?: Message[],
+      onChartSpec?: (spec: ChartSpec) => void,
+    ) => {
       const asstId = crypto.randomUUID()
       setMessages(prev => [
         ...(prependMessages ?? prev),
         { id: asstId, role: 'assistant', content: '', isStreaming: true },
       ])
       setIsStreaming(true)
-      await _runStream(gen, asstId, setMessages, setIsStreaming)
+      await _runStream(gen, asstId, setMessages, setIsStreaming, onChartSpec)
     },
     [_runStream],
   )
@@ -125,6 +136,7 @@ export function useChat(): UseChatReturn {
       fileContextPrompt?: string,
       systemInstruction?: string,
       ollamaOptions?: OllamaOptionsPayload,
+      onChartSpec?: (spec: ChartSpec) => void,
     ) => {
       if (isStreaming) return
 
@@ -174,6 +186,7 @@ export function useChat(): UseChatReturn {
             { signal: ctrl.signal, userName },
           ),
           [...messagesRef.current, userMsg],
+          onChartSpec,
         )
       } finally {
         abortControllerRef.current = null
