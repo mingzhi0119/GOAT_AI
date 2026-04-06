@@ -51,4 +51,10 @@ export interface Message {
   content: string
   isStreaming?: boolean
   isError?: boolean
+  /**
+   * Hidden messages are kept in state so they are sent to the LLM as history
+   * (e.g. the injected file-context prompt and its "I have loaded" ack), but
+   * are never rendered in the chat window.
+   */
+  hidden?: boolean
 }

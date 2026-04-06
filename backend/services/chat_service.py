@@ -281,12 +281,22 @@ def stream_chat_sse(
                 generate_timeout=generate_timeout,
                 model=model,
             )
+            stored_dicts: list[dict[str, str]] = [
+                {"role": m.role, "content": m.content} for m in stored_messages
+            ]
+            # Persist the last chart spec so the frontend can restore it when
+            # loading this session from history (role "__chart__" is a sentinel;
+            # it is filtered out before display and never sent to Ollama).
+            if chart_spec is not None:
+                stored_dicts.append(
+                    {"role": "__chart__", "content": json.dumps(chart_spec, ensure_ascii=False)}
+                )
             log_service.upsert_session(
                 db_path=log_db_path,
                 session_id=session_id,
                 title=title,
                 model=model,
-                messages=[{"role": m.role, "content": m.content} for m in stored_messages],
+                messages=stored_dicts,
                 created_at=created_at,
                 updated_at=now_iso,
             )

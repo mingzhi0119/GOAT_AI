@@ -28,14 +28,15 @@ export default function App() {
   const gpu = useGpuStatus(chat.isStreaming)
   const [chartSpec, setChartSpec] = useState<ChartSpec | null>(null)
 
-  /** Title for top bar: server session title after save, else first user line (optimistic). */
+  /** Title for top bar: server session title after save, else first visible user line (optimistic). */
   const sessionTitleForTopBar = useMemo(() => {
     const sid = chat.sessionId
     if (!sid) return null
     const fromList = history.sessions.find(s => s.id === sid)?.title?.trim()
     if (fromList) return fromList
+    // Skip hidden messages (e.g. injected file-context prompts) when picking the title.
     const firstUser = chat.messages.find(
-      m => m.role === 'user' && !m.isStreaming && m.content.trim().length > 0,
+      m => m.role === 'user' && !m.isStreaming && !m.hidden && m.content.trim().length > 0,
     )
     if (firstUser) {
       const t = firstUser.content.trim().replace(/\n/g, ' ')
@@ -82,9 +83,24 @@ export default function App() {
         onDeleteAllHistory={handleDeleteAllHistory}
         onLoadHistorySession={sessionId => {
           void history.loadSession(sessionId).then(session => {
+            // Restore the chart spec from the __chart__ sentinel stored in the session
+            // (the backend appends it after every response that contained a chart block).
+            const allMsgs = session.messages as Array<{ role: string; content: string }>
+            const chartMessages = allMsgs.filter(m => m.role === '__chart__')
+            const lastChart = chartMessages[chartMessages.length - 1]
+            if (lastChart) {
+              try {
+                setChartSpec(JSON.parse(lastChart.content) as ChartSpec)
+              } catch {
+                setChartSpec(null)
+              }
+            } else {
+              setChartSpec(null)
+            }
             chat.loadSession(session.id, session.messages)
+            // Clear the active file-upload context; the file context is already
+            // embedded as hidden messages in the session so the LLM still has memory.
             clearFileContext()
-            setChartSpec(null)
           })
         }}
         onDeleteHistorySession={sessionId => {
@@ -107,7 +123,7 @@ export default function App() {
           systemInstruction={systemInstruction}
           onSystemInstructionChange={setSystemInstruction}
           onExportMarkdown={() =>
-            downloadChatAsMarkdown(chat.messages, sessionTitleForTopBar)
+            downloadChatAsMarkdown(chat.messages.filter(m => !m.hidden), sessionTitleForTopBar)
           }
           advancedOpen={advanced.advancedOpen}
           onAdvancedOpenChange={advanced.setAdvancedOpen}

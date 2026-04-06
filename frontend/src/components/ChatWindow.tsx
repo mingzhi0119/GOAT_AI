@@ -53,6 +53,16 @@ const ChatWindow: FC<Props> = ({
     return prompts
   }, [fileContext])
 
+  /** Visible (non-hidden) messages to render in the chat list. */
+  const visibleMessages = useMemo(() => messages.filter(m => !m.hidden), [messages])
+
+  /**
+   * True when the current session has an active file upload OR carries embedded
+   * file-context hidden messages (restored from history). Used to enable chart
+   * block stripping in MessageBubble.
+   */
+  const sessionHasFileContext = fileContext !== null || messages.some(m => m.hidden)
+
   // Auto-scroll to the latest message
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -91,8 +101,8 @@ const ChatWindow: FC<Props> = ({
     >
       {/* ── Messages area ─────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
-        {chartSpec && messages.length > 0 && <ChartCard spec={chartSpec} />}
-        {messages.length === 0 ? (
+        {chartSpec && visibleMessages.length > 0 && <ChartCard spec={chartSpec} />}
+        {visibleMessages.length === 0 ? (
           /* Empty state */
           <div className="flex flex-col items-center justify-center h-full gap-5 text-center px-4">
             <div
@@ -155,8 +165,8 @@ const ChatWindow: FC<Props> = ({
             </div>
           </div>
         ) : (
-          messages.map(msg => (
-            <MessageBubble key={msg.id} message={msg} hasFileContext={fileContext !== null} />
+          visibleMessages.map(msg => (
+            <MessageBubble key={msg.id} message={msg} hasFileContext={sessionHasFileContext} />
           ))
         )}
         <div ref={bottomRef} />

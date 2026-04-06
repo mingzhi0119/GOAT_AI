@@ -211,17 +211,51 @@ export function useChat(): UseChatReturn {
 
   const loadSession = useCallback((nextSessionId: string, sessionMessages: ChatMessage[]) => {
     setSessionId(nextSessionId)
-    const isUiMessage = (m: ChatMessage): m is ChatMessage & { role: Message['role'] } =>
-      m.role === 'user' || m.role === 'assistant'
-    setMessages(
-      sessionMessages
-        .filter(isUiMessage)
-        .map(m => ({
+
+    // Prefixes used when injecting the file-context turn into the conversation.
+    const FILE_CONTEXT_PREFIXES = [
+      '[User uploaded tabular data for analysis]',
+      '[User requested analysis of uploaded tabular data]',
+    ]
+    const FILE_CONTEXT_REPLY = 'I have loaded the file context.'
+
+    // Cast to loose type so __chart__ sentinels (not in the ChatMessage union) pass through.
+    const raw = sessionMessages as Array<{ role: string; content: string }>
+    const uiRows = raw.filter(m => m.role === 'user' || m.role === 'assistant')
+
+    const mapped: Message[] = []
+    let i = 0
+    while (i < uiRows.length) {
+      const m = uiRows[i]
+      const isFileCtx =
+        m.role === 'user' && FILE_CONTEXT_PREFIXES.some(p => m.content.startsWith(p))
+
+      if (isFileCtx) {
+        // Keep in state (LLM needs the CSV for follow-up chart requests) but hide from UI.
+        mapped.push({ id: crypto.randomUUID(), role: 'user', content: m.content, hidden: true })
+        const next = uiRows[i + 1]
+        if (next && next.role === 'assistant' && next.content === FILE_CONTEXT_REPLY) {
+          mapped.push({
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: next.content,
+            hidden: true,
+          })
+          i += 2
+        } else {
+          i++
+        }
+      } else {
+        mapped.push({
           id: crypto.randomUUID(),
-          role: m.role,
+          role: m.role as Message['role'],
           content: m.content,
-        })),
-    )
+        })
+        i++
+      }
+    }
+
+    setMessages(mapped)
   }, [])
 
   const stopStreaming = useCallback(() => {
