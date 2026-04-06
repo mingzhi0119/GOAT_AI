@@ -91,7 +91,7 @@ const ChatWindow: FC<Props> = ({
     >
       {/* ── Messages area ─────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
-        {chartSpec && <ChartCard spec={chartSpec} />}
+        {chartSpec && messages.length > 0 && <ChartCard spec={chartSpec} />}
         {messages.length === 0 ? (
           /* Empty state */
           <div className="flex flex-col items-center justify-center h-full gap-5 text-center px-4">
