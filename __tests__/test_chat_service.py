@@ -15,12 +15,14 @@ from backend.services.chat_service import (
 
 
 class ChatServiceTitleTests(unittest.TestCase):
-    def test_fallback_truncates_first_user_line(self) -> None:
+    def test_fallback_truncates_last_user_line(self) -> None:
         long_user = "x" * 100
         t = _build_session_title_fallback(
             [ChatMessage(role="user", content=long_user)],
         )
-        self.assertEqual(80, len(t))
+        # 80 content chars + "…" ellipsis
+        self.assertEqual(81, len(t))
+        self.assertTrue(t.endswith("…"))
 
     def test_first_exchange_uses_ollama_summary(self) -> None:
         tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)

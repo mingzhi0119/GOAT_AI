@@ -74,7 +74,7 @@ Frontend parsers: `frontend/src/api/chat.ts`, `frontend/src/api/upload.ts`.
 
 ```bash
 # Backend
-python -m unittest discover -s tests -p "test_*.py" -v
+python -m unittest discover -s __tests__ -p "test_*.py" -v
 
 # Frontend
 cd frontend && npm test -- --run && npm run build

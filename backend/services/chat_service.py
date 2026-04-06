@@ -55,11 +55,15 @@ def _compose_system_prompt(base_prompt: str, user_name: str, system_instruction:
 
 
 def _build_session_title_fallback(messages: list[ChatMessage]) -> str:
-    """Fallback title from the first user message (no LLM)."""
-    for msg in messages:
+    """Fallback title from the last user message (no LLM).
+
+    Uses the last user turn so that an injected file-context prompt at
+    position 0 does not pollute the title.
+    """
+    for msg in reversed(messages):
         if msg.role == "user":
             text = msg.content.strip().replace("\n", " ")
-            return text[:80] if len(text) > 80 else text
+            return (text[:80] + "…") if len(text) > 80 else text
     return "New Chat"
 
 
@@ -105,25 +109,33 @@ def _session_title_for_upsert(
     generate_timeout: int,
     model: str,
 ) -> str:
-    """Sidebar title: after first complete exchange, LLM summary of Q+A; else keep prior or fallback."""
+    """Sidebar title: generate once on the first exchange, keep it on all subsequent turns.
+
+    Uses the *last* user message for the LLM title prompt so that an injected
+    file-context prompt at position 0 is never used as the title source.
+    The session is considered "already titled" if it already exists in the DB
+    with a non-empty title, regardless of how many messages the history has.
+    """
     existing = (
         log_service.get_session(db_path=log_db_path, session_id=session_id)
         if session_id
         else None
     )
-    is_first_exchange = len(messages) == 1 and messages[0].role == "user"
-    if is_first_exchange and assistant_text.strip() and ollama_base_url.strip():
+    if existing and str(existing.get("title", "")).strip():
+        return str(existing["title"])
+
+    # First exchange for this session: generate a title using the real question.
+    last_user = _last_user_message(messages)
+    if last_user and assistant_text.strip() and ollama_base_url.strip():
         gen = _ollama_generate_session_title(
             ollama_base_url,
             generate_timeout,
             model,
-            messages[0].content,
+            last_user,
             assistant_text,
         )
         if gen:
             return gen
-    if existing and str(existing.get("title", "")).strip():
-        return str(existing["title"])
     return _build_session_title_fallback(messages)
 
 

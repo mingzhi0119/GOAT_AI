@@ -1,5 +1,10 @@
-/** Stream CSV/XLSX upload analysis as tokens via Server-Sent Events. */
-import type { OllamaOptionsPayload } from './types'
+/** Stream CSV/XLSX upload parse events via Server-Sent Events.
+ *
+ * The backend now only parses the file and returns structured metadata
+ * (file_context + chart_spec). No LLM inference is triggered on upload;
+ * the model answers when the user sends their first follow-up message.
+ */
+import type { ChartSpec } from './types'
 
 export interface UploadFileContextEvent {
   type: 'file_context'
@@ -9,30 +14,15 @@ export interface UploadFileContextEvent {
 
 export interface UploadChartSpecEvent {
   type: 'chart_spec'
-  chart: import('./types').ChartSpec
+  chart: ChartSpec
 }
 
 export type UploadStreamEvent = string | UploadFileContextEvent | UploadChartSpecEvent
 
-/** Stream CSV/XLSX upload analysis events via Server-Sent Events. */
-export async function* streamUpload(
-  file: File,
-  model: string,
-  systemInstruction?: string,
-  ollamaOptions?: OllamaOptionsPayload,
-): AsyncGenerator<UploadStreamEvent> {
+/** Parse a CSV/XLSX file and yield structured metadata events (no LLM call). */
+export async function* streamUpload(file: File): AsyncGenerator<UploadStreamEvent> {
   const form = new FormData()
   form.append('file', file)
-  form.append('model', model)
-  const extra = systemInstruction?.trim()
-  if (extra) {
-    form.append('system_instruction', extra)
-  }
-  if (ollamaOptions) {
-    form.append('temperature', String(ollamaOptions.temperature))
-    form.append('max_tokens', String(ollamaOptions.max_tokens))
-    form.append('top_p', String(ollamaOptions.top_p))
-  }
 
   const resp = await fetch('./api/upload', { method: 'POST', body: form })
   if (!resp.ok) throw new Error(`Upload API: HTTP ${resp.status}`)

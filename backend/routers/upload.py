@@ -1,17 +1,14 @@
-"""POST /api/upload — parse CSV/XLSX and stream an analysis via SSE."""
+"""POST /api/upload — parse CSV/XLSX and return structured metadata via SSE."""
 from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
 from backend.config import get_settings
-from backend.dependencies import get_llm_client
-from backend.routers.chat_options import build_ollama_options
 from backend.services.upload_service import stream_upload_analysis_sse
 from goat_ai.config import Settings
-from goat_ai.ollama_client import LLMClient
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -26,19 +23,15 @@ _MAX_READ_BYTES = 25 * 1024 * 1024  # hard cap before hitting service logic
 
 
 @router.post("/upload")
-async def upload_and_analyze(
+async def upload_and_parse(
     file: UploadFile,
-    model: str = Form("llama3:latest"),
-    system_instruction: str | None = Form(None),
-    temperature: float | None = Form(None),
-    max_tokens: int | None = Form(None),
-    top_p: float | None = Form(None),
-    llm: LLMClient = Depends(get_llm_client),
     settings: Settings = Depends(get_settings),
 ) -> StreamingResponse:
-    """Accept a CSV or XLSX upload, parse it, and stream an LLM analysis.
+    """Accept a CSV or XLSX upload, parse it, and stream structured metadata.
 
-    The response is an SSE stream identical in format to POST /api/chat.
+    Returns SSE events: ``file_context`` (always), ``chart_spec`` (when numeric
+    data is present), then ``[DONE]``. No LLM inference is performed here; the
+    caller uses the file_context prompt as hidden history on the next chat turn.
     """
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided.")
@@ -49,22 +42,11 @@ async def upload_and_analyze(
 
     content = await file.read(_MAX_READ_BYTES)
 
-    extra = (system_instruction or "").strip()[:8000]
-    o_opts = build_ollama_options(
-        temperature=temperature,
-        max_tokens=max_tokens,
-        top_p=top_p,
-    )
-
     return StreamingResponse(
         stream_upload_analysis_sse(
-            llm=llm,
-            model=model,
             content=content,
             filename=file.filename,
             settings=settings,
-            system_instruction=extra,
-            ollama_options=o_opts,
         ),
         media_type="text/event-stream",
         headers=_SSE_HEADERS,

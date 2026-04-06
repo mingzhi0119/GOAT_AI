@@ -1,18 +1,25 @@
-"""Upload service — adapts FastAPI UploadFile to the goat_ai upload layer."""
+"""Upload service — parses CSV/XLSX and emits structured SSE metadata events.
+
+No LLM inference is triggered here. The backend returns:
+  1. A ``file_context`` event so the frontend can persist the data description.
+  2. An optional ``chart_spec`` event when numeric columns are present.
+  3. A ``[DONE]`` sentinel to close the stream.
+
+The user then types a follow-up question in the chat input; ``sendMessage``
+prepends the file-context prompt to the conversation history so the model
+answers with full awareness of the uploaded data.
+"""
 from __future__ import annotations
 
-import io
 import json
 import logging
 from typing import Generator
 
-from backend.services.chat_service import sse_event, stream_chat_sse
+from backend.services.chat_service import sse_event
 from goat_ai.config import Settings
-from goat_ai.exceptions import OllamaUnavailable
-from goat_ai.ollama_client import LLMClient
 from goat_ai.tools import build_analysis_user_message
-from goat_ai.types import ChatTurn
 from goat_ai.uploads import TabularLoadResult, load_tabular_upload
+import io
 
 logger = logging.getLogger(__name__)
 
@@ -63,17 +70,14 @@ def _build_chart_spec(result: TabularLoadResult) -> dict[str, object] | None:
 
 def stream_upload_analysis_sse(
     *,
-    llm: LLMClient,
-    model: str,
     content: bytes,
     filename: str,
     settings: Settings,
-    system_instruction: str = "",
-    ollama_options: dict[str, float | int] | None = None,
 ) -> Generator[str, None, None]:
-    """Parse the uploaded file then stream an LLM analysis as SSE events.
+    """Parse the uploaded file and emit structured SSE metadata events.
 
-    Yields a single error event (then [DONE]) if the file is invalid.
+    Yields a ``file_context`` event (always), an optional ``chart_spec`` event,
+    then ``[DONE]``. Yields a single error event if the file is invalid.
     """
     result = parse_upload(content, filename, settings)
 
@@ -84,23 +88,10 @@ def stream_upload_analysis_sse(
 
     assert result.dataframe is not None  # parse_upload guarantees this when no user_error
     analysis_prompt = build_analysis_user_message(result.dataframe)
-    # Emit structured context so frontend can persist uploaded-file context.
     yield f'data: {json.dumps({"type": "file_context", "filename": filename, "prompt": analysis_prompt})}\n\n'
+
     chart_spec = _build_chart_spec(result)
     if chart_spec is not None:
         yield f'data: {json.dumps({"type": "chart_spec", "chart": chart_spec})}\n\n'
 
-    from backend.models.chat import ChatMessage  # local import avoids circular dep
-    chat_messages = [ChatMessage(role="user", content=analysis_prompt)]
-    yield from stream_chat_sse(
-        llm=llm,
-        model=model,
-        messages=chat_messages,
-        system_prompt=settings.system_prompt,
-        ip="upload",
-        log_db_path=settings.log_db_path,
-        ollama_base_url=settings.ollama_base_url,
-        generate_timeout=settings.generate_timeout,
-        system_instruction=system_instruction.strip(),
-        ollama_options=ollama_options,
-    )
+    yield sse_event("[DONE]")

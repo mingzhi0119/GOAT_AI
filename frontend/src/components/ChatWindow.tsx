@@ -1,22 +1,28 @@
-import { useEffect, useRef, useState, type FC, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FC, type KeyboardEvent } from 'react'
 import type { ChartSpec, Message } from '../api/types'
 import type { GPUStatus } from '../api/system'
+import type { FileContext } from '../hooks/useFileContext'
 import GpuStatusDot from './GpuStatusDot'
 import MessageBubble from './MessageBubble'
 import ChartCard from './ChartCard'
 
-const STARTER_PROMPTS = [
+const BASE_PROMPTS = [
   'Summarize key trends in consumer behavior',
   'What are the top strategic risks for 2026?',
-  'Explain Porter\'s Five Forces briefly',
+  "Explain Porter's Five Forces briefly",
   'Draft an executive summary template',
 ]
+
+/** Prompt injected at slot 3 (0-indexed) when a file has been uploaded. */
+const FILE_PROMPT =
+  'Visualize the uploaded data with a chart and explain the key trends'
 
 interface Props {
   messages: Message[]
   chartSpec: ChartSpec | null
   isStreaming: boolean
   selectedModel: string
+  fileContext: FileContext | null
   onSendMessage: (content: string) => void
   onStop: () => void
   gpuStatus: GPUStatus | null
@@ -29,6 +35,7 @@ const ChatWindow: FC<Props> = ({
   chartSpec,
   isStreaming,
   selectedModel,
+  fileContext,
   onSendMessage,
   onStop,
   gpuStatus,
@@ -37,6 +44,14 @@ const ChatWindow: FC<Props> = ({
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  /** Replace the last starter prompt with a data-analysis shortcut when a file is loaded. */
+  const starterPrompts = useMemo(() => {
+    if (!fileContext) return BASE_PROMPTS
+    const prompts = [...BASE_PROMPTS]
+    prompts[3] = FILE_PROMPT
+    return prompts
+  }, [fileContext])
 
   // Auto-scroll to the latest message
   useEffect(() => {
@@ -108,20 +123,35 @@ const ChatWindow: FC<Props> = ({
             </div>
             {/* Starter prompts */}
             <div className="grid grid-cols-2 gap-2 w-full max-w-md mt-2">
-              {STARTER_PROMPTS.map(prompt => (
-                <button
-                  key={prompt}
-                  onClick={() => onSendMessage(prompt)}
-                  className="text-xs px-3 py-2 rounded-xl text-left transition-colors hover:opacity-80"
-                  style={{
-                    border: '1px solid var(--border-color)',
-                    color: 'var(--text-main)',
-                    background: 'var(--bg-asst-bubble)',
-                  }}
-                >
-                  {prompt}
-                </button>
-              ))}
+              {starterPrompts.map((prompt, i) => {
+                const isFilePrompt = fileContext !== null && i === 3
+                return (
+                  <button
+                    key={prompt}
+                    onClick={() => onSendMessage(prompt)}
+                    className="text-xs px-3 py-2 rounded-xl text-left transition-colors hover:opacity-80"
+                    style={{
+                      border: isFilePrompt
+                        ? '1px solid var(--gold)'
+                        : '1px solid var(--border-color)',
+                      color: 'var(--text-main)',
+                      background: isFilePrompt
+                        ? 'rgba(255,205,0,0.08)'
+                        : 'var(--bg-asst-bubble)',
+                    }}
+                  >
+                    {isFilePrompt && (
+                      <span
+                        className="block text-[10px] font-semibold mb-0.5 leading-none"
+                        style={{ color: 'var(--gold)' }}
+                      >
+                        📊 From your file
+                      </span>
+                    )}
+                    {prompt}
+                  </button>
+                )
+              })}
             </div>
           </div>
         ) : (

@@ -262,14 +262,10 @@ frontend/src/
 
 **Structure**:
 ```
-tests/
-├── conftest.py          # shared fixtures: mock LLMClient, sample DataFrames, tmp settings
-├── unit/
-│   ├── test_tools.py
-│   ├── test_uploads.py
-│   └── test_chat_service.py
-└── integration/
-    └── test_api.py      # uses FastAPI TestClient, mocks OllamaService via DI
+__tests__/
+├── test_chat_service.py
+├── test_upload_service.py
+└── …                    # unittest discover — mock Ollama at Protocol boundary
 ```
 
 **Rules**:
@@ -320,7 +316,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install -r requirements.txt pytest pytest-asyncio httpx
-      - run: pytest tests/ -v --tb=short
+      - run: pytest __tests__/ -v --tb=short
 
   test-frontend:
     runs-on: ubuntu-latest

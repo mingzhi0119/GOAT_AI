@@ -4,7 +4,6 @@ import GoatIcon from './GoatIcon'
 import type { HistorySessionItem } from '../api/history'
 import type { ChartSpec } from '../api/types'
 import type { FileContext } from '../hooks/useFileContext'
-import type { OllamaOptionsPayload } from '../api/types'
 import {
   sidebarErrorTextClass,
   sidebarFileChipNameClass,
@@ -24,7 +23,6 @@ interface Props {
   onClearChat: () => void
   isLoadingModels: boolean
   modelsError: string | null
-  onStream: (gen: AsyncGenerator<string>) => Promise<void>
   userName: string
   onUserNameChange: (name: string) => void
   historySessions: HistorySessionItem[]
@@ -38,9 +36,6 @@ interface Props {
   onFileContext: (ctx: { type: 'file_context'; filename: string; prompt: string }) => void
   onChartSpec: (spec: ChartSpec) => void
   onClearFileContext: () => void
-  /** Same optional system instruction as TopBar settings; applied to upload analysis. */
-  systemInstruction: string
-  getOllamaOptions: () => OllamaOptionsPayload
 }
 
 /** Hover helper: avoids inlining repeated mouse-event handlers */
@@ -72,7 +67,6 @@ const Sidebar: FC<Props> = ({
   onClearChat,
   isLoadingModels,
   modelsError,
-  onStream,
   userName,
   onUserNameChange,
   historySessions,
@@ -86,8 +80,6 @@ const Sidebar: FC<Props> = ({
   onFileContext,
   onChartSpec,
   onClearFileContext,
-  systemInstruction,
-  getOllamaOptions,
 }) => {
   const fmtDate = (value: string) => {
     const d = new Date(value)
@@ -286,10 +278,6 @@ const Sidebar: FC<Props> = ({
             Analyze File
           </p>
           <FileUpload
-            model={selectedModel}
-            systemInstruction={systemInstruction}
-            getOllamaOptions={getOllamaOptions}
-            onStream={onStream}
             onFileContext={onFileContext}
             onChartSpec={event => onChartSpec(event.chart)}
           />

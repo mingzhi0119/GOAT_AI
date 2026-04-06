@@ -66,6 +66,7 @@ GOAT_AI/
 ├── deploy.sh                   Deploy: git pull, pip, npm build, FastAPI on :62606
 ├── goat-ai.service             Example user systemd unit (port 62606)
 ├── requirements.txt            Python dependencies (pinned)
+├── __tests__/                  Python unit tests (`unittest`; `python -m unittest discover -s __tests__`)
 │
 ├── backend/                    FastAPI application
 │   ├── main.py                 App factory: CORS, routers, SPA mount, DB init
@@ -187,6 +188,16 @@ python3 tools/query_logs.py export > logs.csv
 | `GOAT_CORS_ORIGINS` | `http://localhost:3000` | Allowed CORS origins |
 
 Full list: [`.env.example`](.env.example) · [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
+
+---
+
+## Backend tests
+
+From the repo root (with the venv activated and dev dependencies as needed):
+
+```bash
+python -m unittest discover -s __tests__ -p "test_*.py" -v
+```
 
 ---
 

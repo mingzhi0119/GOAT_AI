@@ -10,12 +10,6 @@ from backend.services.upload_service import stream_upload_analysis_sse
 from goat_ai.config import Settings
 
 
-class _FakeLLMClient:
-    def stream_tokens(self, model, messages, system_prompt, *, ollama_options=None):
-        yield "token-A"
-        yield "token-B"
-
-
 class UploadServiceTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmpdir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
@@ -41,8 +35,6 @@ class UploadServiceTests(unittest.TestCase):
         content = b"col1,col2\n1,2\n"
         events = list(
             stream_upload_analysis_sse(
-                llm=_FakeLLMClient(),
-                model="llama3:latest",
                 content=content,
                 filename="data.csv",
                 settings=self.settings,
@@ -52,14 +44,16 @@ class UploadServiceTests(unittest.TestCase):
 
         first = events[0]
         self.assertTrue(first.startswith("data: "))
-        payload = json.loads(first[len("data: ") :].strip())
+        payload = json.loads(first[len("data: "):].strip())
         self.assertEqual("file_context", payload["type"])
         self.assertEqual("data.csv", payload["filename"])
         self.assertIn("col1", payload["prompt"])
-        chart_payload = json.loads(events[1][len("data: ") :].strip())
+
+        chart_payload = json.loads(events[1][len("data: "):].strip())
         self.assertEqual("chart_spec", chart_payload["type"])
         self.assertIn("chart", chart_payload)
         self.assertEqual("line", chart_payload["chart"]["type"])
+
         self.assertTrue(any('"[DONE]"' in event for event in events))
 
 

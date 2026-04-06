@@ -1,6 +1,6 @@
 ---
 description: Automated testing patterns for Python (pytest) and TypeScript (Vitest) — mock strategy, fixtures, CI
-globs: {tests,**/__tests__,**/*.test.*,**/conftest*}/**
+globs: {__tests__,**/__tests__,**/*.test.*,**/conftest*}/**
 alwaysApply: false
 ---
 
@@ -35,10 +35,8 @@ def client(app: FastAPI) -> TestClient:
 
 **Layout**:
 ```
-tests/
-  conftest.py          # FakeLLMClient, sample DataFrames, tmp Settings
-  unit/                # pure logic — no HTTP
-  integration/         # FastAPI TestClient — mocks DI, no real Ollama
+__tests__/
+  test_*.py            # unittest — mock at Protocol boundary; no real Ollama
 ```
 
 ## TypeScript (Vitest + React Testing Library)
@@ -58,7 +56,7 @@ const { result } = renderHook(() => useChat());
 ```yaml
 - uses: actions/setup-python@v5
   with: { python-version: "3.12" }          # match server
-- run: pytest tests/ -v --tb=short
+- run: pytest __tests__/ -v --tb=short
 
 - uses: actions/setup-node@v4
   with: { node-version: "18" }              # match server exactly

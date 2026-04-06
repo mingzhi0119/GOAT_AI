@@ -4,26 +4,20 @@ import {
   type UploadChartSpecEvent,
   type UploadFileContextEvent,
 } from '../api/upload'
-import type { OllamaOptionsPayload } from '../api/types'
 
 interface Props {
-  model: string
-  systemInstruction?: string
-  getOllamaOptions: () => OllamaOptionsPayload
-  onStream: (gen: AsyncGenerator<string>) => Promise<void>
   onFileContext: (ctx: UploadFileContextEvent) => void
   onChartSpec: (event: UploadChartSpecEvent) => void
 }
 
-/** Drag-and-drop / click-to-browse upload area for CSV and XLSX files. */
-const FileUpload: FC<Props> = ({
-  model,
-  systemInstruction = '',
-  getOllamaOptions,
-  onStream,
-  onFileContext,
-  onChartSpec,
-}) => {
+/**
+ * Drag-and-drop / click-to-browse upload area for CSV and XLSX files.
+ *
+ * On upload the backend parses the file and returns a file_context + chart_spec
+ * event. No LLM inference is triggered here; the user types a follow-up question
+ * in the chat input and the model answers using the file context.
+ */
+const FileUpload: FC<Props> = ({ onFileContext, onChartSpec }) => {
   const [isDragging, setIsDragging] = useState(false)
   const [status, setStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle')
   const [fileName, setFileName] = useState<string | null>(null)
@@ -36,26 +30,18 @@ const FileUpload: FC<Props> = ({
       setErrorMsg(null)
       setStatus('uploading')
       try {
-        const source = streamUpload(file, model, systemInstruction, getOllamaOptions())
-        async function* tokenOnly(): AsyncGenerator<string> {
-          for await (const event of source) {
-            if (typeof event === 'string') {
-              yield event
-            } else if (event.type === 'file_context') {
-              onFileContext(event)
-            } else if (event.type === 'chart_spec') {
-              onChartSpec(event)
-            }
-          }
+        for await (const event of streamUpload(file)) {
+          if (typeof event === 'string') continue
+          if (event.type === 'file_context') onFileContext(event)
+          else if (event.type === 'chart_spec') onChartSpec(event)
         }
-        await onStream(tokenOnly())
         setStatus('done')
       } catch (err) {
         setErrorMsg(err instanceof Error ? err.message : 'Upload failed')
         setStatus('error')
       }
     },
-    [model, onChartSpec, onFileContext, onStream, systemInstruction, getOllamaOptions],
+    [onChartSpec, onFileContext],
   )
 
   const handleDrop = useCallback(
@@ -72,7 +58,6 @@ const FileUpload: FC<Props> = ({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0]
       if (file) void processFile(file)
-      // Reset so the same file can be re-uploaded
       e.target.value = ''
     },
     [processFile],
@@ -80,9 +65,9 @@ const FileUpload: FC<Props> = ({
 
   const label =
     status === 'uploading'
-      ? `Analyzing ${fileName ?? 'file'}…`
+      ? `Reading ${fileName ?? 'file'}…`
       : status === 'done'
-        ? `${fileName ?? 'File'} ✓`
+        ? `${fileName ?? 'File'} ready ✓\nAsk your question below`
         : status === 'error'
           ? 'Upload failed — retry'
           : 'Drop CSV / XLSX\nor click to browse'

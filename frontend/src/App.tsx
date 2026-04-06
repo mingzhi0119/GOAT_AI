@@ -44,6 +44,12 @@ export default function App() {
     return null
   }, [chat.sessionId, chat.messages, history.sessions])
 
+  const handleClearChat = () => {
+    chat.clearMessages()
+    clearFileContext()
+    setChartSpec(null)
+  }
+
   const handleDeleteAllHistory = () => {
     if (
       !window.confirm(
@@ -64,10 +70,9 @@ export default function App() {
         selectedModel={models.selectedModel}
         onModelChange={models.setSelectedModel}
         onRefreshModels={models.refresh}
-        onClearChat={chat.clearMessages}
+        onClearChat={handleClearChat}
         isLoadingModels={models.isLoading}
         modelsError={models.error}
-        onStream={chat.streamToChat}
         userName={userName}
         onUserNameChange={setUserName}
         historySessions={history.sessions}
@@ -87,8 +92,6 @@ export default function App() {
         onFileContext={setFileContext}
         onChartSpec={setChartSpec}
         onClearFileContext={clearFileContext}
-        systemInstruction={systemInstruction}
-        getOllamaOptions={advanced.getOptionsForRequest}
       />
       <div className="flex flex-col flex-1 min-w-0 min-h-0">
         <TopBar
@@ -116,6 +119,7 @@ export default function App() {
             chartSpec={chartSpec}
             isStreaming={chat.isStreaming}
             selectedModel={models.selectedModel}
+            fileContext={fileContext}
             onSendMessage={content => {
               void chat
                 .sendMessage(
