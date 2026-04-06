@@ -226,7 +226,9 @@ export function useChat(): UseChatReturn {
     const mapped: Message[] = []
     let i = 0
     while (i < uiRows.length) {
-      const m = uiRows[i]
+      // Explicit non-null assertion: the while-guard ensures i is in bounds.
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const m = uiRows[i]!
       const isFileCtx =
         m.role === 'user' && FILE_CONTEXT_PREFIXES.some(p => m.content.startsWith(p))
 
