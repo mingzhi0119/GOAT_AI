@@ -26,7 +26,7 @@ describe('upload api', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(sseResponse(payload)))
 
     const events: unknown[] = []
-    for await (const event of streamUpload(new File(['x,y\n1,2'], 'data.csv'), 'llama3:latest')) {
+    for await (const event of streamUpload(new File(['x,y\n1,2'], 'data.csv'))) {
       events.push(event)
     }
     expect(events).toHaveLength(2)
