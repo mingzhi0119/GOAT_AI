@@ -7,7 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 
 from backend.dependencies import get_session_repository
 from backend.models.common import ErrorResponse
-from backend.models.history import HistorySessionDetailResponse, HistorySessionListResponse
+from backend.models.history import (
+    HistorySessionDetailResponse,
+    HistorySessionFileContext,
+    HistorySessionListResponse,
+)
 from backend.services.chat_runtime import SessionRepository
 
 router = APIRouter()
@@ -55,7 +59,14 @@ def get_history_session(
     session = session_repository.get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
-    return HistorySessionDetailResponse.model_validate(asdict(session))
+    response_body = asdict(session)
+    file_context_prompt = response_body.pop("file_context_prompt", None)
+    response_body["file_context"] = (
+        HistorySessionFileContext(prompt=file_context_prompt)
+        if isinstance(file_context_prompt, str) and file_context_prompt.strip()
+        else None
+    )
+    return HistorySessionDetailResponse.model_validate(response_body)
 
 
 @router.delete(

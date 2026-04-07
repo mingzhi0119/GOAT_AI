@@ -6,8 +6,10 @@ from dataclasses import dataclass
 
 from backend.models.chat import ChatMessage
 from backend.services.chat_runtime import SessionDetailRecord, SessionUpsertPayload
+from backend.services.session_message_codec import decode_session_payload
 from backend.services.session_message_codec import (
     FILE_CONTEXT_REPLY,
+    STORED_CHART_ROLE,
     STORED_FILE_CONTEXT_ACK_ROLE,
     STORED_FILE_CONTEXT_ROLE,
 )
@@ -26,13 +28,16 @@ class FakeSessionRepository:
         return self.sessions.get(session_id)
 
     def upsert_session(self, payload: SessionUpsertPayload) -> None:
+        decoded = decode_session_payload(payload.payload)
         self.sessions[payload.session_id] = SessionDetailRecord(
             id=payload.session_id,
             title=payload.title,
             model=payload.model,
             created_at=payload.created_at,
             updated_at=payload.updated_at,
-            messages=payload.messages,
+            messages=decoded.messages,
+            chart_spec=decoded.chart_spec,
+            file_context_prompt=decoded.file_context_prompt,
         )
 
     def list_sessions(self) -> list[object]:
@@ -120,7 +125,7 @@ class ChatServiceTitleTests(unittest.TestCase):
         )
         self.assertEqual("Hello world", title)
 
-    def test_persist_chat_session_encodes_file_context_rows_as_storage_roles(self) -> None:
+    def test_persist_chat_session_writes_versioned_payload(self) -> None:
         repository = FakeSessionRepository(sessions={})
         persist_chat_session(
             session_id="sid-4",
@@ -146,8 +151,27 @@ class ChatServiceTitleTests(unittest.TestCase):
         stored = repository.get_session("sid-4")
         self.assertIsNotNone(stored)
         assert stored is not None
-        self.assertEqual(STORED_FILE_CONTEXT_ROLE, stored.messages[0]["role"])
-        self.assertEqual(STORED_FILE_CONTEXT_ACK_ROLE, stored.messages[1]["role"])
+        self.assertEqual("user", stored.messages[0]["role"])
+        self.assertEqual("Please chart revenue.", stored.messages[0]["content"])
+        self.assertEqual("assistant", stored.messages[1]["role"])
+        self.assertEqual("Done.", stored.messages[1]["content"])
+        self.assertIsNotNone(stored.file_context_prompt)
+
+    def test_decode_session_payload_keeps_legacy_storage_compatible(self) -> None:
+        decoded = decode_session_payload(
+            [
+                {"role": STORED_FILE_CONTEXT_ROLE, "content": "legacy prompt"},
+                {"role": STORED_FILE_CONTEXT_ACK_ROLE, "content": FILE_CONTEXT_REPLY},
+                {"role": "user", "content": "show me a chart"},
+                {"role": "assistant", "content": "done"},
+                {"role": STORED_CHART_ROLE, "content": '{"type":"bar","title":"Revenue"}'},
+            ]
+        )
+
+        self.assertEqual("legacy prompt", decoded.file_context_prompt)
+        self.assertEqual("show me a chart", decoded.messages[0]["content"])
+        self.assertEqual("done", decoded.messages[1]["content"])
+        self.assertEqual("Revenue", decoded.chart_spec["title"])
 
 
 if __name__ == "__main__":

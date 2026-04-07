@@ -1,4 +1,4 @@
-import type { HistorySessionMessage } from './types'
+import type { ChartSpec, HistorySessionMessage } from './types'
 
 export interface HistorySessionItem {
   id: string
@@ -10,6 +10,8 @@ export interface HistorySessionItem {
 
 export interface HistorySessionDetail extends HistorySessionItem {
   messages: HistorySessionMessage[]
+  chart_spec: ChartSpec | null
+  file_context: { prompt: string } | null
 }
 
 export async function fetchHistory(): Promise<HistorySessionItem[]> {

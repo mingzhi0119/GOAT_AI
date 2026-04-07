@@ -3,7 +3,6 @@ import type { ChartSpec, OllamaOptionsPayload } from '../api/types'
 import { useChat } from './useChat'
 import { useFileContext } from './useFileContext'
 import { useHistory } from './useHistory'
-import { parseStoredChartSpec } from '../utils/sessionHistory'
 
 interface UseChatSessionArgs {
   selectedModel: string
@@ -76,8 +75,8 @@ export function useChatSession({
   const loadHistorySession = useCallback(
     async (sessionId: string) => {
       const session = await history.loadSession(sessionId)
-      setChartSpec(parseStoredChartSpec(session))
-      chat.loadSession(session.id, session.messages)
+      setChartSpec(session.chart_spec)
+      chat.loadSession(session)
       clearFileContext()
     },
     [chat, clearFileContext, history],

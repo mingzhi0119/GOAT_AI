@@ -1,84 +1,34 @@
 import type { HistorySessionDetail } from '../api/history'
-import type { ChartSpec, HistorySessionMessage, Message } from '../api/types'
-
-type UiHistoryMessage = {
-  role: 'user' | 'assistant'
-  content: string
-}
-
-export const FILE_CONTEXT_PREFIXES = [
-  '[User uploaded tabular data for analysis]',
-  '[User requested analysis of uploaded tabular data]',
-] as const
+import type { Message } from '../api/types'
 
 export const FILE_CONTEXT_REPLY = 'I have loaded the file context.'
-export const STORED_CHART_ROLE = '__chart__' as const
-export const STORED_FILE_CONTEXT_ROLE = '__file_context__' as const
-export const STORED_FILE_CONTEXT_ACK_ROLE = '__file_context_ack__' as const
 
-export function parseStoredChartSpec(session: HistorySessionDetail): ChartSpec | null {
-  const chartMessages = session.messages.filter(message => message.role === STORED_CHART_ROLE)
-  const lastChart = chartMessages[chartMessages.length - 1]
-  if (!lastChart) return null
-  try {
-    return JSON.parse(lastChart.content) as ChartSpec
-  } catch {
-    return null
-  }
-}
-
-export function hydrateVisibleMessages(sessionMessages: HistorySessionMessage[]): Message[] {
-  const uiRows: UiHistoryMessage[] = sessionMessages.flatMap(message => {
-    if (message.role === 'user' || message.role === 'assistant') {
-      return [{ role: message.role, content: message.content }]
-    }
-    if (message.role === STORED_FILE_CONTEXT_ROLE) {
-      return [{ role: 'user', content: message.content }]
-    }
-    if (message.role === STORED_FILE_CONTEXT_ACK_ROLE) {
-      return [{ role: 'assistant', content: message.content }]
-    }
-    return []
-  })
-
+export function hydrateHistorySession(session: HistorySessionDetail): Message[] {
   const mapped: Message[] = []
-  let index = 0
-  while (index < uiRows.length) {
-    const current = uiRows[index]
-    if (!current) break
 
-    const isFileContext =
-      current.role === 'user' &&
-      FILE_CONTEXT_PREFIXES.some(prefix => current.content.startsWith(prefix))
-
-    if (isFileContext) {
-      mapped.push({
-        id: crypto.randomUUID(),
-        role: 'user',
-        content: current.content,
-        hidden: true,
-      })
-      const next = uiRows[index + 1]
-      if (next && next.role === 'assistant' && next.content === FILE_CONTEXT_REPLY) {
-        mapped.push({
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: next.content,
-          hidden: true,
-        })
-        index += 2
-        continue
-      }
-      index += 1
-      continue
-    }
-
+  const fileContextPrompt = session.file_context?.prompt?.trim()
+  if (fileContextPrompt) {
     mapped.push({
       id: crypto.randomUUID(),
-      role: current.role,
-      content: current.content,
+      role: 'user',
+      content: fileContextPrompt,
+      hidden: true,
     })
-    index += 1
+    mapped.push({
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      content: FILE_CONTEXT_REPLY,
+      hidden: true,
+    })
+  }
+
+  for (const message of session.messages) {
+    if (message.role !== 'user' && message.role !== 'assistant') continue
+    mapped.push({
+      id: crypto.randomUUID(),
+      role: message.role,
+      content: message.content,
+    })
   }
 
   return mapped

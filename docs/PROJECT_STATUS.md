@@ -41,7 +41,7 @@ Last updated: 2026-04-07
 - `/api/chat` streams typed JSON SSE objects, not legacy string sentinels
 - `/api/upload` emits `file_context` then `done`; it no longer emits starter charts
 - `/api/upload/analyze` keeps `chart: null` only for backward compatibility
-- History storage still contains compatibility roles such as `__chart__`, `__file_context__`, and `__file_context_ack__`, but the restore logic is now centralized and typed on the client side
+- History reads are normalized at the backend boundary: `/api/history/{id}` returns standard chat roles plus structured `chart_spec` / `file_context`, while legacy stored payloads remain readable through a dedicated compatibility codec
 - When `GOAT_API_KEY` is configured, every API except `/api/health` requires `X-GOAT-API-Key`
 
 ## Operational notes

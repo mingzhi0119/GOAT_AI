@@ -87,13 +87,21 @@ schemas:
       model: string
       created_at: string
       updated_at: string
-      messages: ChatMessage[]
+      messages: HistorySessionMessage[]
   HistorySessionListResponse:
     type: object
     required:
       - sessions
     properties:
       sessions: HistorySessionSummary[]
+  HistorySessionMessage:
+    type: object
+    required:
+      - role
+      - content
+    properties:
+      role: string
+      content: string
   HistorySessionSummary:
     type: object
     required:

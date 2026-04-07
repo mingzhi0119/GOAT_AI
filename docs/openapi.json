@@ -974,6 +974,28 @@
             },
             "type": "array",
             "title": "Messages"
+          },
+          "chart_spec": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chart Spec"
+          },
+          "file_context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HistorySessionFileContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -987,6 +1009,20 @@
         ],
         "title": "HistorySessionDetailResponse",
         "description": "Body for GET /api/history/{session_id}."
+      },
+      "HistorySessionFileContext": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt"
+        ],
+        "title": "HistorySessionFileContext",
+        "description": "Normalized stored file-context metadata for one session."
       },
       "HistorySessionListResponse": {
         "properties": {
@@ -1009,7 +1045,7 @@
         "properties": {
           "role": {
             "type": "string",
-            "pattern": "^(user|assistant|system|__chart__|__file_context__|__file_context_ack__)$",
+            "pattern": "^(user|assistant|system)$",
             "title": "Role"
           },
           "content": {

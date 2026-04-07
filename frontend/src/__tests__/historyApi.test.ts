@@ -27,6 +27,8 @@ describe('history api', () => {
         model: 'm',
         created_at: 'c',
         updated_at: 'u',
+        chart_spec: { version: '2.0', engine: 'echarts' },
+        file_context: { prompt: 'prompt' },
         messages: [{ role: 'user', content: 'hi' }],
       }),
     })
@@ -34,6 +36,8 @@ describe('history api', () => {
 
     const detail = await fetchSession('s1')
     expect(detail.id).toBe('s1')
+    expect(detail.chart_spec).toEqual({ version: '2.0', engine: 'echarts' })
+    expect(detail.file_context).toEqual({ prompt: 'prompt' })
     expect(mockedFetch).toHaveBeenCalledWith('./api/history/s1')
   })
 

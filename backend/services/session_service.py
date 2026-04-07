@@ -1,16 +1,12 @@
 """Session persistence and title-generation helpers for chat flows."""
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime, timezone
 
 from backend.models.chat import ChatMessage
 from backend.services.chat_runtime import SessionRepository, SessionUpsertPayload, TitleGenerator
-from backend.services.session_message_codec import (
-    STORED_CHART_ROLE,
-    encode_session_message,
-)
+from backend.services.session_message_codec import build_session_payload
 
 logger = logging.getLogger(__name__)
 
@@ -74,9 +70,6 @@ def persist_chat_session(
     title_override: str | None = None,
 ) -> None:
     """Persist the latest session snapshot, including optional chart state."""
-    stored_messages = list(final_messages) + [
-        ChatMessage(role="assistant", content=assistant_text),
-    ]
     now_iso = datetime.now(timezone.utc).isoformat()
     existing = session_repository.get_session(session_id)
     created_at = existing.created_at if existing is not None else now_iso
@@ -92,19 +85,16 @@ def persist_chat_session(
             title_generator=title_generator,
         )
     )
-    stored_dicts: list[dict[str, str]] = [
-        encode_session_message(message) for message in stored_messages
-    ]
-    if chart_spec is not None:
-        stored_dicts.append(
-            {"role": STORED_CHART_ROLE, "content": json.dumps(chart_spec, ensure_ascii=False)}
-        )
     session_repository.upsert_session(
         SessionUpsertPayload(
             session_id=session_id,
             title=title,
             model=model,
-            messages=stored_dicts,
+            payload=build_session_payload(
+                messages=final_messages,
+                assistant_text=assistant_text,
+                chart_spec=chart_spec,
+            ),
             created_at=created_at,
             updated_at=now_iso,
         )

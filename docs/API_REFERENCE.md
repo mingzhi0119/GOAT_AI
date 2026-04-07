@@ -197,7 +197,7 @@ Returns session metadata list:
 
 ## `GET /api/history/{session_id}`
 
-Returns one stored session with messages:
+Returns one normalized stored session:
 
 ```json
 {
@@ -206,6 +206,10 @@ Returns one stored session with messages:
   "model": "gemma4:26b",
   "created_at": "2026-04-07T14:00:00+00:00",
   "updated_at": "2026-04-07T14:01:30+00:00",
+  "chart_spec": { "version": "2.0", "engine": "echarts", "kind": "line" },
+  "file_context": {
+    "prompt": "[User uploaded tabular data for analysis] ..."
+  },
   "messages": [
     { "role": "user", "content": "Explain Porter." },
     { "role": "assistant", "content": "..." }
@@ -213,7 +217,11 @@ Returns one stored session with messages:
 }
 ```
 
-Stored history may also contain compatibility roles such as `__chart__`, `__file_context__`, and `__file_context_ack__`.
+Notes:
+
+- `messages` now contains only normalized chat roles: `user`, `assistant`, `system`
+- `chart_spec` and `file_context` are returned as dedicated fields instead of compatibility pseudo-roles
+- Legacy stored sessions are still readable; the compatibility decode lives in the backend storage codec, not the API contract
 
 ## `DELETE /api/history`
 

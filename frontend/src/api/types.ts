@@ -6,13 +6,7 @@ export interface ChatMessage {
 }
 
 export interface HistorySessionMessage {
-  role:
-    | 'user'
-    | 'assistant'
-    | 'system'
-    | '__chart__'
-    | '__file_context__'
-    | '__file_context_ack__'
+  role: 'user' | 'assistant' | 'system'
   content: string
 }
 

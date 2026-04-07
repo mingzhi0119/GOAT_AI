@@ -363,7 +363,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(["token", "done"], [event["type"] for event in events])
         self.assertEqual(SAFEGUARD_REFUSAL_MESSAGE, events[0]["token"])
 
-    def test_chat_chart_flow_persists_storage_roles_for_history(self) -> None:
+    def test_chat_chart_flow_returns_normalized_history_contract(self) -> None:
         file_context_prompt = (
             "[User uploaded tabular data for analysis]\n\n"
             "Column names: month, revenue.\n\n"
@@ -389,10 +389,11 @@ class ApiBlackboxContractTests(unittest.TestCase):
 
         history_detail = self.client.get("/api/history/chart-1")
         self.assertEqual(200, history_detail.status_code)
-        roles = [message["role"] for message in history_detail.json()["messages"]]
-        self.assertIn("__file_context__", roles)
-        self.assertIn("__file_context_ack__", roles)
-        self.assertIn("__chart__", roles)
+        body = history_detail.json()
+        roles = [message["role"] for message in body["messages"]]
+        self.assertEqual(["user", "assistant"], roles)
+        self.assertEqual(file_context_prompt, body["file_context"]["prompt"])
+        self.assertIsNotNone(body["chart_spec"])
 
     def test_upload_sse_and_json_endpoints_cover_success_and_validation_boundaries(self) -> None:
         upload_response = self.client.post(

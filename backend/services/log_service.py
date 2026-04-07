@@ -118,13 +118,13 @@ def upsert_session(
     session_id: str,
     title: str,
     model: str,
-    messages: list[dict[str, str]],
+    payload: dict[str, Any],
     created_at: str,
     updated_at: str,
 ) -> None:
     """Insert or update a persisted chat session with full message history."""
     try:
-        payload = json.dumps(messages, ensure_ascii=False)
+        encoded_payload = json.dumps(payload, ensure_ascii=False)
         with sqlite3.connect(db_path) as conn:
             conn.execute(
                 """
@@ -136,7 +136,7 @@ def upsert_session(
                     updated_at=excluded.updated_at,
                     messages=excluded.messages
                 """,
-                (session_id, title, model, created_at, updated_at, payload),
+                (session_id, title, model, created_at, updated_at, encoded_payload),
             )
     except Exception:
         logger.exception("Failed to upsert session %s in %s", session_id, db_path)
@@ -178,7 +178,7 @@ def get_session(*, db_path: Path, session_id: str) -> dict[str, Any] | None:
         item = dict(row)
         raw_messages = item.get("messages", "[]")
         parsed = json.loads(raw_messages) if isinstance(raw_messages, str) else []
-        item["messages"] = parsed if isinstance(parsed, list) else []
+        item["messages"] = parsed if isinstance(parsed, (list, dict)) else []
         return item
     except Exception:
         logger.exception("Failed to fetch session %s from %s", session_id, db_path)

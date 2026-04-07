@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { streamChat } from '../api/chat'
+import type { HistorySessionDetail } from '../api/history'
 import type {
   ChatMessage,
   ChatStreamEvent,
   ChartSpec,
-  HistorySessionMessage,
   Message,
   OllamaOptionsPayload,
 } from '../api/types'
-import { FILE_CONTEXT_REPLY, hydrateVisibleMessages } from '../utils/sessionHistory'
+import { FILE_CONTEXT_REPLY, hydrateHistorySession } from '../utils/sessionHistory'
 
 const MESSAGES_KEY = 'goat-ai-messages'
 const SESSION_KEY = 'goat-ai-session-id'
@@ -42,7 +42,7 @@ export interface UseChatReturn {
   clearMessages: () => void
   stopStreaming: () => void
   sessionId: string | null
-  loadSession: (sessionId: string, messages: HistorySessionMessage[]) => void
+  loadSession: (session: HistorySessionDetail) => void
 }
 
 /** Stream a mixed token/chart-spec generator into an existing assistant message slot. */
@@ -222,9 +222,9 @@ export function useChat(): UseChatReturn {
     localStorage.removeItem(MESSAGES_KEY)
   }, [])
 
-  const loadSession = useCallback((nextSessionId: string, sessionMessages: HistorySessionMessage[]) => {
-    setSessionId(nextSessionId)
-    setMessages(hydrateVisibleMessages(sessionMessages))
+  const loadSession = useCallback((session: HistorySessionDetail) => {
+    setSessionId(session.id)
+    setMessages(hydrateHistorySession(session))
   }, [])
 
   const stopStreaming = useCallback(() => {

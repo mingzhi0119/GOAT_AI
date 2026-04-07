@@ -9,6 +9,7 @@ from backend.models.chart_v2 import (
 from backend.models.common import ErrorResponse
 from backend.models.history import (
     HistorySessionDetailResponse,
+    HistorySessionFileContext,
     HistorySessionListResponse,
     HistorySessionSummary,
 )
@@ -22,6 +23,7 @@ __all__ = [
     "ChartSpecV2",
     "ErrorResponse",
     "HistorySessionDetailResponse",
+    "HistorySessionFileContext",
     "HistorySessionListResponse",
     "HistorySessionSummary",
     "UploadAnalysisResponse",

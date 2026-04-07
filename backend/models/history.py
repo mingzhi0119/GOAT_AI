@@ -7,11 +7,14 @@ from pydantic import BaseModel, Field
 class HistorySessionMessage(BaseModel):
     """Stored message row for persisted session history."""
 
-    role: str = Field(
-        ...,
-        pattern="^(user|assistant|system|__chart__|__file_context__|__file_context_ack__)$",
-    )
+    role: str = Field(..., pattern="^(user|assistant|system)$")
     content: str
+
+
+class HistorySessionFileContext(BaseModel):
+    """Normalized stored file-context metadata for one session."""
+
+    prompt: str
 
 
 class HistorySessionSummary(BaseModel):
@@ -34,3 +37,5 @@ class HistorySessionDetailResponse(HistorySessionSummary):
     """Body for GET /api/history/{session_id}."""
 
     messages: list[HistorySessionMessage]
+    chart_spec: dict[str, object] | None = None
+    file_context: HistorySessionFileContext | None = None

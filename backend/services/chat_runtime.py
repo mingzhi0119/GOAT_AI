@@ -8,6 +8,7 @@ from typing import Protocol
 import requests
 
 from backend.services import log_service
+from backend.services.session_message_codec import decode_session_payload
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,8 @@ class SessionDetailRecord(SessionSummaryRecord):
     """Typed session detail returned by the history repository."""
 
     messages: list[dict[str, str]]
+    chart_spec: dict[str, object] | None = None
+    file_context_prompt: str | None = None
 
 
 @dataclass(frozen=True)
@@ -35,7 +38,7 @@ class SessionUpsertPayload:
     session_id: str
     title: str
     model: str
-    messages: list[dict[str, str]]
+    payload: dict[str, object]
     created_at: str
     updated_at: str
 
@@ -109,20 +112,16 @@ class SQLiteSessionRepository:
         row = log_service.get_session(db_path=self._db_path, session_id=session_id)
         if row is None:
             return None
-        raw_messages = row.get("messages", [])
-        messages = raw_messages if isinstance(raw_messages, list) else []
-        normalized_messages = [
-            {"role": str(message.get("role", "")), "content": str(message.get("content", ""))}
-            for message in messages
-            if isinstance(message, dict)
-        ]
+        decoded = decode_session_payload(row.get("messages", []))
         return SessionDetailRecord(
             id=str(row["id"]),
             title=str(row["title"]),
             model=str(row["model"]),
             created_at=str(row["created_at"]),
             updated_at=str(row["updated_at"]),
-            messages=normalized_messages,
+            messages=decoded.messages,
+            chart_spec=decoded.chart_spec,
+            file_context_prompt=decoded.file_context_prompt,
         )
 
     def upsert_session(self, payload: SessionUpsertPayload) -> None:
@@ -131,7 +130,7 @@ class SQLiteSessionRepository:
             session_id=payload.session_id,
             title=payload.title,
             model=payload.model,
-            messages=payload.messages,
+            payload=payload.payload,
             created_at=payload.created_at,
             updated_at=payload.updated_at,
         )
