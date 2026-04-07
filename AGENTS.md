@@ -62,6 +62,8 @@ These constraints are important and easy to forget.
 - Deploy from the current local checkout unless explicit sync is requested.
 - Keep `SYNC_GIT=1` as an explicit opt-in only.
 - Keep `nohup` fallback deployment behavior intact.
+- Runtime target selection is interface-driven: `GOAT_DEPLOY_TARGET=auto` must prefer `GOAT_SERVER_PORT` (default `62606`) and fall back to `GOAT_LOCAL_PORT` (default `8002`) only when the current environment cannot bind/use the server port.
+- The deploy/ops contract for target resolution is exposed at `GET /api/system/runtime-target`; keep script behavior and API output aligned.
 
 ## Python Backend Standards
 

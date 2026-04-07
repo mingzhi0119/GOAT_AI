@@ -19,8 +19,18 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    // Warn on chunks > 500 kB
+    // Keep heavy visualization code in its own async chunk instead of the main app bundle.
     chunkSizeWarningLimit: 500,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/recharts')) {
+            return 'charts'
+          }
+          return undefined
+        },
+      },
+    },
   },
   test: {
     environment: 'jsdom',

@@ -51,12 +51,30 @@ bash deploy.sh              # full deploy from current local checkout
 QUICK=1 bash deploy.sh      # skip pip install, still rebuild frontend and restart
 SKIP_BUILD=1 bash deploy.sh # restart using existing frontend/dist
 SYNC_GIT=1 bash deploy.sh   # optional: reset to origin/$GIT_BRANCH before deploy
+GOAT_DEPLOY_TARGET=local bash deploy.sh   # force local fallback port
 ```
+
+Windows PowerShell:
+
+```powershell
+.\deploy.ps1
+.\deploy.ps1 -Quick
+.\deploy.ps1 -SkipBuild
+.\deploy.ps1 -SyncGit
+```
+
+On Windows, `deploy.ps1` now auto-manages local Ollama only when `OLLAMA_BASE_URL` is not explicitly set in the shell or `.env`:
+- If `http://127.0.0.1:11434` is already serving Ollama, it reuses that endpoint.
+- If not, it tries to start `ollama serve` and then uses `http://127.0.0.1:11434`.
+- If you explicitly set `OLLAMA_BASE_URL`, that value is respected and the script does not override it.
 
 - **Logs:** `fastapi.log` in the project root.
 - **PID:** `fastapi.pid` (nohup mode only)
 - **Stop (nohup):** `kill "$(cat fastapi.pid)"`
 - **Stop (systemd):** `systemctl --user stop goat-ai`
+- **Stop (PowerShell):** `Stop-Process -Id (Get-Content .\fastapi.pid)`
+- **Default target resolution:** `GOAT_DEPLOY_TARGET=auto` prefers `GOAT_SERVER_PORT=62606`; if the current environment cannot bind/use that port, deployment falls back to `GOAT_LOCAL_PORT=8002`.
+- **Introspection API:** `GET /api/system/runtime-target` returns the active target plus the ordered fallback list used by deploy/ops tooling.
 
 ---
 
@@ -163,6 +181,9 @@ Do not enable **`GOAT_WATCHDOG_RESTART=1`** until you trust `deploy.sh` is safe 
 | `GOAT_API_KEY` | Optional shared secret required on all non-health API routes via `X-GOAT-API-Key` | _(empty / disabled)_ |
 | `GOAT_RATE_LIMIT_WINDOW_SEC` | Rolling window for protected-route rate limiting | `60` |
 | `GOAT_RATE_LIMIT_MAX_REQUESTS` | Max protected-route requests allowed per window per API key | `60` |
+| `GOAT_DEPLOY_TARGET` | Runtime target mode: `auto`, `server`, or `local` | `auto` |
+| `GOAT_SERVER_PORT` | Preferred school-server bind port | `62606` |
+| `GOAT_LOCAL_PORT` | Local fallback bind port | `8002` |
 | `GOAT_GPU_UUID` | Optional GPU UUID lock for `/api/system/gpu` (overrides index) | _(empty)_ |
 | `GOAT_GPU_INDEX` | GPU index for `/api/system/gpu` when UUID not set | `0` |
 | `GOAT_LATENCY_ROLLING_MAX_SAMPLES` | Max samples for rolling average in `/api/system/inference` (chat stream ms) | `20` |
@@ -248,6 +269,7 @@ curl -sf http://127.0.0.1:62606/api/health
 | `DELETE` | `/api/history/{session_id}` | Delete a saved session |
 | `GET` | `/api/system/gpu` | GPU telemetry JSON for sidebar status strip |
 | `GET` | `/api/system/inference` | Rolling average chat stream duration (ms) + sample count |
+| `GET` | `/api/system/runtime-target` | Current bind target plus ordered fallback candidates |
 
 For a full request/response/error contract, see [API_REFERENCE.md](API_REFERENCE.md).
 

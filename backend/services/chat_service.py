@@ -14,14 +14,20 @@ import requests
 
 from backend.models.chat import ChatMessage
 from backend.services import log_service
+from goat_ai.chart_tool import GENERATE_CHART_SCHEMA, build_chart_spec_from_tool_arguments
 from goat_ai.exceptions import OllamaUnavailable
 from goat_ai.latency_metrics import record_chat_inference_ms
-from goat_ai.ollama_client import LLMClient
+from goat_ai.ollama_client import LLMClient, ToolCallPlan
+from goat_ai.tools import messages_for_ollama
 from goat_ai.types import ChatTurn
 
 logger = logging.getLogger(__name__)
 
 _DONE_SENTINEL = "[DONE]"
+_CHART_INTENT_RE = re.compile(
+    r"\b(chart|plot|graph|visuali[sz]e|visualization|trend|compare|comparison)\b",
+    re.IGNORECASE,
+)
 
 
 def _to_chat_turns(messages: list[ChatMessage]) -> list[ChatTurn]:
@@ -162,6 +168,60 @@ def _find_csv_in_messages(messages: list[ChatMessage]) -> "pd.DataFrame | None":
     return None
 
 
+def _strip_chart_block(text: str) -> str:
+    """Remove the legacy :::chart block from assistant text when present."""
+    return _CHART_BLOCK_RE.sub("", text).strip()
+
+
+def _should_attempt_native_chart_tool(messages: list[ChatMessage]) -> bool:
+    """True when the latest user turn looks like a visualization request."""
+    last_user = _last_user_message(messages)
+    return bool(last_user and _CHART_INTENT_RE.search(last_user))
+
+
+def _prepare_native_chart_tool_followup(
+    *,
+    llm: LLMClient,
+    model: str,
+    messages: list[ChatMessage],
+    turns: list[ChatTurn],
+    system_prompt: str,
+    ollama_options: dict[str, float | int] | None,
+) -> tuple[dict[str, object], list[dict[str, object]]] | None:
+    """Plan a native chart tool call and return chart spec + follow-up messages."""
+    if not _should_attempt_native_chart_tool(messages):
+        return None
+
+    df = _find_csv_in_messages(messages)
+    if df is None:
+        return None
+
+    tool_plan: ToolCallPlan | None = llm.plan_tool_call(
+        model,
+        turns,
+        system_prompt,
+        tools=[GENERATE_CHART_SCHEMA],
+        ollama_options=ollama_options,
+    )
+    if tool_plan is None or tool_plan.tool_name != "generate_chart":
+        return None
+
+    chart_spec = build_chart_spec_from_tool_arguments(df, tool_plan.arguments)
+    if chart_spec is None:
+        return None
+
+    followup_messages: list[dict[str, object]] = [
+        *messages_for_ollama(turns, system_prompt),
+        tool_plan.assistant_message,
+        {
+            "role": "tool",
+            "tool_name": tool_plan.tool_name,
+            "content": json.dumps({"chart": chart_spec}, ensure_ascii=False),
+        },
+    ]
+    return chart_spec, followup_messages
+
+
 def _extract_chart_from_response(
     full_text: str,
     messages: list[ChatMessage],
@@ -233,11 +293,35 @@ def stream_chat_sse(
     effective_prompt = _compose_system_prompt(system_prompt, user_name, system_instruction)
     buf: list[str] = []
     t_start = time.monotonic()
+    emitted_chart_spec: dict[str, object] | None = None
+    native_tool_followup: list[dict[str, object]] | None = None
+
+    native_chart_plan = _prepare_native_chart_tool_followup(
+        llm=llm,
+        model=model,
+        messages=messages,
+        turns=turns,
+        system_prompt=effective_prompt,
+        ollama_options=ollama_options,
+    )
+    if native_chart_plan is not None:
+        emitted_chart_spec, native_tool_followup = native_chart_plan
+        yield f'data: {json.dumps({"type": "chart_spec", "chart": emitted_chart_spec})}\n\n'
 
     try:
-        for token in llm.stream_tokens(
-            model, turns, effective_prompt, ollama_options=ollama_options
-        ):
+        if native_tool_followup is not None:
+            token_stream = llm.stream_tool_followup(
+                model,
+                native_tool_followup,
+                tools=[GENERATE_CHART_SCHEMA],
+                ollama_options=ollama_options,
+            )
+        else:
+            token_stream = llm.stream_tokens(
+                model, turns, effective_prompt, ollama_options=ollama_options
+            )
+
+        for token in token_stream:
             buf.append(token)
             yield sse_event(token)
     except OllamaUnavailable as exc:
@@ -248,8 +332,12 @@ def stream_chat_sse(
         yield sse_event("[ERROR] An unexpected error occurred.")
     finally:
         full_text = "".join(buf)
-        chart_spec, clean_text = _extract_chart_from_response(full_text, messages)
-        if chart_spec is not None:
+        if emitted_chart_spec is not None:
+            chart_spec = emitted_chart_spec
+            clean_text = _strip_chart_block(full_text)
+        else:
+            chart_spec, clean_text = _extract_chart_from_response(full_text, messages)
+        if emitted_chart_spec is None and chart_spec is not None:
             yield f'data: {json.dumps({"type": "chart_spec", "chart": chart_spec})}\n\n'
         yield sse_event(_DONE_SENTINEL)
         elapsed_ms = round((time.monotonic() - t_start) * 1000)

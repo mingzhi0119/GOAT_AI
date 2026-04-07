@@ -14,7 +14,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     """Body for POST /api/chat."""
 
-    model: str = Field("llama3:latest", min_length=1)
+    model: str = Field("gemma4:26b", min_length=1)
     messages: list[ChatMessage] = Field(..., min_length=1)
     session_id: str | None = None
     system_instruction: str | None = Field(

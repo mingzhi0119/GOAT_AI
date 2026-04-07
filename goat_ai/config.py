@@ -89,6 +89,9 @@ class Settings:
     api_key: str = ""
     rate_limit_window_sec: int = 60
     rate_limit_max_requests: int = 60
+    deploy_target: str = "auto"
+    server_port: int = 62606
+    local_port: int = 8002
     gpu_target_uuid: str = ""
     gpu_target_index: int = 0
     latency_rolling_max_samples: int = 20
@@ -105,11 +108,20 @@ def load_settings() -> Settings:
     _default_log_db = str(APP_ROOT / "chat_logs.db")
     _rate_limit_window_sec = int(os.environ.get("GOAT_RATE_LIMIT_WINDOW_SEC", "60"))
     _rate_limit_max_requests = int(os.environ.get("GOAT_RATE_LIMIT_MAX_REQUESTS", "60"))
+    _deploy_target = os.environ.get("GOAT_DEPLOY_TARGET", "auto").strip().lower()
+    _server_port = int(os.environ.get("GOAT_SERVER_PORT", "62606"))
+    _local_port = int(os.environ.get("GOAT_LOCAL_PORT", "8002"))
     _lat_n = int(os.environ.get("GOAT_LATENCY_ROLLING_MAX_SAMPLES", "20"))
+    if _deploy_target not in {"auto", "server", "local"}:
+        raise ValueError("GOAT_DEPLOY_TARGET must be one of: auto, server, local")
     if _rate_limit_window_sec < 1:
         raise ValueError("GOAT_RATE_LIMIT_WINDOW_SEC must be >= 1")
     if _rate_limit_max_requests < 1:
         raise ValueError("GOAT_RATE_LIMIT_MAX_REQUESTS must be >= 1")
+    if _server_port < 1 or _server_port > 65535:
+        raise ValueError("GOAT_SERVER_PORT must be between 1 and 65535")
+    if _local_port < 1 or _local_port > 65535:
+        raise ValueError("GOAT_LOCAL_PORT must be between 1 and 65535")
     if _lat_n < 1:
         raise ValueError("GOAT_LATENCY_ROLLING_MAX_SAMPLES must be >= 1")
     return Settings(
@@ -126,6 +138,9 @@ def load_settings() -> Settings:
         api_key=os.environ.get("GOAT_API_KEY", "").strip(),
         rate_limit_window_sec=_rate_limit_window_sec,
         rate_limit_max_requests=_rate_limit_max_requests,
+        deploy_target=_deploy_target,
+        server_port=_server_port,
+        local_port=_local_port,
         gpu_target_uuid=os.environ.get("GOAT_GPU_UUID", "").strip(),
         gpu_target_index=int(os.environ.get("GOAT_GPU_INDEX", "0")),
         latency_rolling_max_samples=_lat_n,

@@ -46,6 +46,18 @@ class DotenvConfigTests(unittest.TestCase):
                     else:
                         os.environ[key] = value
 
+    def test_load_settings_rejects_invalid_deploy_target(self) -> None:
+        original = os.environ.get("GOAT_DEPLOY_TARGET")
+        try:
+            os.environ["GOAT_DEPLOY_TARGET"] = "invalid"
+            with self.assertRaises(ValueError):
+                config.load_settings()
+        finally:
+            if original is None:
+                os.environ.pop("GOAT_DEPLOY_TARGET", None)
+            else:
+                os.environ["GOAT_DEPLOY_TARGET"] = original
+
 
 if __name__ == "__main__":
     unittest.main()

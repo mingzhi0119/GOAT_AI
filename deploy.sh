@@ -7,7 +7,7 @@
 #   SYNC_GIT=1 bash deploy.sh        # optional: reset to origin/$GIT_BRANCH before deploy
 #
 # Override any variable before running, e.g.:
-#   PORT_API=8003 bash deploy.sh
+#   GOAT_DEPLOY_TARGET=local bash deploy.sh
 
 _DEPLOY_SCRIPT="${BASH_SOURCE[0]:-$0}"
 if [[ -f "$_DEPLOY_SCRIPT" ]]; then
@@ -24,7 +24,6 @@ GIT_BRANCH="${GIT_BRANCH:-main}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 VENV_DIR="${VENV_DIR:-$PROJECT_DIR/.venv}"
 
-PORT_API="${PORT_API:-62606}"          # FastAPI + React (e.g. nginx / public path)
 LOCAL_OLLAMA_URL="${LOCAL_OLLAMA_URL:-http://127.0.0.1:11435}"
 
 SKIP_BUILD="${SKIP_BUILD:-0}"
@@ -44,6 +43,17 @@ free_port() {
     [ -n "$pids" ] && echo "$pids" | xargs -r kill -9 2>/dev/null || true
   fi
   sleep 1
+}
+
+healthcheck_port() {
+  local p="$1"
+  for i in {1..15}; do
+    if curl -sf "http://127.0.0.1:${p}/api/health" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
 }
 
 # ── Helper: stop process from pidfile if alive ────────────────────────────────
@@ -131,38 +141,69 @@ _goat_systemd_restart() {
   return 1
 }
 
-if _goat_systemd_restart goat-ai; then
-  :
-else
+resolve_target_ports() {
+  "${VENV_DIR}/bin/python" -m goat_ai.runtime_target --ordered-ports
+}
+
+SYSTEMD_USED=0
+SELECTED_PORT=""
+TARGET_PORTS=()
+while IFS= read -r port; do
+  [ -n "$port" ] && TARGET_PORTS+=("$port")
+done < <(resolve_target_ports)
+
+if [ "${#TARGET_PORTS[@]}" -eq 0 ]; then
+  echo "❌ Failed to resolve deployment target ports."
+  exit 1
+fi
+
+if [ "${TARGET_PORTS[0]}" = "${GOAT_SERVER_PORT:-62606}" ] && _goat_systemd_restart goat-ai; then
+  SYSTEMD_USED=1
+  SELECTED_PORT="${TARGET_PORTS[0]}"
+  echo "⏳ Waiting for FastAPI on ${SELECTED_PORT} via systemd…"
+  if ! healthcheck_port "${SELECTED_PORT}"; then
+    echo "⚠️ systemd target ${SELECTED_PORT} did not become healthy; falling back to nohup target resolution."
+    systemctl --user stop goat-ai 2>/dev/null || true
+    SYSTEMD_USED=0
+    SELECTED_PORT=""
+  fi
+fi
+
+if [ "${SYSTEMD_USED}" != "1" ]; then
   # ── nohup fallback (works without systemd setup) ─────────────────────────
-  echo "🧹 Freeing port ${PORT_API}…"
-  free_port "$PORT_API"
-
   stop_pidfile "$API_PID"
+  for candidate_port in "${TARGET_PORTS[@]}"; do
+    echo "🧹 Freeing port ${candidate_port}…"
+    free_port "$candidate_port"
 
-  echo "🚀 Starting FastAPI on 0.0.0.0:${PORT_API} (log: ${API_LOG})…"
-  nohup "${VENV_DIR}/bin/python" -m uvicorn server:app \
-    --host 0.0.0.0 \
-    --port "$PORT_API" \
-    --workers 2 \
-    >> "$API_LOG" 2>&1 &
-  echo $! > "$API_PID"
-  echo "   PID: $(cat "$API_PID")"
+    stop_pidfile "$API_PID"
+
+    echo "🚀 Starting FastAPI on 0.0.0.0:${candidate_port} (log: ${API_LOG})…"
+    GOAT_PORT="${candidate_port}" nohup "${VENV_DIR}/bin/python" -m uvicorn server:app \
+      --host 0.0.0.0 \
+      --port "$candidate_port" \
+      --workers 2 \
+      >> "$API_LOG" 2>&1 &
+    echo $! > "$API_PID"
+    echo "   PID: $(cat "$API_PID")"
+
+    echo "⏳ Waiting for FastAPI on ${candidate_port}…"
+    if healthcheck_port "${candidate_port}"; then
+      SELECTED_PORT="${candidate_port}"
+      echo "✅ FastAPI health OK on ${candidate_port}."
+      break
+    fi
+
+    echo "⚠️ FastAPI did not become healthy on ${candidate_port}; trying next target."
+    stop_pidfile "$API_PID"
+  done
 fi
 
 # ── 5. Health check — FastAPI ─────────────────────────────────────────────────
-echo "⏳ Waiting for FastAPI on ${PORT_API}…"
-for i in {1..15}; do
-  if curl -sf "http://127.0.0.1:${PORT_API}/api/health" >/dev/null 2>&1; then
-    echo "✅ FastAPI health OK on ${PORT_API} (deploy succeeded)."
-    break
-  fi
-  sleep 1
-  if [ "$i" -eq 15 ]; then
-    echo "❌ FastAPI did not respond on ${PORT_API} within 15 s. Check ${API_LOG}"
-    exit 1
-  fi
-done
+if [ -z "${SELECTED_PORT}" ]; then
+  echo "❌ FastAPI did not become healthy on any resolved target port (${TARGET_PORTS[*]}). Check ${API_LOG}"
+  exit 1
+fi
 
 # ── 6. Summary ────────────────────────────────────────────────────────────────
 echo ""
@@ -171,7 +212,7 @@ echo "  GOAT AI — Deployment Complete"
 echo "════════════════════════════════════════════"
 echo ""
 echo "  🌐 React UI  → https://ai.simonbb.com/mingzhi/"
-echo "  🔌 API health→ http://127.0.0.1:${PORT_API}/api/health"
+echo "  🔌 API health→ http://127.0.0.1:${SELECTED_PORT}/api/health"
 echo ""
 echo "  📄 FastAPI log:  tail -f ${API_LOG}"
 echo "  🛑 Stop:         kill \$(cat ${API_PID})"

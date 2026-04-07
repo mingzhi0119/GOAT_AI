@@ -87,6 +87,8 @@ Error codes:
 
 Purpose: stream a chat response from the LLM.
 
+For chart-generation requests over uploaded tabular data, the backend now prefers native Ollama tool calling and falls back to the legacy `:::chart` structured-output protocol when the active model does not support tools.
+
 Headers:
 
 - `Content-Type: application/json`

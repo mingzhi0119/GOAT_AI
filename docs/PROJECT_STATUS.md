@@ -35,6 +35,10 @@
 - **Inference latency:** `GET /api/system/inference` — rolling average duration (ms) of completed chat streams; shown in GPU dot tooltip; window size **`GOAT_LATENCY_ROLLING_MAX_SAMPLES`** (default `20`).
 - **HTTP safety:** optional shared-secret protection on all non-health routes via **`GOAT_API_KEY`** + `X-GOAT-API-Key`, request tracing with `X-Request-ID`, and per-key in-memory rate limiting via **`GOAT_RATE_LIMIT_WINDOW_SEC`** / **`GOAT_RATE_LIMIT_MAX_REQUESTS`**.
 - **Modular API surface:** upload parsing is now available both as SSE (`POST /api/upload`) and plain JSON (`POST /api/upload/analyze`) so external services can reuse the same core analysis logic without consuming a stream.
+- **Chart generation path:** chat-driven charting now prefers native Ollama tool calling and falls back to the legacy `:::chart` pseudo-tool block only when the active model does not support tools.
+- **Deploy target resolution:** `GOAT_DEPLOY_TARGET=auto` now prefers **62606** and falls back to **8002** when the current environment cannot bind/use the server port; `GET /api/system/runtime-target` exposes the active target and fallback order.
+- **Windows-native deploy path:** `deploy.ps1` now provides a PowerShell-first local deployment flow so Windows development does not depend on WSL path translation or Linux-only process tooling.
+- **Windows Ollama behavior:** `deploy.ps1` reuses Ollama on `127.0.0.1:11434` when available and otherwise starts `ollama serve`, but only when `OLLAMA_BASE_URL` is not explicitly configured.
 - **Frontend:** Sidebar history, file-context chip, **GPU status strip** under Actions, **ChartCard** (Recharts) when `chart_spec` received; static sidebar label styles in `sidebarStaticText.ts`.
 - **Deploy fix (important):** `deploy.sh` runs **`npm ci` before every `npm run build`** so new deps (e.g. `recharts`) are never missing on servers that already had `node_modules/`. By default it now deploys the current local checkout on the server; `SYNC_GIT=1` is opt-in.
 
@@ -54,6 +58,7 @@
 | DELETE | `/api/history/{session_id}` | Delete session |
 | GET | `/api/system/gpu` | GPU JSON for status strip |
 | GET | `/api/system/inference` | Rolling avg chat stream ms + sample count |
+| GET | `/api/system/runtime-target` | Active bind target + ordered fallback list |
 
 ---
 

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type FC, type KeyboardEvent } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type FC, type KeyboardEvent } from 'react'
 import type { ChartSpec, Message } from '../api/types'
 import type { GPUStatus, InferenceLatency } from '../api/system'
 import type { FileContext } from '../hooks/useFileContext'
 import GpuStatusDot from './GpuStatusDot'
 import MessageBubble from './MessageBubble'
-import ChartCard from './ChartCard'
+
+const LazyChartCard = lazy(() => import('./ChartCard'))
 
 const BASE_PROMPTS = [
   'Summarize key trends in consumer behavior',
@@ -103,7 +104,20 @@ const ChatWindow: FC<Props> = ({
     >
       {/* ── Messages area ─────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
-        {chartSpec && visibleMessages.length > 0 && <ChartCard spec={chartSpec} />}
+        {chartSpec && visibleMessages.length > 0 && (
+          <Suspense
+            fallback={
+              <div
+                className="rounded-2xl p-4 border text-sm"
+                style={{ borderColor: 'var(--border-color)', background: 'var(--bg-asst-bubble)', color: 'var(--text-muted)' }}
+              >
+                Loading chart…
+              </div>
+            }
+          >
+            <LazyChartCard spec={chartSpec} />
+          </Suspense>
+        )}
         {visibleMessages.length === 0 ? (
           /* Empty state */
           <div className="flex flex-col items-center justify-center h-full gap-5 text-center px-4">

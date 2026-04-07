@@ -99,3 +99,28 @@ def build_chart_spec_from_llm_selection(
         "series": [{"key": k, "name": k} for k in valid_series],
         "data": data,
     }
+
+
+def build_chart_spec_from_tool_arguments(
+    df: pd.DataFrame,
+    arguments: dict[str, Any],
+) -> dict[str, object] | None:
+    """Build a ChartSpec payload from native tool-calling arguments."""
+    chart_type = str(arguments.get("chart_type", "line"))
+    title = str(arguments.get("title", ""))
+    x_key = str(arguments.get("x_key", ""))
+
+    raw_series = arguments.get("series", [])
+    series: list[dict[str, Any]] = raw_series if isinstance(raw_series, list) else []
+    series_keys = [
+        str(item.get("key", ""))
+        for item in series
+        if isinstance(item, dict) and str(item.get("key", "")).strip()
+    ]
+    return build_chart_spec_from_llm_selection(
+        df=df,
+        x_key=x_key,
+        series_keys=series_keys,
+        chart_type=chart_type,
+        title=title,
+    )

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchModels } from '../api/models'
 
+const DEFAULT_MODEL = 'gemma4:26b'
+
 export interface UseModelsReturn {
   models: string[]
   selectedModel: string
@@ -23,8 +25,16 @@ export function useModels(): UseModelsReturn {
     try {
       const list = await fetchModels()
       setModels(list)
-      // Keep existing selection or default to first model
-      setSelectedModel(prev => prev || (list[0] ?? ''))
+      // Keep existing selection when it still exists; otherwise prefer the repo default.
+      setSelectedModel(prev => {
+        if (prev && list.includes(prev)) {
+          return prev
+        }
+        if (list.includes(DEFAULT_MODEL)) {
+          return DEFAULT_MODEL
+        }
+        return list[0] ?? ''
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load models')
     } finally {

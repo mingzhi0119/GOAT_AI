@@ -24,3 +24,21 @@ class InferenceLatencyResponse(BaseModel):
 
     chat_avg_ms: float
     chat_sample_count: int
+
+
+class RuntimeTargetItemResponse(BaseModel):
+    """One runtime target candidate in deployment preference order."""
+
+    mode: str
+    host: str
+    port: int
+    base_url: str
+    reason: str
+
+
+class RuntimeTargetResponse(BaseModel):
+    """Resolved runtime target metadata used by deploy/ops tooling."""
+
+    deploy_target: str
+    current: RuntimeTargetItemResponse
+    ordered_targets: list[RuntimeTargetItemResponse]

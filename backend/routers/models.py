@@ -28,4 +28,4 @@ def list_models(llm: LLMClient = Depends(get_llm_client)) -> ModelsResponse:
     except OllamaUnavailable as exc:
         logger.warning("Ollama unreachable: %s", exc)
         raise HTTPException(status_code=503, detail="AI backend unavailable") from exc
-    return ModelsResponse(models=names or ["llama3:latest"])
+    return ModelsResponse(models=names or ["gemma4:26b"])
