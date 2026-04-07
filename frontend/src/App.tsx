@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { useAdvancedSettings } from './hooks/useAdvancedSettings'
 import { useChatSession } from './hooks/useChatSession'
 import { useGpuStatus } from './hooks/useGpuStatus'
@@ -25,6 +26,19 @@ export default function App() {
     ollamaOptions: advanced.getOptionsForRequest(),
   })
   const gpu = useGpuStatus(session.isStreaming)
+  const { refreshNow } = gpu
+  const wasStreamingRef = useRef(session.isStreaming)
+
+  useEffect(() => {
+    const wasStreaming = wasStreamingRef.current
+    wasStreamingRef.current = session.isStreaming
+    if (!wasStreaming || session.isStreaming) return
+
+    const timer = window.setTimeout(() => {
+      void refreshNow()
+    }, 1000)
+    return () => window.clearTimeout(timer)
+  }, [refreshNow, session.isStreaming])
 
   const handleDeleteAllHistory = () => {
     if (

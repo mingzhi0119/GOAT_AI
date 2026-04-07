@@ -68,6 +68,7 @@ function legacyToEChartsSpec(spec: LegacyChartSpec): ChartSpecV2 {
 
 const ChartCard: FC<Props> = ({ spec }) => {
   const normalized = useMemo(() => (isChartSpecV2(spec) ? spec : legacyToEChartsSpec(spec)), [spec])
+  const isPieChart = normalized.kind === 'pie'
   const themeColors = useMemo(() => {
     if (typeof window === 'undefined') {
       return {
@@ -84,30 +85,40 @@ const ChartCard: FC<Props> = ({ spec }) => {
     }
   }, [])
   const option = useMemo(
-    () => ({
-      ...normalized.option,
-      backgroundColor: 'transparent',
-      textStyle: { color: themeColors.text },
-      title: {
-        ...(typeof normalized.option.title === 'object' && normalized.option.title !== null ? normalized.option.title : {}),
+    () => {
+      const baseOption = {
+        ...normalized.option,
+        backgroundColor: 'transparent',
         textStyle: { color: themeColors.text },
-      },
-      legend: {
-        ...(typeof normalized.option.legend === 'object' && normalized.option.legend !== null ? normalized.option.legend : {}),
-        textStyle: { color: themeColors.muted },
-      },
-      xAxis: {
-        ...(typeof normalized.option.xAxis === 'object' && normalized.option.xAxis !== null ? normalized.option.xAxis : {}),
-        axisLabel: { color: themeColors.muted },
-        axisLine: { lineStyle: { color: themeColors.border } },
-      },
-      yAxis: {
-        ...(typeof normalized.option.yAxis === 'object' && normalized.option.yAxis !== null ? normalized.option.yAxis : {}),
-        axisLabel: { color: themeColors.muted },
-        splitLine: { lineStyle: { color: themeColors.border, opacity: 0.35 } },
-      },
-    }),
-    [normalized.option, themeColors],
+        title: {
+          ...(typeof normalized.option.title === 'object' && normalized.option.title !== null ? normalized.option.title : {}),
+          textStyle: { color: themeColors.text },
+        },
+        legend: {
+          ...(typeof normalized.option.legend === 'object' && normalized.option.legend !== null ? normalized.option.legend : {}),
+          textStyle: { color: themeColors.muted },
+        },
+      }
+
+      if (isPieChart) {
+        return baseOption
+      }
+
+      return {
+        ...baseOption,
+        xAxis: {
+          ...(typeof normalized.option.xAxis === 'object' && normalized.option.xAxis !== null ? normalized.option.xAxis : {}),
+          axisLabel: { color: themeColors.muted },
+          axisLine: { lineStyle: { color: themeColors.border } },
+        },
+        yAxis: {
+          ...(typeof normalized.option.yAxis === 'object' && normalized.option.yAxis !== null ? normalized.option.yAxis : {}),
+          axisLabel: { color: themeColors.muted },
+          splitLine: { lineStyle: { color: themeColors.border, opacity: 0.35 } },
+        },
+      }
+    },
+    [isPieChart, normalized.option, themeColors],
   )
 
   return (

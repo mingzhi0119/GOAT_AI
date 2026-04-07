@@ -1,20 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { fetchGpuStatus, fetchInferenceLatency, type GPUStatus, type InferenceLatency } from '../api/system'
 
 /** Poll interval while the model is streaming vs idle (ms). */
 const POLL_STREAMING_MS = 1000
-const POLL_IDLE_MS = 10000
+const POLL_IDLE_MS = 3000
 
 export interface UseGpuStatusReturn {
   status: GPUStatus | null
   inference: InferenceLatency | null
   error: string | null
+  refreshNow: () => Promise<void>
 }
 
 export function useGpuStatus(isStreaming: boolean): UseGpuStatusReturn {
   const [status, setStatus] = useState<GPUStatus | null>(null)
   const [inference, setInference] = useState<InferenceLatency | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [refreshTick, setRefreshTick] = useState(0)
+
+  const refreshNow = useCallback(async () => {
+    setRefreshTick(tick => tick + 1)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -42,7 +48,7 @@ export function useGpuStatus(isStreaming: boolean): UseGpuStatusReturn {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [isStreaming])
+  }, [isStreaming, refreshTick])
 
-  return { status, inference, error }
+  return { status, inference, error, refreshNow }
 }
