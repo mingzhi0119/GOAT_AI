@@ -6,6 +6,10 @@ from pathlib import Path
 
 _PACKAGE_ROOT = Path(__file__).resolve().parent
 APP_ROOT = _PACKAGE_ROOT.parent
+WORKSPACE_ROOT = APP_ROOT.parent
+LOCAL_OLLAMA_INSTALL_DIR = WORKSPACE_ROOT / "ollama"
+LOCAL_OLLAMA_RUNTIME_DIR = WORKSPACE_ROOT / "ollama-local"
+LOCAL_OLLAMA_DEFAULT_URL = "http://127.0.0.1:11435"
 
 _DEFAULT_SYSTEM_PROMPT = """You are GOAT AI, a helpful assistant for students and faculty at the University of Rochester Simon Business School.
 You give clear, professional business-oriented analysis. Be precise and cite specific figures when data is available, but do not invent numbers or impose tabular structure on non-tabular topics.
@@ -29,6 +33,18 @@ def _read_system_prompt() -> str:
 
 def _env_bool(name: str, default: str) -> bool:
     return os.environ.get(name, default).lower() in ("1", "true", "yes")
+
+
+def _has_local_ollama_layout() -> bool:
+    install_bin = LOCAL_OLLAMA_INSTALL_DIR / "bin" / "ollama"
+    runtime_dir = LOCAL_OLLAMA_RUNTIME_DIR
+    return install_bin.is_file() and runtime_dir.is_dir()
+
+
+def _default_ollama_base_url() -> str:
+    if _has_local_ollama_layout():
+        return LOCAL_OLLAMA_DEFAULT_URL
+    return "http://127.0.0.1:11434"
 
 
 @dataclass(frozen=True)
@@ -55,7 +71,7 @@ class Settings:
 
 
 def load_settings() -> Settings:
-    base = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+    base = os.environ.get("OLLAMA_BASE_URL", _default_ollama_base_url()).rstrip("/")
     max_mb = int(os.environ.get("GOAT_MAX_UPLOAD_MB", "20"))
     _default_log_db = str(APP_ROOT / "chat_logs.db")
     _lat_n = int(os.environ.get("GOAT_LATENCY_ROLLING_MAX_SAMPLES", "20"))

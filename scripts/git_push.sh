@@ -19,9 +19,11 @@ CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 
 EXCLUDES=(
   ".venv"
-  ".venv/**"
-  "**/.ipynb_checkpoints"
-  "**/.ipynb_checkpoints/**"
+  ".venv/*"
+  ".ipynb_checkpoints"
+  ".ipynb_checkpoints/*"
+  "*/.ipynb_checkpoints"
+  "*/.ipynb_checkpoints/*"
   "chat_logs.db"
   "chat_logs.db-shm"
   "chat_logs.db-wal"
@@ -31,12 +33,29 @@ EXCLUDES=(
   "frontend/node_modules"
 )
 
-echo "📦 Staging changes on ${CURRENT_BRANCH}..."
-git add -A
+is_excluded() {
+  local path="$1"
+  local pattern
+  for pattern in "${EXCLUDES[@]}"; do
+    case "$path" in
+      $pattern) return 0 ;;
+    esac
+  done
+  return 1
+}
 
-for pattern in "${EXCLUDES[@]}"; do
-  git reset -q HEAD -- "${pattern}" 2>/dev/null || true
-done
+echo "📦 Staging changes on ${CURRENT_BRANCH}..."
+git add -u
+
+while IFS= read -r path; do
+  [ -n "$path" ] || continue
+  if is_excluded "$path"; then
+    continue
+  fi
+  git add -- "$path"
+done <<EOF
+$(git ls-files --others --exclude-standard)
+EOF
 
 if git diff --cached --quiet; then
   echo "ℹ️ No commitable changes staged."

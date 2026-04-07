@@ -25,6 +25,7 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 VENV_DIR="${VENV_DIR:-$PROJECT_DIR/.venv}"
 
 PORT_API="${PORT_API:-62606}"          # FastAPI + React (e.g. nginx / public path)
+LOCAL_OLLAMA_URL="${LOCAL_OLLAMA_URL:-http://127.0.0.1:11435}"
 
 SKIP_BUILD="${SKIP_BUILD:-0}"
 QUICK="${QUICK:-0}"
@@ -112,6 +113,11 @@ fi
 # ── 4. Start FastAPI (uvicorn) on PORT_API ────────────────────────────────────
 API_LOG="${PROJECT_DIR}/fastapi.log"
 API_PID="${PROJECT_DIR}/fastapi.pid"
+
+if [ "${OLLAMA_BASE_URL:-${LOCAL_OLLAMA_URL}}" = "${LOCAL_OLLAMA_URL}" ] && [ -x "${PROJECT_DIR}/scripts/start_ollama_local.sh" ]; then
+  echo "🦙 Ensuring sibling local Ollama is running at ${LOCAL_OLLAMA_URL}…"
+  OLLAMA_HOST="${LOCAL_OLLAMA_URL}" "${PROJECT_DIR}/scripts/start_ollama_local.sh"
+fi
 
 _goat_systemd_restart() {
   local unit="$1"
