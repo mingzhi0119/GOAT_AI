@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from backend.models.chat import ChatMessage
 
@@ -12,6 +12,7 @@ STORED_FILE_CONTEXT_ROLE = "__file_context__"
 STORED_FILE_CONTEXT_ACK_ROLE = "__file_context_ack__"
 FILE_CONTEXT_REPLY = "I have loaded the file context."
 SESSION_PAYLOAD_VERSION = 2
+ChartDataSource = Literal["uploaded", "demo", "none"]
 
 
 @dataclass(frozen=True)
@@ -21,6 +22,7 @@ class DecodedSessionPayload:
     messages: list[dict[str, str]]
     chart_spec: dict[str, object] | None
     file_context_prompt: str | None
+    chart_data_source: ChartDataSource = "none"
 
 
 def is_file_context_message(message: ChatMessage) -> bool:
@@ -51,6 +53,7 @@ def build_session_payload(
     messages: list[ChatMessage],
     assistant_text: str,
     chart_spec: dict[str, object] | None,
+    chart_data_source: ChartDataSource = "none",
 ) -> dict[str, object]:
     """Build the versioned storage payload for new session snapshots."""
     visible_messages: list[dict[str, str]] = []
@@ -67,6 +70,7 @@ def build_session_payload(
     payload: dict[str, object] = {
         "version": SESSION_PAYLOAD_VERSION,
         "messages": visible_messages,
+        "chart_data_source": chart_data_source,
     }
     if chart_spec is not None:
         payload["chart_spec"] = chart_spec
@@ -108,6 +112,7 @@ def _decode_legacy_session_payload(raw_payload: list[object]) -> DecodedSessionP
         messages=messages,
         chart_spec=chart_spec,
         file_context_prompt=file_context_prompt,
+        chart_data_source="uploaded" if file_context_prompt else "none",
     )
 
 
@@ -128,10 +133,17 @@ def decode_session_payload(raw_payload: Any) -> DecodedSessionPayload:
         chart_spec = raw_chart if isinstance(raw_chart, dict) else None
         raw_file_context = raw_payload.get("file_context_prompt")
         file_context_prompt = raw_file_context if isinstance(raw_file_context, str) else None
+        raw_source = raw_payload.get("chart_data_source")
+        chart_data_source: ChartDataSource = (
+            raw_source
+            if isinstance(raw_source, str) and raw_source in {"uploaded", "demo", "none"}
+            else ("uploaded" if file_context_prompt else "none")
+        )
         return DecodedSessionPayload(
             messages=messages,
             chart_spec=chart_spec,
             file_context_prompt=file_context_prompt,
+            chart_data_source=chart_data_source,
         )
 
-    return DecodedSessionPayload(messages=[], chart_spec=None, file_context_prompt=None)
+    return DecodedSessionPayload(messages=[], chart_spec=None, file_context_prompt=None, chart_data_source="none")

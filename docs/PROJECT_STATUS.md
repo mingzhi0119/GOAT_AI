@@ -11,12 +11,16 @@ Last updated: 2026-04-07
   - `POST /api/upload` as SSE
   - `POST /api/upload/analyze` as JSON
 - Session history via `GET /api/history`, `GET /api/history/{id}`, `DELETE /api/history`, `DELETE /api/history/{id}`
-- GPU telemetry and rolling inference latency APIs
+- GPU telemetry and rolling inference latency APIs (including first-token latency telemetry)
+- Latency telemetry includes p50/p95 and model-scoped buckets for completion and first-token metrics
 - Model capability detection via `GET /api/models/capabilities`
 - Native chart-tool path: charts are emitted only from real Ollama tool calls, never pre-rendered before the LLM responds
 - Typed SSE protocol: `token`, `chart_spec`, `error`, `done`
 - Black-box API contract coverage through `__tests__/test_api_blackbox_contract.py`
 - Lightweight safeguard layer for clearly unsafe sexual or violent misuse requests in chat
+- Single-port runtime-target policy (`:62606`) across deploy scripts and runtime-target API
+- Post-deploy contract verification script integrated into Linux and Windows deploy flows
+- Model capability probing includes in-process TTL caching
 
 ## Current API surface
 

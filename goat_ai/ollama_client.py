@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
+import time
 from dataclasses import dataclass
 from typing import Any, Generator, Protocol
 
@@ -84,6 +86,9 @@ class LLMClient(Protocol):
 class OllamaService:
     """HTTP client for Ollama streaming APIs (chat + generate)."""
 
+    _cap_cache: dict[str, tuple[float, list[str]]] = {}
+    _cache_lock = threading.Lock()
+
     def __init__(self, settings: Settings) -> None:
         self._s = settings
 
@@ -119,10 +124,27 @@ class OllamaService:
             res.raise_for_status()
         except requests.RequestException as exc:
             raise OllamaUnavailable("Cannot reach Ollama /api/tags") from exc
-        return [m["name"] for m in res.json().get("models", [])]
+        names = [m["name"] for m in res.json().get("models", [])]
+        # Invalidate capability cache when model inventory is queried freshly.
+        with self._cache_lock:
+            known = set(self._cap_cache.keys())
+            current = set(names)
+            for removed in known - current:
+                self._cap_cache.pop(removed, None)
+        return names
 
     def get_model_capabilities(self, model: str) -> list[str]:
         """Return the Ollama-reported capability strings for a model."""
+        ttl_sec = max(0, int(self._s.model_cap_cache_ttl_sec))
+        now = time.monotonic()
+        if ttl_sec > 0:
+            with self._cache_lock:
+                cached = self._cap_cache.get(model)
+                if cached is not None:
+                    expires_at, capabilities = cached
+                    if now < expires_at:
+                        return list(capabilities)
+
         try:
             res = requests.post(
                 f"{self._s.ollama_base_url}/api/show",
@@ -135,8 +157,14 @@ class OllamaService:
 
         capabilities = res.json().get("capabilities", [])
         if not isinstance(capabilities, list):
-            return []
-        return [str(item) for item in capabilities]
+            normalized: list[str] = []
+        else:
+            normalized = [str(item) for item in capabilities]
+
+        if ttl_sec > 0:
+            with self._cache_lock:
+                self._cap_cache[model] = (now + ttl_sec, list(normalized))
+        return normalized
 
     def supports_tool_calling(self, model: str) -> bool:
         """Return whether Ollama reports native tool-calling support for the model."""

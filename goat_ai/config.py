@@ -91,10 +91,11 @@ class Settings:
     rate_limit_max_requests: int = 60
     deploy_target: str = "auto"
     server_port: int = 62606
-    local_port: int = 8002
+    local_port: int = 62606
     gpu_target_uuid: str = ""
     gpu_target_index: int = 0
     latency_rolling_max_samples: int = 20
+    model_cap_cache_ttl_sec: int = 60
 
     @property
     def user_facing_error(self) -> str:
@@ -110,8 +111,9 @@ def load_settings() -> Settings:
     _rate_limit_max_requests = int(os.environ.get("GOAT_RATE_LIMIT_MAX_REQUESTS", "60"))
     _deploy_target = os.environ.get("GOAT_DEPLOY_TARGET", "auto").strip().lower()
     _server_port = int(os.environ.get("GOAT_SERVER_PORT", "62606"))
-    _local_port = int(os.environ.get("GOAT_LOCAL_PORT", "8002"))
+    _local_port = int(os.environ.get("GOAT_LOCAL_PORT", str(_server_port)))
     _lat_n = int(os.environ.get("GOAT_LATENCY_ROLLING_MAX_SAMPLES", "20"))
+    _cap_ttl = int(os.environ.get("GOAT_MODEL_CAP_CACHE_TTL_SEC", "60"))
     if _deploy_target not in {"auto", "server", "local"}:
         raise ValueError("GOAT_DEPLOY_TARGET must be one of: auto, server, local")
     if _rate_limit_window_sec < 1:
@@ -124,6 +126,8 @@ def load_settings() -> Settings:
         raise ValueError("GOAT_LOCAL_PORT must be between 1 and 65535")
     if _lat_n < 1:
         raise ValueError("GOAT_LATENCY_ROLLING_MAX_SAMPLES must be >= 1")
+    if _cap_ttl < 0:
+        raise ValueError("GOAT_MODEL_CAP_CACHE_TTL_SEC must be >= 0")
     return Settings(
         ollama_base_url=base,
         generate_timeout=int(os.environ.get("OLLAMA_GENERATE_TIMEOUT", "120")),
@@ -144,4 +148,5 @@ def load_settings() -> Settings:
         gpu_target_uuid=os.environ.get("GOAT_GPU_UUID", "").strip(),
         gpu_target_index=int(os.environ.get("GOAT_GPU_INDEX", "0")),
         latency_rolling_max_samples=_lat_n,
+        model_cap_cache_ttl_sec=_cap_ttl,
     )

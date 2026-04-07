@@ -92,7 +92,7 @@ class ContractFakeLLM:
             if message.get("role") == "user":
                 last_user = str(message.get("content", ""))
                 break
-        if "chart" in last_user.lower() and self.supports_tool_calling(model):
+        if any(token in last_user.lower() for token in ("chart", "pie", "饼图", "图表")) and self.supports_tool_calling(model):
             yield ToolCallPlan(
                 assistant_message={
                     "role": "assistant",
@@ -394,6 +394,43 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(["user", "assistant"], roles)
         self.assertEqual(file_context_prompt, body["file_context"]["prompt"])
         self.assertIsNotNone(body["chart_spec"])
+        self.assertEqual("uploaded", body["chart_data_source"])
+
+    def test_chat_chart_flow_without_uploaded_file_still_uses_tools_contract(self) -> None:
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "model": "viz-model",
+                "session_id": "chart-no-upload",
+                "messages": [
+                    {"role": "user", "content": "Generate a typical pie chart."},
+                ],
+            },
+        )
+
+        self.assertEqual(200, response.status_code)
+        events = parse_sse_payloads(response.text)
+        self.assertIn("chart_spec", [event["type"] for event in events])
+        self.assertEqual("done", events[-1]["type"])
+
+        history_detail = self.client.get("/api/history/chart-no-upload")
+        self.assertEqual(200, history_detail.status_code)
+        self.assertEqual("demo", history_detail.json()["chart_data_source"])
+
+    def test_chat_chart_prompt_with_tools_unsupported_model_stays_text_only(self) -> None:
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "model": "blackbox-model",
+                "session_id": "chart-no-tools",
+                "messages": [{"role": "user", "content": "Generate a typical pie chart."}],
+            },
+        )
+
+        self.assertEqual(200, response.status_code)
+        events = parse_sse_payloads(response.text)
+        self.assertNotIn("chart_spec", [event["type"] for event in events])
+        self.assertEqual("done", events[-1]["type"])
 
     def test_upload_sse_and_json_endpoints_cover_success_and_validation_boundaries(self) -> None:
         upload_response = self.client.post(
@@ -489,6 +526,13 @@ class ApiBlackboxContractTests(unittest.TestCase):
         inference_body = inference.json()
         self.assertGreaterEqual(inference_body["chat_sample_count"], 1)
         self.assertGreaterEqual(inference_body["chat_avg_ms"], 0.0)
+        self.assertGreaterEqual(inference_body["chat_p50_ms"], 0.0)
+        self.assertGreaterEqual(inference_body["chat_p95_ms"], 0.0)
+        self.assertGreaterEqual(inference_body["first_token_sample_count"], 1)
+        self.assertGreaterEqual(inference_body["first_token_avg_ms"], 0.0)
+        self.assertGreaterEqual(inference_body["first_token_p50_ms"], 0.0)
+        self.assertGreaterEqual(inference_body["first_token_p95_ms"], 0.0)
+        self.assertIn("model_buckets", inference_body)
 
         with patch(
             "backend.routers.system.read_gpu_status",

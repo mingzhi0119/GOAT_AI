@@ -24,6 +24,13 @@ class InferenceLatencyResponse(BaseModel):
 
     chat_avg_ms: float
     chat_sample_count: int
+    chat_p50_ms: float
+    chat_p95_ms: float
+    first_token_avg_ms: float
+    first_token_sample_count: int
+    first_token_p50_ms: float
+    first_token_p95_ms: float
+    model_buckets: dict[str, dict[str, float | int]]
 
 
 class RuntimeTargetItemResponse(BaseModel):

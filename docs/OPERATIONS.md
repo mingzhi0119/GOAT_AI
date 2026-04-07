@@ -2,12 +2,12 @@
 
 ## Runtime targets
 
-- Local development backend: `:8002`
+- Local development backend: `:62606`
 - Frontend dev server: `:3000`
 - Production server target: `:62606`
 - Runtime target API: `GET /api/system/runtime-target`
 
-`GOAT_DEPLOY_TARGET=auto` prefers `GOAT_SERVER_PORT` and falls back to `GOAT_LOCAL_PORT` only when needed.
+Runtime target resolution now follows a single-port policy: always `GOAT_SERVER_PORT` (default `62606`), with no `8002` fallback.
 
 ## Development
 
@@ -18,7 +18,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-python3 -m uvicorn server:app --host 0.0.0.0 --port 8002 --reload
+python3 -m uvicorn server:app --host 0.0.0.0 --port 62606 --reload
 ```
 
 Frontend:
@@ -55,6 +55,7 @@ Important behavior:
 - `SYNC_GIT=1` is explicit opt-in
 - `deploy.sh` keeps the `nohup` + `logs/fastapi.pid` fallback path
 - Windows deploy reuses Ollama on `127.0.0.1:11434` when available unless `OLLAMA_BASE_URL` is explicitly set
+- Deploy now includes a post-deploy contract check (`scripts/post_deploy_check.py`) before success is reported
 
 ## Shared-host constraints
 
@@ -83,10 +84,11 @@ This project is designed for an unprivileged JupyterHub-style server environment
 | `GOAT_RATE_LIMIT_MAX_REQUESTS` | Max requests per window | `60` |
 | `GOAT_DEPLOY_TARGET` | `auto`, `server`, or `local` | `auto` |
 | `GOAT_SERVER_PORT` | Preferred server port | `62606` |
-| `GOAT_LOCAL_PORT` | Local fallback port | `8002` |
+| `GOAT_LOCAL_PORT` | Deprecated alias (single-port policy uses `GOAT_SERVER_PORT`) | `62606` |
 | `GOAT_GPU_UUID` | Preferred GPU UUID | empty |
 | `GOAT_GPU_INDEX` | GPU index fallback | `0` |
 | `GOAT_LATENCY_ROLLING_MAX_SAMPLES` | Inference average sample window | `20` |
+| `GOAT_MODEL_CAP_CACHE_TTL_SEC` | Model capability cache TTL seconds (`0` disables cache) | `60` |
 
 ## Process and health
 

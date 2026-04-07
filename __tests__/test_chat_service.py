@@ -38,6 +38,7 @@ class FakeSessionRepository:
             messages=decoded.messages,
             chart_spec=decoded.chart_spec,
             file_context_prompt=decoded.file_context_prompt,
+            chart_data_source=decoded.chart_data_source,
         )
 
     def list_sessions(self) -> list[object]:
@@ -156,6 +157,7 @@ class ChatServiceTitleTests(unittest.TestCase):
         self.assertEqual("assistant", stored.messages[1]["role"])
         self.assertEqual("Done.", stored.messages[1]["content"])
         self.assertIsNotNone(stored.file_context_prompt)
+        self.assertEqual("uploaded", stored.chart_data_source)
 
     def test_decode_session_payload_keeps_legacy_storage_compatible(self) -> None:
         decoded = decode_session_payload(
@@ -172,6 +174,7 @@ class ChatServiceTitleTests(unittest.TestCase):
         self.assertEqual("show me a chart", decoded.messages[0]["content"])
         self.assertEqual("done", decoded.messages[1]["content"])
         self.assertEqual("Revenue", decoded.chart_spec["title"])
+        self.assertEqual("uploaded", decoded.chart_data_source)
 
 
 if __name__ == "__main__":

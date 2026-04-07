@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from backend.models.chat import ChatMessage
 from backend.services.chat_runtime import SessionRepository, SessionUpsertPayload, TitleGenerator
-from backend.services.session_message_codec import build_session_payload
+from backend.services.session_message_codec import ChartDataSource, build_session_payload, is_file_context_message
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +67,7 @@ def persist_chat_session(
     chart_spec: dict[str, object] | None,
     session_repository: SessionRepository,
     title_generator: TitleGenerator,
+    chart_data_source: ChartDataSource = "none",
     title_override: str | None = None,
 ) -> None:
     """Persist the latest session snapshot, including optional chart state."""
@@ -85,6 +86,10 @@ def persist_chat_session(
             title_generator=title_generator,
         )
     )
+    resolved_chart_data_source: ChartDataSource = chart_data_source
+    if resolved_chart_data_source == "none" and any(is_file_context_message(msg) for msg in final_messages):
+        resolved_chart_data_source = "uploaded"
+
     session_repository.upsert_session(
         SessionUpsertPayload(
             session_id=session_id,
@@ -94,6 +99,7 @@ def persist_chat_session(
                 messages=final_messages,
                 assistant_text=assistant_text,
                 chart_spec=chart_spec,
+                chart_data_source=resolved_chart_data_source,
             ),
             created_at=created_at,
             updated_at=now_iso,

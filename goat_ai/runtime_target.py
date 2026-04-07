@@ -47,43 +47,19 @@ def ordered_runtime_targets(
     host: str = "127.0.0.1",
     probe: RuntimeTargetProbe | None = None,
 ) -> list[ResolvedRuntimeTarget]:
-    """Return deployment targets in preference order."""
-    if settings.deploy_target == "server":
-        return [
-            make_runtime_target(
-                "server62606",
-                host,
-                settings.server_port,
-                "GOAT_DEPLOY_TARGET explicitly set to server",
-            )
-        ]
-
-    if settings.deploy_target == "local":
-        return [
-            make_runtime_target(
-                "local",
-                host,
-                settings.local_port,
-                "GOAT_DEPLOY_TARGET explicitly set to local",
-            )
-        ]
-
+    """Return deployment targets in preference order (single-port policy)."""
     bind_probe = probe or can_bind_runtime_target
     can_bind_server, reason = bind_probe(host, settings.server_port)
-    if can_bind_server:
-        return [
-            make_runtime_target("server62606", host, settings.server_port, "server port is bindable"),
-            make_runtime_target("local", host, settings.local_port, "fallback local port"),
-        ]
+    if settings.deploy_target == "local":
+        target_reason = "GOAT_DEPLOY_TARGET=local is deprecated; enforcing server port policy"
+    elif settings.deploy_target == "server":
+        target_reason = "GOAT_DEPLOY_TARGET explicitly set to server"
+    elif can_bind_server:
+        target_reason = "server port is bindable"
+    else:
+        target_reason = f"server port unavailable: {reason}"
 
-    return [
-        make_runtime_target(
-            "local",
-            host,
-            settings.local_port,
-            f"server port unavailable: {reason}",
-        )
-    ]
+    return [make_runtime_target("server62606", host, settings.server_port, target_reason)]
 
 
 def current_runtime_target(
@@ -95,8 +71,6 @@ def current_runtime_target(
     """Describe the currently active runtime target."""
     if current_port == settings.server_port:
         return make_runtime_target("server62606", host, current_port, "current process bound to server port")
-    if current_port == settings.local_port:
-        return make_runtime_target("local", host, current_port, "current process bound to local port")
     return make_runtime_target("explicit_override", host, current_port, "current process bound to custom port")
 
 

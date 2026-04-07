@@ -83,6 +83,63 @@ Progress already landed in this phase:
 
 ---
 
+## Phase 12: Hardening and Scale Readiness
+
+Status legend:
+- `[ ]` Not started
+- `[~]` In progress
+- `[x]` Completed
+
+Objective:
+- Convert the recently stabilized contracts into durable guardrails so performance, architecture boundaries, and deploy behavior remain stable as features scale.
+
+Execution plan:
+
+1. `[x]` Finish decomposing backend chat orchestration into focused services
+   - Extract `PromptComposer`, `ChartToolOrchestrator`, `ChatStreamService`, and `SessionPersistenceService` as explicit units.
+   - Keep router and dependency wiring unchanged at the API edge while reducing internal coupling.
+
+2. `[x]` Introduce explicit chart data-source policy models
+   - Add typed chart data source metadata (`uploaded`, `demo`, `none`) instead of implicit marker-driven behavior.
+   - Persist source provenance with session history for debugging and auditability.
+
+3. `[x]` Add architecture guard tests (backend + frontend)
+   - Lock in backend layer boundaries (router/service/shared layer import rules).
+   - Lock in frontend boundary rule that hooks do not import components.
+
+4. `[x]` Define latency SLOs with percentile telemetry
+   - Extend telemetry from rolling mean to include p50/p95 for chat completion and first-token latency.
+   - Add model-aware buckets to catch regressions by model family.
+
+5. `[x]` Expand `/api/chat` black-box scenario matrix
+   - Cover uploaded vs non-uploaded chart prompts, tools-supported vs tools-unsupported models, and mixed-language chart intents.
+   - Keep assertions centered on typed SSE contract behavior.
+
+6. `[x]` Add deploy post-check acceptance script
+   - Validate health, runtime-target contract, and typed stream behavior immediately after deploy.
+   - Fail fast when process is alive but contract is broken.
+
+7. `[x]` Enforce docs-and-contract CI gate
+   - Require synchronized updates for `docs/openapi.json`, `docs/api.llm.yaml`, and black-box tests when API payloads change.
+   - Prevent drift between runtime behavior and committed contract artifacts.
+
+8. `[x]` Add model capability cache with TTL
+
+Progress already landed in this phase:
+
+- Backend chat orchestration now uses dedicated collaborators (`PromptComposer`, `ChartToolOrchestrator`, `SessionPersistenceService`) while preserving `/api/chat` SSE contract behavior.
+- Chart rendering policy is now explicit about data source provenance (`uploaded`, `demo`, `none`) and persisted in session payloads.
+- Architecture guard tests lock backend and frontend layer boundaries to reduce regression risk.
+- Inference telemetry now exposes rolling average + p50/p95 for completion and first-token latency, including model-scoped buckets.
+- Black-box API coverage now includes chart tool behavior for uploaded and non-uploaded scenarios as well as tools-unsupported models.
+- Deploy scripts now run post-deploy contract checks before declaring success.
+- CI now blocks drift between runtime API contracts and committed `docs/openapi.json` + `docs/api.llm.yaml`.
+- Ollama model capability checks now use a configurable TTL cache to reduce repetitive capability probes.
+   - Cache tool-capability probes to reduce repeated upstream capability checks.
+   - Keep cache boundaries explicit and invalidate safely on model list changes.
+
+---
+
 ## Infrastructure Notes
 
 | Item | Current | Target |

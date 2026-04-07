@@ -245,16 +245,6 @@ function Resolve-OllamaBaseUrl {
     throw "OLLAMA_BASE_URL was not explicitly configured, and deploy.ps1 could not reach or start Ollama on $defaultUrl. Check $ollamaOutLog and $ollamaErrLog."
 }
 
-function Get-ResolvedTargetPorts {
-    param([string]$PythonExe)
-    $output = & $PythonExe -m goat_ai.runtime_target --ordered-ports
-    if ($LASTEXITCODE -ne 0) {
-        throw "Failed to resolve deployment target ports."
-    }
-
-    return @($output | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ })
-}
-
 $ProjectDir = [System.IO.Path]::GetFullPath($ProjectDir)
 $VenvDir = Join-Path $ProjectDir ".venv"
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
@@ -263,6 +253,7 @@ $LogsDir = Join-Path $ProjectDir "logs"
 $ApiLog = Join-Path $LogsDir "fastapi.log"
 $ApiErrLog = Join-Path $LogsDir "fastapi.err.log"
 $ApiPid = Join-Path $LogsDir "fastapi.pid"
+$ServerPort = 62606
 $QuickLabel = if ($Quick.IsPresent) { " [QUICK mode]" } else { "" }
 $ResolvedOllamaBaseUrl = $null
 
@@ -337,62 +328,52 @@ if ($SkipBuild.IsPresent -and (Test-Path -LiteralPath (Join-Path $FrontendDir "d
 
 $ResolvedOllamaBaseUrl = Resolve-OllamaBaseUrl -ProjectRoot $ProjectDir
 
-$TargetPorts = Get-ResolvedTargetPorts -PythonExe $VenvPython
-if ($TargetPorts.Count -eq 0) {
-    throw "No deployment target ports were resolved."
-}
-
-$SelectedPort = $null
+Stop-PidFileProcess -PidFile $ApiPid
+Write-Step "Trying FastAPI on port $ServerPort"
+Clear-PortOrFail -Port $ServerPort
 Stop-PidFileProcess -PidFile $ApiPid
 
-foreach ($candidatePortText in $TargetPorts) {
-    $candidatePort = [int]$candidatePortText
-    Write-Step "Trying FastAPI on port $candidatePort"
+$startupArgs = @(
+    "-m", "uvicorn",
+    "server:app",
+    "--host", "0.0.0.0",
+    "--port", $ServerPort.ToString(),
+    "--workers", "1"
+)
 
-    Clear-PortOrFail -Port $candidatePort
-    Stop-PidFileProcess -PidFile $ApiPid
-
-    $startupArgs = @(
-        "-m", "uvicorn",
-        "server:app",
-        "--host", "0.0.0.0",
-        "--port", $candidatePort.ToString(),
-        "--workers", "1"
-    )
-
-    $startInfo = @{
-        FilePath = $VenvPython
-        ArgumentList = $startupArgs
-        WorkingDirectory = $ProjectDir
-        RedirectStandardOutput = $ApiLog
-        RedirectStandardError = $ApiErrLog
-        WindowStyle = "Hidden"
-        PassThru = $true
-    }
-
-    $previousGoatPort = $env:GOAT_PORT
-    $previousOllamaBaseUrl = $env:OLLAMA_BASE_URL
-    try {
-        $env:GOAT_PORT = $candidatePort.ToString()
-        $env:OLLAMA_BASE_URL = $ResolvedOllamaBaseUrl
-        $process = Start-Process @startInfo
-    } finally {
-        $env:GOAT_PORT = $previousGoatPort
-        $env:OLLAMA_BASE_URL = $previousOllamaBaseUrl
-    }
-
-    Set-Content -LiteralPath $ApiPid -Value $process.Id -Encoding utf8
-
-    if (Test-DeploymentContract -Port $candidatePort) {
-        $SelectedPort = $candidatePort
-        break
-    }
-
-    Stop-PidFileProcess -PidFile $ApiPid
+$startInfo = @{
+    FilePath = $VenvPython
+    ArgumentList = $startupArgs
+    WorkingDirectory = $ProjectDir
+    RedirectStandardOutput = $ApiLog
+    RedirectStandardError = $ApiErrLog
+    WindowStyle = "Hidden"
+    PassThru = $true
 }
 
-if ($null -eq $SelectedPort) {
-    throw "FastAPI did not become healthy on any resolved target port: $($TargetPorts -join ', ')"
+$previousGoatPort = $env:GOAT_PORT
+$previousOllamaBaseUrl = $env:OLLAMA_BASE_URL
+try {
+    $env:GOAT_PORT = $ServerPort.ToString()
+    $env:OLLAMA_BASE_URL = $ResolvedOllamaBaseUrl
+    $process = Start-Process @startInfo
+} finally {
+    $env:GOAT_PORT = $previousGoatPort
+    $env:OLLAMA_BASE_URL = $previousOllamaBaseUrl
+}
+
+Set-Content -LiteralPath $ApiPid -Value $process.Id -Encoding utf8
+
+if (-not (Test-DeploymentContract -Port $ServerPort)) {
+    Stop-PidFileProcess -PidFile $ApiPid
+    throw "FastAPI did not become healthy on port $ServerPort."
+}
+
+Write-Step "Running post-deploy contract checks"
+& $VenvPython (Join-Path $ProjectDir "scripts\post_deploy_check.py") --base-url "http://127.0.0.1:$ServerPort"
+if ($LASTEXITCODE -ne 0) {
+    Stop-PidFileProcess -PidFile $ApiPid
+    throw "Post-deploy contract checks failed on port $ServerPort."
 }
 
 $stopPidText = if (Test-Path -LiteralPath $ApiPid) {
@@ -403,8 +384,8 @@ $stopPidText = if (Test-Path -LiteralPath $ApiPid) {
 
 Write-Host ""
 Write-Host "GOAT AI deployment complete"
-Write-Host "API health: http://127.0.0.1:$SelectedPort/api/health"
-Write-Host "API contract: http://127.0.0.1:$SelectedPort/api/models/capabilities?model=gemma4:26b"
+Write-Host "API health: http://127.0.0.1:$ServerPort/api/health"
+Write-Host "API contract: http://127.0.0.1:$ServerPort/api/models/capabilities?model=gemma4:26b"
 Write-Host "OLLAMA_BASE_URL: $ResolvedOllamaBaseUrl"
 Write-Host "FastAPI log: $ApiLog"
 Write-Host "FastAPI err: $ApiErrLog"

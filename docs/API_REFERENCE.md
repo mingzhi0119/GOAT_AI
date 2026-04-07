@@ -206,6 +206,7 @@ Returns one normalized stored session:
   "model": "gemma4:26b",
   "created_at": "2026-04-07T14:00:00+00:00",
   "updated_at": "2026-04-07T14:01:30+00:00",
+  "chart_data_source": "uploaded",
   "chart_spec": { "version": "2.0", "engine": "echarts", "kind": "line" },
   "file_context": {
     "prompt": "[User uploaded tabular data for analysis] ..."
@@ -221,6 +222,7 @@ Notes:
 
 - `messages` now contains only normalized chat roles: `user`, `assistant`, `system`
 - `chart_spec` and `file_context` are returned as dedicated fields instead of compatibility pseudo-roles
+- `chart_data_source` indicates where chart data came from: `uploaded`, `demo`, or `none`
 - Legacy stored sessions are still readable; the compatibility decode lives in the backend storage codec, not the API contract
 
 ## `DELETE /api/history`
@@ -242,7 +244,25 @@ Returns:
 ```json
 {
   "chat_avg_ms": 842.3,
-  "chat_sample_count": 20
+  "chat_sample_count": 20,
+  "chat_p50_ms": 800.0,
+  "chat_p95_ms": 1260.4,
+  "first_token_avg_ms": 210.5,
+  "first_token_sample_count": 20,
+  "first_token_p50_ms": 190.2,
+  "first_token_p95_ms": 320.1,
+  "model_buckets": {
+    "gemma4:26b": {
+      "chat_avg_ms": 910.2,
+      "chat_p50_ms": 870.0,
+      "chat_p95_ms": 1410.3,
+      "chat_sample_count": 15,
+      "first_token_avg_ms": 220.8,
+      "first_token_p50_ms": 205.3,
+      "first_token_p95_ms": 340.0,
+      "first_token_sample_count": 15
+    }
+  }
 }
 ```
 
@@ -254,20 +274,19 @@ Returns deploy target resolution information:
 {
   "deploy_target": "auto",
   "current": {
-    "name": "server",
+    "mode": "server62606",
     "host": "127.0.0.1",
-    "port": 62606
+    "port": 62606,
+    "base_url": "http://127.0.0.1:62606",
+    "reason": "current process bound to server port"
   },
   "ordered_targets": [
     {
-      "name": "server",
+      "mode": "server62606",
       "host": "127.0.0.1",
-      "port": 62606
-    },
-    {
-      "name": "local",
-      "host": "127.0.0.1",
-      "port": 8002
+      "port": 62606,
+      "base_url": "http://127.0.0.1:62606",
+      "reason": "server port is bindable"
     }
   ]
 }

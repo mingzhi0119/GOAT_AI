@@ -36,7 +36,7 @@ class SystemRouterIntegrationTests(unittest.TestCase):
             log_db_path=root / "chat_logs.db",
             deploy_target="auto",
             server_port=62606,
-            local_port=8002,
+            local_port=62606,
         )
 
         app = FastAPI()
@@ -56,7 +56,7 @@ class SystemRouterIntegrationTests(unittest.TestCase):
         self.assertIn("current", payload)
         self.assertIn("ordered_targets", payload)
         self.assertGreaterEqual(len(payload["ordered_targets"]), 1)
-        self.assertIn(payload["current"]["mode"], {"server62606", "local", "explicit_override"})
+        self.assertIn(payload["current"]["mode"], {"server62606", "explicit_override"})
 
 
 if __name__ == "__main__":

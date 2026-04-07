@@ -14,6 +14,25 @@ export interface GPUStatus {
 export interface InferenceLatency {
   chat_avg_ms: number
   chat_sample_count: number
+  chat_p50_ms: number
+  chat_p95_ms: number
+  first_token_avg_ms: number
+  first_token_sample_count: number
+  first_token_p50_ms: number
+  first_token_p95_ms: number
+  model_buckets: Record<
+    string,
+    {
+      chat_avg_ms: number
+      chat_p50_ms: number
+      chat_p95_ms: number
+      chat_sample_count: number
+      first_token_avg_ms: number
+      first_token_p50_ms: number
+      first_token_p95_ms: number
+      first_token_sample_count: number
+    }
+  >
 }
 
 export async function fetchGpuStatus(): Promise<GPUStatus> {

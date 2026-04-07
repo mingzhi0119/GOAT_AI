@@ -11,7 +11,8 @@ GENERATE_CHART_V2_SCHEMA: dict[str, Any] = {
     "function": {
         "name": "generate_chart_v2",
         "description": (
-            "Create a chart intent for Apache ECharts from uploaded tabular data. "
+            "Create a chart intent for Apache ECharts from available tabular data. "
+            "If no uploaded dataset is available, a small built-in demo dataset may be used. "
             "Return a high-level intent only; do not generate raw ECharts option fields."
         ),
         "parameters": ChartIntentV2.model_json_schema(),

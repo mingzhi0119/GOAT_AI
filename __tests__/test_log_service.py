@@ -24,7 +24,11 @@ class LogServiceTests(unittest.TestCase):
             session_id=session_id,
             title="First chat",
             model="llama3:latest",
-            messages=[{"role": "user", "content": "hello"}],
+            payload={
+                "version": 2,
+                "messages": [{"role": "user", "content": "hello"}],
+                "chart_data_source": "none",
+            },
             created_at="2026-01-01T00:00:00+00:00",
             updated_at="2026-01-01T00:00:01+00:00",
         )
@@ -37,7 +41,8 @@ class LogServiceTests(unittest.TestCase):
         self.assertIsNotNone(detail)
         assert detail is not None
         self.assertEqual("First chat", detail["title"])
-        self.assertEqual([{"role": "user", "content": "hello"}], detail["messages"])
+        self.assertIsInstance(detail["messages"], dict)
+        self.assertEqual([{"role": "user", "content": "hello"}], detail["messages"]["messages"])
 
         log_service.log_conversation(
             db_path=self.db_path,

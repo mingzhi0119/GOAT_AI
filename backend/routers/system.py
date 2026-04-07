@@ -37,6 +37,13 @@ def get_inference_latency() -> InferenceLatencyResponse:
     return InferenceLatencyResponse(
         chat_avg_ms=float(snap["chat_avg_ms"]),
         chat_sample_count=int(snap["chat_sample_count"]),
+        chat_p50_ms=float(snap["chat_p50_ms"]),
+        chat_p95_ms=float(snap["chat_p95_ms"]),
+        first_token_avg_ms=float(snap["first_token_avg_ms"]),
+        first_token_sample_count=int(snap["first_token_sample_count"]),
+        first_token_p50_ms=float(snap["first_token_p50_ms"]),
+        first_token_p95_ms=float(snap["first_token_p95_ms"]),
+        model_buckets=dict(snap["model_buckets"]),
     )
 
 

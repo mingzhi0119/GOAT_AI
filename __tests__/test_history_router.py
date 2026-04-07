@@ -53,10 +53,14 @@ class HistoryRouterIntegrationTests(unittest.TestCase):
             session_id=session_id,
             title="Case discussion",
             model="llama3:latest",
-            messages=[
-                {"role": "user", "content": "hello"},
-                {"role": "assistant", "content": "world"},
-            ],
+            payload={
+                "version": 2,
+                "messages": [
+                    {"role": "user", "content": "hello"},
+                    {"role": "assistant", "content": "world"},
+                ],
+                "chart_data_source": "none",
+            },
             created_at="2026-01-01T00:00:00+00:00",
             updated_at="2026-01-01T00:00:01+00:00",
         )
@@ -90,7 +94,11 @@ class HistoryRouterIntegrationTests(unittest.TestCase):
                 session_id=sid,
                 title=title,
                 model="m",
-                messages=[{"role": "user", "content": "x"}],
+                payload={
+                    "version": 2,
+                    "messages": [{"role": "user", "content": "x"}],
+                    "chart_data_source": "none",
+                },
                 created_at="2026-01-01T00:00:00+00:00",
                 updated_at="2026-01-01T00:00:01+00:00",
             )

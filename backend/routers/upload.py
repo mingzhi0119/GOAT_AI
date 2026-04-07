@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from backend.config import get_settings
 from backend.models.common import ErrorResponse
 from backend.models.upload import UploadAnalysisResponse
-from backend.services.upload_request_service import read_validated_upload
+from backend.services.upload_request_service import UploadValidationError, read_validated_upload
 from backend.services.upload_service import analyze_upload, stream_upload_analysis_sse
 from goat_ai.config import Settings
 
@@ -46,7 +46,10 @@ async def upload_and_parse(
     hidden history on the next chat turn. Charts are rendered later only if the
     LLM explicitly calls the native chart tool during chat.
     """
-    upload = await read_validated_upload(file=file, max_read_bytes=_MAX_READ_BYTES)
+    try:
+        upload = await read_validated_upload(file=file, max_read_bytes=_MAX_READ_BYTES)
+    except UploadValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return StreamingResponse(
         stream_upload_analysis_sse(
@@ -74,7 +77,10 @@ async def analyze_upload_json(
     settings: Settings = Depends(get_settings),
 ) -> UploadAnalysisResponse:
     """Accept a CSV or XLSX upload and return reusable analysis metadata as JSON."""
-    upload = await read_validated_upload(file=file, max_read_bytes=_MAX_READ_BYTES)
+    try:
+        upload = await read_validated_upload(file=file, max_read_bytes=_MAX_READ_BYTES)
+    except UploadValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     try:
         prompt, chart = analyze_upload(
             content=upload.content,

@@ -7,7 +7,7 @@
 #   SYNC_GIT=1 bash deploy.sh        # optional: reset to origin/$GIT_BRANCH before deploy
 #
 # Override any variable before running, e.g.:
-#   GOAT_DEPLOY_TARGET=local bash deploy.sh
+#   GOAT_SERVER_PORT=62606 bash deploy.sh
 
 _DEPLOY_SCRIPT="${BASH_SOURCE[0]:-$0}"
 if [[ -f "$_DEPLOY_SCRIPT" ]]; then
@@ -25,6 +25,8 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 VENV_DIR="${VENV_DIR:-$PROJECT_DIR/.venv}"
 
 LOCAL_OLLAMA_URL="${LOCAL_OLLAMA_URL:-http://127.0.0.1:11435}"
+SERVER_PORT="${GOAT_SERVER_PORT:-62606}"
+EFFECTIVE_OLLAMA_URL="${OLLAMA_BASE_URL:-${LOCAL_OLLAMA_URL}}"
 
 SKIP_BUILD="${SKIP_BUILD:-0}"
 QUICK="${QUICK:-0}"
@@ -126,7 +128,7 @@ mkdir -p "${LOGS_DIR}"
 API_LOG="${LOGS_DIR}/fastapi.log"
 API_PID="${LOGS_DIR}/fastapi.pid"
 
-if [ "${OLLAMA_BASE_URL:-${LOCAL_OLLAMA_URL}}" = "${LOCAL_OLLAMA_URL}" ] && [ -x "${PROJECT_DIR}/scripts/start_ollama_local.sh" ]; then
+if [ "${EFFECTIVE_OLLAMA_URL}" = "${LOCAL_OLLAMA_URL}" ] && [ -x "${PROJECT_DIR}/scripts/start_ollama_local.sh" ]; then
   echo "🦙 Ensuring sibling local Ollama is running at ${LOCAL_OLLAMA_URL}…"
   OLLAMA_HOST="${LOCAL_OLLAMA_URL}" "${PROJECT_DIR}/scripts/start_ollama_local.sh"
 fi
@@ -143,25 +145,14 @@ _goat_systemd_restart() {
   return 1
 }
 
-resolve_target_ports() {
-  "${VENV_DIR}/bin/python" -m goat_ai.runtime_target --ordered-ports
-}
-
 SYSTEMD_USED=0
-SELECTED_PORT=""
-TARGET_PORTS=()
-while IFS= read -r port; do
-  [ -n "$port" ] && TARGET_PORTS+=("$port")
-done < <(resolve_target_ports)
+SELECTED_PORT="${SERVER_PORT}"
+echo "🧹 Freeing port ${SERVER_PORT}…"
+free_port "${SERVER_PORT}"
+stop_pidfile "$API_PID"
 
-if [ "${#TARGET_PORTS[@]}" -eq 0 ]; then
-  echo "❌ Failed to resolve deployment target ports."
-  exit 1
-fi
-
-if [ "${TARGET_PORTS[0]}" = "${GOAT_SERVER_PORT:-62606}" ] && _goat_systemd_restart goat-ai; then
+if _goat_systemd_restart goat-ai; then
   SYSTEMD_USED=1
-  SELECTED_PORT="${TARGET_PORTS[0]}"
   echo "⏳ Waiting for FastAPI on ${SELECTED_PORT} via systemd…"
   if ! healthcheck_port "${SELECTED_PORT}"; then
     echo "⚠️ systemd target ${SELECTED_PORT} did not become healthy; falling back to nohup target resolution."
@@ -173,37 +164,35 @@ fi
 
 if [ "${SYSTEMD_USED}" != "1" ]; then
   # ── nohup fallback (works without systemd setup) ─────────────────────────
-  stop_pidfile "$API_PID"
-  for candidate_port in "${TARGET_PORTS[@]}"; do
-    echo "🧹 Freeing port ${candidate_port}…"
-    free_port "$candidate_port"
+  echo "🚀 Starting FastAPI on 0.0.0.0:${SERVER_PORT} (log: ${API_LOG})…"
+  GOAT_PORT="${SERVER_PORT}" nohup "${VENV_DIR}/bin/python" -m uvicorn server:app \
+    --host 0.0.0.0 \
+    --port "${SERVER_PORT}" \
+    --workers 2 \
+    >> "$API_LOG" 2>&1 &
+  echo $! > "$API_PID"
+  echo "   PID: $(cat "$API_PID")"
 
+  echo "⏳ Waiting for FastAPI on ${SERVER_PORT}…"
+  if healthcheck_port "${SERVER_PORT}"; then
+    SELECTED_PORT="${SERVER_PORT}"
+    echo "✅ FastAPI health OK on ${SERVER_PORT}."
+  else
     stop_pidfile "$API_PID"
-
-    echo "🚀 Starting FastAPI on 0.0.0.0:${candidate_port} (log: ${API_LOG})…"
-    GOAT_PORT="${candidate_port}" nohup "${VENV_DIR}/bin/python" -m uvicorn server:app \
-      --host 0.0.0.0 \
-      --port "$candidate_port" \
-      --workers 2 \
-      >> "$API_LOG" 2>&1 &
-    echo $! > "$API_PID"
-    echo "   PID: $(cat "$API_PID")"
-
-    echo "⏳ Waiting for FastAPI on ${candidate_port}…"
-    if healthcheck_port "${candidate_port}"; then
-      SELECTED_PORT="${candidate_port}"
-      echo "✅ FastAPI health OK on ${candidate_port}."
-      break
-    fi
-
-    echo "⚠️ FastAPI did not become healthy on ${candidate_port}; trying next target."
-    stop_pidfile "$API_PID"
-  done
+    echo "❌ FastAPI did not become healthy on ${SERVER_PORT}. Check ${API_LOG}"
+    exit 1
+  fi
 fi
 
 # ── 5. Health check — FastAPI ─────────────────────────────────────────────────
 if [ -z "${SELECTED_PORT}" ]; then
-  echo "❌ FastAPI did not become healthy on any resolved target port (${TARGET_PORTS[*]}). Check ${API_LOG}"
+  echo "❌ FastAPI did not become healthy on ${SERVER_PORT}. Check ${API_LOG}"
+  exit 1
+fi
+
+echo "🧪 Running post-deploy contract checks..."
+if ! "${VENV_DIR}/bin/python" "${PROJECT_DIR}/scripts/post_deploy_check.py" --base-url "http://127.0.0.1:${SELECTED_PORT}"; then
+  echo "❌ Post-deploy contract checks failed."
   exit 1
 fi
 

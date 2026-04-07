@@ -13,6 +13,7 @@ from backend.services.chat_runtime import (
     SQLiteSessionRepository,
 )
 from backend.services.chat_service import stream_chat_sse
+from backend.services.safeguard_service import RuleBasedSafeguardService
 from backend.services.sse import sse_event
 from goat_ai.latency_metrics import get_inference_snapshot
 from goat_ai.ollama_client import ToolCallPlan
@@ -137,6 +138,20 @@ class FakeChartToolLLMClient(FakeLLMClient):
         yield "Here is the chart-driven answer."
 
 
+class FakeLongStreamingLLMClient(FakeLLMClient):
+    def stream_tokens(
+        self,
+        model: str,
+        messages: list[ChatTurn],
+        system_prompt: str,
+        *,
+        ollama_options: dict[str, float | int] | None = None,
+    ) -> Generator[str, None, None]:
+        yield "This is the first chunk."
+        yield " Here is the second chunk."
+        yield " Finally the third chunk."
+
+
 def test_stream_chat_sse_emits_tokens_done_and_records_latency() -> None:
     tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
     db_path = Path(tmp.name) / "chat_logs.db"
@@ -160,6 +175,8 @@ def test_stream_chat_sse_emits_tokens_done_and_records_latency() -> None:
         snap = get_inference_snapshot()
         assert snap["chat_sample_count"] == 1
         assert float(snap["chat_avg_ms"]) >= 0.0
+        assert snap["first_token_sample_count"] == 1
+        assert float(snap["first_token_avg_ms"]) >= 0.0
     finally:
         tmp.cleanup()
 
@@ -207,6 +224,28 @@ def test_stream_chat_sse_emits_chart_only_after_native_tool_followup_completes()
         tmp.cleanup()
 
 
+def test_stream_chat_sse_allows_tool_chart_without_uploaded_file_context() -> None:
+    tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+    db_path = Path(tmp.name) / "chat_logs.db"
+    log_service.init_db(db_path)
+    try:
+        events = list(
+            stream_chat_sse(
+                llm=FakeChartToolLLMClient(),
+                model="test-model",
+                messages=[ChatMessage(role="user", content="生成一个典型的饼状图表")],
+                system_prompt="You are helpful.",
+                ip="127.0.0.1",
+                conversation_logger=SQLiteConversationLogger(db_path),
+            )
+        )
+
+        assert any('"type": "chart_spec"' in event for event in events)
+        assert any('"type": "done"' in event for event in events)
+    finally:
+        tmp.cleanup()
+
+
 def test_stream_chat_sse_does_not_emit_chart_from_legacy_pseudo_block_when_tools_unsupported() -> None:
     class FakeLegacyChartBlockLLMClient(FakeLLMClient):
         def stream_tokens(
@@ -246,5 +285,29 @@ def test_stream_chat_sse_does_not_emit_chart_from_legacy_pseudo_block_when_tools
 
         assert not any('"type": "chart_spec"' in event for event in events)
         assert any('"type": "done"' in event for event in events)
+    finally:
+        tmp.cleanup()
+
+
+def test_stream_chat_sse_emits_tokens_before_done_with_safeguard_enabled() -> None:
+    tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+    db_path = Path(tmp.name) / "chat_logs.db"
+    log_service.init_db(db_path)
+    try:
+        events = list(
+            stream_chat_sse(
+                llm=FakeLongStreamingLLMClient(),
+                model="test-model",
+                messages=[ChatMessage(role="user", content="Share a brief update.")],
+                system_prompt="You are helpful.",
+                ip="127.0.0.1",
+                conversation_logger=SQLiteConversationLogger(db_path),
+                safeguard_service=RuleBasedSafeguardService(),
+            )
+        )
+
+        first_token_index = next(i for i, event in enumerate(events) if '"type": "token"' in event)
+        done_index = next(i for i, event in enumerate(events) if '"type": "done"' in event)
+        assert first_token_index < done_index
     finally:
         tmp.cleanup()

@@ -39,3 +39,4 @@ class HistorySessionDetailResponse(HistorySessionSummary):
     messages: list[HistorySessionMessage]
     chart_spec: dict[str, object] | None = None
     file_context: HistorySessionFileContext | None = None
+    chart_data_source: str | None = Field(default=None, pattern="^(uploaded|demo|none)$")

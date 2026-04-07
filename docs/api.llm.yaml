@@ -88,6 +88,15 @@ schemas:
       created_at: string
       updated_at: string
       messages: HistorySessionMessage[]
+      chart_spec: object|null
+      file_context: HistorySessionFileContext|null
+      chart_data_source: string|null
+  HistorySessionFileContext:
+    type: object
+    required:
+      - prompt
+    properties:
+      prompt: string
   HistorySessionListResponse:
     type: object
     required:
@@ -121,9 +130,23 @@ schemas:
     required:
       - chat_avg_ms
       - chat_sample_count
+      - chat_p50_ms
+      - chat_p95_ms
+      - first_token_avg_ms
+      - first_token_sample_count
+      - first_token_p50_ms
+      - first_token_p95_ms
+      - model_buckets
     properties:
       chat_avg_ms: number
       chat_sample_count: integer
+      chat_p50_ms: number
+      chat_p95_ms: number
+      first_token_avg_ms: number
+      first_token_sample_count: integer
+      first_token_p50_ms: number
+      first_token_p95_ms: number
+      model_buckets: map[string,map[string,number|integer]]
   ModelCapabilitiesResponse:
     type: object
     required:

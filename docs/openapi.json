@@ -996,6 +996,18 @@
                 "type": "null"
               }
             ]
+          },
+          "chart_data_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(uploaded|demo|none)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chart Data Source"
           }
         },
         "type": "object",
@@ -1104,12 +1116,60 @@
           "chat_sample_count": {
             "type": "integer",
             "title": "Chat Sample Count"
+          },
+          "chat_p50_ms": {
+            "type": "number",
+            "title": "Chat P50 Ms"
+          },
+          "chat_p95_ms": {
+            "type": "number",
+            "title": "Chat P95 Ms"
+          },
+          "first_token_avg_ms": {
+            "type": "number",
+            "title": "First Token Avg Ms"
+          },
+          "first_token_sample_count": {
+            "type": "integer",
+            "title": "First Token Sample Count"
+          },
+          "first_token_p50_ms": {
+            "type": "number",
+            "title": "First Token P50 Ms"
+          },
+          "first_token_p95_ms": {
+            "type": "number",
+            "title": "First Token P95 Ms"
+          },
+          "model_buckets": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ]
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Model Buckets"
           }
         },
         "type": "object",
         "required": [
           "chat_avg_ms",
-          "chat_sample_count"
+          "chat_sample_count",
+          "chat_p50_ms",
+          "chat_p95_ms",
+          "first_token_avg_ms",
+          "first_token_sample_count",
+          "first_token_p50_ms",
+          "first_token_p95_ms",
+          "model_buckets"
         ],
         "title": "InferenceLatencyResponse",
         "description": "Rolling average chat completion time (server-side, in-process)."
