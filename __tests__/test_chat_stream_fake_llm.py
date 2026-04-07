@@ -82,6 +82,15 @@ class FakeLLMClient:
             yield ""
         return
 
+    def generate_completion(
+        self,
+        model: str,
+        prompt: str,
+        *,
+        ollama_options: dict[str, float | int] | None = None,
+    ) -> str:
+        return ""
+
 
 class FakeChartToolLLMClient(FakeLLMClient):
     def get_model_capabilities(self, model: str) -> list[str]:
@@ -208,7 +217,7 @@ def test_stream_chat_sse_emits_chart_only_after_native_tool_followup_completes()
                 ip="127.0.0.1",
                 conversation_logger=SQLiteConversationLogger(db_path),
                 session_repository=SQLiteSessionRepository(db_path),
-                title_generator=OllamaTitleGenerator("http://127.0.0.1:11434", 30),
+                title_generator=OllamaTitleGenerator(FakeChartToolLLMClient()),
             )
         )
 

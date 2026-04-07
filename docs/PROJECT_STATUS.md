@@ -2,6 +2,10 @@
 
 Last updated: 2026-04-07
 
+## Release
+
+- **Current: v1.3.0** — Phase 11 (industrialization / decoupling) **complete**. Backend chat path: `chat_orchestration.py` + `ChatStreamService` + thin `stream_chat_sse`; injectable tabular + title via `LLMClient`; `log_service` only behind SQLite adapters + architecture guard. See [ROADMAP.md](ROADMAP.md).
+
 ## What is shipped
 
 - React SPA + FastAPI backend, deployed behind school nginx at `https://ai.simonbb.com/mingzhi/`
@@ -17,6 +21,7 @@ Last updated: 2026-04-07
 - Native chart-tool path: charts are emitted only from real Ollama tool calls, never pre-rendered before the LLM responds
 - Typed SSE protocol: `token`, `chart_spec`, `error`, `done`
 - Black-box API contract coverage through `__tests__/test_api_blackbox_contract.py`
+- Architecture guard suite (`__tests__/test_architecture_boundaries.py`) included in standard `unittest discover` runs (services/`goat_ai` / routers / hooks + `log_service` confinement)
 - Lightweight safeguard layer for clearly unsafe sexual or violent misuse requests in chat
 - Single-port runtime-target policy (`:62606`) across deploy scripts and runtime-target API
 - Post-deploy contract verification script integrated into Linux and Windows deploy flows

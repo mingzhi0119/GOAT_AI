@@ -7,9 +7,11 @@ import pandas as pd
 from goat_ai.types import ChatTurn
 
 # Marker used by the backend to embed the raw CSV data inside the file-context
-# prompt so that chat_service can reconstruct a DataFrame when the LLM emits a
-# :::chart block.
-_CSV_EMBED_MARKER = "CHART_DATA_CSV"
+# prompt so that tabular extractors can reconstruct a DataFrame from history.
+CHART_DATA_CSV_MARKER = "CHART_DATA_CSV"
+_CSV_EMBED_MARKER = CHART_DATA_CSV_MARKER
+
+FILE_CONTEXT_UPLOAD_PREFIX = "[User uploaded tabular data for analysis]"
 
 # Instructions appended to every file-context prompt that explain the :::chart
 # structured-output protocol to the LLM.
@@ -53,7 +55,7 @@ def describe_dataframe(df: pd.DataFrame) -> str:
 def build_analysis_user_message(df: pd.DataFrame) -> str:
     """Build the hidden file-context user message injected at position 0 of the history."""
     return (
-        "[User uploaded tabular data for analysis]\n\n"
+        f"{FILE_CONTEXT_UPLOAD_PREFIX}\n\n"
         f"{describe_dataframe(df)}\n\n"
         "Summarize what this data contains and suggest sensible next analyses. "
         "Cite the row/column counts in your answer."

@@ -15,6 +15,7 @@ from backend.services.chat_runtime import (
     SQLiteSessionRepository,
     TitleGenerator,
 )
+from backend.services.tabular_context import EmbeddedCsvTabularExtractor, TabularContextExtractor
 from backend.services.safeguard_service import RuleBasedSafeguardService, SafeguardService
 from goat_ai.config import Settings
 from goat_ai.ollama_client import LLMClient, OllamaService
@@ -43,11 +44,14 @@ def get_session_repository(
     return SQLiteSessionRepository(settings.log_db_path)
 
 
-def get_title_generator(
-    settings: Settings = Depends(get_settings),
-) -> TitleGenerator:
-    """Return the title generator bound to current settings."""
-    return OllamaTitleGenerator(settings.ollama_base_url, settings.generate_timeout)
+def get_title_generator(llm: LLMClient = Depends(get_llm_client)) -> TitleGenerator:
+    """Return the title generator using the same Ollama client as chat (injectable for tests)."""
+    return OllamaTitleGenerator(llm)
+
+
+def get_tabular_context_extractor() -> TabularContextExtractor:
+    """Return the tabular context extractor used for chart tool data resolution."""
+    return EmbeddedCsvTabularExtractor()
 
 
 def get_safeguard_service() -> SafeguardService:

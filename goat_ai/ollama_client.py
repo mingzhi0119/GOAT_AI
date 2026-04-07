@@ -81,6 +81,16 @@ class LLMClient(Protocol):
         ollama_options: dict[str, float | int] | None = None,
     ) -> Generator[str, None, None]: ...
 
+    def generate_completion(
+        self,
+        model: str,
+        prompt: str,
+        *,
+        ollama_options: dict[str, float | int] | None = None,
+    ) -> str:
+        """Non-streaming /api/generate response body (session titles, etc.)."""
+        ...
+
 
 # ── Implementation ─────────────────────────────────────────────────────────────
 class OllamaService:
@@ -221,6 +231,30 @@ class OllamaService:
                 token = chunk.get("response", "")
                 if token:
                     yield token
+
+    def generate_completion(
+        self,
+        model: str,
+        prompt: str,
+        *,
+        ollama_options: dict[str, float | int] | None = None,
+    ) -> str:
+        """Return a single non-streaming completion from /api/generate."""
+        payload: dict[str, Any] = {"model": model, "prompt": prompt, "stream": False}
+        if ollama_options:
+            payload["options"] = ollama_options
+        try:
+            res = requests.post(
+                f"{self._s.ollama_base_url}/api/generate",
+                json=payload,
+                stream=False,
+                timeout=self._s.generate_timeout,
+            )
+            res.raise_for_status()
+        except requests.RequestException as exc:
+            raise OllamaUnavailable("Cannot reach Ollama /api/generate") from exc
+        data = res.json()
+        return str(data.get("response") or "").strip()
 
     def stream_tokens(
         self,

@@ -161,12 +161,30 @@ class ContractFakeLLM:
     ):
         yield "Chart answer"
 
+    def generate_completion(
+        self,
+        model: str,
+        prompt: str,
+        *,
+        ollama_options: dict[str, float | int] | None = None,
+    ) -> str:
+        return ""
+
 
 class UnavailableLLM(ContractFakeLLM):
     def list_model_names(self) -> list[str]:
         raise OllamaUnavailable("offline")
 
     def get_model_capabilities(self, model: str) -> list[str]:
+        raise OllamaUnavailable("offline")
+
+    def generate_completion(
+        self,
+        model: str,
+        prompt: str,
+        *,
+        ollama_options: dict[str, float | int] | None = None,
+    ) -> str:
         raise OllamaUnavailable("offline")
 
     def stream_tokens(

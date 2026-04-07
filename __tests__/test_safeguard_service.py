@@ -80,6 +80,15 @@ class CountingLLM:
             yield ""
         return
 
+    def generate_completion(
+        self,
+        model: str,
+        prompt: str,
+        *,
+        ollama_options: dict[str, float | int] | None = None,
+    ) -> str:
+        return ""
+
 
 class SafeguardServiceTests(unittest.TestCase):
     def test_rule_engine_blocks_explicit_sex_request_but_allows_academic_topic(self) -> None:

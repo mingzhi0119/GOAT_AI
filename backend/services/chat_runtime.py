@@ -5,10 +5,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-import requests
-
 from backend.services import log_service
 from backend.services.session_message_codec import decode_session_payload
+from goat_ai.ollama_client import LLMClient
 
 
 @dataclass(frozen=True)
@@ -165,11 +164,10 @@ class SQLiteConversationLogger:
 
 
 class OllamaTitleGenerator:
-    """Ollama-backed implementation of TitleGenerator."""
+    """Ollama-backed TitleGenerator using the injectable LLM client (no direct HTTP here)."""
 
-    def __init__(self, base_url: str, timeout_sec: int) -> None:
-        self._base_url = base_url.rstrip("/")
-        self._timeout_sec = timeout_sec
+    def __init__(self, llm: LLMClient) -> None:
+        self._llm = llm
 
     def generate_title(
         self,
@@ -183,14 +181,7 @@ class OllamaTitleGenerator:
             "Output only the title text, no quotes, no role labels.\n\n"
             f"User: {user_text[:4000]}\n\nAssistant: {assistant_text[:4000]}"
         )
-        response = requests.post(
-            f"{self._base_url}/api/generate",
-            json={"model": model, "prompt": prompt, "stream": False},
-            timeout=float(min(max(self._timeout_sec, 5), 90)),
-        )
-        response.raise_for_status()
-        data = response.json()
-        text = (data.get("response") or "").strip()
+        text = self._llm.generate_completion(model, prompt)
         one_line = " ".join(text.splitlines()).strip()
         if not one_line:
             return None

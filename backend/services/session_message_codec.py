@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from backend.models.chat import ChatMessage
+from backend.services.tabular_context import LEGACY_CSV_FENCE_SUBSTRING
+from goat_ai.tools import FILE_CONTEXT_UPLOAD_PREFIX
 
 STORED_CHART_ROLE = "__chart__"
 STORED_FILE_CONTEXT_ROLE = "__file_context__"
@@ -13,6 +15,9 @@ STORED_FILE_CONTEXT_ACK_ROLE = "__file_context_ack__"
 FILE_CONTEXT_REPLY = "I have loaded the file context."
 SESSION_PAYLOAD_VERSION = 2
 ChartDataSource = Literal["uploaded", "demo", "none"]
+
+# Alternate upload-analysis header (legacy compatibility / future prompts).
+FILE_CONTEXT_REQUESTED_PREFIX = "[User requested analysis of uploaded tabular data]"
 
 
 @dataclass(frozen=True)
@@ -29,10 +34,10 @@ def is_file_context_message(message: ChatMessage) -> bool:
     """Return whether a chat message is the injected file-context prompt."""
     return (
         message.role == "user"
-        and "CHART_DATA_CSV:\n```" in message.content
+        and LEGACY_CSV_FENCE_SUBSTRING in message.content
         and (
-            message.content.startswith("[User uploaded tabular data for analysis]")
-            or message.content.startswith("[User requested analysis of uploaded tabular data]")
+            message.content.startswith(FILE_CONTEXT_UPLOAD_PREFIX)
+            or message.content.startswith(FILE_CONTEXT_REQUESTED_PREFIX)
         )
     )
 

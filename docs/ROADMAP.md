@@ -1,10 +1,16 @@
 # GOAT AI Roadmap
 
-> Last updated: 2026-04-07
-> Current release: **v1.2.0**
+> Last updated: 2026-04-07 — **Phase 11 shipped** in v1.3.0; API black-box re-verified (79 + 13 tests)
+> Current release: **v1.3.0**
 > Compact snapshot: [PROJECT_STATUS.md](PROJECT_STATUS.md)
 
 ---
+
+## Shipped (v1.3.0)
+
+| Phase | Content |
+|-------|---------|
+| 11 | **Industrialization and decoupling (complete):** `ChatStreamService` owns SSE/tool/safeguard streaming; `chat_orchestration.py` holds `PromptComposer` / `ChartToolOrchestrator` / `SessionPersistenceService`; `chat_service.py` is a thin `stream_chat_sse` entry; injectable `TabularContextExtractor` + `LLMClient.generate_completion` for titles; `log_service` import confined to adapters with architecture guard; wire markers centralized (`CHART_DATA_CSV_MARKER`, `FILE_CONTEXT_UPLOAD_PREFIX`, `LEGACY_CSV_FENCE_SUBSTRING`); `test_architecture_boundaries` runs under `unittest discover` |
 
 ## Shipped (v1.2.0)
 
@@ -22,64 +28,19 @@
 | 9 | Access and security: API key protection, rate limiting, request tracing headers, production-safe access controls |
 | 10 | Native chart-tool path: constrained `ChartIntentV2` -> `ChartSpecV2` compiler, Ollama tool-capability checks, tool-call-only chart rendering |
 
----
+### Phase 11 (archived objective — met)
 
-## Phase 11: Industrialization and Decoupling
+- Align with `AGENTS.md`: typed boundaries, router-thin API, orchestration in services, portable dev/prod.
+- **Follow-up (post–Phase 11):** optional deeper migration of legacy session **content** markers (`__chart__`, etc.) into versioned payload-only fields without breaking SQLite rows — not blocking; v2 payload + codec already separate display roles from chat turns.
 
-Status legend:
-- `[ ]` Not started
-- `[~]` In progress
-- `[x]` Completed
+### Near-term execution order (project-calibrated)
 
-Objective:
-- Bring the codebase in line with the engineering contract in `AGENTS.md`: industrial-grade boundaries, typed interfaces, and maintainable service decomposition.
-- Reduce coupling between transport, orchestration, persistence, and UI state so features can evolve without repeatedly editing the same large files.
+Aligned with `AGENTS.md` and **no-root / JupyterHub-style** production (`docs/OPERATIONS.md`): `systemd --user` when D-Bus works; **nohup + PID remains a permanent fallback**.
 
-Execution plan:
-
-1. `[~]` Split backend chat orchestration into focused services
-   - Extract `PromptComposer`, `ChartToolOrchestrator`, `ChatStreamService`, and `SessionPersistenceService` from the current chat flow.
-   - Keep routers thin: input validation, dependency wiring, and HTTP translation only.
-   - Remove the current "god service" pattern where prompt logic, chart logic, SSE formatting, logging, and session writes live together.
-
-2. `[~]` Replace direct infrastructure calls with injected interfaces
-   - Introduce typed Protocol/repository boundaries for session storage, conversation logging, title generation, and tabular-context extraction.
-   - Remove direct `requests` calls and static persistence helpers from business services.
-   - Make unit tests target service interfaces instead of concrete HTTP or SQLite behavior.
-
-3. `[~]` Replace magic-string protocols with typed domain payloads
-   - Stop using raw text markers such as `CHART_DATA_CSV`, hidden acknowledgement messages, and `__chart__` sentinels as the primary application contract.
-   - Introduce explicit models for file context, stored chart state, and stream payloads.
-   - Keep compatibility shims isolated at the edges while migrating old sessions safely.
-
-4. `[x]` Formalize the SSE event contract
-   - Standardize stream frames as typed event objects such as `token`, `chart_spec`, `done`, and `error`.
-   - Remove mixed string/object sentinel parsing from frontend clients.
-   - Regenerate OpenAPI and compact LLM-facing API contracts after the stream protocol is stabilized.
-
-5. `[x]` Introduce a frontend chat-session controller
-   - Move session restore, chart restore, file-context injection, and send-policy logic out of `App.tsx` and transport hooks into a dedicated `useChatSession` store/controller.
-   - Keep components focused on rendering and user interaction.
-   - Make session hydration rules explicit instead of encoding them indirectly in hidden-message behavior.
-
-6. `[x]` Consolidate upload handling behind a shared boundary
-   - Remove duplicated upload filename/extension/read logic across routes.
-   - Introduce a single typed upload parsing/application service used by both SSE and JSON endpoints.
-   - Keep route handlers free of repeated file validation and branching.
-
-7. `[~]` Add architecture tests and documentation gates
-   - Add tests that lock in router/service/client separation and typed stream contracts.
-   - Extend docs to describe architectural boundaries, not just endpoint behavior.
-   - Update `PROJECT_STATUS.md`, `API_REFERENCE.md`, and durable agent memory as each boundary migration lands.
-
-Progress already landed in this phase:
-
-- Session persistence, title generation, runtime adapters, and SSE helpers have been extracted into smaller backend boundaries.
-- SQLite logging and session history now sit behind injectable interfaces.
-- Frontend session orchestration has been moved out of `App.tsx` into a dedicated controller hook.
-- Upload validation and request parsing are centralized behind a shared service.
-- SSE frames are now typed event objects instead of legacy string sentinels.
-- Black-box API contract coverage exists through `__tests__/test_api_blackbox_contract.py`.
+| Horizon | Focus |
+|---------|--------|
+| **v1.3.x** | Ops hardening from Phase 12 backlog: systemd vs nohup playbook, SQLite backup/migration thresholds, security/audit as exposure grows. |
+| **v1.4** | Evaluate Postgres / jobs / multi-instance **after** ops gates from v1.3.x are stable. |
 
 ---
 
@@ -95,9 +56,8 @@ Objective:
 
 Execution plan:
 
-1. `[x]` Finish decomposing backend chat orchestration into focused services
-   - Extract `PromptComposer`, `ChartToolOrchestrator`, `ChatStreamService`, and `SessionPersistenceService` as explicit units.
-   - Keep router and dependency wiring unchanged at the API edge while reducing internal coupling.
+1. `[x]` Decompose backend chat orchestration into focused collaborators
+   - **Landed:** `PromptComposer`, `ChartToolOrchestrator`, and `SessionPersistenceService` in `chat_orchestration.py`; **`ChatStreamService`** in `chat_stream_service.py`; thin `stream_chat_sse` in `chat_service.py`. SSE contract preserved.
 
 2. `[x]` Introduce explicit chart data-source policy models
    - Add typed chart data source metadata (`uploaded`, `demo`, `none`) instead of implicit marker-driven behavior.
@@ -106,6 +66,7 @@ Execution plan:
 3. `[x]` Add architecture guard tests (backend + frontend)
    - Lock in backend layer boundaries (router/service/shared layer import rules).
    - Lock in frontend boundary rule that hooks do not import components.
+   - **`log_service` confinement:** only `log_service.py` and `chat_runtime.py` may import `log_service` under `backend/services/` (enforced in `test_architecture_boundaries`).
 
 4. `[x]` Define latency SLOs with percentile telemetry
    - Extend telemetry from rolling mean to include p50/p95 for chat completion and first-token latency.
@@ -127,7 +88,7 @@ Execution plan:
 
 Progress already landed in this phase:
 
-- Backend chat orchestration now uses dedicated collaborators (`PromptComposer`, `ChartToolOrchestrator`, `SessionPersistenceService`) while preserving `/api/chat` SSE contract behavior.
+- Backend chat orchestration uses `ChatStreamService` plus collaborators (`PromptComposer`, `ChartToolOrchestrator`, `SessionPersistenceService`) while preserving `/api/chat` SSE contract behavior (Phase 11 complete).
 - Chart rendering policy is now explicit about data source provenance (`uploaded`, `demo`, `none`) and persisted in session payloads.
 - Architecture guard tests lock backend and frontend layer boundaries to reduce regression risk.
 - Inference telemetry now exposes rolling average + p50/p95 for completion and first-token latency, including model-scoped buckets.
@@ -147,7 +108,7 @@ Progress already landed in this phase:
 | Server | A100 Ubuntu 24.04 | same |
 | Public URL | `https://ai.simonbb.com/mingzhi/` | same (or dedicated subdomain) |
 | Port | 62606 (nginx proxy) | 62606 |
-| Process mgmt | `nohup` + PID file by default on no-root hosts | `systemd --user` if available; otherwise watchdog/tmux fallback |
+| Process mgmt | `nohup` + PID file default on no-root hosts (required fallback) | Try `systemd --user` when D-Bus/session is available; **always** retain nohup/watchdog path for SSH/JupyterHub hosts where user systemd fails |
 | Log files | `logs/fastapi.log` + user-space rotation script | same |
 | Node version | 24.14.1 (`.nvmrc`) | 24.x |
 | Python | 3.12.6 | 3.12.x |
@@ -163,3 +124,5 @@ Progress already landed in this phase:
 | 2026-03-30 | SSE over WebSocket | Simpler and more proxy-friendly; native browser support |
 | 2026-03-30 | No React Router | Single-page app; extra routing complexity had little benefit |
 | 2026-03-31 | Dual-port deploy reverted | Production uses `:62606` only |
+| 2026-04-07 | Process mgmt: systemd is additive, not a drop-in for nohup | Shared host may lack reliable `systemctl --user`; deploy contract keeps nohup + PID as permanent fallback per `AGENTS.md` / `OPERATIONS.md` |
+| 2026-04-07 | Phase 11 closed in v1.3.0 | `ChatStreamService` + orchestration split; tabular/title injection; log_service adapter-only guard; wire constants centralized; 79 unittest + 13 black-box OK |

@@ -129,14 +129,18 @@ STATIC_DIR = "C:\\Users\\simon\\GOAT_AI\\frontend\\dist"
 backend/
 ├── main.py              # App factory: create_app() → FastAPI; mounts static, registers routers
 ├── config.py            # Settings wrapper; validated at startup/import boundary
-├── dependencies.py      # FastAPI Depends() factories (get_llm_client, get_settings, ...)
+├── dependencies.py      # FastAPI Depends() factories (get_llm_client, get_tabular_context_extractor, …)
 ├── exceptions.py        # Domain exception hierarchy
 ├── routers/
 │   ├── chat.py          # POST /api/chat  (SSE streaming)
 │   ├── models.py        # GET  /api/models
 │   └── upload.py        # POST /api/upload
 ├── services/
-│   ├── chat_service.py  # Orchestrates LLMClient + session; pure business logic
+│   ├── chat_service.py       # Public `stream_chat_sse` entry (thin wrapper)
+│   ├── chat_stream_service.py # ChatStreamService: SSE + tools + safeguards
+│   ├── chat_orchestration.py  # PromptComposer, ChartToolOrchestrator, SessionPersistenceService
+│   ├── chat_runtime.py        # SessionRepository / ConversationLogger SQLite adapters (import `log_service`)
+│   ├── tabular_context.py     # TabularContextExtractor Protocol + EmbeddedCsvTabularExtractor
 │   └── upload_service.py
 └── models/              # Pydantic request/response schemas (no business logic)
     ├── chat.py
@@ -146,6 +150,8 @@ backend/
 **Rules**:
 - `routers/` only: validate input, call service, return response.
 - `services/` only: orchestrate, no HTTP primitives.
+- **Tabular context for charts**: resolve upload-embedded tables through injectable `TabularContextExtractor` (`tabular_context.py`), not ad hoc regex scattered in orchestration.
+- **`log_service` imports:** under `backend/services/`, only `log_service.py` and `chat_runtime.py` may import `log_service` (enforced by `__tests__/test_architecture_boundaries.py`).
 - `models/` only: data shapes, no methods beyond validators.
 - `goat_ai/` (shared): LLM client, upload parsing, tools. No FastAPI imports in the shared layer.
 

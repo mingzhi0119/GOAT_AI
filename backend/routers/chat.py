@@ -12,6 +12,7 @@ from backend.dependencies import (
     get_llm_client,
     get_safeguard_service,
     get_session_repository,
+    get_tabular_context_extractor,
     get_title_generator,
 )
 from backend.models.common import ErrorResponse
@@ -19,6 +20,7 @@ from backend.models.chat import ChatRequest
 from backend.routers.chat_options import ollama_options_from_chat_request
 from backend.services.chat_service import stream_chat_sse
 from backend.services.chat_runtime import ConversationLogger, SessionRepository, TitleGenerator
+from backend.services.tabular_context import TabularContextExtractor
 from backend.services.safeguard_service import SafeguardService
 from goat_ai.config import Settings
 from goat_ai.ollama_client import LLMClient
@@ -49,6 +51,7 @@ def chat_stream(
     conversation_logger: ConversationLogger = Depends(get_conversation_logger),
     session_repository: SessionRepository = Depends(get_session_repository),
     title_generator: TitleGenerator = Depends(get_title_generator),
+    tabular_extractor: TabularContextExtractor = Depends(get_tabular_context_extractor),
     safeguard_service: SafeguardService = Depends(get_safeguard_service),
     settings: Settings = Depends(get_settings),
 ) -> StreamingResponse:
@@ -77,6 +80,7 @@ def chat_stream(
             safeguard_service=safeguard_service,
             system_instruction=(req.system_instruction or "").strip(),
             ollama_options=o_opts,
+            tabular_extractor=tabular_extractor,
         ),
         media_type="text/event-stream",
         headers=_SSE_HEADERS,

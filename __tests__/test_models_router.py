@@ -42,6 +42,22 @@ class FakeModelsLLMClient:
             yield ""
         return
 
+    def stream_tokens_with_tools(
+        self,
+        model: str,
+        messages: list[ChatTurn],
+        system_prompt: str,
+        *,
+        tools: list[dict[str, object]],
+        ollama_options: dict[str, float | int] | None = None,
+    ) -> Generator[str, None, None]:
+        yield from self.stream_tokens(
+            model,
+            messages,
+            system_prompt,
+            ollama_options=ollama_options,
+        )
+
     def plan_tool_call(
         self,
         model: str,
@@ -64,6 +80,15 @@ class FakeModelsLLMClient:
         if False:
             yield ""
         return
+
+    def generate_completion(
+        self,
+        model: str,
+        prompt: str,
+        *,
+        ollama_options: dict[str, float | int] | None = None,
+    ) -> str:
+        return ""
 
 
 @unittest.skipUnless(FastAPI is not None and TestClient is not None, "fastapi not installed")
