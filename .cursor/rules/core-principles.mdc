@@ -1,30 +1,37 @@
 ---
-description: Core engineering principles and cross-environment compatibility rules for GOAT AI
+description: Project direction, five non-negotiables, and cross-environment rules (mirrors AGENTS.md top sections)
 alwaysApply: true
 ---
 
-# GOAT AI — Core Principles
+# GOAT AI — Core principles
 
-## Five Non-Negotiables
-1. **Fail fast, fail loud** — bad config crashes at startup with a clear message, never silently at runtime.
+Canonical durable summary: repo root `AGENTS.md`. Keep these rules aligned when either file changes.
+
+## Purpose (why these rules exist)
+
+- Preserve engineering standards and server constraints.
+- Stay aligned with architecture; avoid repeating deploy mistakes on the live host.
+- Prefer stable contracts over re-reading implementation on every task.
+
+## Core project direction
+
+- Stay engineering-grade: clear interfaces, typed boundaries, dependency injection; avoid tightly coupled feature code.
+- Prefer maintainable structure over patchwork. If a change weakens boundaries, refactor before calling it done.
+
+## Five non-negotiables
+
+1. **Fail fast, fail loud** — invalid config crashes at startup with a clear message, never silently at runtime.
 2. **Decouple by boundary** — HTTP handler → service → client. No business logic in route handlers.
-3. **Portable by default** — runs identically on Windows (dev) and Ubuntu A100 (prod) without changes.
+3. **Portable by default** — Windows (dev) and Ubuntu A100 (prod) without source edits.
 4. **Type everything** — every function signature carries types; untyped code is untestable code.
-5. **Test the boundary, mock the world** — unit tests own pure logic; only integration tests touch real I/O.
+5. **Test the boundary, mock the world** — unit tests own pure logic; integration tests are narrow and touch real I/O only where intended.
 
-## Cross-Environment Checklist (apply to every file)
-- Paths: always `pathlib.Path(__file__).parent / "sub"` — never hardcoded strings.
-- Ports / URLs: always env vars with safe defaults — never `localhost:8000` hardcoded.
+## Cross-environment rules
+
+- Paths: `pathlib.Path(__file__).parent / "sub"` — never hardcoded platform path strings.
+- Ports / URLs / secrets: env vars — never hardcode in source.
 - File I/O: always `encoding="utf-8"` on `open()`.
-- Line endings: `.gitattributes` enforces `eol=lf` — prevents CRLF breakage on Windows dev.
-- Deps: exact pins in `requirements.txt`; `package-lock.json` committed; CI uses `npm ci`.
-- Secrets: `.env` in `.gitignore`; `.env.example` committed; never in scripts or source.
-- Startup: validate all env vars at import time — use `pydantic_settings.BaseSettings` when adding a new service, or the existing `goat_ai/config.py` `@dataclass` + `load_settings()` pattern. Either way: crash with a clear message at startup, never silently at first request.
-
-## Commit Checklist
-- [ ] All new functions typed + one-line docstring.
-- [ ] No `print()`, hardcoded paths/ports/secrets, or commented-out code.
-- [ ] New logic has at least a happy-path unit test.
-- [ ] `requirements.txt` / `package-lock.json` updated if deps changed.
-- [ ] `OPERATIONS.md` updated if a new env var or startup step was added.
-- [ ] `README.md` updated if directory structure or architecture changed.
+- Line endings: `.gitattributes` enforces `eol=lf` where applicable.
+- Deps: exact pins in `requirements.txt`; `package-lock.json` committed; CI/deploy uses `npm ci`.
+- Secrets: `.env` gitignored; `.env.example` committed; never in scripts or source.
+- Startup: validate env/config at import or app factory time — `pydantic_settings.BaseSettings` for new services, or existing `goat_ai/config.py` `@dataclass` + `load_settings()`. Crash with a clear message at startup, never lazily on first request.

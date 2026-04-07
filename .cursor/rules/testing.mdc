@@ -1,64 +1,49 @@
 ---
-description: Automated testing patterns for Python (pytest) and TypeScript (Vitest) — mock strategy, fixtures, CI
-globs: {__tests__,**/__tests__,**/*.test.*,**/conftest*}/**
+description: Python and TypeScript testing — boundaries, mocks, runners (AGENTS.md testing standards)
+globs: __tests__/**,**/__tests__/**,**/*.test.*,**/conftest.py
 alwaysApply: false
 ---
 
-# Testing Standards
+# Testing standards
 
-## Python (pytest)
+## Python
 
-**Coverage targets**: `goat_ai/tools.py` 100% · `goat_ai/uploads.py` 90% · `backend/services/` 90% (chat_service, upload_service, log_service) · `backend/routers/` 80%
+- Tests live in `__tests__/`.
+- Mock at the **protocol** boundary; unit tests do not hit real Ollama.
+- Prefer fixtures / shared setup over global mutable state in test files.
+- Cover happy path and edge cases.
+- Do **not** use `time.sleep()` in tests — use async-aware patterns where needed.
 
-**Mock at the Protocol boundary** — inject `FakeLLMClient`; unit tests never touch real Ollama.
+**Common commands:**
+
+- `python -m unittest discover -s __tests__ -p "test_*.py" -v`
+- Targeted: `python -m pytest ...` (same mocking discipline)
+
+**Example (fake at LLM boundary):**
 
 ```python
-# ✅ fake satisfies the LLMClient Protocol — no network needed
-# Protocol methods: list_model_names() + stream_tokens(model, messages, system_prompt)
 class FakeLLMClient:
-    def list_model_names(self) -> list[str]: return ["llama3:latest"]
+    def list_model_names(self) -> list[str]:
+        return ["llama3:latest"]
     def stream_tokens(
         self, model: str, messages: list[ChatTurn], system_prompt: str
     ) -> Generator[str, None, None]:
-        yield "Hello"; yield " world"
-
-@pytest.fixture
-def client(app: FastAPI) -> TestClient:
-    app.dependency_overrides[get_llm_client] = lambda: FakeLLMClient()
-    return TestClient(app)
+        yield "Hello"
+        yield " world"
 ```
 
-**Rules**:
-- `pytest.fixture` for all shared state — no module-level globals in test files.
-- Parametrize edge cases: empty messages, oversized upload, Ollama timeout.
-- Never `time.sleep()` — use `pytest-asyncio` + async fixtures.
+## TypeScript
 
-**Layout**:
-```
-__tests__/
-  test_*.py            # unittest — mock at Protocol boundary; no real Ollama
-```
-
-## TypeScript (Vitest + React Testing Library)
+- **Vitest** and **React Testing Library**.
+- Mock `fetch` — never hit the live backend in unit tests.
+- Assert behavior and user-visible output, not CSS implementation details.
 
 ```typescript
-// ✅ mock fetch globally — never hit real server
 vi.stubGlobal("fetch", vi.fn().mockResolvedValue(...));
-
-// ✅ test hooks with renderHook
 const { result } = renderHook(() => useChat());
 ```
 
-- Assert on ARIA roles/text — not CSS classes or DOM structure.
-- Test files in `src/__tests__/`.
+## CI reference (versions)
 
-## CI (GitHub Actions)
-```yaml
-- uses: actions/setup-python@v5
-  with: { python-version: "3.12" }          # match server
-- run: pytest __tests__/ -v --tb=short
-
-- uses: actions/setup-node@v4
-  with: { node-version: "18" }              # match server exactly
-- run: cd frontend && npm ci && npm test -- --run
-```
+- Python **3.12** (match backend target).
+- Node **24** (match server/CI per `AGENTS.md`).

@@ -1,0 +1,37 @@
+---
+description: When to update which docs, commit hygiene, and recovery notes (AGENTS.md workflow sections)
+globs: README.md,docs/**,AGENTS.md
+alwaysApply: false
+---
+
+# GOAT AI — Documentation, commits, recovery
+
+## Documentation update rules
+
+Update docs when behavior changes:
+
+| Change type | File |
+|-------------|------|
+| Architecture, structure, developer workflow | `README.md` |
+| Committed OpenAPI from FastAPI | `docs/openapi.json` |
+| LLM-optimized compact API | `docs/api.llm.yaml` (regenerate via `tools/generate_llm_api_yaml.py`) |
+| Human-readable endpoints | `docs/API_REFERENCE.md` |
+| Env vars, deploy, startup, host ops | `docs/OPERATIONS.md` |
+| Current shipped state | `docs/PROJECT_STATUS.md` |
+| Phase completion / future work | `docs/ROADMAP.md` |
+
+## Commit hygiene
+
+Before committing:
+
+- No `print()`, commented-out code, or hardcoded secrets/ports/paths
+- New functions typed (and one-line docstring where the repo expects it)
+- New logic has tests where practical
+- `requirements.txt` / `package-lock.json` updated if dependencies changed
+- Docs updated per the table above when user-facing or ops behavior changes
+
+## Recovery notes
+
+- If work appears lost, check `git reflog` before assuming it is gone.
+- Be careful with `git reset --hard` on the server-hosted checkout.
+- Do not commit `.venv/`, PID files, SQLite runtime files, notebook checkpoints, or other machine-local artifacts.

@@ -1,23 +1,45 @@
 ---
-description: Production A100 / JupyterHub host constraints (no root, deploy fallbacks)
-globs: deploy.sh, docs/OPERATIONS.md, docs/PROJECT_STATUS.md, goat-ai.service, scripts/rotate_fastapi_log.py, scripts/backup_chat_db.py, scripts/healthcheck.sh, scripts/watchdog.sh
+description: Project snapshot, production host constraints, and deploy rules (AGENTS.md server/deploy sections)
+globs: deploy.sh,docs/OPERATIONS.md,docs/PROJECT_STATUS.md,goat-ai.service,scripts/rotate_fastapi_log.py,scripts/backup_chat_db.py,scripts/healthcheck.sh,scripts/watchdog.sh
 alwaysApply: false
 ---
 
-# GOAT AI — Production server environment (snapshot)
+# GOAT AI — Server and deploy
 
-Use this when changing deploy, process management, nginx, or host-only docs.
+Use when changing deploy, process management, host-only docs, or runtime target behavior.
 
-## Facts (verified 2026-03-31, user `jupyter-mhu29@simon.roches-bde1e`)
+## Project snapshot (ops)
 
-- **No sudo / root:** `sudo` is blocked (*no new privileges*). Do not document or assume `apt`, system `systemctl`, `/etc/logrotate.d`, or `nginx -s reload`.
-- **systemd --user:** May fail in SSH with `Failed to connect to bus: No medium found`. `~/.config/systemd/user` can still be writable; **test** `systemctl --user status` before recommending user units. `deploy.sh` must keep **nohup + `fastapi.pid`** fallback.
-- **Supervisor:** Not installed; installing needs admin.
-- **App process:** Uvicorn on **`0.0.0.0:62606`** is valid for this user.
-- **GPU:** `nvidia-smi` works. Prefer **`GOAT_GPU_UUID=GPU-fb2cf8f7-e9bf-f136-a3bb-e150426598e8`** for the A100 (index **0**); index **1** is a GT 1030 on the same host — do not default metrics to the wrong GPU.
+- Repo: `GOAT_AI`
+- Main deploy target: Ubuntu A100 shared host
+- App: FastAPI backend + React SPA
+- Production port: **62606**
+- Frontend: Vite; Node **24** on server/CI
+- Backend: Python **3.12**
 
-## Doc source of truth
+## Production server constraints
 
-- Full table: `docs/OPERATIONS.md` → section **Shared host permissions (JupyterHub / unprivileged user)**.
+- Shared JupyterHub-style environment; **no sudo / root**. Do not assume `apt`, system-wide `systemctl`, nginx reloads, or `/etc/*` access.
+- `systemctl --user` may work but can fail in SSH sessions. **Preserve** `deploy.sh` **nohup** + `logs/fastapi.pid` (or equivalent) fallback.
+- Uvicorn on `0.0.0.0:62606` is valid for this user.
+- GPU: prefer `GOAT_GPU_UUID=GPU-fb2cf8f7-e9bf-f136-a3bb-e150426598e8` for the A100; do not default metrics to the wrong GPU (e.g. GT 1030 on the same host).
+
+### Host snapshot (verified detail)
+
+- **No sudo:** `sudo` blocked (*no new privileges*). Do not document or assume `apt`, system `systemctl`, `/etc/logrotate.d`, or `nginx -s reload`.
+- **systemd --user:** May fail in SSH (`Failed to connect to bus: No medium found`). Test `systemctl --user status` before relying on user units.
+- **Supervisor:** Not assumed installed.
+
+### Doc source of truth
+
+- Full table: `docs/OPERATIONS.md` → **Shared host permissions (JupyterHub / unprivileged user)**.
 - Short snapshot: `docs/PROJECT_STATUS.md` → **8b. Server permissions snapshot**.
 - User-space log backup / health: `docs/OPERATIONS.md` → **User-space ops (no root)** (`scripts/rotate_fastapi_log.py`, `scripts/backup_chat_db.py`, `scripts/healthcheck.sh`, `scripts/watchdog.sh`).
+
+## Deploy rules
+
+- Repo may be developed directly on the server. `deploy.sh` must **not** assume `git pull` or `git reset --hard` by default.
+- Deploy from the current local checkout unless explicit sync is requested. **`SYNC_GIT=1`** is explicit opt-in only.
+- Keep **nohup** fallback deployment behavior intact.
+- Runtime target selection is interface-driven: `GOAT_DEPLOY_TARGET=auto` prefers `GOAT_SERVER_PORT` (default **62606**) and falls back to `GOAT_LOCAL_PORT` (default **8002**) only when the environment cannot bind/use the server port.
+- Keep `deploy.sh` (and related scripts) aligned with **`GET /api/system/runtime-target`**.

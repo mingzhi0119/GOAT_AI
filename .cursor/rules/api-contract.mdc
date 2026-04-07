@@ -1,0 +1,33 @@
+---
+description: API black-box first; OpenAPI and LLM YAML contracts; when to open implementation
+globs: __tests__/test_api_blackbox_contract.py,__tests__/test_api_auth.py,__tests__/test_api_security.py,docs/openapi.json,docs/api.llm.yaml,docs/API_REFERENCE.md
+alwaysApply: false
+---
+
+# GOAT AI — API contract rules
+
+## API working rule
+
+Treat the API surface as a **black-box contract** first, not a source-reading exercise.
+
+**Prefer these artifacts before opening implementation:**
+
+- `__tests__/test_api_blackbox_contract.py`
+- `__tests__/test_api_auth.py`
+- `__tests__/test_api_security.py`
+- `docs/openapi.json`
+- `docs/api.llm.yaml`
+
+**Inspect implementation only when:**
+
+- Changing API behavior
+- Contract tests/docs disagree with runtime
+- Debugging needs details not visible from the contract layer
+
+Goal: save tokens, avoid duplicate analysis, rely on stable contracts.
+
+## API contract memory
+
+- Canonical machine-readable contract: `docs/openapi.json` (OpenAPI **3.2.0**), must match the FastAPI app. Regenerate from `backend.main:app` after endpoint/schema changes so committed spec and runtime `/openapi.json` do not drift.
+- Canonical compact LLM-facing file: `docs/api.llm.yaml`. Regenerate from `docs/openapi.json` via `python tools/generate_llm_api_yaml.py`; do not hand-maintain unless you are also updating the generator.
+- Canonical executable contract: black-box suite `__tests__/test_api_blackbox_contract.py`; keep it aligned with auth/security suites and use it as the first reference for API behavior.

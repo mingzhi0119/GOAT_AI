@@ -1,55 +1,61 @@
 ---
-description: TypeScript strict mode, React component rules, hook patterns, and API layer structure for the frontend
+description: Strict TypeScript, React/hooks/api layers, SSE, charts, theme (AGENTS.md frontend sections)
 globs: **/*.{ts,tsx}
 alwaysApply: false
 ---
 
-# React / TypeScript Standards
+# React / TypeScript standards
 
-## TypeScript Config (required)
-`tsconfig.json` must have `strict: true`, `noUncheckedIndexedAccess: true`, `noImplicitReturns: true`.
+## TypeScript (required)
+
+`tsconfig.json`: `strict: true`, `noUncheckedIndexedAccess: true`, `noImplicitReturns: true`.
+
 - No `any` — use `unknown` and narrow, or define a proper type.
-- No `@ts-ignore` — fix the type instead.
+- No `@ts-ignore` — fix the type.
 
-## API Layer
-- All `fetch()` calls live in `src/api/*.ts` — never inside components or hooks.
-- `src/api/types.ts` mirrors every backend Pydantic model (single source of truth for shared types).
-- SSE streaming via `AsyncGenerator<string>` — not WebSocket.
+## API layer
+
+- All network calls live in `frontend/src/api/*.ts` — not inside components for ad-hoc fetches.
+- Shared types belong with the API layer; keep backend shapes consistent.
 
 ```typescript
 // ✅ api layer owns network
 export async function* streamChat(req: ChatRequest): AsyncGenerator<string> { ... }
 
 // ❌ fetch inside a component
-const resp = await fetch("/api/chat", ...);  // inside ChatWindow — forbidden
+const resp = await fetch("/api/chat", ...);
 ```
 
-## Components
-- One responsibility per component — render only; no business logic in JSX.
-- Props typed with `interface Props` — never `any`.
-- Every async-boundary component needs an error boundary parent.
+## Components and hooks
 
-## Hooks
-- Business logic lives in `src/hooks/use*.ts` — not in components.
-- Return a typed object, not a positional tuple (unless exactly 2 items).
-- Hooks must not import from `src/components/` (prevents circular deps).
+- Components: render UI; avoid business logic in JSX.
+- Hooks: own client-side behavior/state in `frontend/src/hooks/`.
+- Hooks return **typed objects**, not wide positional tuples (except trivial two-value cases if already established).
+- Hooks **must not** import from `src/components/` (avoids circular deps).
+- Use an error boundary around async-heavy UI sections.
 
-```typescript
-// ✅ hook owns state; component owns rendering
-const { messages, sendMessage, isStreaming } = useChat();
-```
+## Frontend architecture rules
 
-## Module Layout
+- `frontend/src/api/`: fetch wrappers and shared API types.
+- `frontend/src/hooks/`: stateful client logic.
+- `frontend/src/components/`: rendering.
+- **SSE** remains the streaming mechanism; do not replace with WebSocket without an explicit design decision.
+- Charts: **Apache ECharts**. Backend contract stays constrained: models emit `ChartIntentV2` via **native tool calling**; services compile to `ChartSpecV2` / ECharts `option`. Do not let models emit raw chart-library config.
+- If the selected Ollama model does not report native tool support, **disable** chart rendering — no fallback to pseudo chart markup.
+
+## Theme rules
+
+- Light/dark via `.dark` on `<html>`.
+- Theme state persists in `localStorage` (`goat-ai-theme` in `useTheme.ts`; seed from `prefers-color-scheme` on first visit).
+- Global tokens: `frontend/src/styles/global.css` (`:root` + `.dark` overrides).
+
+## Module layout (reference)
+
 ```
 frontend/src/
-  api/          types.ts + one file per endpoint
-  components/   ChatWindow, MessageBubble, Sidebar, FileUpload, GoatIcon, ErrorBoundary
-  hooks/        useChat, useModels, useTheme
-  styles/       global.css (CSS variables + dark-mode overrides)
+  api/
+  components/
+  hooks/
+  styles/
   App.tsx
 ```
-
-## Theme
-Light/Dark via a `.dark` CSS class toggled on `<html>` (`document.documentElement.classList.toggle('dark', ...)`).
-CSS variables in `global.css` have a `:root` (light) block and a `.dark` override block.
-`useTheme.ts` persists the preference to `localStorage` under key `goat-ai-theme` and seeds from `prefers-color-scheme` on first visit.

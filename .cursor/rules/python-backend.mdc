@@ -1,16 +1,17 @@
 ---
-description: Python type safety, Pydantic I/O, error handling, logging and module structure for the backend
+description: Python typing, Pydantic, logging, layered errors, and backend folder boundaries (AGENTS.md backend sections)
 globs: **/*.py
 alwaysApply: false
 ---
 
-# Python Backend Standards
+# Python backend standards
 
 ## Types (mandatory)
+
 - `from __future__ import annotations` at top of every file.
 - Every function/method fully annotated including return type.
-- `Protocol` for injectable dependencies — never accept a concrete class when an interface suffices.
-- `pydantic.BaseModel` or `dataclass` for all structured data; no bare `dict[str, Any]` crossing boundaries.
+- `Protocol` for injectable dependencies when appropriate.
+- Structured data: `pydantic.BaseModel` or `dataclass` across boundaries — no loose dicts.
 
 ```python
 # ✅
@@ -20,42 +21,48 @@ def list_models(self) -> list[str]: ...
 def list_models(self): ...
 ```
 
-## Pydantic for All I/O
+## Pydantic and config
+
 - FastAPI bodies: always `BaseModel` subclass.
-- Config: use `pydantic_settings.BaseSettings` for new services **or** the existing `goat_ai/config.py` pattern (`@dataclass(frozen=True)` + `load_settings()` reading `os.environ`). Both patterns validate at startup. Never read `os.environ` inside a request handler.
+- Config: `pydantic_settings.BaseSettings` **or** `goat_ai/config.py` (`@dataclass` + `load_settings()`). Both validate at startup.
+- **Never** read `os.environ` inside request handlers.
 - Never parse raw `request.json()` dict in a handler.
 
-## Error Handling (layered)
+## Error handling (layered)
+
 | Layer | Rule |
 |-------|------|
-| Service/client | Raise domain exceptions (`OllamaUnavailable`). Never swallow. |
-| Route handler | `try/except` domain exc → `HTTPException` with sanitized message. Log original. |
-| Startup | Invalid config → `SystemExit` with clear message. |
-
-```python
-# ✅ service raises; handler translates
-raise OllamaUnavailable("Cannot reach Ollama") from exc
-raise HTTPException(status_code=503, detail="AI backend unavailable") from exc
-```
+| Service/client | Raise domain exceptions (e.g. `OllamaUnavailable`). Never swallow. |
+| Route handler | Map domain exceptions → sanitized `HTTPException`. Log original at appropriate level. |
+| Startup | Invalid config → exit with clear message. |
 
 ## Logging
-- `logging.getLogger(__name__)` in every module — never `print()`.
-- Configure once in `logging_config.py`; never `basicConfig` inside a module.
-- Never log secrets, full file contents, or raw user messages at INFO+.
 
-## Module Layout
+- `logging.getLogger(__name__)` — never `print()`.
+- Configure once in `logging_config.py`; avoid `basicConfig` inside feature modules.
+- Do not log secrets, full uploads, or raw user prompts at INFO+.
+
+## Backend architecture rules
+
+- `backend/routers/`: validate input, call services, return response.
+- `backend/services/`: business logic.
+- `backend/models/`: Pydantic schemas only.
+- `goat_ai/`: shared code, **no FastAPI imports**.
+- `backend/main.py`: app factory and startup wiring.
+
+Do not move business logic into route handlers.
+
+## Module layout (reference)
+
 ```
 backend/
-  main.py          # create_app() factory; calls log_service.init_db() at startup
-  config.py        # server-only config (CORS, port); delegates to goat_ai/config.py
+  main.py          # create_app(); startup wiring
+  config.py        # server-only; delegates to goat_ai/config.py
   dependencies.py  # Depends() factories
-  routers/         # validate → call service → return response (no logic)
+  routers/
   services/
-    chat_service.py    # stream_chat_sse(): token streaming + chat logging
-    upload_service.py  # CSV/XLSX → Ollama analysis
-    log_service.py     # SQLite init + log_conversation() — errors swallowed, never raise
-  models/          # Pydantic schemas only, no methods
-goat_ai/           # shared: LLM client, config, uploads, tools — no FastAPI imports
-  config.py        # @dataclass Settings + load_settings(); reads env vars once at startup
-  exceptions.py    # domain exception hierarchy (OllamaUnavailable)
+  models/
+goat_ai/           # shared: clients, config, tools — no FastAPI
+  config.py
+  exceptions.py
 ```
