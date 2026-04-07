@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # GOAT AI — production deploy (FastAPI + React on :62606)
 # Usage:
-#   bash deploy.sh              # full deploy (git pull → pip → build → restart)
-#   QUICK=1 bash deploy.sh      # quick restart: git pull → npm build → restart API only
-#   SKIP_BUILD=1 bash deploy.sh # skip npm build (use existing dist/)
+#   bash deploy.sh                   # full deploy from current local working tree
+#   QUICK=1 bash deploy.sh           # quick restart: skip pip install
+#   SKIP_BUILD=1 bash deploy.sh      # skip npm build (use existing dist/)
+#   SYNC_GIT=1 bash deploy.sh        # optional: reset to origin/$GIT_BRANCH before deploy
 #
 # Override any variable before running, e.g.:
 #   PORT_API=8003 bash deploy.sh
@@ -27,6 +28,7 @@ PORT_API="${PORT_API:-62606}"          # FastAPI + React (e.g. nginx / public pa
 
 SKIP_BUILD="${SKIP_BUILD:-0}"
 QUICK="${QUICK:-0}"
+SYNC_GIT="${SYNC_GIT:-0}"
 
 echo "🛠️  GOAT AI — Deploy starting (branch: ${GIT_BRANCH})${QUICK:+ [QUICK mode]}"
 
@@ -57,18 +59,23 @@ stop_pidfile() {
   fi
 }
 
-# ── 1. Git sync ───────────────────────────────────────────────────────────────
+# ── 1. Project checkout ───────────────────────────────────────────────────────
 if [ ! -d "${PROJECT_DIR}/.git" ]; then
   echo "📂 Cloning repository…"
   git clone "$REPO_URL" "$PROJECT_DIR"
 fi
 
-echo "🔄 Syncing to origin/${GIT_BRANCH}…"
 cd "$PROJECT_DIR"
-git fetch --all --prune
 git checkout "$GIT_BRANCH"
-git reset --hard "origin/${GIT_BRANCH}"
-echo "✅ Repository up to date."
+
+if [ "${SYNC_GIT}" = "1" ]; then
+  echo "🔄 Syncing to origin/${GIT_BRANCH}…"
+  git fetch --all --prune
+  git reset --hard "origin/${GIT_BRANCH}"
+  echo "✅ Repository synced to origin/${GIT_BRANCH}."
+else
+  echo "📍 Deploying current local checkout on ${GIT_BRANCH} (SYNC_GIT=0)."
+fi
 
 # ── 2. Python virtualenv + deps (skipped in QUICK mode) ──────────────────────
 if [ "${QUICK}" = "1" ]; then

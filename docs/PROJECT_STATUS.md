@@ -1,7 +1,7 @@
 # GOAT AI — Project status snapshot
 
 > **Purpose:** compact handoff for new chats / reviewers when context is full.  
-> **Last updated:** 2026-04-06  
+> **Last updated:** 2026-04-07  
 > **Authoritative detail:** [OPERATIONS.md](OPERATIONS.md) (run/deploy/env), [ROADMAP.md](ROADMAP.md) (phases), [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) (code rules).
 
 ---
@@ -10,7 +10,7 @@
 
 - **Product:** Simon Business School “GOAT AI” — React SPA + FastAPI, Ollama for LLM, SSE streaming.
 - **Prod URL:** `https://ai.simonbb.com/mingzhi/` → nginx → FastAPI on host port **62606** (not 8002 on server).
-- **Repo:** `https://github.com/mingzhi0119/GOAT_AI` — active feature work often on **`feature/chat-history-file-persistence`**; `main` may lag until merged.
+- **Repo:** `https://github.com/mingzhi0119/GOAT_AI` — active production work is currently happening directly on the server checkout; keep `main` and docs aligned.
 
 ---
 
@@ -34,7 +34,7 @@
 - **GPU telemetry:** `GET /api/system/gpu` — real `nvidia-smi` stats; UI polls ~5s; env **`GOAT_GPU_UUID`** (preferred) or **`GOAT_GPU_INDEX`** (default `0`).
 - **Inference latency:** `GET /api/system/inference` — rolling average duration (ms) of completed chat streams; shown in GPU dot tooltip; window size **`GOAT_LATENCY_ROLLING_MAX_SAMPLES`** (default `20`).
 - **Frontend:** Sidebar history, file-context chip, **GPU status strip** under Actions, **ChartCard** (Recharts) when `chart_spec` received; static sidebar label styles in `sidebarStaticText.ts`.
-- **Deploy fix (important):** `deploy.sh` runs **`npm ci` before every `npm run build`** so new deps (e.g. `recharts`) are never missing on servers that already had `node_modules/`.
+- **Deploy fix (important):** `deploy.sh` runs **`npm ci` before every `npm run build`** so new deps (e.g. `recharts`) are never missing on servers that already had `node_modules/`. By default it now deploys the current local checkout on the server; `SYNC_GIT=1` is opt-in.
 
 ---
 
@@ -75,14 +75,14 @@ Frontend parsers: `frontend/src/api/chat.ts`, `frontend/src/api/upload.ts`.
 ## 7. Tests & CI commands (local)
 
 ```bash
-# Backend (pytest runs unittest-style tests too)
+# Backend
 python -m pytest __tests__/ -v
 
 # Frontend
 cd frontend && npm test -- --run && npm run build
 ```
 
-CI: `.github/workflows/ci.yml` — `pytest` + `npm test` + `npm run build` on pushes/PRs to `main` (frontend job uses **Node 20**; Vitest/jsdom need Node ≥20).
+CI: `.github/workflows/ci.yml` — `pytest` + `npm test` + `npm run build` on pushes/PRs to `main` (frontend job uses **Node 20**; Vitest/jsdom require Node >=20 even though the server build target remains Node 18).
 
 Note: `test_history_router.py` may **skip** if `fastapi` is not installed in the active Python env.
 
@@ -124,7 +124,7 @@ Authoritative table and implications: [OPERATIONS.md](OPERATIONS.md) (section **
 
 ---
 
-## 10. Optional: merge / branch
+## 10. Current maintenance notes
 
-- Feature branch with GPU + charts + history work: **`feature/chat-history-file-persistence`**.
-- After merge to `main`, bump README version line and align `ROADMAP` “Phase 8” items that are already implemented.
+- `ROADMAP.md` Phase 7-9 are now reflected as shipped and should stay aligned with the actual repo state.
+- Deploy changes should keep the no-root server constraints and local-checkout deploy workflow intact.

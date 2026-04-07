@@ -2,7 +2,7 @@
 
 > **This document is the authoritative reference for all code written in this project.**  
 > Every AI assistant, contributor, or reviewer must follow these standards.  
-> Last updated: 2026-03-30
+> Last updated: 2026-04-07
 
 ---
 
@@ -44,7 +44,7 @@ class LLMClient(Protocol):
 ### 1.2 Pydantic for All I/O Contracts
 
 - **FastAPI request/response bodies**: always a `pydantic.BaseModel` subclass.
-- **Environment configuration**: always a `pydantic_settings.BaseSettings` subclass — validation runs at import time.
+- **Environment configuration**: use the existing validated settings pattern for the repo. Today that is `goat_ai/config.py` (`@dataclass(frozen=True)` + `load_settings()`), but `BaseSettings` is acceptable for new isolated services if startup validation remains immediate.
 - **Never** parse raw `request.json()` dicts inside route handlers.
 
 ```python
@@ -54,11 +54,16 @@ class ChatRequest(BaseModel):
     messages: list[ChatTurn]
     session_id: str = Field(default_factory=lambda: str(uuid4()))
 
-class Settings(BaseSettings):
-    ollama_base_url: str = "http://127.0.0.1:11434"
-    generate_timeout: int = 120
+@dataclass(frozen=True)
+class Settings:
+    ollama_base_url: str
+    generate_timeout: int
 
-    model_config = SettingsConfigDict(env_prefix="GOAT_", env_file=".env", extra="ignore")
+def load_settings() -> Settings:
+    return Settings(
+        ollama_base_url=os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
+        generate_timeout=int(os.environ.get("OLLAMA_GENERATE_TIMEOUT", "120")),
+    )
 ```
 
 ### 1.3 Error Handling
@@ -123,7 +128,7 @@ STATIC_DIR = "C:\\Users\\simon\\GOAT_AI\\frontend\\dist"
 ```
 backend/
 ├── main.py              # App factory: create_app() → FastAPI; mounts static, registers routers
-├── config.py            # Settings (BaseSettings); validated at import
+├── config.py            # Settings wrapper; validated at startup/import boundary
 ├── dependencies.py      # FastAPI Depends() factories (get_llm_client, get_settings, ...)
 ├── exceptions.py        # Domain exception hierarchy
 ├── routers/
@@ -270,9 +275,9 @@ __tests__/
 
 **Rules**:
 - Mock all I/O at the `Protocol` boundary — never hit real Ollama in unit tests.
-- Use `pytest.fixture` for shared setup; avoid module-level globals in tests.
+- Use `pytest.fixture` or `unittest` setup helpers for shared state; avoid module-level globals in tests.
 - Parametrize edge cases: empty message list, oversized upload, Ollama timeout.
-- Never use `time.sleep()` in tests — use `pytest-asyncio` and async fixtures.
+- Prefer deterministic synchronization over `time.sleep()`.
 
 ```python
 # ✅ inject a fake LLMClient — tests never need Ollama running
@@ -315,15 +320,15 @@ jobs:
     steps:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: pip install -r requirements.txt pytest pytest-asyncio httpx
-      - run: pytest __tests__/ -v --tb=short
+      - run: pip install -r requirements.txt
+      - run: python -m pytest __tests__/ -v --tb=short
 
   test-frontend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-node@v4
-        with: { node-version: "18" }      # match server exactly
-      - run: cd frontend && npm ci && npm test -- --run
+        with: { node-version: "20" }      # Vitest/jsdom require Node >=20 in CI
+      - run: cd frontend && npm ci && npm test -- --run && npm run build
 ```
 
 ---
@@ -335,10 +340,10 @@ jobs:
 | Category | Rule | Example |
 |----------|------|---------|
 | **Paths** | `pathlib.Path`, never string concat | `Path(__file__).parent / "static"` |
-| **Ports** | Env var with server-safe default | `PORT=8002` |
+| **Ports** | Env var with safe dev/prod defaults | `GOAT_PORT=8002` (dev), `62606` behind nginx in prod |
 | **Base URLs** | Env var, never `localhost` hardcoded | `OLLAMA_BASE_URL=http://127.0.0.1:11434` |
 | **Node version** | Pin in `.nvmrc` and CI matrix | `18.19.1` |
-| **Python version** | Pin in `pyproject.toml` `requires-python` | `>=3.12` |
+| **Python version** | Keep runtime/docs/CI aligned | `3.12` |
 | **Dependencies** | Exact pins in `requirements.txt` | `fastapi==0.135.2` |
 | **npm packages** | `package-lock.json` committed | `npm ci` in CI/deploy, never `npm install` |
 | **File encoding** | Always `encoding="utf-8"` on `open()` | `open(path, encoding="utf-8")` |
@@ -352,19 +357,15 @@ jobs:
 
 ```python
 # backend/config.py — fail at import, not at first request
-class Settings(BaseSettings):
-    ollama_base_url: str
-    port: int = 8002
-
-    @field_validator("ollama_base_url")
-    @classmethod
-    def must_be_http(cls, v: str) -> str:
-        if not v.startswith(("http://", "https://")):
-            raise ValueError(f"GOAT_OLLAMA_BASE_URL must start with http(s)://; got: {v!r}")
-        return v
-
-# Instantiated at module level — crashes immediately if misconfigured
-settings = Settings()
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    settings = load_settings()
+    if not settings.ollama_base_url.startswith(("http://", "https://")):
+        raise SystemExit(
+            f"[GOAT AI] Invalid configuration: OLLAMA_BASE_URL must start with http(s)://; "
+            f"got {settings.ollama_base_url!r}"
+        )
+    return settings
 ```
 
 ### 4.3 React Build + Serve Pattern
@@ -425,16 +426,13 @@ requests==2.32.3
 
 # Validation / config
 pydantic==2.x.x
-pydantic-settings==2.x.x
 
-# Testing (separate file: requirements-dev.txt)
+# Testing
 pytest==8.x
-pytest-asyncio==0.x
-httpx==0.x           # FastAPI TestClient async support
+httpx==0.x           # FastAPI TestClient support
 ```
 
-- Use `pip-compile` (pip-tools) to generate locked files from `requirements.in`.
-- `requirements.txt` is the **installed** lock; `requirements.in` is the **intent**.
+- Keep `requirements.txt` as the install source of truth used in deploy and CI.
 - Run `pip install -r requirements.txt` in CI — never `pip install package` ad-hoc.
 
 ### Node / npm
@@ -455,5 +453,5 @@ Before every commit ask:
 - [ ] New logic has a corresponding test (at least a happy-path unit test).
 - [ ] No hardcoded paths, ports, secrets, or usernames.
 - [ ] `requirements.txt` / `package-lock.json` updated if dependencies changed.
-- [ ] The change runs with `pytest` green and `npm test -- --run` green.
+- [ ] The change runs with `python -m pytest __tests__/ -v` green and `npm test -- --run` green.
 - [ ] `OPERATIONS.md` updated if a new env var or startup step was added.

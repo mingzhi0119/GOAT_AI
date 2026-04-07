@@ -47,8 +47,10 @@ FastAPI auto-detects `frontend/dist/` and mounts it as a static file server (see
 ## Deploy (A100 server)
 
 ```bash
-bash deploy.sh              # full deploy
-QUICK=1 bash deploy.sh      # git pull + npm ci + npm build + restart (npm ci ensures new frontend deps)
+bash deploy.sh              # full deploy from current local checkout
+QUICK=1 bash deploy.sh      # skip pip install, still rebuild frontend and restart
+SKIP_BUILD=1 bash deploy.sh # restart using existing frontend/dist
+SYNC_GIT=1 bash deploy.sh   # optional: reset to origin/$GIT_BRANCH before deploy
 ```
 
 - **Logs:** `fastapi.log` in the project root.
@@ -115,7 +117,7 @@ On JupyterHub-style hosts without `logrotate` or reliable `systemctl --user`, us
 | `scripts/rotate_fastapi_log.py` | When `fastapi.log` exceeds **`GOAT_LOG_MAX_MB`** (default `50`), copies to `logs/archive/fastapi_UTCtimestamp.log` and **truncates** the live file (same inode — safe for nohup `>>`). Prunes old archives past **`GOAT_LOG_KEEP_ARCHIVES`** (default `14`). |
 | `scripts/backup_chat_db.py` | **`sqlite3` online backup** of the chat DB to `backups/chat_logs_UTCtimestamp.db`; prunes past **`GOAT_BACKUP_MAX_FILES`** (default `14`). |
 | `scripts/healthcheck.sh` | `curl -sf` **`GOAT_HEALTH_URL`** (default `http://127.0.0.1:62606/api/health`); exit `1` on failure. |
-| `scripts/watchdog.sh` | Loop: sleep → healthcheck; after **`GOAT_WATCHDOG_FAIL_THRESHOLD`** consecutive failures, optionally runs **`QUICK=1 bash deploy.sh`** if **`GOAT_WATCHDOG_RESTART=1`**. Logs to **`GOAT_WATCHDOG_LOG`** (default `~/GOAT_AI/watchdog.log`). **Run inside tmux** so you can attach and inspect. |
+| `scripts/watchdog.sh` | Loop: sleep → healthcheck; after **`GOAT_WATCHDOG_FAIL_THRESHOLD`** consecutive failures, optionally runs **`QUICK=1 bash deploy.sh`** if **`GOAT_WATCHDOG_RESTART=1`**. Because deploys now default to the current local checkout, unattended restarts should only be enabled when that workflow is intentional. Logs to **`GOAT_WATCHDOG_LOG`** (default `~/GOAT_AI/watchdog.log`). **Run inside tmux** so you can attach and inspect. |
 
 **tmux (recommended on shared servers):**
 
@@ -150,9 +152,9 @@ Do not enable **`GOAT_WATCHDOG_RESTART=1`** until you trust `deploy.sh` is safe 
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
-| `GOAT_OLLAMA_BASE_URL` | Ollama HTTP base URL | `http://127.0.0.1:11434` |
-| `GOAT_GENERATE_TIMEOUT` | Request timeout in seconds | `120` |
-| `GOAT_MAX_UPLOAD_MB` | Max file upload size (MB) | `25` |
+| `OLLAMA_BASE_URL` | Ollama HTTP base URL | `http://127.0.0.1:11434` |
+| `OLLAMA_GENERATE_TIMEOUT` | Request timeout in seconds | `120` |
+| `GOAT_MAX_UPLOAD_MB` | Max file upload size (MB) | `20` |
 | `GOAT_MAX_DATAFRAME_ROWS` | Max rows loaded from CSV/XLSX | `50000` |
 | `GOAT_SYSTEM_PROMPT` | Optional system prompt override | _(built-in default)_ |
 | `GOAT_SYSTEM_PROMPT_FILE` | Path to UTF-8 file with system prompt | _(none)_ |
@@ -224,7 +226,7 @@ If these fail, do not show fake GPU values in UI; return a graceful "Telemetry u
 
 ```bash
 curl -sf http://127.0.0.1:62606/api/health
-# → {"status":"ok","version":"1.0.0"}
+# → {"status":"ok","version":"..."}
 ```
 
 ---
@@ -237,6 +239,9 @@ curl -sf http://127.0.0.1:62606/api/health
 | `GET` | `/api/models` | List Ollama model names |
 | `POST` | `/api/chat` | SSE streaming chat completion |
 | `POST` | `/api/upload` | SSE streaming CSV/XLSX analysis |
+| `GET` | `/api/history` | Session list (metadata) |
+| `GET` | `/api/history/{session_id}` | Full saved session JSON |
+| `DELETE` | `/api/history/{session_id}` | Delete a saved session |
 | `GET` | `/api/system/gpu` | GPU telemetry JSON for sidebar status strip |
 | `GET` | `/api/system/inference` | Rolling average chat stream duration (ms) + sample count |
 
@@ -264,20 +269,16 @@ data: "[ERROR] …"\n\n followed by "[DONE]" on Ollama errors
 
 ## Chat logs
 
-Every completed chat request is appended to a local SQLite database (`chat_logs.db` in the project root by default).
+Completed chat sessions and conversation rows are stored in the local SQLite database (`chat_logs.db` in the project root by default).
 
 ### Schema
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | INTEGER | Auto-increment primary key |
-| `created_at` | TEXT | ISO-8601 UTC timestamp |
-| `ip` | TEXT | Client IP address |
-| `model` | TEXT | Ollama model name used |
-| `turn_count` | INTEGER | Number of messages in the request history |
-| `user_message` | TEXT | The last user message |
-| `assistant_response` | TEXT | Full assembled assistant response |
-| `response_ms` | INTEGER | Elapsed time from first token to `[DONE]` |
+Core tables:
+
+| Table | Description |
+|-------|-------------|
+| `conversations` | Per-completion log rows, including optional `session_id` linkage |
+| `sessions` | Per-session metadata and serialized message history for sidebar restore/delete |
 
 ### Querying (SSH to server)
 
@@ -309,7 +310,7 @@ Uploaded CSV/XLSX is read into memory for the request only; nothing is persisted
 
 ## Reverse proxy (school host)
 
-Nginx or Apache: proxy `https://…/` → `http://127.0.0.1:8002/`. Standard proxy headers required:
+Nginx or Apache: proxy `https://…/` → `http://127.0.0.1:62606/`. Standard proxy headers required:
 
 ```nginx
 proxy_set_header Connection '';
