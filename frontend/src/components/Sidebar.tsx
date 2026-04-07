@@ -2,7 +2,7 @@ import { type FC, type MouseEvent } from 'react'
 import FileUpload from './FileUpload'
 import GoatIcon from './GoatIcon'
 import type { HistorySessionItem } from '../api/history'
-import type { ChartSpec } from '../api/types'
+import type { ModelCapabilitiesResponse } from '../api/types'
 import type { FileContext } from '../hooks/useFileContext'
 import {
   sidebarErrorTextClass,
@@ -22,7 +22,10 @@ interface Props {
   onRefreshModels: () => void
   onClearChat: () => void
   isLoadingModels: boolean
+  isLoadingModelCapabilities: boolean
   modelsError: string | null
+  modelCapabilities: ModelCapabilitiesResponse | null
+  modelCapabilitiesError: string | null
   userName: string
   onUserNameChange: (name: string) => void
   historySessions: HistorySessionItem[]
@@ -34,7 +37,6 @@ interface Props {
   onDeleteAllHistory: () => void
   fileContext: FileContext | null
   onFileContext: (ctx: { type: 'file_context'; filename: string; prompt: string }) => void
-  onChartSpec: (spec: ChartSpec) => void
   onClearFileContext: () => void
 }
 
@@ -66,7 +68,10 @@ const Sidebar: FC<Props> = ({
   onRefreshModels,
   onClearChat,
   isLoadingModels,
+  isLoadingModelCapabilities,
   modelsError,
+  modelCapabilities,
+  modelCapabilitiesError,
   userName,
   onUserNameChange,
   historySessions,
@@ -78,7 +83,6 @@ const Sidebar: FC<Props> = ({
   onDeleteAllHistory,
   fileContext,
   onFileContext,
-  onChartSpec,
   onClearFileContext,
 }) => {
   const fmtDate = (value: string) => {
@@ -174,6 +178,17 @@ const Sidebar: FC<Props> = ({
           {modelsError && (
             <p className={sidebarErrorTextClass} style={{ color: '#f87171' }}>
               {modelsError}
+            </p>
+          )}
+          {!modelsError && selectedModel && (
+            <p className={sidebarHelperMutedClass} style={{ color: 'rgba(255,255,255,0.68)' }}>
+              {isLoadingModelCapabilities
+                ? 'Checking chart support...'
+                : modelCapabilitiesError
+                  ? 'Chart support unavailable'
+                  : modelCapabilities?.supports_chart_tools
+                    ? 'Chart tools supported'
+                    : 'Chart tools not supported'}
             </p>
           )}
         </section>
@@ -280,7 +295,6 @@ const Sidebar: FC<Props> = ({
           <FileUpload
             key={fileContext?.filename ?? 'no-file'}
             onFileContext={onFileContext}
-            onChartSpec={event => onChartSpec(event.chart)}
           />
           {fileContext && (
             <div

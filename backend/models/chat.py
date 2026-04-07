@@ -46,3 +46,12 @@ class ModelsResponse(BaseModel):
     """Body for GET /api/models."""
 
     models: list[str]
+
+
+class ModelCapabilitiesResponse(BaseModel):
+    """Capabilities for one Ollama model."""
+
+    model: str
+    capabilities: list[str]
+    supports_tool_calling: bool
+    supports_chart_tools: bool

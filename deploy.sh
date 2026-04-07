@@ -121,8 +121,10 @@ else
 fi
 
 # ── 4. Start FastAPI (uvicorn) on PORT_API ────────────────────────────────────
-API_LOG="${PROJECT_DIR}/fastapi.log"
-API_PID="${PROJECT_DIR}/fastapi.pid"
+LOGS_DIR="${PROJECT_DIR}/logs"
+mkdir -p "${LOGS_DIR}"
+API_LOG="${LOGS_DIR}/fastapi.log"
+API_PID="${LOGS_DIR}/fastapi.pid"
 
 if [ "${OLLAMA_BASE_URL:-${LOCAL_OLLAMA_URL}}" = "${LOCAL_OLLAMA_URL}" ] && [ -x "${PROJECT_DIR}/scripts/start_ollama_local.sh" ]; then
   echo "🦙 Ensuring sibling local Ollama is running at ${LOCAL_OLLAMA_URL}…"

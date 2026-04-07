@@ -56,8 +56,7 @@ def build_analysis_user_message(df: pd.DataFrame) -> str:
         "[User uploaded tabular data for analysis]\n\n"
         f"{describe_dataframe(df)}\n\n"
         "Summarize what this data contains and suggest sensible next analyses. "
-        "Cite the row/column counts in your answer.\n\n"
-        f"{_CHART_INSTRUCTIONS}"
+        "Cite the row/column counts in your answer."
     )
 
 

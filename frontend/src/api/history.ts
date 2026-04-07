@@ -1,4 +1,4 @@
-import type { ChatMessage } from './types'
+import type { HistorySessionMessage } from './types'
 
 export interface HistorySessionItem {
   id: string
@@ -9,7 +9,7 @@ export interface HistorySessionItem {
 }
 
 export interface HistorySessionDetail extends HistorySessionItem {
-  messages: ChatMessage[]
+  messages: HistorySessionMessage[]
 }
 
 export async function fetchHistory(): Promise<HistorySessionItem[]> {

@@ -37,6 +37,10 @@ class LLMClient(Protocol):
 
     def list_model_names(self) -> list[str]: ...
 
+    def get_model_capabilities(self, model: str) -> list[str]: ...
+
+    def supports_tool_calling(self, model: str) -> bool: ...
+
     def stream_tokens(
         self,
         model: str,
@@ -45,6 +49,16 @@ class LLMClient(Protocol):
         *,
         ollama_options: dict[str, float | int] | None = None,
     ) -> Generator[str, None, None]: ...
+
+    def stream_tokens_with_tools(
+        self,
+        model: str,
+        messages: list[ChatTurn],
+        system_prompt: str,
+        *,
+        tools: list[dict[str, Any]],
+        ollama_options: dict[str, float | int] | None = None,
+    ) -> Generator[str | ToolCallPlan, None, None]: ...
 
     def plan_tool_call(
         self,
@@ -106,6 +120,27 @@ class OllamaService:
         except requests.RequestException as exc:
             raise OllamaUnavailable("Cannot reach Ollama /api/tags") from exc
         return [m["name"] for m in res.json().get("models", [])]
+
+    def get_model_capabilities(self, model: str) -> list[str]:
+        """Return the Ollama-reported capability strings for a model."""
+        try:
+            res = requests.post(
+                f"{self._s.ollama_base_url}/api/show",
+                json={"model": model},
+                timeout=5,
+            )
+            res.raise_for_status()
+        except requests.RequestException as exc:
+            raise OllamaUnavailable("Cannot reach Ollama /api/show") from exc
+
+        capabilities = res.json().get("capabilities", [])
+        if not isinstance(capabilities, list):
+            return []
+        return [str(item) for item in capabilities]
+
+    def supports_tool_calling(self, model: str) -> bool:
+        """Return whether Ollama reports native tool-calling support for the model."""
+        return "tools" in self.get_model_capabilities(model)
 
     # ── SSE / generator streaming (FastAPI) ───────────────────────────────────
     def yield_chat_tokens(
@@ -179,6 +214,60 @@ class OllamaService:
             yield from self.yield_generate_tokens(
                 model, prompt, ollama_options=ollama_options
             )
+
+    def stream_tokens_with_tools(
+        self,
+        model: str,
+        messages: list[ChatTurn],
+        system_prompt: str,
+        *,
+        tools: list[dict[str, Any]],
+        ollama_options: dict[str, float | int] | None = None,
+    ) -> Generator[str | ToolCallPlan, None, None]:
+        """Stream assistant tokens and surface native tool calls when they occur."""
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": messages_for_ollama(messages, system_prompt),
+            "tools": tools,
+            "stream": True,
+        }
+        if ollama_options:
+            payload["options"] = ollama_options
+
+        try:
+            res = self._post_chat(payload, stream=True)
+        except ValueError:
+            return
+
+        for line in res.iter_lines():
+            if not line:
+                continue
+
+            chunk = json.loads(line.decode("utf-8"))
+            message = chunk.get("message")
+            if isinstance(message, dict):
+                tool_calls = message.get("tool_calls")
+                if isinstance(tool_calls, list) and tool_calls:
+                    first_call = tool_calls[0]
+                    if isinstance(first_call, dict):
+                        function = first_call.get("function")
+                        if isinstance(function, dict):
+                            name = function.get("name")
+                            arguments = function.get("arguments")
+                            if isinstance(name, str) and isinstance(arguments, dict):
+                                yield ToolCallPlan(
+                                    assistant_message={
+                                        "role": str(message.get("role") or "assistant"),
+                                        "content": str(message.get("content") or ""),
+                                        "tool_calls": tool_calls,
+                                    },
+                                    tool_name=name,
+                                    arguments=arguments,
+                                )
+
+            token = _stream_line_tokens(chunk)
+            if token:
+                yield token
 
     def plan_tool_call(
         self,

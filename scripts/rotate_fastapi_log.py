@@ -23,7 +23,7 @@ def resolve_log_path(project_root: Path) -> Path:
     override = os.environ.get("GOAT_FASTAPI_LOG", "").strip()
     if override:
         return Path(override).resolve()
-    return (project_root / "fastapi.log").resolve()
+    return (project_root / "logs" / "fastapi.log").resolve()
 
 
 def resolve_archive_dir(project_root: Path) -> Path:

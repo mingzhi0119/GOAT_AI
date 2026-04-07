@@ -1,23 +1,21 @@
 import { useCallback, useRef, useState, type DragEvent, type FC } from 'react'
 import {
   streamUpload,
-  type UploadChartSpecEvent,
   type UploadFileContextEvent,
 } from '../api/upload'
 
 interface Props {
   onFileContext: (ctx: UploadFileContextEvent) => void
-  onChartSpec: (event: UploadChartSpecEvent) => void
 }
 
 /**
  * Drag-and-drop / click-to-browse upload area for CSV and XLSX files.
  *
- * On upload the backend parses the file and returns a file_context + chart_spec
- * event. No LLM inference is triggered here; the user types a follow-up question
- * in the chat input and the model answers using the file context.
+ * On upload the backend parses the file and returns a file_context event only.
+ * No LLM inference is triggered here; the user types a follow-up question in
+ * the chat input and the model answers using the file context.
  */
-const FileUpload: FC<Props> = ({ onFileContext, onChartSpec }) => {
+const FileUpload: FC<Props> = ({ onFileContext }) => {
   const [isDragging, setIsDragging] = useState(false)
   const [status, setStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle')
   const [fileName, setFileName] = useState<string | null>(null)
@@ -31,9 +29,8 @@ const FileUpload: FC<Props> = ({ onFileContext, onChartSpec }) => {
       setStatus('uploading')
       try {
         for await (const event of streamUpload(file)) {
-          if (typeof event === 'string') continue
           if (event.type === 'file_context') onFileContext(event)
-          else if (event.type === 'chart_spec') onChartSpec(event)
+          else if (event.type === 'error') throw new Error(event.message)
         }
         setStatus('done')
       } catch (err) {
@@ -41,7 +38,7 @@ const FileUpload: FC<Props> = ({ onFileContext, onChartSpec }) => {
         setStatus('error')
       }
     },
-    [onChartSpec, onFileContext],
+    [onFileContext],
   )
 
   const handleDrop = useCallback(

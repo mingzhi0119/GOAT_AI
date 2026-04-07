@@ -17,11 +17,10 @@ describe('upload api', () => {
     vi.restoreAllMocks()
   })
 
-  it('parses file_context and chart_spec events', async () => {
+  it('parses file_context events', async () => {
     const payload = [
       'data: {"type":"file_context","filename":"data.csv","prompt":"p"}\n',
-      'data: {"type":"chart_spec","chart":{"type":"line","title":"t","xKey":"x","series":[{"key":"y","name":"Y"}],"data":[{"x":"a","y":1}]}}\n',
-      'data: "[DONE]"\n',
+      'data: {"type":"done"}\n',
     ].join('')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(sseResponse(payload)))
 
@@ -31,6 +30,6 @@ describe('upload api', () => {
     }
     expect(events).toHaveLength(2)
     expect((events[0] as { type: string }).type).toBe('file_context')
-    expect((events[1] as { type: string }).type).toBe('chart_spec')
+    expect((events[1] as { type: string }).type).toBe('done')
   })
 })

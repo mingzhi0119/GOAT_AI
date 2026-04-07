@@ -49,12 +49,8 @@ class UploadServiceTests(unittest.TestCase):
         self.assertEqual("data.csv", payload["filename"])
         self.assertIn("col1", payload["prompt"])
 
-        chart_payload = json.loads(events[1][len("data: "):].strip())
-        self.assertEqual("chart_spec", chart_payload["type"])
-        self.assertIn("chart", chart_payload)
-        self.assertEqual("line", chart_payload["chart"]["type"])
-
-        self.assertTrue(any('"[DONE]"' in event for event in events))
+        self.assertFalse(any('"type": "chart_spec"' in event for event in events))
+        self.assertTrue(any('"type": "done"' in event for event in events))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { streamChat } from '../api/chat'
-import type { ChatMessage, ChatStreamEvent, ChartSpec, Message, OllamaOptionsPayload } from '../api/types'
+import type {
+  ChatMessage,
+  ChatStreamEvent,
+  ChartSpec,
+  HistorySessionMessage,
+  Message,
+  OllamaOptionsPayload,
+} from '../api/types'
+import { FILE_CONTEXT_REPLY, hydrateVisibleMessages } from '../utils/sessionHistory'
 
 const MESSAGES_KEY = 'goat-ai-messages'
 const SESSION_KEY = 'goat-ai-session-id'
@@ -30,11 +38,11 @@ export interface UseChatReturn {
     ollamaOptions?: OllamaOptionsPayload,
     onChartSpec?: (spec: ChartSpec) => void,
   ) => Promise<void>
-  streamToChat: (gen: AsyncGenerator<string>) => Promise<void>
+  streamToChat: (gen: AsyncGenerator<ChatStreamEvent>) => Promise<void>
   clearMessages: () => void
   stopStreaming: () => void
   sessionId: string | null
-  loadSession: (sessionId: string, messages: ChatMessage[]) => void
+  loadSession: (sessionId: string, messages: HistorySessionMessage[]) => void
 }
 
 /** Stream a mixed token/chart-spec generator into an existing assistant message slot. */
@@ -49,13 +57,18 @@ function useStreamIntoMessage() {
     ) => {
       try {
         for await (const event of gen) {
-          if (typeof event === 'string') {
+          if (event.type === 'token') {
             setMsgs(prev =>
-              prev.map(m => (m.id === msgId ? { ...m, content: m.content + event } : m)),
+              prev.map(m => (m.id === msgId ? { ...m, content: m.content + event.token } : m)),
             )
-          } else {
-            // ChartSpec object from chart_spec SSE event
-            onChartSpec?.(event)
+          } else if (event.type === 'chart_spec') {
+            onChartSpec?.(event.chart)
+          } else if (event.type === 'error') {
+            setMsgs(prev =>
+              prev.map(m =>
+                m.id === msgId ? { ...m, content: event.message, isError: true } : m,
+              ),
+            )
           }
         }
       } catch (err) {
@@ -153,7 +166,7 @@ export function useChat(): UseChatReturn {
       ) {
         baseHistory = [
           { role: 'user', content: fileContextPrompt },
-          { role: 'assistant', content: 'I have loaded the file context.' },
+          { role: 'assistant', content: FILE_CONTEXT_REPLY },
           ...baseHistory,
         ]
       }
@@ -196,7 +209,7 @@ export function useChat(): UseChatReturn {
   )
 
   const streamToChat = useCallback(
-    async (gen: AsyncGenerator<string>) => {
+    async (gen: AsyncGenerator<ChatStreamEvent>) => {
       if (isStreaming) return
       await _startStream(gen)
     },
@@ -209,55 +222,9 @@ export function useChat(): UseChatReturn {
     localStorage.removeItem(MESSAGES_KEY)
   }, [])
 
-  const loadSession = useCallback((nextSessionId: string, sessionMessages: ChatMessage[]) => {
+  const loadSession = useCallback((nextSessionId: string, sessionMessages: HistorySessionMessage[]) => {
     setSessionId(nextSessionId)
-
-    // Prefixes used when injecting the file-context turn into the conversation.
-    const FILE_CONTEXT_PREFIXES = [
-      '[User uploaded tabular data for analysis]',
-      '[User requested analysis of uploaded tabular data]',
-    ]
-    const FILE_CONTEXT_REPLY = 'I have loaded the file context.'
-
-    // Cast to loose type so __chart__ sentinels (not in the ChatMessage union) pass through.
-    const raw = sessionMessages as Array<{ role: string; content: string }>
-    const uiRows = raw.filter(m => m.role === 'user' || m.role === 'assistant')
-
-    const mapped: Message[] = []
-    let i = 0
-    while (i < uiRows.length) {
-      // Explicit non-null assertion: the while-guard ensures i is in bounds.
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const m = uiRows[i]!
-      const isFileCtx =
-        m.role === 'user' && FILE_CONTEXT_PREFIXES.some(p => m.content.startsWith(p))
-
-      if (isFileCtx) {
-        // Keep in state (LLM needs the CSV for follow-up chart requests) but hide from UI.
-        mapped.push({ id: crypto.randomUUID(), role: 'user', content: m.content, hidden: true })
-        const next = uiRows[i + 1]
-        if (next && next.role === 'assistant' && next.content === FILE_CONTEXT_REPLY) {
-          mapped.push({
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            content: next.content,
-            hidden: true,
-          })
-          i += 2
-        } else {
-          i++
-        }
-      } else {
-        mapped.push({
-          id: crypto.randomUUID(),
-          role: m.role as Message['role'],
-          content: m.content,
-        })
-        i++
-      }
-    }
-
-    setMessages(mapped)
+    setMessages(hydrateVisibleMessages(sessionMessages))
   }, [])
 
   const stopStreaming = useCallback(() => {

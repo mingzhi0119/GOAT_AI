@@ -5,6 +5,17 @@ export interface ChatMessage {
   content: string
 }
 
+export interface HistorySessionMessage {
+  role:
+    | 'user'
+    | 'assistant'
+    | 'system'
+    | '__chart__'
+    | '__file_context__'
+    | '__file_context_ack__'
+  content: string
+}
+
 export interface ChatRequest {
   model: string
   messages: ChatMessage[]
@@ -21,6 +32,13 @@ export interface ModelsResponse {
   models: string[]
 }
 
+export interface ModelCapabilitiesResponse {
+  model: string
+  capabilities: string[]
+  supports_tool_calling: boolean
+  supports_chart_tools: boolean
+}
+
 /** Ollama sampling options (Advanced settings); maps to backend ChatRequest fields. */
 export interface OllamaOptionsPayload {
   temperature: number
@@ -33,7 +51,7 @@ export interface ChartSeries {
   name: string
 }
 
-export interface ChartSpec {
+export interface LegacyChartSpec {
   type: 'line' | 'bar'
   title: string
   xKey: string
@@ -41,8 +59,51 @@ export interface ChartSpec {
   data: Record<string, string | number>[]
 }
 
-/** Union of events yielded by streamChat: plain token strings or a chart spec. */
-export type ChatStreamEvent = string | ChartSpec
+export interface ChartMetaV2 {
+  row_count: number
+  truncated: boolean
+  warnings: string[]
+  source_columns: string[]
+}
+
+export interface ChartSpecV2 {
+  version: '2.0'
+  engine: 'echarts'
+  kind: 'line' | 'bar' | 'stacked_bar' | 'area' | 'scatter' | 'pie'
+  title: string
+  description: string
+  dataset: Record<string, unknown>[]
+  option: Record<string, unknown>
+  meta: ChartMetaV2
+}
+
+export type ChartSpec = LegacyChartSpec | ChartSpecV2
+
+export interface ChatTokenStreamEvent {
+  type: 'token'
+  token: string
+}
+
+export interface ChatChartStreamEvent {
+  type: 'chart_spec'
+  chart: ChartSpec
+}
+
+export interface ChatDoneStreamEvent {
+  type: 'done'
+}
+
+export interface ChatErrorStreamEvent {
+  type: 'error'
+  message: string
+}
+
+/** Union of events yielded by streamChat. */
+export type ChatStreamEvent =
+  | ChatTokenStreamEvent
+  | ChatChartStreamEvent
+  | ChatDoneStreamEvent
+  | ChatErrorStreamEvent
 
 /** UI-only message shape: extends ChatMessage with a stable DOM key. */
 export interface Message {

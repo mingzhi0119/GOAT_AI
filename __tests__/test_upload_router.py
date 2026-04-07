@@ -46,7 +46,7 @@ class UploadRouterIntegrationTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmpdir.cleanup()
 
-    def test_upload_analyze_returns_prompt_and_chart(self) -> None:
+    def test_upload_analyze_returns_prompt_without_chart(self) -> None:
         response = self.client.post(
             "/api/upload/analyze",
             files={"file": ("data.csv", b"month,revenue\nJan,10\nFeb,12\n", "text/csv")},
@@ -56,8 +56,7 @@ class UploadRouterIntegrationTests(unittest.TestCase):
         payload = response.json()
         self.assertEqual("data.csv", payload["filename"])
         self.assertIn("month", payload["prompt"])
-        self.assertIsNotNone(payload["chart"])
-        self.assertEqual("line", payload["chart"]["type"])
+        self.assertIsNone(payload["chart"])
 
     def test_upload_analyze_rejects_invalid_extension(self) -> None:
         response = self.client.post(

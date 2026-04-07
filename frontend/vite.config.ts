@@ -24,8 +24,23 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules/recharts')) {
-            return 'charts'
+          if (id.includes('node_modules/echarts-for-react')) {
+            return 'charts-react'
+          }
+          if (id.includes('node_modules/echarts/core')) {
+            return 'charts-core'
+          }
+          if (id.includes('node_modules/echarts/charts')) {
+            return 'charts-series'
+          }
+          if (id.includes('node_modules/echarts/components')) {
+            return 'charts-components'
+          }
+          if (id.includes('node_modules/echarts')) {
+            return 'charts-engine'
+          }
+          if (id.includes('node_modules/zrender')) {
+            return 'charts-renderer'
           }
           return undefined
         },

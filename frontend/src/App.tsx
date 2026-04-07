@@ -1,55 +1,30 @@
-import { useChat } from './hooks/useChat'
+import { useAdvancedSettings } from './hooks/useAdvancedSettings'
+import { useChatSession } from './hooks/useChatSession'
+import { useGpuStatus } from './hooks/useGpuStatus'
 import { useModels } from './hooks/useModels'
+import { useSystemInstruction } from './hooks/useSystemInstruction'
 import { useTheme } from './hooks/useTheme'
 import { useUserName } from './hooks/useUserName'
-import { useHistory } from './hooks/useHistory'
-import { useFileContext } from './hooks/useFileContext'
-import { useGpuStatus } from './hooks/useGpuStatus'
-import { useSystemInstruction } from './hooks/useSystemInstruction'
-import { useAdvancedSettings } from './hooks/useAdvancedSettings'
 import { downloadChatAsMarkdown } from './utils/exportChatMarkdown'
-import type { ChartSpec } from './api/types'
 import ChatWindow from './components/ChatWindow'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
-import { ErrorBoundary } from './components/ErrorBoundary'
-import { useMemo, useState } from 'react'
 
-/** Root application — orchestrates hooks and wires state down to leaf components. */
+/** Root application: compose stateful controllers and render the shell UI. */
 export default function App() {
   const { theme, toggleTheme } = useTheme()
   const models = useModels()
-  const chat = useChat()
   const { userName, setUserName } = useUserName()
-  const history = useHistory()
-  const { fileContext, setFileContext, clearFileContext } = useFileContext()
   const { systemInstruction, setSystemInstruction } = useSystemInstruction()
   const advanced = useAdvancedSettings()
-  const gpu = useGpuStatus(chat.isStreaming)
-  const [chartSpec, setChartSpec] = useState<ChartSpec | null>(null)
-
-  /** Title for top bar: server session title after save, else first visible user line (optimistic). */
-  const sessionTitleForTopBar = useMemo(() => {
-    const sid = chat.sessionId
-    if (!sid) return null
-    const fromList = history.sessions.find(s => s.id === sid)?.title?.trim()
-    if (fromList) return fromList
-    // Skip hidden messages (e.g. injected file-context prompts) when picking the title.
-    const firstUser = chat.messages.find(
-      m => m.role === 'user' && !m.isStreaming && !m.hidden && m.content.trim().length > 0,
-    )
-    if (firstUser) {
-      const t = firstUser.content.trim().replace(/\n/g, ' ')
-      return t.length > 80 ? `${t.slice(0, 80)}…` : t
-    }
-    return null
-  }, [chat.sessionId, chat.messages, history.sessions])
-
-  const handleClearChat = () => {
-    chat.clearMessages()
-    clearFileContext()
-    setChartSpec(null)
-  }
+  const session = useChatSession({
+    selectedModel: models.selectedModel,
+    userName,
+    systemInstruction,
+    ollamaOptions: advanced.getOptionsForRequest(),
+  })
+  const gpu = useGpuStatus(session.isStreaming)
 
   const handleDeleteAllHistory = () => {
     if (
@@ -59,8 +34,8 @@ export default function App() {
     ) {
       return
     }
-    void history.deleteAll().then(() => {
-      chat.clearMessages()
+    void session.deleteAllHistory().then(() => {
+      session.clearChatSession()
     })
   }
 
@@ -71,59 +46,41 @@ export default function App() {
         selectedModel={models.selectedModel}
         onModelChange={models.setSelectedModel}
         onRefreshModels={models.refresh}
-        onClearChat={handleClearChat}
+        onClearChat={session.clearChatSession}
         isLoadingModels={models.isLoading}
+        isLoadingModelCapabilities={models.isLoadingCapabilities}
         modelsError={models.error}
+        modelCapabilities={models.capabilities}
+        modelCapabilitiesError={models.capabilitiesError}
         userName={userName}
         onUserNameChange={setUserName}
-        historySessions={history.sessions}
-        isLoadingHistory={history.isLoading}
-        historyError={history.error}
-        onRefreshHistory={() => void history.refresh()}
+        historySessions={session.historySessions}
+        isLoadingHistory={session.isLoadingHistory}
+        historyError={session.historyError}
+        onRefreshHistory={() => void session.refreshHistory()}
         onDeleteAllHistory={handleDeleteAllHistory}
         onLoadHistorySession={sessionId => {
-          void history.loadSession(sessionId).then(session => {
-            // Restore the chart spec from the __chart__ sentinel stored in the session
-            // (the backend appends it after every response that contained a chart block).
-            const allMsgs = session.messages as Array<{ role: string; content: string }>
-            const chartMessages = allMsgs.filter(m => m.role === '__chart__')
-            const lastChart = chartMessages[chartMessages.length - 1]
-            if (lastChart) {
-              try {
-                setChartSpec(JSON.parse(lastChart.content) as ChartSpec)
-              } catch {
-                setChartSpec(null)
-              }
-            } else {
-              setChartSpec(null)
-            }
-            chat.loadSession(session.id, session.messages)
-            // Clear the active file-upload context; the file context is already
-            // embedded as hidden messages in the session so the LLM still has memory.
-            clearFileContext()
-          })
+          void session.loadHistorySession(sessionId)
         }}
         onDeleteHistorySession={sessionId => {
-          void history.deleteSession(sessionId)
+          void session.deleteHistorySession(sessionId)
         }}
-        fileContext={fileContext}
-        onFileContext={setFileContext}
-        onChartSpec={setChartSpec}
-        onClearFileContext={() => {
-          clearFileContext()
-          chat.clearMessages()
-          setChartSpec(null)
-        }}
+        fileContext={session.fileContext}
+        onFileContext={session.setFileContext}
+        onClearFileContext={session.clearFileContextSession}
       />
       <div className="flex flex-col flex-1 min-w-0 min-h-0">
         <TopBar
-          sessionTitle={sessionTitleForTopBar}
+          sessionTitle={session.sessionTitle}
           theme={theme}
           onToggleTheme={toggleTheme}
           systemInstruction={systemInstruction}
           onSystemInstructionChange={setSystemInstruction}
           onExportMarkdown={() =>
-            downloadChatAsMarkdown(chat.messages.filter(m => !m.hidden), sessionTitleForTopBar)
+            downloadChatAsMarkdown(
+              session.messages.filter(message => !message.hidden),
+              session.sessionTitle,
+            )
           }
           advancedOpen={advanced.advancedOpen}
           onAdvancedOpenChange={advanced.setAdvancedOpen}
@@ -137,25 +94,15 @@ export default function App() {
         />
         <ErrorBoundary>
           <ChatWindow
-            messages={chat.messages}
-            chartSpec={chartSpec}
-            isStreaming={chat.isStreaming}
+            messages={session.messages}
+            chartSpec={session.chartSpec}
+            isStreaming={session.isStreaming}
             selectedModel={models.selectedModel}
-            fileContext={fileContext}
+            fileContext={session.fileContext}
             onSendMessage={content => {
-              void chat
-                .sendMessage(
-                  content,
-                  models.selectedModel,
-                  userName,
-                  fileContext?.prompt,
-                  systemInstruction,
-                  advanced.getOptionsForRequest(),
-                  setChartSpec,
-                )
-                .then(() => history.refresh())
+              void session.sendMessage(content)
             }}
-            onStop={chat.stopStreaming}
+            onStop={session.stopStreaming}
             gpuStatus={gpu.status}
             gpuError={gpu.error}
             inferenceLatency={gpu.inference}

@@ -5,33 +5,39 @@ export interface StreamChatOptions {
   userName?: string
 }
 
-/** Parse completed SSE lines and yield decoded token strings or chart_spec objects. */
+function isChatStreamEvent(payload: unknown): payload is ChatStreamEvent {
+  if (typeof payload !== 'object' || payload === null) return false
+  const event = payload as { type?: string; token?: unknown; chart?: unknown; message?: unknown }
+  if (event.type === 'token') return typeof event.token === 'string'
+  if (event.type === 'chart_spec') return !!event.chart && typeof event.chart === 'object'
+  if (event.type === 'done') return true
+  if (event.type === 'error') return typeof event.message === 'string'
+  return false
+}
+
+/** Parse completed SSE lines and yield typed chat stream events. */
 function* parseSSELines(lines: string[]): Generator<ChatStreamEvent> {
   for (const line of lines) {
     if (!line.startsWith('data: ')) continue
     const raw = line.slice(6).trim()
     try {
       const payload = JSON.parse(raw) as unknown
-      if (typeof payload === 'string') {
-        if (payload === '[DONE]') return
-        yield payload
-        continue
+      if (!isChatStreamEvent(payload)) continue
+
+      if (payload.type === 'chart_spec') {
+        const chart = payload.chart as ChartSpec
+        if (!chart || typeof chart !== 'object') continue
       }
-      if (
-        typeof payload === 'object' &&
-        payload !== null &&
-        (payload as { type?: string }).type === 'chart_spec'
-      ) {
-        const chart = (payload as { type: string; chart: ChartSpec }).chart
-        if (chart && typeof chart === 'object') yield chart
-      }
+
+      yield payload
+      if (payload.type === 'done') return
     } catch {
       // skip malformed frames
     }
   }
 }
 
-/** Stream a chat completion as token strings and optional chart_spec events. */
+/** Stream a chat completion as typed token/chart/error/done events. */
 export async function* streamChat(
   req: ChatRequest,
   options?: StreamChatOptions,
@@ -68,11 +74,13 @@ export async function* streamChat(
       buffer = parts[parts.length - 1] ?? ''
       for (const event of parseSSELines(parts.slice(0, -1))) {
         yield event
+        if (event.type === 'done') return
       }
     }
     if (buffer.trim()) {
       for (const event of parseSSELines([buffer])) {
         yield event
+        if (event.type === 'done') return
       }
     }
   } catch (err) {

@@ -29,28 +29,6 @@ api:
     503:
       detail: ai backend unavailable
 schemas:
-  ChartSeries:
-    type: object
-    required:
-      - key
-      - name
-    properties:
-      key: string
-      name: string
-  ChartSpec:
-    type: object
-    required:
-      - type
-      - title
-      - xKey
-      - series
-      - data
-    properties:
-      type: line|bar
-      title: string
-      xKey: string
-      series: ChartSeries[]
-      data: object[]
   ChatMessage:
     type: object
     required:
@@ -138,12 +116,48 @@ schemas:
     properties:
       chat_avg_ms: number
       chat_sample_count: integer
+  ModelCapabilitiesResponse:
+    type: object
+    required:
+      - model
+      - capabilities
+      - supports_tool_calling
+      - supports_chart_tools
+    properties:
+      model: string
+      capabilities: string[]
+      supports_tool_calling: boolean
+      supports_chart_tools: boolean
   ModelsResponse:
     type: object
     required:
       - models
     properties:
       models: string[]
+  RuntimeTargetItemResponse:
+    type: object
+    required:
+      - mode
+      - host
+      - port
+      - base_url
+      - reason
+    properties:
+      mode: string
+      host: string
+      port: integer
+      base_url: string
+      reason: string
+  RuntimeTargetResponse:
+    type: object
+    required:
+      - deploy_target
+      - current
+      - ordered_targets
+    properties:
+      deploy_target: string
+      current: RuntimeTargetItemResponse
+      ordered_targets: RuntimeTargetItemResponse[]
   UploadAnalysisResponse:
     type: object
     required:
@@ -152,13 +166,22 @@ schemas:
     properties:
       filename: string
       prompt: string
-      chart: ChartSpec|null
+      chart: "null"
 endpoints:
   - op: list_models
     method: GET
     path: /models
     response:
       200: ModelsResponse
+      errors:
+        - 401
+        - 429
+        - 503
+  - op: get_model_capabilities
+    method: GET
+    path: /models/capabilities
+    response:
+      200: ModelCapabilitiesResponse
       errors:
         - 401
         - 429
@@ -172,10 +195,15 @@ endpoints:
       200:
         content_type: text/event-stream
         stream:
-          - token: string
+          - token:
+              type: token
+              token: string
           - chart_spec: ChartSpec
-          - done: "[DONE]"
-          - error_frame: "[ERROR] <message>"
+          - done:
+              type: done
+          - error_frame:
+              type: error
+              message: string
       errors:
         - 401
         - 429
@@ -197,9 +225,11 @@ endpoints:
                 type: file_context
                 filename: string
                 prompt: string
-          - chart_spec: ChartSpec
-          - done: "[DONE]"
-          - error_frame: "[ERROR] <message>"
+          - done:
+              type: done
+          - error_frame:
+              type: error
+              message: string
       errors:
         - 400
         - 401
@@ -268,6 +298,14 @@ endpoints:
     path: /system/inference
     response:
       200: InferenceLatencyResponse
+      errors:
+        - 401
+        - 429
+  - op: get_runtime_target
+    method: GET
+    path: /system/runtime-target
+    response:
+      200: RuntimeTargetResponse
       errors:
         - 401
         - 429

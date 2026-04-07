@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from backend.config import get_settings
 from backend.models.common import ErrorResponse
 from backend.models.upload import UploadAnalysisResponse
+from backend.services.upload_request_service import read_validated_upload
 from backend.services.upload_service import analyze_upload, stream_upload_analysis_sse
 from goat_ai.config import Settings
 
@@ -40,23 +41,17 @@ async def upload_and_parse(
 ) -> StreamingResponse:
     """Accept a CSV or XLSX upload, parse it, and stream structured metadata.
 
-    Returns SSE events: ``file_context`` (always), ``chart_spec`` (when numeric
-    data is present), then ``[DONE]``. No LLM inference is performed here; the
-    caller uses the file_context prompt as hidden history on the next chat turn.
+    Returns SSE events: ``file_context`` (always), then ``{"type":"done"}``. No LLM
+    inference is performed here; the caller uses the file_context prompt as
+    hidden history on the next chat turn. Charts are rendered later only if the
+    LLM explicitly calls the native chart tool during chat.
     """
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No filename provided.")
-
-    ext = file.filename.rsplit(".", 1)[-1].lower()
-    if ext not in ("csv", "xlsx"):
-        raise HTTPException(status_code=400, detail="Only CSV and XLSX files are supported.")
-
-    content = await file.read(_MAX_READ_BYTES)
+    upload = await read_validated_upload(file=file, max_read_bytes=_MAX_READ_BYTES)
 
     return StreamingResponse(
         stream_upload_analysis_sse(
-            content=content,
-            filename=file.filename,
+            content=upload.content,
+            filename=upload.filename,
             settings=settings,
         ),
         media_type="text/event-stream",
@@ -79,17 +74,14 @@ async def analyze_upload_json(
     settings: Settings = Depends(get_settings),
 ) -> UploadAnalysisResponse:
     """Accept a CSV or XLSX upload and return reusable analysis metadata as JSON."""
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No filename provided.")
-
-    ext = file.filename.rsplit(".", 1)[-1].lower()
-    if ext not in ("csv", "xlsx"):
-        raise HTTPException(status_code=400, detail="Only CSV and XLSX files are supported.")
-
-    content = await file.read(_MAX_READ_BYTES)
+    upload = await read_validated_upload(file=file, max_read_bytes=_MAX_READ_BYTES)
     try:
-        prompt, chart = analyze_upload(content=content, filename=file.filename, settings=settings)
+        prompt, chart = analyze_upload(
+            content=upload.content,
+            filename=upload.filename,
+            settings=settings,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    return UploadAnalysisResponse(filename=file.filename, prompt=prompt, chart=chart)
+    return UploadAnalysisResponse(filename=upload.filename, prompt=prompt, chart=chart)

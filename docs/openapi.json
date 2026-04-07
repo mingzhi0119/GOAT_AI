@@ -58,13 +58,86 @@
         }
       }
     },
+    "/api/models/capabilities": {
+      "get": {
+        "tags": [
+          "models"
+        ],
+        "summary": "Read capabilities for one Ollama model",
+        "description": "Return Ollama-reported capabilities for the selected model.",
+        "operationId": "get_model_capabilities_api_models_capabilities_get",
+        "parameters": [
+          {
+            "name": "model",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Model"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelCapabilitiesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/chat": {
       "post": {
         "tags": [
           "chat"
         ],
         "summary": "Stream a chat completion over SSE",
-        "description": "Stream an LLM response as Server-Sent Events.\n\nEach SSE event carries a JSON-encoded token string.\nThe final event is ``data: \"[DONE]\"\\n\\n``.\nThe client reads events with the native ``EventSource`` API or a fetch+ReadableStream.",
+        "description": "Stream an LLM response as Server-Sent Events.\n\nEach SSE event carries a typed JSON object.\nThe final event is ``{\"type\":\"done\"}``.\nThe client reads events with the native ``EventSource`` API or a fetch+ReadableStream.",
         "operationId": "chat_stream_api_chat_post",
         "requestBody": {
           "content": {
@@ -125,7 +198,7 @@
           "upload"
         ],
         "summary": "Stream upload analysis events over SSE",
-        "description": "Accept a CSV or XLSX upload, parse it, and stream structured metadata.\n\nReturns SSE events: ``file_context`` (always), ``chart_spec`` (when numeric\ndata is present), then ``[DONE]``. No LLM inference is performed here; the\ncaller uses the file_context prompt as hidden history on the next chat turn.",
+        "description": "Accept a CSV or XLSX upload, parse it, and stream structured metadata.\n\nReturns SSE events: ``file_context`` (always), then ``{\"type\":\"done\"}``. No LLM\ninference is performed here; the caller uses the file_context prompt as\nhidden history on the next chat turn. Charts are rendered later only if the\nLLM explicitly calls the native chart tool during chat.",
         "operationId": "upload_and_parse_api_upload_post",
         "requestBody": {
           "content": {
@@ -548,6 +621,48 @@
         }
       }
     },
+    "/api/system/runtime-target": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Read resolved deployment target order",
+        "description": "Return the current runtime target and the ordered deployment fallback list.",
+        "operationId": "get_runtime_target_api_system_runtime_target_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeTargetResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "tags": [
@@ -604,70 +719,6 @@
         ],
         "title": "Body_upload_and_parse_api_upload_post"
       },
-      "ChartSeries": {
-        "properties": {
-          "key": {
-            "type": "string",
-            "title": "Key"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          }
-        },
-        "type": "object",
-        "required": [
-          "key",
-          "name"
-        ],
-        "title": "ChartSeries",
-        "description": "One Y-axis series in a chart payload."
-      },
-      "ChartSpec": {
-        "properties": {
-          "type": {
-            "type": "string",
-            "enum": [
-              "line",
-              "bar"
-            ],
-            "title": "Type"
-          },
-          "title": {
-            "type": "string",
-            "title": "Title"
-          },
-          "xKey": {
-            "type": "string",
-            "title": "Xkey"
-          },
-          "series": {
-            "items": {
-              "$ref": "#/components/schemas/ChartSeries"
-            },
-            "type": "array",
-            "title": "Series"
-          },
-          "data": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Data"
-          }
-        },
-        "type": "object",
-        "required": [
-          "type",
-          "title",
-          "xKey",
-          "series",
-          "data"
-        ],
-        "title": "ChartSpec",
-        "description": "Structured chart payload consumed by the frontend."
-      },
       "ChatMessage": {
         "properties": {
           "role": {
@@ -694,7 +745,7 @@
             "type": "string",
             "minLength": 1,
             "title": "Model",
-            "default": "llama3:latest"
+            "default": "gemma4:26b"
           },
           "messages": {
             "items": {
@@ -919,7 +970,7 @@
           },
           "messages": {
             "items": {
-              "$ref": "#/components/schemas/ChatMessage"
+              "$ref": "#/components/schemas/HistorySessionMessage"
             },
             "type": "array",
             "title": "Messages"
@@ -953,6 +1004,26 @@
         ],
         "title": "HistorySessionListResponse",
         "description": "Body for GET /api/history."
+      },
+      "HistorySessionMessage": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "pattern": "^(user|assistant|system|__chart__|__file_context__|__file_context_ack__)$",
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "HistorySessionMessage",
+        "description": "Stored message row for persisted session history."
       },
       "HistorySessionSummary": {
         "properties": {
@@ -1007,6 +1078,38 @@
         "title": "InferenceLatencyResponse",
         "description": "Rolling average chat completion time (server-side, in-process)."
       },
+      "ModelCapabilitiesResponse": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Capabilities"
+          },
+          "supports_tool_calling": {
+            "type": "boolean",
+            "title": "Supports Tool Calling"
+          },
+          "supports_chart_tools": {
+            "type": "boolean",
+            "title": "Supports Chart Tools"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "capabilities",
+          "supports_tool_calling",
+          "supports_chart_tools"
+        ],
+        "title": "ModelCapabilitiesResponse",
+        "description": "Capabilities for one Ollama model."
+      },
       "ModelsResponse": {
         "properties": {
           "models": {
@@ -1024,6 +1127,66 @@
         "title": "ModelsResponse",
         "description": "Body for GET /api/models."
       },
+      "RuntimeTargetItemResponse": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "title": "Port"
+          },
+          "base_url": {
+            "type": "string",
+            "title": "Base Url"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode",
+          "host",
+          "port",
+          "base_url",
+          "reason"
+        ],
+        "title": "RuntimeTargetItemResponse",
+        "description": "One runtime target candidate in deployment preference order."
+      },
+      "RuntimeTargetResponse": {
+        "properties": {
+          "deploy_target": {
+            "type": "string",
+            "title": "Deploy Target"
+          },
+          "current": {
+            "$ref": "#/components/schemas/RuntimeTargetItemResponse"
+          },
+          "ordered_targets": {
+            "items": {
+              "$ref": "#/components/schemas/RuntimeTargetItemResponse"
+            },
+            "type": "array",
+            "title": "Ordered Targets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "deploy_target",
+          "current",
+          "ordered_targets"
+        ],
+        "title": "RuntimeTargetResponse",
+        "description": "Resolved runtime target metadata used by deploy/ops tooling."
+      },
       "UploadAnalysisResponse": {
         "properties": {
           "filename": {
@@ -1036,15 +1199,9 @@
             "description": "Hidden analysis prompt derived from the uploaded table."
           },
           "chart": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ChartSpec"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Suggested starter chart when numeric columns are available."
+            "type": "null",
+            "title": "Chart",
+            "description": "Reserved for backward compatibility; charts are now created only during chat tool calls."
           }
         },
         "type": "object",

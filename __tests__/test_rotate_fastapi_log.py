@@ -18,7 +18,7 @@ class RotateFastapiLogTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             p = resolve_log_path(root)
-            self.assertEqual(root / "fastapi.log", p)
+            self.assertEqual(root / "logs" / "fastapi.log", p)
 
     def test_resolve_archive_dir_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -29,7 +29,8 @@ class RotateFastapiLogTests(unittest.TestCase):
     def test_rotate_truncates_and_archives(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            log_path = root / "fastapi.log"
+            log_path = root / "logs" / "fastapi.log"
+            log_path.parent.mkdir(parents=True, exist_ok=True)
             log_path.write_text("x" * 100, encoding="utf-8")
             archive_dir = root / "logs" / "archive"
             did = rotate_fastapi_log(
@@ -47,7 +48,8 @@ class RotateFastapiLogTests(unittest.TestCase):
     def test_no_op_when_small(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            log_path = root / "fastapi.log"
+            log_path = root / "logs" / "fastapi.log"
+            log_path.parent.mkdir(parents=True, exist_ok=True)
             log_path.write_text("small", encoding="utf-8")
             archive_dir = root / "logs" / "archive"
             did = rotate_fastapi_log(
@@ -88,7 +90,8 @@ class RotateFastapiLogTests(unittest.TestCase):
 
     def test_dry_run_no_write(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            log_path = Path(tmp) / "fastapi.log"
+            log_path = Path(tmp) / "logs" / "fastapi.log"
+            log_path.parent.mkdir(parents=True, exist_ok=True)
             log_path.write_text("x" * 100, encoding="utf-8")
             archive_dir = Path(tmp) / "logs" / "archive"
             did = rotate_fastapi_log(

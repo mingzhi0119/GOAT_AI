@@ -1,9 +1,17 @@
 """Pydantic schemas for chat history endpoints."""
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from backend.models.chat import ChatMessage
+
+class HistorySessionMessage(BaseModel):
+    """Stored message row for persisted session history."""
+
+    role: str = Field(
+        ...,
+        pattern="^(user|assistant|system|__chart__|__file_context__|__file_context_ack__)$",
+    )
+    content: str
 
 
 class HistorySessionSummary(BaseModel):
@@ -25,4 +33,4 @@ class HistorySessionListResponse(BaseModel):
 class HistorySessionDetailResponse(HistorySessionSummary):
     """Body for GET /api/history/{session_id}."""
 
-    messages: list[ChatMessage]
+    messages: list[HistorySessionMessage]

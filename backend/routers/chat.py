@@ -7,11 +7,19 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
 from backend.config import get_settings
-from backend.dependencies import get_llm_client
+from backend.dependencies import (
+    get_conversation_logger,
+    get_llm_client,
+    get_safeguard_service,
+    get_session_repository,
+    get_title_generator,
+)
 from backend.models.common import ErrorResponse
 from backend.models.chat import ChatRequest
 from backend.routers.chat_options import ollama_options_from_chat_request
 from backend.services.chat_service import stream_chat_sse
+from backend.services.chat_runtime import ConversationLogger, SessionRepository, TitleGenerator
+from backend.services.safeguard_service import SafeguardService
 from goat_ai.config import Settings
 from goat_ai.ollama_client import LLMClient
 
@@ -38,12 +46,16 @@ def chat_stream(
     request: Request,
     req: ChatRequest,
     llm: LLMClient = Depends(get_llm_client),
+    conversation_logger: ConversationLogger = Depends(get_conversation_logger),
+    session_repository: SessionRepository = Depends(get_session_repository),
+    title_generator: TitleGenerator = Depends(get_title_generator),
+    safeguard_service: SafeguardService = Depends(get_safeguard_service),
     settings: Settings = Depends(get_settings),
 ) -> StreamingResponse:
     """Stream an LLM response as Server-Sent Events.
 
-    Each SSE event carries a JSON-encoded token string.
-    The final event is ``data: "[DONE]"\\n\\n``.
+    Each SSE event carries a typed JSON object.
+    The final event is ``{"type":"done"}``.
     The client reads events with the native ``EventSource`` API or a fetch+ReadableStream.
     """
     client_ip: str = request.client.host if request.client else "unknown"
@@ -56,12 +68,13 @@ def chat_stream(
             messages=req.messages,
             system_prompt=settings.system_prompt,
             ip=client_ip,
-            log_db_path=settings.log_db_path,
+            conversation_logger=conversation_logger,
             user_name=user_name,
             session_id=req.session_id,
             all_messages=req.messages,
-            ollama_base_url=settings.ollama_base_url,
-            generate_timeout=settings.generate_timeout,
+            session_repository=session_repository,
+            title_generator=title_generator,
+            safeguard_service=safeguard_service,
             system_instruction=(req.system_instruction or "").strip(),
             ollama_options=o_opts,
         ),

@@ -3,7 +3,7 @@ __pycache__/
 *.py[cod]
 
 # Logs
-logs
+logs/
 *.log
 
 # Local SQLite backups (scripts/backup_chat_db.py)
@@ -46,6 +46,7 @@ dist-ssr
 
 # Local runtime artifacts
 chat_logs.db
+chat_logs.db-*
 *.pid
 
 # Build

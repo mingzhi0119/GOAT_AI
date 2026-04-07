@@ -1,10 +1,8 @@
 /** Stream CSV/XLSX upload parse events via Server-Sent Events.
  *
- * The backend now only parses the file and returns structured metadata
- * (file_context + chart_spec). No LLM inference is triggered on upload;
- * the model answers when the user sends their first follow-up message.
+ * The backend returns typed SSE objects. Uploading a file produces
+ * `file_context`, optional `error`, and terminal `done` events.
  */
-import type { ChartSpec } from './types'
 
 export interface UploadFileContextEvent {
   type: 'file_context'
@@ -12,14 +10,29 @@ export interface UploadFileContextEvent {
   prompt: string
 }
 
-export interface UploadChartSpecEvent {
-  type: 'chart_spec'
-  chart: ChartSpec
+export interface UploadErrorEvent {
+  type: 'error'
+  message: string
 }
 
-export type UploadStreamEvent = string | UploadFileContextEvent | UploadChartSpecEvent
+export interface UploadDoneEvent {
+  type: 'done'
+}
 
-/** Parse a CSV/XLSX file and yield structured metadata events (no LLM call). */
+export type UploadStreamEvent = UploadFileContextEvent | UploadErrorEvent | UploadDoneEvent
+
+function isUploadStreamEvent(payload: unknown): payload is UploadStreamEvent {
+  if (typeof payload !== 'object' || payload === null) return false
+  const event = payload as { type?: string; filename?: unknown; prompt?: unknown; message?: unknown }
+  if (event.type === 'file_context') {
+    return typeof event.filename === 'string' && typeof event.prompt === 'string'
+  }
+  if (event.type === 'error') return typeof event.message === 'string'
+  if (event.type === 'done') return true
+  return false
+}
+
+/** Parse a CSV/XLSX file and yield typed metadata events. */
 export async function* streamUpload(file: File): AsyncGenerator<UploadStreamEvent> {
   const form = new FormData()
   form.append('file', file)
@@ -43,32 +56,9 @@ export async function* streamUpload(file: File): AsyncGenerator<UploadStreamEven
       const raw = line.slice(6).trim()
       try {
         const payload = JSON.parse(raw) as unknown
-        if (typeof payload === 'string') {
-          if (payload === '[DONE]') return
-          yield payload
-          continue
-        }
-        if (
-          typeof payload === 'object' &&
-          payload !== null &&
-          (payload as { type?: string }).type === 'file_context'
-        ) {
-          const event = payload as UploadFileContextEvent
-          if (typeof event.filename === 'string' && typeof event.prompt === 'string') {
-            yield event
-          }
-          continue
-        }
-        if (
-          typeof payload === 'object' &&
-          payload !== null &&
-          (payload as { type?: string }).type === 'chart_spec'
-        ) {
-          const event = payload as UploadChartSpecEvent
-          if (event.chart && typeof event.chart === 'object') {
-            yield event
-          }
-        }
+        if (!isUploadStreamEvent(payload)) continue
+        yield payload
+        if (payload.type === 'done') return
       } catch {
         // skip malformed frames
       }

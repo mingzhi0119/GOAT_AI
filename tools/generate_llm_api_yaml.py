@@ -168,10 +168,10 @@ def _response_schema(operation: dict[str, Any], status_code: str) -> Any:
             return {
                 "content_type": "text/event-stream",
                 "stream": [
-                    {"token": "string"},
+                    {"token": {"type": "token", "token": "string"}},
                     {"chart_spec": "ChartSpec"},
-                    {"done": "[DONE]"},
-                    {"error_frame": "[ERROR] <message>"},
+                    {"done": {"type": "done"}},
+                    {"error_frame": {"type": "error", "message": "string"}},
                 ],
             }
         return {
@@ -187,9 +187,8 @@ def _response_schema(operation: dict[str, Any], status_code: str) -> Any:
                         },
                     }
                 },
-                {"chart_spec": "ChartSpec"},
-                {"done": "[DONE]"},
-                {"error_frame": "[ERROR] <message>"},
+                {"done": {"type": "done"}},
+                {"error_frame": {"type": "error", "message": "string"}},
             ],
         }
 

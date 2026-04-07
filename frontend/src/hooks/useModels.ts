@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { fetchModels } from '../api/models'
+import { fetchModelCapabilities, fetchModels } from '../api/models'
+import type { ModelCapabilitiesResponse } from '../api/types'
 
 const DEFAULT_MODEL = 'gemma4:26b'
 
@@ -8,7 +9,10 @@ export interface UseModelsReturn {
   selectedModel: string
   setSelectedModel: (model: string) => void
   isLoading: boolean
+  isLoadingCapabilities: boolean
   error: string | null
+  capabilities: ModelCapabilitiesResponse | null
+  capabilitiesError: string | null
   refresh: () => void
 }
 
@@ -17,7 +21,10 @@ export function useModels(): UseModelsReturn {
   const [models, setModels] = useState<string[]>([])
   const [selectedModel, setSelectedModel] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingCapabilities, setIsLoadingCapabilities] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [capabilities, setCapabilities] = useState<ModelCapabilitiesResponse | null>(null)
+  const [capabilitiesError, setCapabilitiesError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -46,5 +53,51 @@ export function useModels(): UseModelsReturn {
     void load()
   }, [load])
 
-  return { models, selectedModel, setSelectedModel, isLoading, error, refresh: load }
+  useEffect(() => {
+    if (!selectedModel) {
+      setCapabilities(null)
+      setCapabilitiesError(null)
+      return
+    }
+
+    let cancelled = false
+    setIsLoadingCapabilities(true)
+    setCapabilitiesError(null)
+
+    void fetchModelCapabilities(selectedModel)
+      .then(result => {
+        if (!cancelled) {
+          setCapabilities(result)
+        }
+      })
+      .catch(err => {
+        if (!cancelled) {
+          setCapabilities(null)
+          setCapabilitiesError(
+            err instanceof Error ? err.message : 'Failed to load model capabilities',
+          )
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingCapabilities(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedModel])
+
+  return {
+    models,
+    selectedModel,
+    setSelectedModel,
+    isLoading,
+    isLoadingCapabilities,
+    error,
+    capabilities,
+    capabilitiesError,
+    refresh: load,
+  }
 }

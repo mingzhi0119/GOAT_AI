@@ -1,24 +1,13 @@
 # GOAT AI API Reference
 
-## Overview
-
-GOAT AI exposes its core backend logic through FastAPI endpoints grouped by capability:
-
-- Chat orchestration: stream LLM completions and optional chart directives.
-- Upload analysis: parse CSV/XLSX files into reusable analysis prompts and starter chart specs.
-- Session history: list, inspect, and delete persisted chat sessions.
-- System telemetry: inspect GPU state and rolling chat latency.
-- Model discovery: enumerate available Ollama models.
-
 Base path: `/api`
 
-Authentication:
+## Global behavior
 
-- If `GOAT_API_KEY` is configured, every endpoint except `GET /api/health` requires the `X-GOAT-API-Key` header.
-- All API responses include `X-Request-ID`.
-- Rate-limited requests return `429 Too Many Requests` with `Retry-After`.
-
-Error format:
+- If `GOAT_API_KEY` is configured, every endpoint except `GET /api/health` requires `X-GOAT-API-Key`
+- Responses include `X-Request-ID`
+- Rate-limited requests return `429` with `Retry-After`
+- Standard error shape:
 
 ```json
 {
@@ -26,29 +15,27 @@ Error format:
 }
 ```
 
-## Endpoint Summary
+## Endpoint summary
 
 | Method | Path | Purpose |
 |--------|------|---------|
 | `GET` | `/api/health` | Liveness probe |
-| `GET` | `/api/models` | List available Ollama models |
-| `POST` | `/api/chat` | Stream a chat completion over SSE |
-| `POST` | `/api/upload` | Stream upload analysis events over SSE |
-| `POST` | `/api/upload/analyze` | Analyze an uploaded file and return JSON |
-| `GET` | `/api/history` | List saved chat sessions |
-| `GET` | `/api/history/{session_id}` | Get one saved chat session |
-| `DELETE` | `/api/history` | Delete all saved chat sessions |
-| `DELETE` | `/api/history/{session_id}` | Delete one saved chat session |
-| `GET` | `/api/system/gpu` | Read GPU telemetry |
-| `GET` | `/api/system/inference` | Read rolling chat latency telemetry |
+| `GET` | `/api/models` | List Ollama models |
+| `GET` | `/api/models/capabilities` | Read capabilities for one model |
+| `POST` | `/api/chat` | Stream chat SSE |
+| `POST` | `/api/upload` | Stream upload analysis SSE |
+| `POST` | `/api/upload/analyze` | Upload analysis as JSON |
+| `GET` | `/api/history` | List saved sessions |
+| `GET` | `/api/history/{session_id}` | Read one session |
+| `DELETE` | `/api/history` | Delete all sessions |
+| `DELETE` | `/api/history/{session_id}` | Delete one session |
+| `GET` | `/api/system/gpu` | GPU telemetry |
+| `GET` | `/api/system/inference` | Rolling chat latency |
+| `GET` | `/api/system/runtime-target` | Runtime target resolution |
 
 ## `GET /api/health`
 
-Purpose: verify the service is live without requiring model access.
-
-Request parameters: none.
-
-Success response:
+Returns:
 
 ```json
 {
@@ -57,49 +44,49 @@ Success response:
 }
 ```
 
-Error codes:
-
-- `200 OK`
-
 ## `GET /api/models`
 
-Purpose: list locally available Ollama model names.
-
-Headers:
-
-- `X-GOAT-API-Key` optional unless API key protection is enabled.
-
-Success response:
+Returns:
 
 ```json
 {
-  "models": ["llama3:latest", "mistral:latest"]
+  "models": ["gemma4:26b", "qwen3"]
 }
 ```
 
-Error codes:
+If Ollama is unavailable, returns `503`.
 
-- `401 Unauthorized`
-- `429 Too Many Requests`
-- `503 Service Unavailable`
+## `GET /api/models/capabilities`
+
+Query:
+
+- `model`: exact Ollama model name
+
+Returns:
+
+```json
+{
+  "model": "qwen3",
+  "capabilities": ["completion", "tools"],
+  "supports_tool_calling": true,
+  "supports_chart_tools": true
+}
+```
 
 ## `POST /api/chat`
 
-Purpose: stream a chat response from the LLM.
+Purpose:
 
-For chart-generation requests over uploaded tabular data, the backend now prefers native Ollama tool calling and falls back to the legacy `:::chart` structured-output protocol when the active model does not support tools.
-
-Headers:
-
-- `Content-Type: application/json`
-- `X-User-Name` optional display name to fold into the effective system prompt.
-- `X-GOAT-API-Key` optional unless API key protection is enabled.
+- Stream LLM responses over SSE
+- Persist session history when `session_id` is present
+- Emit chart specs only from real native tool calls
+- Apply lightweight safeguard blocking for clearly unsafe misuse
 
 Request body:
 
 ```json
 {
-  "model": "llama3:latest",
+  "model": "gemma4:26b",
   "messages": [
     { "role": "user", "content": "Summarize Porter's Five Forces." }
   ],
@@ -111,159 +98,88 @@ Request body:
 }
 ```
 
-Request fields:
+SSE event types:
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `model` | `string` | Yes | Ollama model name |
-| `messages` | `ChatMessage[]` | Yes | At least one item |
-| `session_id` | `string \| null` | No | Enables session persistence |
-| `system_instruction` | `string \| null` | No | Appended after the base system prompt |
-| `temperature` | `number \| null` | No | Range `0.0` to `2.0` |
-| `max_tokens` | `integer \| null` | No | Mapped to Ollama `num_predict` |
-| `top_p` | `number \| null` | No | Range `0.0` to `1.0` |
-
-`ChatMessage`:
-
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `role` | `user \| assistant \| system` | Yes | Message role |
-| `content` | `string` | Yes | Message content |
-
-Success response:
-
-- Content type: `text/event-stream`
-- Frames are emitted in `data: ...` format
+- `token`
+- `chart_spec`
+- `error`
+- `done`
 
 Token frame:
 
 ```text
-data: "partial token"
+data: {"type":"token","token":"Hello"}
 ```
 
 Chart frame:
 
 ```text
-data: {"type":"chart_spec","chart":{"type":"line","title":"Revenue trend","xKey":"month","series":[{"key":"revenue","name":"revenue"}],"data":[{"month":"Jan","revenue":10}]}}
+data: {"type":"chart_spec","chart":{"version":"2.0","engine":"echarts","kind":"line"}}
 ```
 
-Completion frame:
+Error frame:
 
 ```text
-data: "[DONE]"
+data: {"type":"error","message":"AI service temporarily unavailable."}
 ```
 
-Error codes:
+Done frame:
 
-- `401 Unauthorized`
-- `429 Too Many Requests`
+```text
+data: {"type":"done"}
+```
 
 Notes:
 
-- Runtime model failures are emitted inside the stream as `"[ERROR] ..."` frames, followed by `"[DONE]"`.
+- If the selected model does not support native tools, chat remains text-only
+- Unsafe prompts are converted into a safe refusal instead of passing through the raw request
+- Unsafe model output is replaced server-side before streaming
 
 ## `POST /api/upload`
 
-Purpose: parse a CSV/XLSX file and stream analysis metadata over SSE.
+Purpose:
 
-Headers:
+- Parse CSV/XLSX
+- Return reusable file context for the next chat turn
 
-- `Content-Type: multipart/form-data`
-- `X-GOAT-API-Key` optional unless API key protection is enabled.
+Form field:
 
-Form fields:
+- `file`: `.csv` or `.xlsx`
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `file` | binary | Yes | `.csv` or `.xlsx` only |
+SSE event types:
 
-Success response:
+- `file_context`
+- `error`
+- `done`
 
-- Content type: `text/event-stream`
-
-`file_context` frame:
+Success frame:
 
 ```text
 data: {"type":"file_context","filename":"sales.csv","prompt":"[User uploaded tabular data for analysis] ..."}
 ```
 
-Optional `chart_spec` frame:
-
-```text
-data: {"type":"chart_spec","chart":{"type":"line","title":"revenue trend","xKey":"month","series":[{"key":"revenue","name":"revenue"}],"data":[{"month":"Jan","revenue":10}]}}
-```
-
-Completion frame:
-
-```text
-data: "[DONE]"
-```
-
-Error codes:
-
-- `400 Bad Request`
-- `401 Unauthorized`
-- `429 Too Many Requests`
-
 Notes:
 
-- Parse failures are surfaced as SSE error strings like `data: "[ERROR] Could not read this file..."`.
+- This endpoint does not emit `chart_spec`
+- Charts are created later during `/api/chat` tool calls
 
 ## `POST /api/upload/analyze`
 
-Purpose: expose upload parsing as a plain JSON API for external integrations.
-
-Headers:
-
-- `Content-Type: multipart/form-data`
-- `X-GOAT-API-Key` optional unless API key protection is enabled.
-
-Form fields:
-
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `file` | binary | Yes | `.csv` or `.xlsx` only |
-
-Success response:
+Returns:
 
 ```json
 {
   "filename": "sales.csv",
-  "prompt": "[User uploaded tabular data for analysis]\n\nDataframe shape: 2 rows x 2 columns.",
-  "chart": {
-    "type": "line",
-    "title": "revenue trend",
-    "xKey": "month",
-    "series": [
-      { "key": "revenue", "name": "revenue" }
-    ],
-    "data": [
-      { "month": "Jan", "revenue": 10 },
-      { "month": "Feb", "revenue": 12 }
-    ]
-  }
+  "prompt": "[User uploaded tabular data for analysis] ...",
+  "chart": null
 }
 ```
 
-Response fields:
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `filename` | `string` | Original uploaded filename |
-| `prompt` | `string` | Reusable analysis prompt generated from the uploaded data |
-| `chart` | `ChartSpec \| null` | Suggested starter visualization |
-
-Error codes:
-
-- `400 Bad Request`
-- `401 Unauthorized`
-- `429 Too Many Requests`
+`chart` is retained only for backward compatibility.
 
 ## `GET /api/history`
 
-Purpose: list saved chat sessions.
-
-Success response:
+Returns session metadata list:
 
 ```json
 {
@@ -271,7 +187,7 @@ Success response:
     {
       "id": "session-123",
       "title": "Porter analysis",
-      "model": "llama3:latest",
+      "model": "gemma4:26b",
       "created_at": "2026-04-07T14:00:00+00:00",
       "updated_at": "2026-04-07T14:01:30+00:00"
     }
@@ -279,28 +195,15 @@ Success response:
 }
 ```
 
-Error codes:
-
-- `401 Unauthorized`
-- `429 Too Many Requests`
-
 ## `GET /api/history/{session_id}`
 
-Purpose: fetch one persisted session with full message history.
-
-Path parameters:
-
-| Name | Type | Required | Notes |
-|------|------|----------|-------|
-| `session_id` | `string` | Yes | Session identifier |
-
-Success response:
+Returns one stored session with messages:
 
 ```json
 {
   "id": "session-123",
   "title": "Porter analysis",
-  "model": "llama3:latest",
+  "model": "gemma4:26b",
   "created_at": "2026-04-07T14:00:00+00:00",
   "updated_at": "2026-04-07T14:01:30+00:00",
   "messages": [
@@ -310,79 +213,23 @@ Success response:
 }
 ```
 
-Error codes:
-
-- `401 Unauthorized`
-- `404 Not Found`
-- `429 Too Many Requests`
+Stored history may also contain compatibility roles such as `__chart__`, `__file_context__`, and `__file_context_ack__`.
 
 ## `DELETE /api/history`
 
-Purpose: remove all saved chat sessions.
-
-Success response:
-
-- Status: `204 No Content`
-
-Error codes:
-
-- `401 Unauthorized`
-- `429 Too Many Requests`
+Returns `204 No Content`.
 
 ## `DELETE /api/history/{session_id}`
 
-Purpose: remove one saved chat session.
-
-Path parameters:
-
-| Name | Type | Required | Notes |
-|------|------|----------|-------|
-| `session_id` | `string` | Yes | Session identifier |
-
-Success response:
-
-- Status: `204 No Content`
-
-Error codes:
-
-- `401 Unauthorized`
-- `429 Too Many Requests`
+Returns `204 No Content`.
 
 ## `GET /api/system/gpu`
 
-Purpose: read real-time GPU telemetry from `nvidia-smi`.
-
-Success response:
-
-```json
-{
-  "available": true,
-  "active": true,
-  "message": "A100 Inference Engine: Active",
-  "name": "NVIDIA A100-SXM4-80GB",
-  "uuid": "GPU-xxxx",
-  "utilization_gpu": 63.0,
-  "memory_used_mb": 11234.0,
-  "memory_total_mb": 81920.0,
-  "temperature_c": 54.0,
-  "power_draw_w": 201.5
-}
-```
-
-Error codes:
-
-- `401 Unauthorized`
-- `429 Too Many Requests`
-
-Notes:
-
-- Telemetry failures still return `200` with `available=false` and a fallback message.
+Returns real-time GPU telemetry, or a graceful fallback payload with `available=false` when telemetry cannot be read.
 
 ## `GET /api/system/inference`
 
-Purpose: inspect rolling average latency for completed chat streams.
-
-Success response:
+Returns:
 
 ```json
 {
@@ -391,16 +238,37 @@ Success response:
 }
 ```
 
-Error codes:
+## `GET /api/system/runtime-target`
 
-- `401 Unauthorized`
-- `429 Too Many Requests`
+Returns deploy target resolution information:
 
-## OpenAPI / Swagger
+```json
+{
+  "deploy_target": "auto",
+  "current": {
+    "name": "server",
+    "host": "127.0.0.1",
+    "port": 62606
+  },
+  "ordered_targets": [
+    {
+      "name": "server",
+      "host": "127.0.0.1",
+      "port": 62606
+    },
+    {
+      "name": "local",
+      "host": "127.0.0.1",
+      "port": 8002
+    }
+  ]
+}
+```
 
-Because the backend is FastAPI-based, the same contract is also available as generated OpenAPI metadata:
+## Canonical sources
 
-- OpenAPI version: `3.2.0`
-- Swagger UI: `/docs`
-- ReDoc: `/redoc`
-- OpenAPI JSON: `/openapi.json`
+For machine-readable contract details, prefer:
+
+- [openapi.json](openapi.json)
+- [api.llm.yaml](api.llm.yaml)
+- `__tests__/test_api_blackbox_contract.py`

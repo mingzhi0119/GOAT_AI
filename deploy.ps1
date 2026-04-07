@@ -31,25 +31,90 @@ function Stop-PidFileProcess {
     $rawPid = Get-Content -LiteralPath $PidFile -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($rawPid -and ($rawPid.ToString().Trim() -match '^\d+$')) {
         $pidValue = [int]$rawPid
-        $proc = Get-Process -Id $pidValue -ErrorAction SilentlyContinue
-        if ($null -ne $proc) {
-            Stop-Process -Id $pidValue -Force -ErrorAction SilentlyContinue
-            Start-Sleep -Seconds 1
-        }
+        Stop-ProcessTree -ProcessId $pidValue
     }
 
     Remove-Item -LiteralPath $PidFile -Force -ErrorAction SilentlyContinue
 }
 
-function Stop-PortProcess {
-    param([int]$Port)
-    $connections = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
-    foreach ($connection in $connections) {
-        if ($connection.OwningProcess -gt 0) {
-            Stop-Process -Id $connection.OwningProcess -Force -ErrorAction SilentlyContinue
-        }
+function Stop-ProcessTree {
+    param([int]$ProcessId)
+
+    $children = Get-CimInstance Win32_Process -Filter "ParentProcessId = $ProcessId" -ErrorAction SilentlyContinue
+    foreach ($child in $children) {
+        Stop-ProcessTree -ProcessId $child.ProcessId
     }
-    Start-Sleep -Seconds 1
+
+    $proc = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+    if ($null -ne $proc) {
+        Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 300
+    }
+}
+
+function Stop-ProcessTreeTaskkill {
+    param([int]$ProcessId)
+
+    if ($ProcessId -le 0) {
+        return
+    }
+
+    $taskkillExe = Join-Path $env:SystemRoot "System32\taskkill.exe"
+    if (Test-Path -LiteralPath $taskkillExe) {
+        & $taskkillExe /PID $ProcessId /T /F | Out-Null
+    }
+}
+
+function Clear-PortOrFail {
+    param(
+        [int]$Port,
+        [int]$MaxPasses = 8
+    )
+
+    for ($attempt = 0; $attempt -lt $MaxPasses; $attempt++) {
+        $connections = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+        if (-not $connections) {
+            return
+        }
+
+        $owners = @(
+            $connections |
+                Select-Object -ExpandProperty OwningProcess -Unique |
+                Where-Object { $_ -gt 0 }
+        )
+
+        if (-not $owners) {
+            throw "Port $Port is occupied, but no user-mode owning process was found."
+        }
+
+        $kernelOwners = @($owners | Where-Object { $_ -in @(0, 4) })
+        if ($kernelOwners.Count -gt 0) {
+            throw "Port $Port is occupied by a system/kernel-managed process: $($kernelOwners -join ', ')"
+        }
+
+        foreach ($ownerProcessId in $owners) {
+            Stop-ProcessTree -ProcessId $ownerProcessId
+            Stop-ProcessTreeTaskkill -ProcessId $ownerProcessId
+        }
+
+        Start-Sleep -Seconds 1
+    }
+
+    $remaining = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+    if ($remaining) {
+        $stillListening = @(
+            $remaining |
+                Select-Object -ExpandProperty OwningProcess -Unique |
+                Where-Object { $_ -gt 0 }
+        )
+
+        $kernelOwners = @($stillListening | Where-Object { $_ -in @(0, 4) })
+        if ($kernelOwners.Count -gt 0) {
+            throw "Port $Port is occupied by a system/kernel-managed process: $($kernelOwners -join ', ')"
+        }
+
+        throw "Port $Port is still occupied after forced cleanup: $($stillListening -join ', ')"
+    }
 }
 
 function Test-HealthPort {
@@ -63,6 +128,24 @@ function Test-HealthPort {
         }
     }
     return $false
+}
+
+function Test-DeploymentContract {
+    param([int]$Port)
+
+    if (-not (Test-HealthPort -Port $Port)) {
+        return $false
+    }
+
+    try {
+        $openApi = Invoke-WebRequest -Uri "http://127.0.0.1:$Port/openapi.json" -UseBasicParsing
+        if ($openApi.StatusCode -ne 200) {
+            return $false
+        }
+        return $openApi.Content -match '"/api/models/capabilities"'
+    } catch {
+        return $false
+    }
 }
 
 function Read-DotEnvValue {
@@ -137,8 +220,10 @@ function Resolve-OllamaBaseUrl {
     }
 
     Assert-CommandAvailable -Name ollama
-    $ollamaOutLog = Join-Path $ProjectRoot "ollama.local.out.log"
-    $ollamaErrLog = Join-Path $ProjectRoot "ollama.local.err.log"
+    $logsDir = Join-Path $ProjectRoot "logs"
+    New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
+    $ollamaOutLog = Join-Path $logsDir "ollama.local.out.log"
+    $ollamaErrLog = Join-Path $logsDir "ollama.local.err.log"
 
     Write-Step "Starting local Ollama on $defaultUrl"
     $ollamaProcess = Start-Process `
@@ -174,9 +259,10 @@ $ProjectDir = [System.IO.Path]::GetFullPath($ProjectDir)
 $VenvDir = Join-Path $ProjectDir ".venv"
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
 $FrontendDir = Join-Path $ProjectDir "frontend"
-$ApiLog = Join-Path $ProjectDir "fastapi.log"
-$ApiErrLog = Join-Path $ProjectDir "fastapi.err.log"
-$ApiPid = Join-Path $ProjectDir "fastapi.pid"
+$LogsDir = Join-Path $ProjectDir "logs"
+$ApiLog = Join-Path $LogsDir "fastapi.log"
+$ApiErrLog = Join-Path $LogsDir "fastapi.err.log"
+$ApiPid = Join-Path $LogsDir "fastapi.pid"
 $QuickLabel = if ($Quick.IsPresent) { " [QUICK mode]" } else { "" }
 $ResolvedOllamaBaseUrl = $null
 
@@ -192,6 +278,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $ProjectDir ".git"))) {
 }
 
 Set-Location -LiteralPath $ProjectDir
+New-Item -ItemType Directory -Path $LogsDir -Force | Out-Null
 git checkout $GitBranch
 
 if ($SyncGit.IsPresent) {
@@ -262,7 +349,7 @@ foreach ($candidatePortText in $TargetPorts) {
     $candidatePort = [int]$candidatePortText
     Write-Step "Trying FastAPI on port $candidatePort"
 
-    Stop-PortProcess -Port $candidatePort
+    Clear-PortOrFail -Port $candidatePort
     Stop-PidFileProcess -PidFile $ApiPid
 
     $startupArgs = @(
@@ -270,7 +357,7 @@ foreach ($candidatePortText in $TargetPorts) {
         "server:app",
         "--host", "0.0.0.0",
         "--port", $candidatePort.ToString(),
-        "--workers", "2"
+        "--workers", "1"
     )
 
     $startInfo = @{
@@ -296,7 +383,7 @@ foreach ($candidatePortText in $TargetPorts) {
 
     Set-Content -LiteralPath $ApiPid -Value $process.Id -Encoding utf8
 
-    if (Test-HealthPort -Port $candidatePort) {
+    if (Test-DeploymentContract -Port $candidatePort) {
         $SelectedPort = $candidatePort
         break
     }
@@ -317,6 +404,7 @@ $stopPidText = if (Test-Path -LiteralPath $ApiPid) {
 Write-Host ""
 Write-Host "GOAT AI deployment complete"
 Write-Host "API health: http://127.0.0.1:$SelectedPort/api/health"
+Write-Host "API contract: http://127.0.0.1:$SelectedPort/api/models/capabilities?model=gemma4:26b"
 Write-Host "OLLAMA_BASE_URL: $ResolvedOllamaBaseUrl"
 Write-Host "FastAPI log: $ApiLog"
 Write-Host "FastAPI err: $ApiErrLog"
