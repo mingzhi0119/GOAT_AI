@@ -5,6 +5,7 @@
 - Public URL: <https://ai.simonbb.com/mingzhi/>
 - Repo: <https://github.com/mingzhi0119/GOAT_AI> · branch `main`
 - **Current snapshot (features, APIs, deploy pitfalls):** [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md)
+- **API contract:** [docs/API_REFERENCE.md](docs/API_REFERENCE.md)
 - Version line in this README may lag; trust **PROJECT_STATUS** + **ROADMAP** for “what shipped”.
 
 ---
@@ -17,14 +18,14 @@
 | **Python runtime** | CPython | 3.12.6 | Backend language |
 | **Backend framework** | FastAPI + Uvicorn | 0.135 / 0.35 | REST + SSE API |
 | **LLM runtime** | Ollama | latest | Local model serving |
-| **Frontend build** | Vite | 5 | Build tool + dev server |
-| **Frontend UI** | React + TypeScript | 18 / 5 | SPA |
+| **Frontend build** | Vite | 8 | Build tool + dev server |
+| **Frontend UI** | React + TypeScript | 19 / 5 | SPA |
 | **Styling** | Tailwind CSS | 3.4 | Utility-first CSS |
 | **Markdown** | react-markdown + remark-gfm | 9 / 4 | Chat message rendering |
 | **Data** | pandas + openpyxl | 2.2 / 3.1 | CSV/XLSX analysis |
 | **Chat logging** | SQLite (stdlib) | — | Q&A persistence |
 | **Reverse proxy** | Nginx | school-managed | TLS + path routing |
-| **Node** | Node.js | 18.19.1 | Frontend build (CI/prod) |
+| **Node** | Node.js | 24.14.1 | Frontend build (CI/prod, managed via `nvm`) |
 
 ---
 
@@ -206,5 +207,6 @@ python -m unittest discover -s __tests__ -p "test_*.py" -v
 | Doc | Content |
 |-----|---------|
 | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | Deploy, stop, env vars, API reference, chat log schema |
+| [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) | Endpoint-by-endpoint request/response/error contract |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Shipped phases, upcoming features, infrastructure decisions |
 | [`docs/ENGINEERING_STANDARDS.md`](docs/ENGINEERING_STANDARDS.md) | Coding conventions and quality rules |

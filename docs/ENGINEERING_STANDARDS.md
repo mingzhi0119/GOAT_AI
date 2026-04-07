@@ -327,7 +327,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }      # Vitest/jsdom require Node >=20 in CI
+        with: { node-version: "24.14.1" } # Keep CI aligned with `.nvmrc`
       - run: cd frontend && npm ci && npm test -- --run && npm run build
 ```
 
@@ -342,7 +342,7 @@ jobs:
 | **Paths** | `pathlib.Path`, never string concat | `Path(__file__).parent / "static"` |
 | **Ports** | Env var with safe dev/prod defaults | `GOAT_PORT=8002` (dev), `62606` behind nginx in prod |
 | **Base URLs** | Env var, never `localhost` hardcoded | `OLLAMA_BASE_URL=http://127.0.0.1:11434` |
-| **Node version** | Pin in `.nvmrc` and CI matrix | `18.19.1` |
+| **Node version** | Pin in `.nvmrc` and CI matrix | `24.14.1` |
 | **Python version** | Keep runtime/docs/CI aligned | `3.12` |
 | **Dependencies** | Exact pins in `requirements.txt` | `fastapi==0.135.2` |
 | **npm packages** | `package-lock.json` committed | `npm ci` in CI/deploy, never `npm install` |
@@ -439,7 +439,7 @@ httpx==0.x           # FastAPI TestClient support
 
 - Commit `package-lock.json`.
 - Use `npm ci` in CI and deploy — never `npm install` (which can change the lock).
-- Add `.nvmrc` with content `18.19.1` so `nvm use` picks the right version automatically.
+- Add `.nvmrc` with content `24.14.1` so `nvm use` picks the right version automatically.
 - Dev dependencies in `devDependencies`; runtime dependencies in `dependencies`.
 
 ---

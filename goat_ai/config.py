@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Final
 
 _PACKAGE_ROOT = Path(__file__).resolve().parent
 APP_ROOT = _PACKAGE_ROOT.parent
@@ -19,6 +20,30 @@ If you are unsure, say so briefly."""
 USER_FACING_ERROR = (
     "Sorry, the AI service is temporarily unavailable. Please try again or check that Ollama is running."
 )
+_DOTENV_QUOTES: Final[tuple[str, str]] = ("'", '"')
+
+
+def _strip_wrapped_quotes(value: str) -> str:
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in _DOTENV_QUOTES:
+        return value[1:-1]
+    return value
+
+
+def _load_dotenv_file(dotenv_path: Path) -> None:
+    if not dotenv_path.is_file():
+        return
+
+    for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, raw_value = line.split("=", 1)
+        env_name = key.strip()
+        if not env_name or env_name in os.environ:
+            continue
+
+        os.environ[env_name] = _strip_wrapped_quotes(raw_value.strip())
 
 
 def _read_system_prompt() -> str:
@@ -61,6 +86,9 @@ class Settings:
     app_root: Path
     logo_svg: Path
     log_db_path: Path
+    api_key: str = ""
+    rate_limit_window_sec: int = 60
+    rate_limit_max_requests: int = 60
     gpu_target_uuid: str = ""
     gpu_target_index: int = 0
     latency_rolling_max_samples: int = 20
@@ -71,10 +99,17 @@ class Settings:
 
 
 def load_settings() -> Settings:
+    _load_dotenv_file(APP_ROOT / ".env")
     base = os.environ.get("OLLAMA_BASE_URL", _default_ollama_base_url()).rstrip("/")
     max_mb = int(os.environ.get("GOAT_MAX_UPLOAD_MB", "20"))
     _default_log_db = str(APP_ROOT / "chat_logs.db")
+    _rate_limit_window_sec = int(os.environ.get("GOAT_RATE_LIMIT_WINDOW_SEC", "60"))
+    _rate_limit_max_requests = int(os.environ.get("GOAT_RATE_LIMIT_MAX_REQUESTS", "60"))
     _lat_n = int(os.environ.get("GOAT_LATENCY_ROLLING_MAX_SAMPLES", "20"))
+    if _rate_limit_window_sec < 1:
+        raise ValueError("GOAT_RATE_LIMIT_WINDOW_SEC must be >= 1")
+    if _rate_limit_max_requests < 1:
+        raise ValueError("GOAT_RATE_LIMIT_MAX_REQUESTS must be >= 1")
     if _lat_n < 1:
         raise ValueError("GOAT_LATENCY_ROLLING_MAX_SAMPLES must be >= 1")
     return Settings(
@@ -88,6 +123,9 @@ def load_settings() -> Settings:
         app_root=APP_ROOT,
         logo_svg=APP_ROOT / "static" / "urochester_simon_business_horizontal.svg",
         log_db_path=Path(os.environ.get("GOAT_LOG_PATH", _default_log_db)),
+        api_key=os.environ.get("GOAT_API_KEY", "").strip(),
+        rate_limit_window_sec=_rate_limit_window_sec,
+        rate_limit_max_requests=_rate_limit_max_requests,
         gpu_target_uuid=os.environ.get("GOAT_GPU_UUID", "").strip(),
         gpu_target_index=int(os.environ.get("GOAT_GPU_INDEX", "0")),
         latency_rolling_max_samples=_lat_n,

@@ -95,3 +95,19 @@ def stream_upload_analysis_sse(
         yield f'data: {json.dumps({"type": "chart_spec", "chart": chart_spec})}\n\n'
 
     yield sse_event("[DONE]")
+
+
+def analyze_upload(
+    *,
+    content: bytes,
+    filename: str,
+    settings: Settings,
+) -> tuple[str, dict[str, object] | None]:
+    """Parse the uploaded file and return a reusable prompt plus optional chart suggestion."""
+    result = parse_upload(content, filename, settings)
+    if result.user_error:
+        raise ValueError(result.user_error)
+
+    assert result.dataframe is not None
+    analysis_prompt = build_analysis_user_message(result.dataframe)
+    return analysis_prompt, _build_chart_spec(result)

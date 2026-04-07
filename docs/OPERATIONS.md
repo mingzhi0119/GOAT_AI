@@ -160,6 +160,9 @@ Do not enable **`GOAT_WATCHDOG_RESTART=1`** until you trust `deploy.sh` is safe 
 | `GOAT_SYSTEM_PROMPT_FILE` | Path to UTF-8 file with system prompt | _(none)_ |
 | `GOAT_CORS_ORIGINS` | Comma-separated CORS allow-origins | `http://localhost:3000` |
 | `GOAT_LOG_PATH` | Path to SQLite chat log database | `<project_root>/chat_logs.db` |
+| `GOAT_API_KEY` | Optional shared secret required on all non-health API routes via `X-GOAT-API-Key` | _(empty / disabled)_ |
+| `GOAT_RATE_LIMIT_WINDOW_SEC` | Rolling window for protected-route rate limiting | `60` |
+| `GOAT_RATE_LIMIT_MAX_REQUESTS` | Max protected-route requests allowed per window per API key | `60` |
 | `GOAT_GPU_UUID` | Optional GPU UUID lock for `/api/system/gpu` (overrides index) | _(empty)_ |
 | `GOAT_GPU_INDEX` | GPU index for `/api/system/gpu` when UUID not set | `0` |
 | `GOAT_LATENCY_ROLLING_MAX_SAMPLES` | Max samples for rolling average in `/api/system/inference` (chat stream ms) | `20` |
@@ -239,11 +242,16 @@ curl -sf http://127.0.0.1:62606/api/health
 | `GET` | `/api/models` | List Ollama model names |
 | `POST` | `/api/chat` | SSE streaming chat completion |
 | `POST` | `/api/upload` | SSE streaming CSV/XLSX analysis |
+| `POST` | `/api/upload/analyze` | JSON CSV/XLSX analysis payload for external integrations |
 | `GET` | `/api/history` | Session list (metadata) |
 | `GET` | `/api/history/{session_id}` | Full saved session JSON |
 | `DELETE` | `/api/history/{session_id}` | Delete a saved session |
 | `GET` | `/api/system/gpu` | GPU telemetry JSON for sidebar status strip |
 | `GET` | `/api/system/inference` | Rolling average chat stream duration (ms) + sample count |
+
+For a full request/response/error contract, see [API_REFERENCE.md](API_REFERENCE.md).
+
+When `GOAT_API_KEY` is configured, every endpoint above except `GET /api/health` requires the `X-GOAT-API-Key` header. Responses also include `X-Request-ID`, and rate-limited requests return `429` with `Retry-After`.
 
 **SSE format** (chat & upload):
 ```
@@ -258,8 +266,8 @@ data: "[ERROR] …"\n\n followed by "[DONE]" on Ollama errors
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| Vite | 5 | Build tool + dev server |
-| React | 18 | UI framework |
+| Vite | 8 | Build tool + dev server |
+| React | 19 | UI framework |
 | TypeScript | 5 (strict) | Type safety |
 | Tailwind CSS | 3.4 | Utility-first styling |
 | react-markdown | 9 | Markdown rendering in chat |

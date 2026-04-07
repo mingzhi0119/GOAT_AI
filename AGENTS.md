@@ -22,7 +22,7 @@ It summarizes the operating rules in `.cursor/rules/` so the repo can be recover
 - App shape: FastAPI backend serving a React SPA
 - Production port: `62606`
 - Frontend build tool: Vite
-- Frontend runtime target: Node 18 on server/CI
+- Frontend runtime target: Node 24 on server/CI
 - Backend runtime target: Python 3.12
 
 ## Five Non-Negotiables
@@ -139,9 +139,20 @@ Current expectation in this repo:
 Update docs when behavior changes:
 
 - `README.md` for architecture, structure, or developer workflow changes
+- `docs/openapi.json` for the committed OpenAPI contract generated from FastAPI
+- `docs/api.llm.yaml` for the committed LLM-optimized compact API contract
+- `docs/API_REFERENCE.md` for human-readable endpoint reference
 - `docs/OPERATIONS.md` for env vars, deploy, startup, or host operations changes
 - `docs/PROJECT_STATUS.md` for current shipped state
 - `docs/ROADMAP.md` for phase completion and future work
+
+## API Contract Memory
+
+- The canonical machine-readable API contract is `docs/openapi.json`.
+- It must stay in OpenAPI `3.2.0` format and reflect the current FastAPI app.
+- Regenerate it from `backend.main:app` after endpoint/schema changes so the committed spec and runtime `/openapi.json` do not drift.
+- The canonical compact LLM-facing API file is `docs/api.llm.yaml`.
+- Regenerate `docs/api.llm.yaml` from `docs/openapi.json` with `python tools/generate_llm_api_yaml.py`; do not hand-maintain it unless you are also updating the generator.
 
 ## Commit Hygiene
 

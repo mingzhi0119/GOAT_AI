@@ -20,7 +20,7 @@
 |-------|--------|
 | Backend | Python 3.12, FastAPI, Uvicorn |
 | LLM | Ollama HTTP (`OLLAMA_BASE_URL`) |
-| Frontend | React 18, TypeScript strict, Vite 5, Tailwind 3 |
+| Frontend | React 19, TypeScript strict, Vite 8, Tailwind 3 |
 | Data | pandas + openpyxl for CSV/XLSX |
 | Logs | SQLite `chat_logs.db` (`GOAT_LOG_PATH`) |
 
@@ -33,6 +33,8 @@
 - **History API:** `GET /api/history`, `GET /api/history/{id}`, `DELETE /api/history/{id}` — sidebar list / restore / delete.
 - **GPU telemetry:** `GET /api/system/gpu` — real `nvidia-smi` stats; UI polls ~5s; env **`GOAT_GPU_UUID`** (preferred) or **`GOAT_GPU_INDEX`** (default `0`).
 - **Inference latency:** `GET /api/system/inference` — rolling average duration (ms) of completed chat streams; shown in GPU dot tooltip; window size **`GOAT_LATENCY_ROLLING_MAX_SAMPLES`** (default `20`).
+- **HTTP safety:** optional shared-secret protection on all non-health routes via **`GOAT_API_KEY`** + `X-GOAT-API-Key`, request tracing with `X-Request-ID`, and per-key in-memory rate limiting via **`GOAT_RATE_LIMIT_WINDOW_SEC`** / **`GOAT_RATE_LIMIT_MAX_REQUESTS`**.
+- **Modular API surface:** upload parsing is now available both as SSE (`POST /api/upload`) and plain JSON (`POST /api/upload/analyze`) so external services can reuse the same core analysis logic without consuming a stream.
 - **Frontend:** Sidebar history, file-context chip, **GPU status strip** under Actions, **ChartCard** (Recharts) when `chart_spec` received; static sidebar label styles in `sidebarStaticText.ts`.
 - **Deploy fix (important):** `deploy.sh` runs **`npm ci` before every `npm run build`** so new deps (e.g. `recharts`) are never missing on servers that already had `node_modules/`. By default it now deploys the current local checkout on the server; `SYNC_GIT=1` is opt-in.
 
@@ -46,6 +48,7 @@
 | GET | `/api/models` | Ollama model list |
 | POST | `/api/chat` | SSE; body includes optional `session_id` |
 | POST | `/api/upload` | SSE; see events below |
+| POST | `/api/upload/analyze` | JSON upload analysis payload for external integrations |
 | GET | `/api/history` | Session list (metadata) |
 | GET | `/api/history/{session_id}` | Full session + messages JSON |
 | DELETE | `/api/history/{session_id}` | Delete session |
@@ -82,7 +85,7 @@ python -m pytest __tests__/ -v
 cd frontend && npm test -- --run && npm run build
 ```
 
-CI: `.github/workflows/ci.yml` — `pytest` + `npm test` + `npm run build` on pushes/PRs to `main` (frontend job uses **Node 20**; Vitest/jsdom require Node >=20 even though the server build target remains Node 18).
+CI: `.github/workflows/ci.yml` — `pytest` + `npm test` + `npm run build` on pushes/PRs to `main` (frontend job uses **Node 24.14.1** to match `.nvmrc` and the project build target).
 
 Note: `test_history_router.py` may **skip** if `fastapi` is not installed in the active Python env.
 
@@ -118,6 +121,7 @@ Authoritative table and implications: [OPERATIONS.md](OPERATIONS.md) (section **
 | File | Role |
 |------|------|
 | [OPERATIONS.md](OPERATIONS.md) | Env vars, deploy, health, GPU probes, API table |
+| [API_REFERENCE.md](API_REFERENCE.md) | Full request/response/error contract for backend consumers |
 | [ROADMAP.md](ROADMAP.md) | Phases, shipped vs planned |
 | [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) | Coding and test standards |
 | **PROJECT_STATUS.md** (this file) | **Compact snapshot for context reset** |

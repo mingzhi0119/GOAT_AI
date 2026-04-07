@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 
 from backend.config import get_settings
 from backend.dependencies import get_llm_client
+from backend.models.common import ErrorResponse
 from backend.models.chat import ChatRequest
 from backend.routers.chat_options import ollama_options_from_chat_request
 from backend.services.chat_service import stream_chat_sse
@@ -24,7 +25,15 @@ _SSE_HEADERS = {
 }
 
 
-@router.post("/chat")
+@router.post(
+    "/chat",
+    summary="Stream a chat completion over SSE",
+    responses={
+        200: {"content": {"text/event-stream": {}}},
+        401: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+    },
+)
 def chat_stream(
     request: Request,
     req: ChatRequest,

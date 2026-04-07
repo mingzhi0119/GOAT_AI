@@ -9,7 +9,7 @@
 
 | Phase | Content |
 |-------|---------|
-| 0 | Environment verification — Node 18, Vite 5, FastAPI smoke test |
+| 0 | Environment verification — Node 24, Vite 8, FastAPI smoke test |
 | 1 | FastAPI backend: `/api/health`, `/api/models`, `/api/chat` SSE, `/api/upload` SSE |
 | 2 | React frontend: Sidebar, ChatWindow, MessageBubble (Markdown), FileUpload, useChat/useModels/useTheme hooks, Tailwind CSS, navy+gold brand |
 | 3 | Production deploy: `deploy.sh` (local checkout → npm build → uvicorn :62606), nginx proxy via `ai.simonbb.com/mingzhi/` |
@@ -31,7 +31,7 @@
 | Port | 62606 (nginx proxy) | 62606 |
 | Process mgmt | `nohup` + PID file (default on no-root hosts) | systemd --user *if* bus works; else watchdog/tmux |
 | Log files | `fastapi.log` + user-space rotation script | Same; IT logrotate only with root |
-| Node version | 18.19.1 (TLJH fixed) | 18.19.1 |
+| Node version | 24.14.1 (`.nvmrc`) | 24.x |
 | Python | 3.12.6 | 3.12.6 |
 
 ---

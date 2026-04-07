@@ -1,10 +1,4 @@
-"""GOAT AI — FastAPI application factory.
-
-Usage:
-    python3 -m uvicorn backend.main:app --host 0.0.0.0 --port 8002
-    # or via the project root alias:
-    python3 -m uvicorn server:app --host 0.0.0.0 --port 8002
-"""
+"""GOAT AI FastAPI application factory."""
 from __future__ import annotations
 
 import logging
@@ -15,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from backend.config import CORS_ORIGINS, get_settings
+from backend.http_security import register_http_security
 from backend.routers import chat, history, models, system, upload
 from backend.services import log_service
 from goat_ai.latency_metrics import init_latency_metrics
@@ -31,16 +26,21 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="GOAT AI",
         version="1.0.0",
-        description="Simon Business School — Strategic Intelligence API",
-        # Hide docs in production by setting docs_url=None; keep open for now.
+        description="Simon Business School Strategic Intelligence API",
+        openapi_tags=[
+            {"name": "system", "description": "Health and server telemetry endpoints."},
+            {"name": "models", "description": "Model discovery endpoints for Ollama-backed chat."},
+            {"name": "chat", "description": "Streaming conversational analysis endpoints."},
+            {"name": "upload", "description": "Tabular file analysis endpoints for CSV/XLSX uploads."},
+            {"name": "history", "description": "Persisted chat session listing and retrieval."},
+        ],
     )
+    app.openapi_version = "3.2.0"
 
-    # ── Initialise chat log DB + inference metrics on startup ───────────────
-    _settings = get_settings()
-    log_service.init_db(_settings.log_db_path)
-    init_latency_metrics(_settings.latency_rolling_max_samples)
+    settings = get_settings()
+    log_service.init_db(settings.log_db_path)
+    init_latency_metrics(settings.latency_rolling_max_samples)
 
-    # ── CORS (allows React dev server on :3000 to call the API on :8002) ──────
     app.add_middleware(
         CORSMiddleware,
         allow_origins=CORS_ORIGINS,
@@ -48,26 +48,24 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    register_http_security(app)
 
-    # ── API routes (must be registered before the SPA catch-all) ─────────────
     app.include_router(models.router, prefix="/api", tags=["models"])
-    app.include_router(chat.router,   prefix="/api", tags=["chat"])
+    app.include_router(chat.router, prefix="/api", tags=["chat"])
     app.include_router(upload.router, prefix="/api", tags=["upload"])
     app.include_router(history.router, prefix="/api", tags=["history"])
     app.include_router(system.router, prefix="/api", tags=["system"])
 
-    # ── Health probe (quick liveness check, no deps) ──────────────────────────
-    @app.get("/api/health", tags=["system"])
+    @app.get("/api/health", tags=["system"], summary="Read service liveness")
     def health() -> dict[str, str]:
         return {"status": "ok", "version": "1.0.0"}
 
-    # ── React SPA (production: built dist/ served as static files) ────────────
     if DIST.is_dir():
         logger.info("Serving React SPA from %s", DIST)
         app.mount("/", StaticFiles(directory=DIST, html=True), name="spa")
     else:
         logger.info(
-            "frontend/dist not found — API-only mode. "
+            "frontend/dist not found; running in API-only mode. "
             "Run `cd frontend && npm run build` to enable SPA serving."
         )
 

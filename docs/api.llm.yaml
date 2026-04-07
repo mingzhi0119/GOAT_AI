@@ -1,0 +1,279 @@
+format: llm-compact-api
+source:
+  canonical_openapi: docs/openapi.json
+  openapi_version: 3.2.0
+  generated_from: backend.main:app
+  purpose: Minimal API context for LLM consumption
+api:
+  name: GOAT AI
+  base_path: /api
+  auth:
+    scheme: api_key_optional
+    header: X-GOAT-API-Key
+    applies_to: all_except_health
+  common_headers:
+    response:
+      X-Request-ID: request trace id
+      Retry-After: present on 429
+  common_errors:
+    400:
+      detail: bad request
+    401:
+      detail: invalid or missing api key
+    404:
+      detail: not found
+    422:
+      detail: validation error
+    429:
+      detail: too many requests
+    503:
+      detail: ai backend unavailable
+schemas:
+  ChartSeries:
+    type: object
+    required:
+      - key
+      - name
+    properties:
+      key: string
+      name: string
+  ChartSpec:
+    type: object
+    required:
+      - type
+      - title
+      - xKey
+      - series
+      - data
+    properties:
+      type: line|bar
+      title: string
+      xKey: string
+      series: ChartSeries[]
+      data: object[]
+  ChatMessage:
+    type: object
+    required:
+      - role
+      - content
+    properties:
+      role: string
+      content: string
+  ChatRequest:
+    type: object
+    required:
+      - messages
+    properties:
+      model: string
+      messages: ChatMessage[]
+      session_id: string|null
+      system_instruction: string|null
+      temperature: number|null
+      max_tokens: integer|null
+      top_p: number|null
+  ErrorResponse:
+    type: object
+    required:
+      - detail
+    properties:
+      detail: string
+  GPUStatusResponse:
+    type: object
+    required:
+      - available
+      - active
+      - message
+    properties:
+      available: boolean
+      active: boolean
+      message: string
+      name: string
+      uuid: string
+      utilization_gpu: number|null
+      memory_used_mb: number|null
+      memory_total_mb: number|null
+      temperature_c: number|null
+      power_draw_w: number|null
+  HistorySessionDetailResponse:
+    type: object
+    required:
+      - id
+      - title
+      - model
+      - created_at
+      - updated_at
+      - messages
+    properties:
+      id: string
+      title: string
+      model: string
+      created_at: string
+      updated_at: string
+      messages: ChatMessage[]
+  HistorySessionListResponse:
+    type: object
+    required:
+      - sessions
+    properties:
+      sessions: HistorySessionSummary[]
+  HistorySessionSummary:
+    type: object
+    required:
+      - id
+      - title
+      - model
+      - created_at
+      - updated_at
+    properties:
+      id: string
+      title: string
+      model: string
+      created_at: string
+      updated_at: string
+  InferenceLatencyResponse:
+    type: object
+    required:
+      - chat_avg_ms
+      - chat_sample_count
+    properties:
+      chat_avg_ms: number
+      chat_sample_count: integer
+  ModelsResponse:
+    type: object
+    required:
+      - models
+    properties:
+      models: string[]
+  UploadAnalysisResponse:
+    type: object
+    required:
+      - filename
+      - prompt
+    properties:
+      filename: string
+      prompt: string
+      chart: ChartSpec|null
+endpoints:
+  - op: list_models
+    method: GET
+    path: /models
+    response:
+      200: ModelsResponse
+      errors:
+        - 401
+        - 429
+        - 503
+  - op: chat_stream
+    method: POST
+    path: /chat
+    body: ChatRequest
+    content_type: application/json
+    response:
+      200:
+        content_type: text/event-stream
+        stream:
+          - token: string
+          - chart_spec: ChartSpec
+          - done: "[DONE]"
+          - error_frame: "[ERROR] <message>"
+      errors:
+        - 401
+        - 429
+  - op: upload_and_parse
+    method: POST
+    path: /upload
+    body:
+      content_type: multipart/form-data
+      fields:
+        file: binary
+      schema: Body_upload_and_parse_api_upload_post
+    response:
+      200:
+        content_type: text/event-stream
+        stream:
+          - file_context:
+              type: object
+              properties:
+                type: file_context
+                filename: string
+                prompt: string
+          - chart_spec: ChartSpec
+          - done: "[DONE]"
+          - error_frame: "[ERROR] <message>"
+      errors:
+        - 400
+        - 401
+        - 429
+  - op: analyze_upload_json
+    method: POST
+    path: /upload/analyze
+    body:
+      content_type: multipart/form-data
+      fields:
+        file: binary
+      schema: Body_analyze_upload_json_api_upload_analyze_post
+    response:
+      200: UploadAnalysisResponse
+      errors:
+        - 400
+        - 401
+        - 429
+  - op: list_history
+    method: GET
+    path: /history
+    response:
+      200: HistorySessionListResponse
+      errors:
+        - 401
+        - 429
+  - op: delete_all_history
+    method: DELETE
+    path: /history
+    response:
+      204: no_content
+      errors:
+        - 401
+        - 429
+  - op: get_history_session
+    method: GET
+    path: /history/{session_id}
+    path_params:
+      session_id: string
+    response:
+      200: HistorySessionDetailResponse
+      errors:
+        - 401
+        - 404
+        - 429
+  - op: delete_history_session
+    method: DELETE
+    path: /history/{session_id}
+    path_params:
+      session_id: string
+    response:
+      204: no_content
+      errors:
+        - 401
+        - 429
+  - op: get_gpu_status
+    method: GET
+    path: /system/gpu
+    response:
+      200: GPUStatusResponse
+      errors:
+        - 401
+        - 429
+  - op: get_inference_latency
+    method: GET
+    path: /system/inference
+    response:
+      200: InferenceLatencyResponse
+      errors:
+        - 401
+        - 429
+  - op: health
+    method: GET
+    path: /health
+    auth: none
+    response:
+      200: map[string,string]
