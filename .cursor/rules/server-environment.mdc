@@ -1,46 +1,46 @@
 ---
-description: Project snapshot, production host constraints, and deploy rules (docs/ENGINEERING_STANDARDS.md §9–10)
+description: Project snapshot, production host constraints, and deploy rules aligned with docs/ENGINEERING_STANDARDS.md
 globs: deploy.sh,docs/OPERATIONS.md,docs/PROJECT_STATUS.md,goat-ai.service,scripts/rotate_fastapi_log.py,scripts/backup_chat_db.py,scripts/healthcheck.sh,scripts/watchdog.sh
 alwaysApply: false
 ---
 
-# GOAT AI — Server and deploy
+# GOAT AI - Server and deploy
 
-Use when changing deploy, process management, host-only docs, or runtime target behavior.
+Use this when changing deploy scripts, process management, host-only docs, or runtime target behavior.
 
-## Project snapshot (ops)
+## Project snapshot
 
 - Repo: `GOAT_AI`
-- Deployments: **portable** (Windows/macOS/Linux dev; varied Linux/server layouts in prod)—see `README.md` **Environments**
-- Example reference: GPU Linux host + Ollama + reverse proxy (not the only topology)
-- App: FastAPI backend + React SPA
-- Default port: **62606** (`GOAT_SERVER_PORT`)
-- Frontend: Vite; Node **24** on server/CI
-- Backend: Python **3.12**
+- Deployments are portable across Windows, macOS, Linux development, and varied Linux or server layouts in production.
+- Reference deployment: GPU Linux host plus Ollama plus reverse proxy, but not the only topology.
+- App: FastAPI backend plus React SPA.
+- Default port: `62606` (`GOAT_SERVER_PORT`).
+- Frontend: Vite; Node 24 on server and CI.
+- Backend: Python 3.12.
 
 ## Production server constraints
 
-- Shared JupyterHub-style environment; **no sudo / root**. Do not assume `apt`, system-wide `systemctl`, nginx reloads, or `/etc/*` access.
-- `systemctl --user` may work but can fail in SSH sessions. **Preserve** `deploy.sh` **nohup** + `logs/fastapi.pid` (or equivalent) fallback.
+- Shared JupyterHub-style environment; no sudo or root. Do not assume `apt`, system `systemctl`, nginx reloads, or `/etc/*` access.
+- `systemctl --user` may work but can fail in SSH sessions. Preserve the `deploy.sh` nohup plus PID fallback.
 - Uvicorn on `0.0.0.0:62606` is valid for this user.
-- GPU: prefer `GOAT_GPU_UUID=GPU-fb2cf8f7-e9bf-f136-a3bb-e150426598e8` for the A100; do not default metrics to the wrong GPU (e.g. GT 1030 on the same host).
+- GPU: prefer `GOAT_GPU_UUID=GPU-fb2cf8f7-e9bf-f136-a3bb-e150426598e8` for the A100.
 
-### Host snapshot (verified detail)
+## Host snapshot
 
-- **No sudo:** `sudo` blocked (*no new privileges*). Do not document or assume `apt`, system `systemctl`, `/etc/logrotate.d`, or `nginx -s reload`.
-- **systemd --user:** May fail in SSH (`Failed to connect to bus: No medium found`). Test `systemctl --user status` before relying on user units.
-- **Supervisor:** Not assumed installed.
+- No sudo: `sudo` blocked. Do not assume `apt`, system `systemctl`, `/etc/logrotate.d`, or `nginx -s reload`.
+- `systemctl --user`: may fail in SSH with `Failed to connect to bus: No medium found`. Test `systemctl --user status` before relying on user units.
+- Supervisor is not assumed installed.
 
-### Doc source of truth
+## Doc source of truth
 
-- Full table: `docs/OPERATIONS.md` → **Shared host permissions (JupyterHub / unprivileged user)**.
-- Short snapshot: `docs/PROJECT_STATUS.md` → **8b. Server permissions snapshot**.
-- User-space log backup / health: `docs/OPERATIONS.md` → **User-space ops (no root)** (`scripts/rotate_fastapi_log.py`, `scripts/backup_chat_db.py`, `scripts/healthcheck.sh`, `scripts/watchdog.sh`).
+- Full table: `docs/OPERATIONS.md` - Shared host permissions (JupyterHub / unprivileged user).
+- Short snapshot: `docs/PROJECT_STATUS.md` - server permissions snapshot.
+- User-space log backup and health: `docs/OPERATIONS.md` - user-space ops (no root) and related scripts.
 
 ## Deploy rules
 
-- Repo may be developed directly on the server. `deploy.sh` must **not** assume `git pull` or `git reset --hard` by default.
-- Deploy from the current local checkout unless explicit sync is requested. **`SYNC_GIT=1`** is explicit opt-in only.
-- Keep **nohup** fallback deployment behavior intact.
-- Runtime target selection is interface-driven: `GOAT_DEPLOY_TARGET=auto` prefers `GOAT_SERVER_PORT` (default **62606**) and falls back to `GOAT_LOCAL_PORT` (default **8002**) only when the environment cannot bind/use the server port.
-- Keep `deploy.sh` (and related scripts) aligned with **`GET /api/system/runtime-target`**.
+- Do not assume `git pull` or `git reset --hard` by default.
+- Deploy from the current local checkout unless explicit sync is requested. `SYNC_GIT=1` is explicit opt-in only.
+- Keep nohup fallback deployment behavior intact.
+- Runtime target selection is interface-driven: `GOAT_DEPLOY_TARGET=auto` prefers `GOAT_SERVER_PORT` and falls back to `GOAT_LOCAL_PORT` only when the environment cannot bind or use the server port.
+- Keep `deploy.sh` and related scripts aligned with `GET /api/system/runtime-target`.

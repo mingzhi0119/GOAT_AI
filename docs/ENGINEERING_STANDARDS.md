@@ -1,4 +1,4 @@
-# GOAT AI — Engineering Standards
+# GOAT AI - Engineering Standards
 
 > **Single source of truth for engineering rules in this repo.**  
 > Repo root [`AGENTS.md`](../AGENTS.md) is a short durable index for automation; it must stay aligned with this file.  
@@ -8,11 +8,11 @@
 
 ## 0. Core Principles
 
-1. **Fail fast, fail loud** — bad config or missing env vars must crash at startup with a clear message, not silently at runtime.
-2. **Decouple by boundary** — HTTP handler → service → client. No business logic in route handlers. No I/O inside domain models.
-3. **Portable by default** — code must run identically on `localhost:dev` and `A100:prod` without modification. No hardcoded paths, ports, or OS assumptions.
-4. **Type everything** — untyped code is untestable code. Every function signature must carry types.
-5. **Test the boundary, mock the world** — unit tests own pure logic; integration tests own real I/O; nothing else hits the network.
+1. **Fail fast, fail loud** - bad config or missing env vars must crash at startup with a clear message, not silently at runtime.
+2. **Decouple by boundary** - HTTP handler -> service -> client. No business logic in route handlers. No I/O inside domain models.
+3. **Portable by default** - code must run identically on `localhost:dev` and `A100:prod` without modification. No hardcoded paths, ports, or OS assumptions.
+4. **Type everything** - untyped code is untestable code. Every function signature must carry types.
+5. **Test the boundary, mock the world** - unit tests own pure logic; integration tests own real I/O; nothing else hits the network.
 
 ---
 
@@ -23,20 +23,20 @@
 Every function, method, and module-level variable must be fully annotated.
 
 ```python
-# ✅ correct
+# correct
 def stream_chat(model: str, messages: list[ChatTurn]) -> Generator[str, None, None]: ...
 
-# ❌ forbidden — missing return type, untyped list
+# forbidden - missing return type, untyped list
 def stream_chat(model, messages): ...
 ```
 
 - Use `from __future__ import annotations` at the top of every file (deferred evaluation, avoids circular import issues).
 - Use `TypeAlias` for complex repeated types.
-- Use `Protocol` for injectable dependencies — never accept a concrete class when an interface suffices.
+- Use `Protocol` for injectable dependencies - never accept a concrete class when an interface suffices.
 - Use `dataclass` or `pydantic.BaseModel` for all structured data; no bare `dict[str, Any]` crossing function boundaries.
 
 ```python
-# ✅ Protocol for the LLM client — swappable without changing callers
+# Protocol for the LLM client - swappable without changing callers
 class LLMClient(Protocol):
     def stream_chat(self, model: str, messages: list[ChatTurn]) -> Generator[str, None, None]: ...
 ```
@@ -48,7 +48,7 @@ class LLMClient(Protocol):
 - **Never** parse raw `request.json()` dicts inside route handlers.
 
 ```python
-# ✅
+# example
 class ChatRequest(BaseModel):
     model: str
     messages: list[ChatTurn]
@@ -73,12 +73,12 @@ Layer-by-layer rule:
 | Layer | Rule |
 |-------|------|
 | **Service / client** | Raise domain exceptions (`OllamaUnavailable`, `UploadTooLarge`). Never swallow. |
-| **Route handler** | `try/except` domain exceptions → return structured `HTTPException` with a user-safe message. Log the original. |
+| **Route handler** | `try/except` domain exceptions -> return structured `HTTPException` with a user-safe message. Log the original. |
 | **Startup** | Validate config; if invalid, raise `SystemExit` with a clear message. |
 | **Background tasks** | Always `try/except Exception` at the task root; log with full traceback. |
 
 ```python
-# ✅ service layer — raise, never swallow
+# service layer - raise, never swallow
 def list_models(self) -> list[str]:
     try:
         resp = self._http.get(f"{self._base}/api/tags", timeout=5)
@@ -87,7 +87,7 @@ def list_models(self) -> list[str]:
         raise OllamaUnavailable("Cannot reach Ollama") from exc
     return [m["name"] for m in resp.json().get("models", [])]
 
-# ✅ handler layer — catch domain exception, return HTTP error
+# handler layer - catch domain exception, return HTTP error
 @router.get("/api/models")
 async def get_models(llm: LLMClient = Depends(get_llm_client)) -> list[str]:
     try:
@@ -99,7 +99,7 @@ async def get_models(llm: LLMClient = Depends(get_llm_client)) -> list[str]:
 
 ### 1.4 Logging
 
-- Use `logging.getLogger(__name__)` in every module — never `print()` in production code.
+- Use `logging.getLogger(__name__)` in every module - never `print()` in production code.
 - Log at the correct level: `DEBUG` for verbose flow, `INFO` for lifecycle events, `WARNING` for recoverable problems, `ERROR`/`EXCEPTION` for failures.
 - Never log secrets, file contents, or full user messages at level INFO or above.
 - Configure once at entrypoint (`logging_config.py`); never call `basicConfig` inside a module.
@@ -107,12 +107,12 @@ async def get_models(llm: LLMClient = Depends(get_llm_client)) -> list[str]:
 ### 1.5 Path Handling
 
 ```python
-# ✅ always use pathlib — works on Linux (server) and Windows (dev)
+# always use pathlib - works on Linux (server) and Windows (dev)
 from pathlib import Path
 BASE_DIR = Path(__file__).parent.parent.resolve()
 STATIC_DIR = BASE_DIR / "frontend" / "dist"
 
-# ❌ forbidden
+# forbidden
 STATIC_DIR = "/home/jupyter-mhu29@simon.roches-bde1e/GOAT_AI/frontend/dist"
 STATIC_DIR = "C:\\Users\\simon\\GOAT_AI\\frontend\\dist"
 ```
@@ -121,16 +121,16 @@ STATIC_DIR = "C:\\Users\\simon\\GOAT_AI\\frontend\\dist"
 
 - Every tunable value lives in `Settings` (env var) or a named constant in config / the relevant module.
 - Defaults must work on the A100 server out of the box.
-- Port numbers, base URLs, timeouts, size limits — all env vars with documented defaults.
+- Port numbers, base URLs, timeouts, size limits - all env vars with documented defaults.
 
 ### 1.7 Module Structure (Python backend)
 
 ```
 backend/
-├── main.py              # App factory: create_app() → FastAPI; mounts static, registers routers
+├── main.py              # App factory: create_app() -> FastAPI; mounts static, registers routers
 ├── config.py            # Settings wrapper; validated at startup/import boundary
 ├── types.py             # Re-exports `Settings` / `LLMClient` for router signatures (no direct `goat_ai` in routers)
-├── dependencies.py      # FastAPI Depends() factories (get_llm_client, get_tabular_context_extractor, …)
+├── dependencies.py      # FastAPI Depends() factories (get_llm_client, get_tabular_context_extractor, ...)
 ├── http_security.py       # API key + rate limit middleware
 ├── routers/
 │   ├── chat.py          # POST /api/chat  (SSE streaming)
@@ -151,13 +151,13 @@ backend/
 ### 1.8 Import layers (enforced)
 
 - **Mechanical check:** from the repo root, run `lint-imports` (config: `pyproject.toml`). CI runs this before pytest.
-- **Intent:** outer layers must not import inward-only modules (e.g. `goat_ai` never imports `backend`; `backend.services` must not import `backend.application` or `backend.routers`). Order is enforced in `pyproject.toml`: `main` → `routers` → `dependencies` → `exception_handlers` → **`application`** → `services` → `domain` → `models` → … → `goat_ai`. See [DEPENDENCY_GRAPH.md](DEPENDENCY_GRAPH.md) for the diagram and “current vs target” wiring.
+- **Intent:** outer layers must not import inward-only modules (e.g. `goat_ai` never imports `backend`; `backend.services` must not import `backend.application` or `backend.routers`). Order is enforced in `pyproject.toml`: `main` -> `routers` -> `dependencies` -> `exception_handlers` -> **`application`** -> `services` -> `domain` -> `models` -> ... -> `goat_ai`. See [DEPENDENCY_GRAPH.md](DEPENDENCY_GRAPH.md) for the diagram and "current vs target" wiring.
 - **Routers:** do not add direct `import goat_ai` / `from goat_ai` (use `backend.types` for shared type hints). `__tests__/test_router_direct_imports.py` also rejects direct `httpx` / `requests` / `pandas` / `openpyxl` in `backend/routers/`.
-- **Domain → HTTP:** `InferenceBackendUnavailable` (in `backend/services/exceptions.py`) is registered in `main` and maps to HTTP 503 for model listing endpoints; keep other routes using explicit `HTTPException` or the same pattern when you add more cross-cutting failures.
+- **Domain -> HTTP:** `InferenceBackendUnavailable` (in `backend/services/exceptions.py`) is registered in `main` and maps to HTTP 503 for model listing endpoints; keep other routes using explicit `HTTPException` or the same pattern when you add more cross-cutting failures.
 
 **Rules**:
 - `routers/` only: validate input, call service, return response.
-- **Never read `os.environ` inside request handlers** — use injected `Settings` / dependencies.
+- **Never read `os.environ` inside request handlers** - use injected `Settings` / dependencies.
 - `services/` only: orchestrate, no HTTP primitives.
 - **Tabular context for charts**: resolve upload-embedded tables through injectable `TabularContextExtractor` (`tabular_context.py`), not ad hoc regex scattered in orchestration.
 - **`log_service` imports:** under `backend/services/`, only `log_service.py` and `chat_runtime.py` may import `log_service` (enforced by `__tests__/test_architecture_boundaries.py`).
@@ -167,8 +167,8 @@ backend/
 
 ### 1.9 Ports and persisted session JSON
 
-- **Ports (injectable boundaries):** [PORTS.md](PORTS.md) — `SessionRepository`, `ConversationLogger`, `TitleGenerator`, `LLMClient`, telemetry hooks.
-- **Session blob format:** [SESSION_SCHEMA.md](SESSION_SCHEMA.md) — `SESSION_PAYLOAD_VERSION`, `build_session_payload` / `decode_session_payload`, legacy list vs dict.
+- **Ports (injectable boundaries):** [PORTS.md](PORTS.md) - `SessionRepository`, `ConversationLogger`, `TitleGenerator`, `LLMClient`, telemetry hooks.
+- **Session blob format:** [SESSION_SCHEMA.md](SESSION_SCHEMA.md) - `SESSION_PAYLOAD_VERSION`, `build_session_payload` / `decode_session_payload`, legacy list vs dict.
 
 ---
 
@@ -188,8 +188,8 @@ backend/
 ```
 
 - `strict: true` enables `strictNullChecks`, `noImplicitAny`, etc.
-- **No `any`** — use `unknown` and narrow it, or define a proper type.
-- **No `@ts-ignore`** — if you need it, fix the type.
+- **No `any`** - use `unknown` and narrow it, or define a proper type.
+- **No `@ts-ignore`** - if you need it, fix the type.
 
 ### 2.2 API Types
 
@@ -213,7 +213,7 @@ export interface ModelListResponse {
 }
 ```
 
-All API call functions live in `src/api/` — never `fetch()` directly inside a component or hook.
+All API call functions live in `src/api/` - never `fetch()` directly inside a component or hook.
 
 ```typescript
 // src/api/chat.ts
@@ -225,13 +225,13 @@ export async function* streamChat(req: ChatRequest): AsyncGenerator<string> {
 
 ### 2.3 Component Rules
 
-- **One responsibility per component** — `ChatWindow` only renders messages; `useChat` manages state; `streamChat` handles network.
-- **Props must be typed** — use `interface Props`, never `any`.
-- **No business logic inside JSX** — extract to hooks or utils.
-- **Error boundaries** — every async-boundary component must have an error boundary parent.
+- **One responsibility per component** - `ChatWindow` only renders messages; `useChat` manages state; `streamChat` handles network.
+- **Props must be typed** - use `interface Props`, never `any`.
+- **No business logic inside JSX** - extract to hooks or utils.
+- **Error boundaries** - every async-boundary component must have an error boundary parent.
 
 ```typescript
-// ✅ hook owns state, component owns rendering
+// hook owns state, component owns rendering
 function ChatWindow() {
   const { messages, sendMessage, isStreaming } = useChat();
   return <div>{ messages.map(m => <MessageBubble key={m.id} turn={m} />) }</div>;
@@ -241,7 +241,7 @@ function ChatWindow() {
 ### 2.4 Hooks
 
 - Custom hooks (`use*.ts`) live in `src/hooks/`.
-- Every hook returns a stable, typed object — not a tuple (unless exactly 2 items like `useState`).
+- Every hook returns a stable, typed object - not a tuple (unless exactly 2 items like `useState`).
 - Hooks must not import from `src/components/` (no circular dependency).
 
 ### 2.5 Module Structure (React frontend)
@@ -293,18 +293,18 @@ frontend/src/
 __tests__/
 ├── test_chat_service.py
 ├── test_upload_service.py
-├── integration/         # pytest marker `integration` — app + SQLite paths (keep total CI time in budget)
-└── …                    # mock Ollama at Protocol boundary
+├── integration/         # pytest marker `integration` - app + SQLite paths (keep total CI time in budget)
+└── ...                    # mock Ollama at Protocol boundary
 ```
 
 **Rules**:
-- Mock all I/O at the `Protocol` boundary — never hit real Ollama in unit tests.
+- Mock all I/O at the `Protocol` boundary - never hit real Ollama in unit tests.
 - Use `pytest.fixture` or `unittest` setup helpers for shared state; avoid module-level globals in tests.
 - Parametrize edge cases: empty message list, oversized upload, Ollama timeout.
 - Prefer deterministic synchronization over `time.sleep()`.
 
 ```python
-# ✅ inject a fake LLMClient — tests never need Ollama running
+# inject a fake LLMClient - tests never need Ollama running
 class FakeLLMClient:
     def list_models(self) -> list[str]:
         return ["llama3:latest"]
@@ -330,7 +330,7 @@ frontend/src/
 ```
 
 **Rules**:
-- Mock `fetch` with `vi.stubGlobal("fetch", ...)` — never hit the real server.
+- Mock `fetch` with `vi.stubGlobal("fetch", ...)` - never hit the real server.
 - Test hooks with `renderHook` from `@testing-library/react`.
 - Assert on accessible roles/text, not on CSS classes or DOM structure.
 
@@ -380,7 +380,7 @@ jobs:
 ### 4.2 Startup Validation Pattern
 
 ```python
-# backend/config.py — fail at import, not at first request
+# backend/config.py - fail at import, not at first request
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     settings = load_settings()
@@ -394,7 +394,7 @@ def get_settings() -> Settings:
 
 ### 4.3 React Build + Serve Pattern
 
-FastAPI serves the compiled React bundle — zero separate Node process in production:
+FastAPI serves the compiled React bundle - zero separate Node process in production:
 
 ```python
 # backend/main.py
@@ -421,13 +421,13 @@ def create_app() -> FastAPI:
 
 ## 5. API Design Rules
 
-- **SSE for streaming**, not WebSocket — simpler, works through more proxies, native `EventSource` in browser.
-- **Charts:** backend compiles `ChartIntentV2` → `ChartSpecV2` / ECharts options; models must not emit raw chart-library JSON. If the model does not report native tool support, keep chart rendering **disabled** (no pseudo chart markup fallback).
-- Every endpoint returns a typed Pydantic response model — never `dict` or `Response(content=...)` unless it's a stream.
-- Use `Depends()` for all cross-cutting concerns (auth, settings, LLM client) — no global state.
-- Prefix all API routes with `/api/` — frontend SPA handles everything else.
+- **SSE for streaming**, not WebSocket - simpler, works through more proxies, native `EventSource` in browser.
+- **Charts:** backend compiles `ChartIntentV2` -> `ChartSpecV2` / ECharts options; models must not emit raw chart-library JSON. If the model does not report native tool support, keep chart rendering **disabled** (no pseudo chart markup fallback).
+- Every endpoint returns a typed Pydantic response model - never `dict` or `Response(content=...)` unless it's a stream.
+- Use `Depends()` for all cross-cutting concerns (auth, settings, LLM client) - no global state.
+- Prefix all API routes with `/api/` - frontend SPA handles everything else.
 - HTTP status codes: `200` success, `400` bad input, `422` validation, `503` backend unavailable, `500` unexpected.
-- Never expose internal error messages to the client — log them, return a sanitized string.
+- Never expose internal error messages to the client - log them, return a sanitized string.
 
 ---
 
@@ -436,7 +436,7 @@ def create_app() -> FastAPI:
 ### Python
 
 ```
-# requirements.txt — exact pins, grouped
+# requirements.txt - exact pins, grouped
 # Web framework
 fastapi==0.135.2
 uvicorn[standard]==0.35.0
@@ -458,12 +458,12 @@ httpx==0.x           # FastAPI TestClient support
 ```
 
 - Keep `requirements.txt` as the install source of truth used in deploy and CI.
-- Run `pip install -r requirements.txt` in CI — never `pip install package` ad-hoc.
+- Run `pip install -r requirements.txt` in CI - never `pip install package` ad-hoc.
 
 ### Node / npm
 
 - Commit `package-lock.json`.
-- Use `npm ci` in CI and deploy — never `npm install` (which can change the lock).
+- Use `npm ci` in CI and deploy - never `npm install` (which can change the lock).
 - Add `.nvmrc` with content `24.14.1` so `nvm use` picks the right version automatically.
 - Dev dependencies in `devDependencies`; runtime dependencies in `dependencies`.
 
@@ -501,8 +501,8 @@ Before every commit ask:
 | Item | Value |
 |------|--------|
 | Repo | `GOAT_AI` |
-| Supported environments | **Windows, macOS, Linux** for development; Linux or containerized hosts for production—**not** limited to one campus image (see `README.md` **Environments**) |
-| Example reference deployment | Unprivileged shared Linux with GPU (e.g. A100) + Ollama + reverse proxy—one real ops profile, not a global requirement |
+| Supported environments | **Windows, macOS, Linux** for development; Linux or containerized hosts for production-**not** limited to one campus image (see `README.md` **Environments**) |
+| Example reference deployment | Unprivileged shared Linux with GPU (e.g. A100) + Ollama + reverse proxy-one real ops profile, not a global requirement |
 | App shape | FastAPI backend serving a React SPA |
 | Default bind port | `62606` (`GOAT_SERVER_PORT`; override per environment) |
 | Frontend build | Vite |
@@ -533,22 +533,23 @@ Before every commit ask:
 
 ## 12. Documentation update rules
 
-- **Language** — All prose in **`docs/`** and **`README.md`** must be **English**. Do not commit Chinese or other non-English text in those paths.
-- **RAG quality (§14.7)** — Changes to retrieval/rerank/rewrite logic or `evaldata/rag_eval_cases.jsonl` must keep `python -m tools.run_rag_eval` green; document golden-set updates in `evaldata/README.md` / `evaldata/VERSION`. Operational knobs: [OPERATIONS.md](OPERATIONS.md) **RAG retrieval quality**.
+- **Language** - All prose in **`docs/`** and **`README.md`** must be **English**. Do not commit Chinese or other non-English text in those paths.
+- **Encoding** - Keep prose UTF-8 and ASCII-safe where practical. Avoid mojibake, replacement characters, and other glyphs that do not render cleanly in shell logs or CI output. The repo root `.editorconfig` must declare `charset = utf-8` so editors do not reintroduce BOM headers.
+- **RAG quality (Section 14.7)** - Changes to retrieval/rerank/rewrite logic or `evaldata/rag_eval_cases.jsonl` must keep `python -m tools.run_rag_eval` green; document golden-set updates in `evaldata/README.md` / `evaldata/VERSION`. Operational knobs: [OPERATIONS.md](OPERATIONS.md) **RAG retrieval quality**.
 
 When behavior changes, update:
 
-- `docs/DOMAIN.md` — ubiquitous terms and user-visible semantics (Phase 15.1); required when chat/chart/safeguard meaning changes
-- `docs/SESSION_SCHEMA.md` — when `SESSION_PAYLOAD_VERSION` or persisted session JSON shape changes
-- `docs/PORTS.md` / `docs/DEPENDENCY_GRAPH.md` — when injectable ports or layer import rules change
-- `README.md` — architecture, structure, or developer workflow
-- `docs/openapi.json` — committed OpenAPI from FastAPI (`backend.main:app`)
-- `docs/api.llm.yaml` — regenerate via `python -m tools.generate_llm_api_yaml` (from repository root)
-- `docs/API_REFERENCE.md` — human-readable endpoint reference
-- `docs/OPERATIONS.md` — env vars, deploy, startup, host operations
-- `docs/PROJECT_STATUS.md` — current shipped state
-- `docs/ROADMAP.md` — phase completion and future work
-- Optional / capability-gated features — follow **§15**; update **`.env.example`** and **`docs/OPERATIONS.md`** for new `GOAT_*` flags
+- `docs/DOMAIN.md` - ubiquitous terms and user-visible semantics (Phase 15.1); required when chat/chart/safeguard meaning changes
+- `docs/SESSION_SCHEMA.md` - when `SESSION_PAYLOAD_VERSION` or persisted session JSON shape changes
+- `docs/PORTS.md` / `docs/DEPENDENCY_GRAPH.md` - when injectable ports or layer import rules change
+- `README.md` - architecture, structure, or developer workflow
+- `docs/openapi.json` - committed OpenAPI from FastAPI (`backend.main:app`)
+- `docs/api.llm.yaml` - regenerate via `python -m tools.generate_llm_api_yaml` (from repository root)
+- `docs/API_REFERENCE.md` - human-readable endpoint reference
+- `docs/OPERATIONS.md` - env vars, deploy, startup, host operations
+- `docs/PROJECT_STATUS.md` - current shipped state
+- `docs/ROADMAP.md` - phase completion and future work
+- Optional / capability-gated features - follow **Section 15**; update **`.env.example`** and **`docs/OPERATIONS.md`** for new `GOAT_*` flags
 
 ---
 
@@ -580,13 +581,13 @@ Industrial-grade **feature on/off (including authorization and runtime capabilit
 | **Authorization / policy** | Whether **this user, role, or tenant** is **allowed** to use the feature | API key scope, session ownership, RBAC | `{ policy_allowed, deny_reason }`; denial tends toward **403** |
 | **Capability / runtime** | Whether **deployment policy, Docker, GPU, sandbox, external deps** are **ready right now** | `GOAT_*`, socket probes, `/api/ready`-style checks | `{ effective_enabled, deny_reason }`; denial tends toward **503** |
 
-Both can look like **`{ enabled, reason }`, but the semantics differ**: Docker socket probes and operator kill-switches are **runtime / feature availability**, not the same meaning as **“permission”** in the AuthZ sense. This repo’s AuthZ roadmap is in `docs/ROADMAP.md` Phase 15; **readiness** and **`/api/ready`** have their own semantics—do not mix them with feature gates in documentation.
+Both can look like **`{ enabled, reason }`, but the semantics differ**: Docker socket probes and operator kill-switches are **runtime / feature availability**, not the same meaning as **"permission"** in the AuthZ sense. This repo’s AuthZ roadmap is in `docs/ROADMAP.md` Phase 15; **readiness** and **`/api/ready`** have their own semantics-do not mix them with feature gates in documentation.
 
 ### 15.2 HTTP semantics and stable `code` (avoid implementation drift)
 
-- **`403 Forbidden`** — The **caller is not authorized** to use this feature (policy / AuthZ denial).
-- **`503 Service Unavailable`** — The feature is **not available on this deployment/runtime**, or a **dependency is not ready** (runtime / capability / operator-disabled capability that applies to the whole deployment).
-- **`422` / `409`** — Use only in the **few** cases where the request is **well-formed but conflicts with current **feature state**; do **not** overuse them.
+- **`403 Forbidden`** - The **caller is not authorized** to use this feature (policy / AuthZ denial).
+- **`503 Service Unavailable`** - The feature is **not available on this deployment/runtime**, or a **dependency is not ready** (runtime / capability / operator-disabled capability that applies to the whole deployment).
+- **`422` / `409`** - Use only in the **few** cases where the request is **well-formed but conflicts with current **feature state**; do **not** overuse them.
 - Stay consistent with global readiness: behaviors such as **`/api/ready`** when a global dependency is down remain **503** per existing rules.
 
 Routes must **translate** the service’s gate decision into the HTTP semantics and **`code`** above (see `docs/API_ERRORS.md`), e.g. **`FEATURE_DISABLED`** (403) vs **`FEATURE_UNAVAILABLE`** (503).
@@ -598,15 +599,16 @@ Routes must **translate** the service’s gate decision into the HTTP semantics 
 
 ### 15.4 Five layers (not frontend-only)
 
-1. **Configuration (startup)** — Express whether the **deployment policy allows** the feature via `GOAT_*` and related env vars; **fail fast** in `load_settings()` on contradictory combinations (e.g. sandbox enabled in config but required paths missing when you enforce strict validation).
-2. **Runtime probing** — At startup or first use, probe Docker socket / runtime dependencies for **actual availability**, producing **`effective_enabled`** and an **enumerated `deny_reason`**; do not return raw exception strings to clients.
+1. **Configuration (startup)** - Express whether the **deployment policy allows** the feature via `GOAT_*` and related env vars; **fail fast** in `load_settings()` on contradictory combinations (e.g. sandbox enabled in config but required paths missing when you enforce strict validation).
+2. **Runtime probing** - At startup or first use, probe Docker socket / runtime dependencies for **actual availability**, producing **`effective_enabled`** and an **enumerated `deny_reason`**; do not return raw exception strings to clients.
 3. **Three enforcement layers**
-   - **Service** — **Single place** to validate before any side effect (spawn process, disk, outbound network); this is the **primary enforcement** point.
-   - **Route** — Map gate decisions to stable HTTP semantics and **`code`**. **Not authorized → 403**; **dependency not ready / feature unavailable on this deployment → 503**.
-   - **Frontend** — Consumes public **capability / feature** payloads for UI only; this is **UX**, **not** a security boundary.
-4. **API contract** — Expose stable shapes via **`GET /api/system/features`** (or equivalent); schema changes must stay in sync with **OpenAPI** and the **black-box contract**.
-5. **Observability and tests** — Add metrics such as `feature_gate_denials_total{feature,reason}`; cover contradictory config, missing deps, policy denial, and closed-feature status codes in a **test matrix**, with black-box assertions.
+   - **Service** - **Single place** to validate before any side effect (spawn process, disk, outbound network); this is the **primary enforcement** point.
+   - **Route** - Map gate decisions to stable HTTP semantics and **`code`**. **Not authorized -> 403**; **dependency not ready / feature unavailable on this deployment -> 503**.
+   - **Frontend** - Consumes public **capability / feature** payloads for UI only; this is **UX**, **not** a security boundary.
+4. **API contract** - Expose stable shapes via **`GET /api/system/features`** (or equivalent); schema changes must stay in sync with **OpenAPI** and the **black-box contract**.
+5. **Observability and tests** - Add metrics such as `feature_gate_denials_total{feature,reason}`; cover contradictory config, missing deps, policy denial, and closed-feature status codes in a **test matrix**, with black-box assertions.
 
 ### 15.5 Documentation and operations
 
 - Document each **`GOAT_*` flag in **`.env.example`** and **`docs/OPERATIONS.md`**, including whether it is **runtime vs policy** when that distinction matters.
+

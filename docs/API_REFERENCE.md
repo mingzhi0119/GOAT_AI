@@ -63,7 +63,7 @@ Returns JSON `{ "ready": boolean, "checks": { ... } }`. HTTP `503` when any requ
 
 ## `GET /api/system/metrics`
 
-Returns Prometheus exposition text (`text/plain`). Requires `X-GOAT-API-Key` when `GOAT_API_KEY` is set. Includes `http_requests_total`, `http_request_duration_seconds`, `chat_stream_completed_total`, `ollama_errors_total`, `sqlite_log_write_failures_total`, `feature_gate_denials_total` (when any), and **§14.7** retrieval counters: `knowledge_retrieval_requests_total{retrieval_profile,outcome}` and `knowledge_query_rewrite_applied_total{retrieval_profile}`.
+Returns Prometheus exposition text (`text/plain`). Requires `X-GOAT-API-Key` when `GOAT_API_KEY` is set. Includes `http_requests_total`, `http_request_duration_seconds`, `chat_stream_completed_total`, `ollama_errors_total`, `sqlite_log_write_failures_total`, `feature_gate_denials_total` (when any), and **Section 14.7** retrieval counters: `knowledge_retrieval_requests_total{retrieval_profile,outcome}` and `knowledge_query_rewrite_applied_total{retrieval_profile}`.
 
 ## `GET /api/models`
 
@@ -411,7 +411,7 @@ Returns deploy target resolution information:
 
 ## `GET /api/system/features`
 
-Returns machine-readable flags for optional high-risk features (see `docs/ENGINEERING_STANDARDS.md` §15). Example:
+Returns machine-readable flags for optional high-risk features (see `docs/ENGINEERING_STANDARDS.md` Section 15). Example:
 
 ```json
 {
@@ -438,3 +438,4 @@ For machine-readable contract details, prefer:
 - [openapi.json](openapi.json)
 - [api.llm.yaml](api.llm.yaml)
 - `__tests__/test_api_blackbox_contract.py`
+

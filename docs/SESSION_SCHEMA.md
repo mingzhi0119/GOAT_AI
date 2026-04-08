@@ -29,8 +29,8 @@ New snapshots are built with `build_session_payload()` and persist as a **JSON o
 
 Older rows may store **`messages` as a JSON array** (not wrapped in a versioned object). That list uses **role-tagged pseudo-messages**, including:
 
-- `__chart__` — chart JSON embedded as content.
-- `__file_context__` / `__file_context_ack__` — file context and acknowledgements.
+- `__chart__` - chart JSON embedded as content.
+- `__file_context__` / `__file_context_ack__` - file context and acknowledgements.
 
 `decode_session_payload()` detects `list` vs `dict` and normalizes to the same `DecodedSessionPayload` abstraction.
 
@@ -40,7 +40,7 @@ Older rows may store **`messages` as a JSON array** (not wrapped in a versioned 
 - Changing how real chat turns are represented in `messages` (e.g. new required roles or structures).
 - Incompatible changes to `chart_spec` or knowledge document embedding.
 
-Cosmetic or backward-compatible additions (optional fields ignored by older readers) may not require a bump if all readers tolerate unknown keys—still prefer a version bump when in doubt.
+Cosmetic or backward-compatible additions (optional fields ignored by older readers) may not require a bump if all readers tolerate unknown keys-still prefer a version bump when in doubt.
 
 ## Related docs
 
@@ -51,3 +51,4 @@ Cosmetic or backward-compatible additions (optional fields ignored by older read
 ## Integration test time budget (Phase 15.3)
 
 Backend CI runs `pytest` over `__tests__/` including **`integration`**-marked tests. Keep the **integration slice** small enough that the full backend test job stays **under ~30 seconds** on CI; if the suite grows, split with `pytest -m "not integration"` vs `-m integration` (see `pytest.ini`).
+

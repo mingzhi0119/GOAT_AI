@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# GOAT AI 閳?production deploy (FastAPI + React on :62606)
+# GOAT AI production deploy (FastAPI + React on :62606)
 # Usage:
 #   bash deploy.sh                   # full deploy from current local working tree
 #   QUICK=1 bash deploy.sh           # quick restart: skip pip install
 #   SKIP_BUILD=1 bash deploy.sh      # skip npm build (use existing dist/)
-#   SYNC_GIT=1 bash deploy.sh        # optional: reset to origin/$GIT_BRANCH before deploy
+#   SYNC_GIT=1 bash deploy.sh        # optionally reset to origin/$GIT_BRANCH before deploy
 #   GIT_REF=<ref> bash deploy.sh     # deploy a specific branch, tag, or commit
 #
-# Override any variable before running, e.g.:
+# Override any variable before running, for example:
 #   GOAT_SERVER_PORT=62606 bash deploy.sh
 
 _DEPLOY_SCRIPT="${BASH_SOURCE[0]:-$0}"
@@ -18,7 +18,6 @@ unset _DEPLOY_SCRIPT
 
 set -euo pipefail
 
-# 閳光偓閳光偓 Configuration 閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓
 REPO_URL="${REPO_URL:-https://github.com/mingzhi0119/GOAT_AI.git}"
 PROJECT_DIR="${PROJECT_DIR:-$HOME/GOAT_AI}"
 GIT_BRANCH="${GIT_BRANCH:-main}"
@@ -34,9 +33,8 @@ SKIP_BUILD="${SKIP_BUILD:-0}"
 QUICK="${QUICK:-0}"
 SYNC_GIT="${SYNC_GIT:-0}"
 
-echo "棣冩礈閿? GOAT AI 閳?Deploy starting (branch: ${GIT_BRANCH}, ref: ${GIT_REF})${QUICK:+ [QUICK mode]}"
+echo "GOAT AI deploy starting (branch: ${GIT_BRANCH}, ref: ${GIT_REF})${QUICK:+ [QUICK mode]}"
 
-# 閳光偓閳光偓 Helper: free a TCP port 閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓
 free_port() {
   local p="$1"
   if command -v fuser >/dev/null 2>&1; then
@@ -51,7 +49,7 @@ free_port() {
 
 healthcheck_port() {
   local p="$1"
-  for i in {1..15}; do
+  for _ in {1..15}; do
     if curl -sf "http://127.0.0.1:${p}/api/health" >/dev/null 2>&1; then
       return 0
     fi
@@ -72,7 +70,6 @@ wait_for_pid_exit() {
   return 1
 }
 
-# 閳光偓閳光偓 Helper: stop process from pidfile if alive 閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓
 stop_pidfile() {
   local pidfile="$1"
   if [ -f "$pidfile" ]; then
@@ -81,7 +78,7 @@ stop_pidfile() {
     if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
       kill "$old_pid" 2>/dev/null || true
       if ! wait_for_pid_exit "$old_pid" 30; then
-        echo "閳跨媴绗? Graceful shutdown timed out for PID ${old_pid}; forcing cleanup."
+        echo "Graceful shutdown timed out for PID ${old_pid}; forcing cleanup."
         kill -9 "$old_pid" 2>/dev/null || true
       fi
     fi
@@ -89,7 +86,7 @@ stop_pidfile() {
   fi
 }
 
-# 閳光偓閳光偓 1. Project checkout 閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓
+echo "1. Project checkout"
 if [ ! -d "${PROJECT_DIR}/.git" ]; then
   echo "Cloning repository"
   git clone "$REPO_URL" "$PROJECT_DIR"
@@ -102,16 +99,16 @@ if [ "${SYNC_GIT}" = "1" ]; then
   echo "Syncing to origin/${GIT_BRANCH}"
   git fetch --all --prune
   git reset --hard "origin/${GIT_BRANCH}"
-  echo "閴?Repository synced to origin/${GIT_BRANCH}."
+  echo "Repository synced to origin/${GIT_BRANCH}"
 else
-  echo "棣冩惙 Deploying current local checkout on ${GIT_BRANCH} (SYNC_GIT=0)."
+  echo "Deploying current local checkout on ${GIT_BRANCH} (SYNC_GIT=0)"
 fi
 
-# 閳光偓閳光偓 2. Python virtualenv + deps (skipped in QUICK mode) 閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓
+echo "2. Python virtualenv and dependencies"
 if [ "${QUICK}" = "1" ]; then
-  echo "閳?[QUICK] Skipping Python venv / pip install."
+  echo "[QUICK] Skipping Python venv and pip install"
   if [ ! -x "${VENV_DIR}/bin/python" ]; then
-    echo "閴?Venv not found at ${VENV_DIR}. Run a full deploy first."
+    echo "Venv not found at ${VENV_DIR}. Run a full deploy first."
     exit 1
   fi
 else
@@ -123,23 +120,22 @@ else
   echo "Installing Python dependencies"
   "${VENV_DIR}/bin/pip" install --upgrade pip --quiet
   "${VENV_DIR}/bin/pip" install -r requirements.txt --quiet
-  echo "閴?Python deps installed."
+  echo "Python dependencies installed"
 fi
 
-# 閳光偓閳光偓 3. Node / npm deps + React build 閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓
+echo "3. Node dependencies and React build"
 FRONTEND_DIR="${PROJECT_DIR}/frontend"
-
 if [ "${SKIP_BUILD}" = "1" ] && [ -d "${FRONTEND_DIR}/dist" ]; then
-  echo "閳?Skipping npm build (SKIP_BUILD=1, dist/ exists)."
+  echo "Skipping npm build (SKIP_BUILD=1, dist/ exists)"
 else
   echo "Installing Node dependencies (npm ci)"
   (cd "$FRONTEND_DIR" && npm ci --silent)
   echo "Building React frontend"
   (cd "$FRONTEND_DIR" && npm run build)
-  echo "閴?Frontend built 閳?${FRONTEND_DIR}/dist/"
+  echo "Frontend built at ${FRONTEND_DIR}/dist/"
 fi
 
-# 閳光偓閳光偓 4. Start FastAPI (uvicorn) on PORT_API 閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓
+echo "4. Start FastAPI on port ${SERVER_PORT}"
 LOGS_DIR="${PROJECT_DIR}/logs"
 mkdir -p "${LOGS_DIR}"
 API_LOG="${LOGS_DIR}/fastapi.log"
@@ -156,7 +152,7 @@ _goat_systemd_restart() {
     echo "Restarting FastAPI via systemd (${unit})"
     systemctl --user restart "$unit"
     sleep 2
-    echo "   MainPID: $(systemctl --user show "$unit" --property=MainPID --value 2>/dev/null || echo '?')"
+    echo "MainPID: $(systemctl --user show "$unit" --property=MainPID --value 2>/dev/null || echo '?')"
     return 0
   fi
   return 1
@@ -169,7 +165,7 @@ if _goat_systemd_restart goat-ai; then
   SYSTEMD_USED=1
   echo "Waiting for FastAPI on ${SELECTED_PORT} via systemd"
   if ! healthcheck_port "${SELECTED_PORT}"; then
-    echo "閳跨媴绗?systemd target ${SELECTED_PORT} did not become healthy; falling back to nohup target resolution."
+    echo "systemd target ${SELECTED_PORT} did not become healthy; falling back to nohup."
     systemctl --user stop goat-ai 2>/dev/null || true
     SYSTEMD_USED=0
     SELECTED_PORT=""
@@ -179,7 +175,6 @@ fi
 if [ "${SYSTEMD_USED}" != "1" ]; then
   echo "Freeing port ${SERVER_PORT}"
   free_port "${SERVER_PORT}"
-  # 閳光偓閳光偓 nohup fallback (works without systemd setup) 閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓
   echo "Starting FastAPI on 0.0.0.0:${SERVER_PORT} (log: ${API_LOG})"
   GOAT_PORT="${SERVER_PORT}" nohup "${VENV_DIR}/bin/python" -m uvicorn server:app \
     --host 0.0.0.0 \
@@ -187,40 +182,36 @@ if [ "${SYSTEMD_USED}" != "1" ]; then
     --workers 2 \
     >> "$API_LOG" 2>&1 &
   echo $! > "$API_PID"
-  echo "   PID: $(cat "$API_PID")"
+  echo "PID: $(cat "$API_PID")"
 
   echo "Waiting for FastAPI on ${SERVER_PORT}"
   if healthcheck_port "${SERVER_PORT}"; then
     SELECTED_PORT="${SERVER_PORT}"
-    echo "閴?FastAPI health OK on ${SERVER_PORT}."
+    echo "FastAPI health OK on ${SERVER_PORT}"
   else
     stop_pidfile "$API_PID"
-    echo "閴?FastAPI did not become healthy on ${SERVER_PORT}. Check ${API_LOG}"
+    echo "FastAPI did not become healthy on ${SERVER_PORT}. Check ${API_LOG}"
     exit 1
   fi
 fi
 
-# 閳光偓閳光偓 5. Health check 閳?FastAPI 閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓
 if [ -z "${SELECTED_PORT}" ]; then
-  echo "閴?FastAPI did not become healthy on ${SERVER_PORT}. Check ${API_LOG}"
+  echo "FastAPI did not become healthy on ${SERVER_PORT}. Check ${API_LOG}"
   exit 1
 fi
 
-echo "棣冃?Running post-deploy contract checks..."
+echo "5. Post-deploy checks"
+echo "Running post-deploy contract checks..."
 if ! "${VENV_DIR}/bin/python" "${PROJECT_DIR}/scripts/post_deploy_check.py" --base-url "http://127.0.0.1:${SELECTED_PORT}"; then
-  echo "閴?Post-deploy contract checks failed."
+  echo "Post-deploy contract checks failed."
   exit 1
 fi
 
-# 閳光偓閳光偓 6. Summary 閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓
 echo ""
-echo "閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜"
-echo "  GOAT AI 閳?Deployment Complete"
-echo "閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜"
+echo "Deployment complete"
+echo "React UI:   https://ai.simonbb.com/mingzhi/"
+echo "API health: http://127.0.0.1:${SELECTED_PORT}/api/health"
 echo ""
-echo "  棣冨 React UI  閳?https://ai.simonbb.com/mingzhi/"
-echo "  棣冩敳 API health閳?http://127.0.0.1:${SELECTED_PORT}/api/health"
-echo ""
-echo "  棣冩惈 FastAPI log:  tail -f ${API_LOG}"
-echo "  棣冩磧 Stop:         kill \$(cat ${API_PID})"
+echo "FastAPI log: tail -f ${API_LOG}"
+echo "Stop:        kill \$(cat ${API_PID})"
 echo ""

@@ -1,4 +1,4 @@
-# Enforce LF on all text files — prevents CRLF issues between Windows dev and Linux server
+# Enforce LF on all text files - prevents CRLF issues between Windows dev and Linux server
 * text=auto eol=lf
 *.bat text eol=crlf
 *.cmd text eol=crlf

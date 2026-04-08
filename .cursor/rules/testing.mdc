@@ -1,5 +1,5 @@
 ---
-description: Python and TypeScript testing — boundaries, mocks, runners (docs/ENGINEERING_STANDARDS.md §3)
+description: Python and TypeScript testing boundaries, mocks, and runners aligned with docs/ENGINEERING_STANDARDS.md
 globs: __tests__/**,**/__tests__/**,**/*.test.*,**/conftest.py
 alwaysApply: false
 ---
@@ -9,22 +9,23 @@ alwaysApply: false
 ## Python
 
 - Tests live in `__tests__/`.
-- Mock at the **protocol** boundary; unit tests do not hit real Ollama.
-- Prefer fixtures / shared setup over global mutable state in test files.
+- Mock at the protocol boundary; unit tests do not hit real Ollama.
+- Prefer fixtures and shared setup over global mutable state in test files.
 - Cover happy path and edge cases.
-- Do **not** use `time.sleep()` in tests — use async-aware patterns where needed.
+- Do not use `time.sleep()` in tests; use async-aware patterns where needed.
 
 **Common commands:**
 
 - `python -m unittest discover -s __tests__ -p "test_*.py" -v`
-- Targeted: `python -m pytest ...` (same mocking discipline)
+- Targeted: `python -m pytest ...` with the same mocking discipline
 
-**Example (fake at LLM boundary):**
+**Example fake at the LLM boundary:**
 
 ```python
 class FakeLLMClient:
     def list_model_names(self) -> list[str]:
         return ["llama3:latest"]
+
     def stream_tokens(
         self, model: str, messages: list[ChatTurn], system_prompt: str
     ) -> Generator[str, None, None]:
@@ -34,8 +35,8 @@ class FakeLLMClient:
 
 ## TypeScript
 
-- **Vitest** and **React Testing Library**.
-- Mock `fetch` — never hit the live backend in unit tests.
+- Use Vitest and React Testing Library.
+- Mock `fetch`; never hit the live backend in unit tests.
 - Assert behavior and user-visible output, not CSS implementation details.
 
 ```typescript
@@ -43,7 +44,7 @@ vi.stubGlobal("fetch", vi.fn().mockResolvedValue(...));
 const { result } = renderHook(() => useChat());
 ```
 
-## CI reference (versions)
+## CI reference
 
-- Python **3.12** (match backend target).
-- Node **24** (match server/CI per `.nvmrc` / docs/ENGINEERING_STANDARDS.md).
+- Python 3.12 (match backend target).
+- Node 24 (match server and CI).

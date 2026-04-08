@@ -8,7 +8,7 @@ This document names **user-visible and persistence concepts** shared across chat
 |------|---------|
 | **Session** | One saved conversation (SQLite row) keyed by `session_id`, with versioned JSON payload. |
 | **Turn** | One logical exchange: user message(s) plus assistant reply in the live chat buffer; persisted as a snapshot after streaming completes. |
-| **Schema version** | `SESSION_PAYLOAD_VERSION` in `session_message_codec` — bump when stored JSON shape changes. Full field list: [SESSION_SCHEMA.md](SESSION_SCHEMA.md). |
+| **Schema version** | `SESSION_PAYLOAD_VERSION` in `session_message_codec` - bump when stored JSON shape changes. Full field list: [SESSION_SCHEMA.md](SESSION_SCHEMA.md). |
 
 ## Chat content
 
@@ -30,10 +30,11 @@ This document names **user-visible and persistence concepts** shared across chat
 
 | Term | Meaning |
 |------|---------|
-| **SafeguardAssessment** | `allowed` / `reason_code` / `stage` — output of **safeguard policy** (`backend.domain.safeguard_policy`) on combined user+system text (input) or assistant text (output). |
+| **SafeguardAssessment** | `allowed` / `reason_code` / `stage` - output of **safeguard policy** (`backend.domain.safeguard_policy`) on combined user+system text (input) or assistant text (output). |
 | **Policy refusal** | Fixed refusal copy + blocked title when input or streaming output fails policy. |
 
 ## PR checklist (user-visible behavior)
 
 - [ ] Updated this file if any term above changed meaning, or added a new ubiquitous term.
 - [ ] Contract artifacts (`docs/openapi.json`, `docs/api.llm.yaml`) regenerated if HTTP schemas changed.
+

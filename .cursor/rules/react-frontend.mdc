@@ -1,55 +1,52 @@
 ---
-description: Strict TypeScript, React/hooks/api layers, SSE, charts, theme (docs/ENGINEERING_STANDARDS.md §2, §11)
+description: Strict TypeScript, React/hooks/api layers, SSE, charts, and theme aligned with docs/ENGINEERING_STANDARDS.md
 globs: **/*.{ts,tsx}
 alwaysApply: false
 ---
 
 # React / TypeScript standards
 
-## TypeScript (required)
+## TypeScript
 
-`tsconfig.json`: `strict: true`, `noUncheckedIndexedAccess: true`, `noImplicitReturns: true`.
-
-- No `any` — use `unknown` and narrow, or define a proper type.
-- No `@ts-ignore` — fix the type.
+- `tsconfig.json` must include `strict: true`, `noUncheckedIndexedAccess: true`, and `noImplicitReturns: true`.
+- No `any`; use `unknown` and narrow it, or define a proper type.
+- No `@ts-ignore`; fix the type.
 
 ## API layer
 
-- All network calls live in `frontend/src/api/*.ts` — not inside components for ad-hoc fetches.
-- Shared types belong with the API layer; keep backend shapes consistent.
+- All network calls live in `frontend/src/api/*.ts`; do not place ad hoc fetches inside components.
+- Shared types belong with the API layer and should match backend shapes.
 
 ```typescript
-// ✅ api layer owns network
 export async function* streamChat(req: ChatRequest): AsyncGenerator<string> { ... }
 
-// ❌ fetch inside a component
 const resp = await fetch("/api/chat", ...);
 ```
 
 ## Components and hooks
 
-- Components: render UI; avoid business logic in JSX.
-- Hooks: own client-side behavior/state in `frontend/src/hooks/`.
-- Hooks return **typed objects**, not wide positional tuples (except trivial two-value cases if already established).
-- Hooks **must not** import from `src/components/` (avoids circular deps).
+- Components render UI; avoid business logic in JSX.
+- Hooks own client-side behavior and state in `frontend/src/hooks/`.
+- Hooks return typed objects, not wide positional tuples except for trivial established cases.
+- Hooks must not import from `src/components/`.
 - Use an error boundary around async-heavy UI sections.
 
-## Frontend architecture rules
+## Frontend architecture
 
 - `frontend/src/api/`: fetch wrappers and shared API types.
 - `frontend/src/hooks/`: stateful client logic.
 - `frontend/src/components/`: rendering.
-- **SSE** remains the streaming mechanism; do not replace with WebSocket without an explicit design decision.
-- Charts: **Apache ECharts**. Backend contract stays constrained: models emit `ChartIntentV2` via **native tool calling**; services compile to `ChartSpecV2` / ECharts `option`. Do not let models emit raw chart-library config.
-- If the selected Ollama model does not report native tool support, **disable** chart rendering — no fallback to pseudo chart markup.
+- SSE remains the streaming mechanism; do not replace it with WebSocket without an explicit design decision.
+- Charts use Apache ECharts. The backend contract stays constrained: models emit `ChartIntentV2` through native tool calling; services compile to `ChartSpecV2` / ECharts `option`. Do not let models emit raw chart-library config.
+- If the selected Ollama model does not report native tool support, disable chart rendering; do not fall back to pseudo chart markup.
 
 ## Theme rules
 
-- Light/dark via `.dark` on `<html>`.
+- Light and dark theme toggles use `.dark` on `<html>`.
 - Theme state persists in `localStorage` (`goat-ai-theme` in `useTheme.ts`; seed from `prefers-color-scheme` on first visit).
-- Global tokens: `frontend/src/styles/global.css` (`:root` + `.dark` overrides).
+- Global tokens live in `frontend/src/styles/global.css` (`:root` plus `.dark` overrides).
 
-## Module layout (reference)
+## Module layout
 
 ```
 frontend/src/

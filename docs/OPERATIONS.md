@@ -26,7 +26,7 @@ python3 -m uvicorn server:app --host 0.0.0.0 --port 62606 --reload
 
 **Repository tools:** run CLI modules from the **repository root** with `python -m tools.<module>` (for example `python -m tools.run_rag_eval`, `python -m tools.check_api_contract_sync`). This avoids setting `PYTHONPATH` manually; `.env` is for app runtime, not your shell.
 
-### SQLite schema migrations (Phase 13 §13.0)
+### SQLite schema migrations (Phase 13 Section 13.0)
 
 On startup, `log_service.init_db` runs **`backend/services/db_migrations.apply_migrations`**, which executes `backend/migrations/NNN_*.sql` in order and records each file's SHA-256 in the `schema_migrations` table. If a migration file changes after apply, the process **refuses to start** on checksum mismatch. Add new DDL only as a new numbered SQL file.
 
@@ -87,7 +87,7 @@ Many production installs match an **unprivileged** server (e.g. JupyterHub-style
 
 ### Other environments
 
-Self-managed VMs, Docker Compose, Kubernetes, or developer laptops use the same codebase with **env-driven** ports and paths. Features that need **strong isolation** (e.g. a future **code-execution sandbox**) must be **off** unless Docker (or an approved runtime) is available and explicitly enabled—see **`docs/ENGINEERING_STANDARDS.md` §15** and `README.md` **Capability-based / high-risk features**.
+Self-managed VMs, Docker Compose, Kubernetes, or developer laptops use the same codebase with **env-driven** ports and paths. Features that need **strong isolation** (e.g. a future **code-execution sandbox**) must be **off** unless Docker (or an approved runtime) is available and explicitly enabled-see **`docs/ENGINEERING_STANDARDS.md` Section 15** and `README.md` **Capability-based / high-risk features**.
 
 ## Key environment variables
 
@@ -130,7 +130,7 @@ Self-managed VMs, Docker Compose, Kubernetes, or developer laptops use the same 
 
 ### OpenTelemetry (optional, Phase 15.6)
 
-- Default **`GOAT_OTEL_ENABLED=0`** — tracing is off; the app does not eagerly import the OpenTelemetry SDK.
+- Default **`GOAT_OTEL_ENABLED=0`** - tracing is off; the app does not eagerly import the OpenTelemetry SDK.
 - Set **`GOAT_OTEL_ENABLED=1`** to enable a `TracerProvider`, W3C **`traceparent`** / **`tracestate`** extraction on incoming HTTP requests (`backend/otel_middleware.py`), and spans around Ollama HTTP calls in `goat_ai/ollama_client.py`.
 - **`GOAT_OTEL_EXPORTER`:** `console` (default) prints spans to stderr; `otlp` sends to **`OTEL_EXPORTER_OTLP_ENDPOINT`** (OTLP/HTTP traces URL, e.g. `http://127.0.0.1:4318/v1/traces`).
 - Standard OpenTelemetry env vars apply alongside the above (see OpenTelemetry Python docs for OTLP tuning).
@@ -189,15 +189,15 @@ curl -sS -H "X-GOAT-API-Key: $GOAT_API_KEY" http://127.0.0.1:62606/api/system/me
 | Control | Where | Behavior |
 |---------|--------|----------|
 | `GOAT_RAG_RERANK_MODE` | `passthrough` or `lexical` | For `retrieval_profile=default` only, selects vector order vs lexical overlap rerank after the vector stage (`goat_ai/config.py`). |
-| `retrieval_profile` | `POST /api/knowledge/search` body | `default` — uses `GOAT_RAG_RERANK_MODE`; `rag3_lexical` / `rag3_quality` — always lexical rerank; `rag3_quality` also enables conservative whitespace query rewrite before search. |
-| Vector similarity | Implementation | Scores are backend-specific; there is **no** global numeric score threshold in config—triage uses **hit vs miss** (see metrics) and eval cases. |
+| `retrieval_profile` | `POST /api/knowledge/search` body | `default` - uses `GOAT_RAG_RERANK_MODE`; `rag3_lexical` / `rag3_quality` - always lexical rerank; `rag3_quality` also enables conservative whitespace query rewrite before search. |
+| Vector similarity | Implementation | Scores are backend-specific; there is **no** global numeric score threshold in config-triage uses **hit vs miss** (see metrics) and eval cases. |
 
 **No-hit behavior:** search returns zero citations when nothing ranks above the empty list; `POST /api/knowledge/answers` returns the documented fixed sentence when no hits (after optional attached-document fallback).
 
 **Observability (`GET /api/system/metrics`):**
 
-- `knowledge_retrieval_requests_total{retrieval_profile="...",outcome="hit|miss"}` — one increment per `search_knowledge` execution.
-- `knowledge_query_rewrite_applied_total{retrieval_profile="..."}` — increments when conservative rewrite changed the query (`rag3_quality`).
+- `knowledge_retrieval_requests_total{retrieval_profile="...",outcome="hit|miss"}` - one increment per `search_knowledge` execution.
+- `knowledge_query_rewrite_applied_total{retrieval_profile="..."}` - increments when conservative rewrite changed the query (`rag3_quality`).
 
 **Golden set:** see [evaldata/README.md](../evaldata/README.md) and `evaldata/VERSION`.
 
@@ -316,3 +316,4 @@ Treat the following as operational stop signs during Phase 13 rollout work:
 
 For exact request and response details, use [API_REFERENCE.md](API_REFERENCE.md).  
 For current upload/API threat notes, use [SECURITY.md](SECURITY.md).
+

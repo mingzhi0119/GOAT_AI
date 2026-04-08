@@ -1,13 +1,13 @@
 ---
-description: Project direction, five non-negotiables, and cross-environment rules (aligned with docs/ENGINEERING_STANDARDS.md)
+description: Project direction, five non-negotiables, and cross-environment rules aligned with docs/ENGINEERING_STANDARDS.md
 alwaysApply: true
 ---
 
-# GOAT AI — Core principles
+# GOAT AI - Core principles
 
-Canonical engineering rules: **`docs/ENGINEERING_STANDARDS.md`**. Repo root `AGENTS.md` is a short index; keep `.cursor/rules/` aligned when standards change.
+Canonical engineering rules: `docs/ENGINEERING_STANDARDS.md`. Repo root `AGENTS.md` is a short index; keep `.cursor/rules/` aligned when standards change.
 
-## Purpose (why these rules exist)
+## Purpose
 
 - Preserve engineering standards and server constraints.
 - Stay aligned with architecture; avoid repeating deploy mistakes on the live host.
@@ -15,27 +15,29 @@ Canonical engineering rules: **`docs/ENGINEERING_STANDARDS.md`**. Repo root `AGE
 
 ## Core project direction
 
-- Stay engineering-grade: clear interfaces, typed boundaries, dependency injection; avoid tightly coupled feature code.
+- Stay engineering-grade: clear interfaces, typed boundaries, dependency injection, and no tightly coupled feature code.
 - Prefer maintainable structure over patchwork. If a change weakens boundaries, refactor before calling it done.
 
 ## Five non-negotiables
 
-1. **Fail fast, fail loud** — invalid config crashes at startup with a clear message, never silently at runtime.
-2. **Decouple by boundary** — HTTP handler → service → client. No business logic in route handlers.
-3. **Portable by default** — Windows (dev) and Ubuntu A100 (prod) without source edits.
-4. **Type everything** — every function signature carries types; untyped code is untestable code.
-5. **Test the boundary, mock the world** — unit tests own pure logic; integration tests are narrow and touch real I/O only where intended.
+1. Fail fast, fail loud: invalid config crashes at startup with a clear message, never silently at runtime.
+2. Decouple by boundary: HTTP handler -> service -> client. No business logic in route handlers.
+3. Portable by default: Windows dev and Ubuntu A100 prod without source edits.
+4. Type everything: every function signature carries types; untyped code is untestable code.
+5. Test the boundary, mock the world: unit tests own pure logic; integration tests are narrow and touch real I/O only where intended.
 
 ## Cross-environment rules
 
-- Paths: `pathlib.Path(__file__).parent / "sub"` — never hardcoded platform path strings.
-- Ports / URLs / secrets: env vars — never hardcode in source.
+- Paths: `pathlib.Path(__file__).parent / "sub"` - never hardcoded platform path strings.
+- Ports, URLs, and secrets: env vars - never hardcode them in source.
 - File I/O: always `encoding="utf-8"` on `open()`.
 - Line endings: `.gitattributes` enforces `eol=lf` where applicable.
-- Deps: exact pins in `requirements.txt`; `package-lock.json` committed; CI/deploy uses `npm ci`.
+- Deps: exact pins in `requirements.txt`; `package-lock.json` committed; CI and deploy use `npm ci`.
 - Secrets: `.env` gitignored; `.env.example` committed; never in scripts or source.
-- Startup: validate env/config at import or app factory time — `pydantic_settings.BaseSettings` for new services, or existing `goat_ai/config.py` `@dataclass` + `load_settings()`. Crash with a clear message at startup, never lazily on first request.
+- Startup: validate env/config at import or app factory time with `pydantic_settings.BaseSettings` for new services, or the existing `goat_ai/config.py` `@dataclass` + `load_settings()`. Crash with a clear message at startup, never lazily on first request.
 
 ## Documentation language
 
-- **`docs/`** and **`README.md`**: committed prose must be **English** only (see also `documentation-workflow.mdc` and `AGENTS.md`).
+- `docs/` and `README.md`: committed prose must be English only.
+- Keep docs UTF-8 without BOM.
+- Prefer ASCII-safe prose where practical, and avoid mojibake or replacement characters.

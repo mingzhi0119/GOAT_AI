@@ -28,5 +28,6 @@ A later phase may stop duplicating message text in JSON or make `session_message
 
 ## Related
 
-- [SESSION_SCHEMA.md](SESSION_SCHEMA.md) — versioned JSON shape.
-- [BACKUP_RESTORE.md](BACKUP_RESTORE.md) — SQLite backup discipline.
+- [SESSION_SCHEMA.md](SESSION_SCHEMA.md) - versioned JSON shape.
+- [BACKUP_RESTORE.md](BACKUP_RESTORE.md) - SQLite backup discipline.
+

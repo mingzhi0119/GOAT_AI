@@ -1,14 +1,16 @@
 ---
-description: When to update which docs, commit hygiene, and recovery notes (docs/ENGINEERING_STANDARDS.md §12–14)
+description: Docs update rules, commit hygiene, and recovery notes aligned with docs/ENGINEERING_STANDARDS.md
 globs: README.md,docs/**,AGENTS.md
 alwaysApply: false
 ---
 
-# GOAT AI — Documentation, commits, recovery
+# GOAT AI - Documentation, commits, recovery
 
 ## Documentation language
 
-- All prose under **`docs/`** and in **`README.md`** must be **English**. Do not commit Chinese or other non-English text in those paths.
+- All prose under `docs/` and in `README.md` must be English.
+- Keep docs UTF-8 without BOM.
+- Prefer ASCII-safe prose where practical, and avoid mojibake or replacement characters.
 
 ## Documentation update rules
 
@@ -29,14 +31,14 @@ Update docs when behavior changes:
 
 Before committing:
 
-- No `print()`, commented-out code, or hardcoded secrets/ports/paths
-- New functions typed (and one-line docstring where the repo expects it)
+- No `print()`, commented-out code, or hardcoded secrets, ports, or paths
+- New functions are typed and have one-line docstrings where the repo expects them
 - New logic has tests where practical
-- `requirements.txt` / `package-lock.json` updated if dependencies changed
-- Docs updated per the table above when user-facing or ops behavior changes
+- `requirements.txt` and `package-lock.json` are updated if dependencies changed
+- Docs are updated per the table above when user-facing or ops behavior changes
 
 ## Recovery notes
 
-- If work appears lost, check `git reflog` before assuming it is gone.
-- Be careful with `git reset --hard` on the server-hosted checkout.
-- Do not commit `.venv/`, PID files, SQLite runtime files, notebook checkpoints, or other machine-local artifacts.
+- If work appears lost, check `git reflog` before assuming it is gone
+- Be careful with `git reset --hard` on the server-hosted checkout
+- Do not commit `.venv/`, PID files, SQLite runtime files, notebook checkpoints, or other machine-local artifacts

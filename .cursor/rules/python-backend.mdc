@@ -1,58 +1,57 @@
 ---
-description: Python typing, Pydantic, logging, layered errors, and backend folder boundaries (docs/ENGINEERING_STANDARDS.md §1)
+description: Python typing, Pydantic, logging, layered errors, and backend folder boundaries aligned with docs/ENGINEERING_STANDARDS.md
 globs: **/*.py
 alwaysApply: false
 ---
 
 # Python backend standards
 
-## Types (mandatory)
+## Types
 
-- `from __future__ import annotations` at top of every file.
-- Every function/method fully annotated including return type.
-- `Protocol` for injectable dependencies when appropriate.
-- Structured data: `pydantic.BaseModel` or `dataclass` across boundaries — no loose dicts.
+- `from __future__ import annotations` at the top of every file.
+- Every function and method must be fully annotated, including return type.
+- Use `Protocol` for injectable dependencies when appropriate.
+- Structured data must cross boundaries as `pydantic.BaseModel` or `dataclass`; do not pass loose dicts.
 
 ```python
-# ✅
 def list_models(self) -> list[str]: ...
 
-# ❌ forbidden
-def list_models(self): ...
+def list_models(self):
+    ...
 ```
 
 ## Pydantic and config
 
-- FastAPI bodies: always `BaseModel` subclass.
-- Config: `pydantic_settings.BaseSettings` **or** `goat_ai/config.py` (`@dataclass` + `load_settings()`). Both validate at startup.
-- **Never** read `os.environ` inside request handlers.
-- Never parse raw `request.json()` dict in a handler.
+- FastAPI bodies: always `BaseModel` subclasses.
+- Config: `pydantic_settings.BaseSettings` or the existing `goat_ai/config.py` `@dataclass` + `load_settings()`. Both must validate at startup.
+- Never read `os.environ` inside request handlers.
+- Never parse raw `request.json()` dicts in a handler.
 
-## Error handling (layered)
+## Error handling
 
 | Layer | Rule |
 |-------|------|
-| Service/client | Raise domain exceptions (e.g. `OllamaUnavailable`). Never swallow. |
-| Route handler | Map domain exceptions → sanitized `HTTPException`. Log original at appropriate level. |
-| Startup | Invalid config → exit with clear message. |
+| Service/client | Raise domain exceptions such as `OllamaUnavailable`. Never swallow errors. |
+| Route handler | Map domain exceptions to sanitized `HTTPException` responses and log the original. |
+| Startup | Invalid config must exit with a clear message. |
 
 ## Logging
 
-- `logging.getLogger(__name__)` — never `print()`.
-- Configure once in `logging_config.py`; avoid `basicConfig` inside feature modules.
-- Do not log secrets, full uploads, or raw user prompts at INFO+.
+- Use `logging.getLogger(__name__)`; never `print()`.
+- Configure logging once in `logging_config.py`; avoid `basicConfig` in feature modules.
+- Do not log secrets, full uploads, or raw user prompts at INFO level or above.
 
-## Backend architecture rules
+## Backend architecture
 
-- `backend/routers/`: validate input, call services, return response.
+- `backend/routers/`: validate input, call services, return responses.
 - `backend/services/`: business logic.
 - `backend/models/`: Pydantic schemas only.
-- `goat_ai/`: shared code, **no FastAPI imports**.
+- `goat_ai/`: shared code, no FastAPI imports.
 - `backend/main.py`: app factory and startup wiring.
 
 Do not move business logic into route handlers.
 
-## Module layout (reference)
+## Module layout
 
 ```
 backend/
@@ -62,7 +61,7 @@ backend/
   routers/
   services/
   models/
-goat_ai/           # shared: clients, config, tools — no FastAPI
+goat_ai/           # shared: clients, config, tools; no FastAPI
   config.py
   exceptions.py
 ```

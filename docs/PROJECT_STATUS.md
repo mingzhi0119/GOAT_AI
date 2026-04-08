@@ -11,8 +11,8 @@ Last updated: 2026-04-09
 - **Phase 14.7 (RAG quality closure):** CI runs `python -m tools.run_rag_eval` on every backend pipeline; `GOAT_RAG_RERANK_MODE` and `retrieval_profile` are documented in [OPERATIONS.md](OPERATIONS.md); golden-set process in [evaldata/README.md](../evaldata/README.md); Prometheus exposes `knowledge_retrieval_requests_total` and `knowledge_query_rewrite_applied_total` at `GET /api/system/metrics`.
 - **Phase 15.1 (domain semantics):** [DOMAIN.md](DOMAIN.md) defines ubiquitous language; `backend.domain` holds safeguard policy, chart provenance helpers, and chart-spec version invariant; [.github/pull_request_template.md](../.github/pull_request_template.md) links DOMAIN + contract regen.
 - **Phase 15 structural closeout:** `backend.application` now owns history, knowledge, media, models, system, upload/analyze, chat preflight, and code-sandbox gating so routers stay thin while public API shapes remain unchanged; `backend.application.ports` is the shared contract face for `Settings`, Protocols, and stable exception re-exports.
-- **Phase 15.4–15.6:** `session_messages` table (dual-read/write with legacy JSON blob); optional `sessions.owner_id`; read/write API keys and optional `X-GOAT-Owner-Id` for session scoping; lazy OpenTelemetry (`GOAT_OTEL_ENABLED`) with `traceparent` middleware and Ollama spans. See [SESSION_MESSAGES_MIGRATION.md](SESSION_MESSAGES_MIGRATION.md), [OPERATIONS.md](OPERATIONS.md), [test_api_authz.py](../__tests__/test_api_authz.py).
-- **Feature gates (§15):** `GET /api/system/features` exposes a stable `code_sandbox` snapshot (config + Docker probe; `policy_allowed` reserved for future AuthZ). `POST /api/code-sandbox/exec` is a scaffold: **503** + `FEATURE_UNAVAILABLE` when the **runtime** gate is closed; **403** + `FEATURE_DISABLED` reserved for **policy** denial; **501** when the gate passes but execution is not implemented.
+- **Phase 15.4-15.6:** `session_messages` table (dual-read/write with legacy JSON blob); optional `sessions.owner_id`; read/write API keys and optional `X-GOAT-Owner-Id` for session scoping; lazy OpenTelemetry (`GOAT_OTEL_ENABLED`) with `traceparent` middleware and Ollama spans. See [SESSION_MESSAGES_MIGRATION.md](SESSION_MESSAGES_MIGRATION.md), [OPERATIONS.md](OPERATIONS.md), [test_api_authz.py](../__tests__/test_api_authz.py).
+- **Feature gates (Section 15):** `GET /api/system/features` exposes a stable `code_sandbox` snapshot (config + Docker probe; `policy_allowed` reserved for future AuthZ). `POST /api/code-sandbox/exec` is a scaffold: **503** + `FEATURE_UNAVAILABLE` when the **runtime** gate is closed; **403** + `FEATURE_DISABLED` reserved for **policy** denial; **501** when the gate passes but execution is not implemented.
 - **RAG-ready wording:** use the term **RAG-ready** in release notes or marketing only after `python -m tools.run_rag_eval` passes in CI or pre-release checks and this file still documents the same threshold.
 
 ## What is shipped
@@ -105,7 +105,7 @@ Last updated: 2026-04-09
 
 ## Recommended reference docs
 
-- [AGENTS.md](../AGENTS.md) (short index) · [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) (canonical rules)
+- [AGENTS.md](../AGENTS.md) (short index) - [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) (canonical rules)
 - [OPERATIONS.md](OPERATIONS.md)
 - [API_REFERENCE.md](API_REFERENCE.md)
 - [API_ERRORS.md](API_ERRORS.md)
@@ -113,3 +113,4 @@ Last updated: 2026-04-09
 - [ROLLBACK.md](ROLLBACK.md)
 - [SECURITY.md](SECURITY.md)
 - [ROADMAP.md](ROADMAP.md)
+

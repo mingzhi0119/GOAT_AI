@@ -1,4 +1,4 @@
-# API error model (Phase 13 §13.0)
+# API error model (Phase 13 Section 13.0)
 
 JSON error responses use a **stable envelope** so logs, metrics, and clients share the same semantics:
 
@@ -10,9 +10,9 @@ JSON error responses use a **stable envelope** so logs, metrics, and clients sha
 }
 ```
 
-- **`detail`** — String for most 4xx/5xx from handlers; **array of objects** for `422` validation (FastAPI / Pydantic shape unchanged, wrapped with `code` and `request_id`).
-- **`code`** — Machine-readable, **do not rename** once shipped (breaking change for clients and dashboards).
-- **`request_id`** — Omitted only if context is missing (should not happen on normal HTTP requests after middleware runs). Clients may send **`X-Request-ID`**; the server echoes it here and in the response header. The active id is stored in **`goat_ai.request_context`** (re-exported from `backend.api_errors` for convenience).
+- **`detail`** - String for most 4xx/5xx from handlers; **array of objects** for `422` validation (FastAPI / Pydantic shape unchanged, wrapped with `code` and `request_id`).
+- **`code`** - Machine-readable, **do not rename** once shipped (breaking change for clients and dashboards).
+- **`request_id`** - Omitted only if context is missing (should not happen on normal HTTP requests after middleware runs). Clients may send **`X-Request-ID`**; the server echoes it here and in the response header. The active id is stored in **`goat_ai.request_context`** (re-exported from `backend.api_errors` for convenience).
 
 ## Registry
 
@@ -32,8 +32,8 @@ JSON error responses use a **stable envelope** so logs, metrics, and clients sha
 | `NOT_IMPLEMENTED` | 501 | no | Contract exists but the feature has not landed yet |
 | `INFERENCE_BACKEND_UNAVAILABLE` | 503 | yes | Ollama (or equivalent) unreachable |
 | `INTERNAL_ERROR` | 500 | no | Unhandled server error (detail sanitized) |
-| `FEATURE_DISABLED` | 403 | no | Policy / AuthZ: caller is not allowed to use this capability (see §15 in `docs/ENGINEERING_STANDARDS.md`) |
-| `FEATURE_UNAVAILABLE` | 503 | yes | Runtime / deployment: feature is off or a dependency (e.g. Docker) is not ready on this host—not an authorization decision |
+| `FEATURE_DISABLED` | 403 | no | Policy / AuthZ: caller is not allowed to use this capability (see Section 15 in `docs/ENGINEERING_STANDARDS.md`) |
+| `FEATURE_UNAVAILABLE` | 503 | yes | Runtime / deployment: feature is off or a dependency (e.g. Docker) is not ready on this host-not an authorization decision |
 
 \*Retry hint is **documentary** for Wave B client policy; server behavior is defined per endpoint.
 
@@ -41,9 +41,10 @@ JSON error responses use a **stable envelope** so logs, metrics, and clients sha
 
 - Constants: `backend/api_errors.py` (request correlation: `goat_ai.request_context`)
 - Handler registration: `backend/exception_handlers.py`
-- OpenAPI schema: `ErrorResponse` in `backend/models/common.py` → `docs/openapi.json`
+- OpenAPI schema: `ErrorResponse` in `backend/models/common.py` -> `docs/openapi.json`
 
 ## Related
 
-- [ROADMAP.md](ROADMAP.md) Phase 13 §13.0  
-- [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) · [AGENTS.md](../AGENTS.md) (index)
+- [ROADMAP.md](ROADMAP.md) Phase 13 Section 13.0  
+- [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) - [AGENTS.md](../AGENTS.md) (index)
+

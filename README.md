@@ -9,7 +9,7 @@ Strategic Intelligence assistant for Simon Business School, University of Roches
 
 ## Environments
 
-- **Portable by design:** the same repo is meant to run on **Windows, macOS, and Linux** for development, and on **various Linux (or container) server layouts** for production—not tied to a single school-owned Ubuntu image. Paths, ports, GPU selection, and secrets are **environment-driven** (see `.env.example` and [docs/OPERATIONS.md](docs/OPERATIONS.md)); avoid hardcoding host-specific assumptions in code.
+- **Portable by design:** the same repo is meant to run on **Windows, macOS, and Linux** for development, and on **various Linux (or container) server layouts** for production, not tied to a single school-owned Ubuntu image. Paths, ports, GPU selection, and secrets are **environment-driven** (see `.env.example` and [docs/OPERATIONS.md](docs/OPERATIONS.md)); avoid hardcoding host-specific assumptions in code.
 - **Reference vs local:** a documented production URL in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) is a **reference deployment**, not a constraint on where you may install or develop.
 
 ### Capability-based / high-risk features
@@ -28,7 +28,7 @@ Some capabilities (for example a future **model-driven code execution sandbox**)
 
 Until such a feature ships, this table documents the **intended** model: **high-risk operations are gated by explicit configuration and runtime readiness**, not on by default; **per-caller policy** is documented separately in the AuthZ roadmap.
 
-**Industrial implementation pattern** (config + probe + API + service enforcement + tests): see [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md) **§15 Feature enable/disable and gating**.
+**Industrial implementation pattern** (config + probe + API + service enforcement + tests): see [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md) **Section 15 Feature enable/disable and gating**.
 
 ## Stack
 
@@ -43,7 +43,7 @@ Until such a feature ships, this table documents the **intended** model: **high-
 
 ## Architecture
 
-Typical production path: **browser → reverse proxy (e.g. nginx) → FastAPI/Uvicorn** on a configured port (default **62606** via `GOAT_SERVER_PORT` / runtime target; see [docs/OPERATIONS.md](docs/OPERATIONS.md)). Local development often uses the same app process without nginx.
+Typical production path: **browser -> reverse proxy (e.g. nginx) -> FastAPI/Uvicorn** on a configured port (default **62606** via `GOAT_SERVER_PORT` / runtime target; see [docs/OPERATIONS.md](docs/OPERATIONS.md)). Local development often uses the same app process without nginx.
 
 FastAPI serves:
 - React SPA from `frontend/dist/`
@@ -123,7 +123,7 @@ Windows PowerShell:
 
 ## Testing
 
-Backend (canonical — matches CI):
+Backend (canonical - matches CI):
 
 ```bash
 python -m pytest __tests__/ -v --tb=short
@@ -173,3 +173,4 @@ Capacity/load validation:
 ```bash
 python -m tools.load_chat_smoke --base-url http://127.0.0.1:62606 --model gemma4:26b --runs 20 --show-system-inference
 ```
+
