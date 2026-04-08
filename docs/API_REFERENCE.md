@@ -50,11 +50,11 @@ Returns:
 
 ## `GET /api/ready`
 
-Returns JSON `{ "ready": boolean, "checks": { ... } }`. HTTP **503** when any required check fails (e.g. SQLite unreachable or Ollama probe failed). Set `GOAT_READY_SKIP_OLLAMA_PROBE=1` to omit the Ollama HTTP check.
+Returns JSON `{ "ready": boolean, "checks": { ... } }`. HTTP `503` when any required check fails, for example SQLite is unreachable or the optional Ollama probe fails. Set `GOAT_READY_SKIP_OLLAMA_PROBE=1` to omit the Ollama HTTP check.
 
 ## `GET /api/system/metrics`
 
-Returns **Prometheus** exposition text (`text/plain`). Requires `X-GOAT-API-Key` when `GOAT_API_KEY` is set. Includes `http_requests_total`, `http_request_duration_seconds`, `chat_stream_completed_total`, `ollama_errors_total`, and `sqlite_log_write_failures_total`.
+Returns Prometheus exposition text (`text/plain`). Requires `X-GOAT-API-Key` when `GOAT_API_KEY` is set. Includes `http_requests_total`, `http_request_duration_seconds`, `chat_stream_completed_total`, `ollama_errors_total`, and `sqlite_log_write_failures_total`.
 
 ## `GET /api/models`
 
@@ -101,7 +101,7 @@ Request body:
   "model": "gemma4:26b",
   "messages": [
     { "role": "user", "content": "Summarize Porter's Five Forces." },
-    { "role": "user", "content": "…", "file_context": true }
+    { "role": "user", "content": "[User uploaded tabular data for analysis] ...", "file_context": true }
   ],
   "session_id": "session-123",
   "system_instruction": "Answer in bullet points.",
@@ -111,7 +111,7 @@ Request body:
 }
 ```
 
-Optional `file_context: true` on a user message marks upload-derived tabular context for the session (preferred over inferring from message text alone).
+Optional `file_context: true` on a user message marks upload-derived tabular context for the session.
 
 SSE event types:
 
@@ -149,10 +149,10 @@ Notes:
 - If the selected model does not support native tools, chat remains text-only
 - Unsafe prompts are converted into a safe refusal instead of passing through the raw request
 - Unsafe model output is replaced server-side before streaming
-- Optional `Idempotency-Key` is supported when `session_id` is present.
-- Duplicate `Idempotency-Key` + same payload replays the same SSE body and avoids duplicate session/conversation writes.
-- Reusing a key with a different payload returns `409` with `code = IDEMPOTENCY_CONFLICT`.
-- Capacity guardrails reject oversized requests with `422` when message count or total payload bytes exceed configured limits (`GOAT_MAX_CHAT_MESSAGES`, `GOAT_MAX_CHAT_PAYLOAD_BYTES`).
+- Optional `Idempotency-Key` is supported when `session_id` is present
+- Duplicate `Idempotency-Key` plus the same payload replays the same SSE body and avoids duplicate session/conversation writes
+- Reusing a key with a different payload returns `409` with `code = IDEMPOTENCY_CONFLICT`
+- Capacity guardrails reject oversized requests with `422` when message count or total payload bytes exceed configured limits (`GOAT_MAX_CHAT_MESSAGES`, `GOAT_MAX_CHAT_PAYLOAD_BYTES`)
 
 ## `POST /api/upload`
 
@@ -198,9 +198,9 @@ Returns:
 
 Idempotency:
 
-- Optional `Idempotency-Key` deduplicates retries.
-- Duplicate key + same file bytes returns the same JSON body.
-- Reusing a key with different file bytes returns `409` with `code = IDEMPOTENCY_CONFLICT`.
+- Optional `Idempotency-Key` deduplicates retries
+- Duplicate key plus the same file bytes returns the same JSON body
+- Reusing a key with different file bytes returns `409` with `code = IDEMPOTENCY_CONFLICT`
 
 ## `GET /api/history`
 
@@ -247,10 +247,10 @@ Returns one normalized stored session:
 
 Notes:
 
-- `messages` now contains only normalized chat roles: `user`, `assistant`, `system`
+- `messages` contains only normalized chat roles: `user`, `assistant`, `system`
 - `chart_spec` and `file_context` are returned as dedicated fields instead of compatibility pseudo-roles
 - `chart_data_source` indicates where chart data came from: `uploaded`, `demo`, or `none`
-- Legacy stored sessions are still readable; the compatibility decode lives in the backend storage codec, not the API contract
+- Legacy stored sessions are still readable; compatibility decode lives in the backend storage codec, not the API contract
 
 ## `DELETE /api/history`
 

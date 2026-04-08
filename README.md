@@ -28,6 +28,8 @@ FastAPI serves:
 
 Core API surface:
 - `GET /api/health`
+- `GET /api/ready`
+- `GET /api/system/metrics`
 - `GET /api/models`
 - `GET /api/models/capabilities`
 - `POST /api/chat`
@@ -48,6 +50,11 @@ Core API surface:
 - Charts are created only from native Ollama tool calls during chat
 - Session history is persisted in SQLite and can restore chart/file-context state
 - Chat now includes a lightweight safeguard layer for clearly unsafe sexual or violent misuse requests
+- Request/error correlation uses `X-Request-ID`, with a stable JSON error envelope documented in [`docs/API_ERRORS.md`](docs/API_ERRORS.md)
+- Liveness and readiness are split into `GET /api/health` and `GET /api/ready`
+- Prometheus-style metrics are exposed at `GET /api/system/metrics`
+- Idempotent retries are supported for `POST /api/upload/analyze` and chat session append requests (`POST /api/chat` with `session_id`)
+- Shared-host operations now include documented graceful shutdown, rollback, backup/restore, and post-deploy checks
 
 ## Quick Start
 
@@ -58,7 +65,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-python3 -m uvicorn server:app --host 0.0.0.0 --port 8002 --reload
+python3 -m uvicorn server:app --host 0.0.0.0 --port 62606 --reload
 ```
 
 Frontend dev server:
@@ -107,8 +114,11 @@ npm run build
 
 - [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md): current shipped state
 - [docs/API_REFERENCE.md](docs/API_REFERENCE.md): endpoint contract
+- [docs/API_ERRORS.md](docs/API_ERRORS.md): stable error envelope and error-code rules
 - [docs/OPERATIONS.md](docs/OPERATIONS.md): deploy, env vars, ops notes
 - [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md): SQLite backup/restore drill
+- [docs/ROLLBACK.md](docs/ROLLBACK.md): rollback procedure for shared-host deploys
+- [docs/SECURITY.md](docs/SECURITY.md): upload/API threat notes and CI security posture
 - [docs/ROADMAP.md](docs/ROADMAP.md): shipped phases and refactor roadmap
 - [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md): coding standards
 

@@ -26,7 +26,7 @@ python3 -m uvicorn server:app --host 0.0.0.0 --port 62606 --reload
 
 ### SQLite schema migrations (Phase 13 §13.0)
 
-On startup, `log_service.init_db` runs **`backend/services/db_migrations.apply_migrations`**, which executes `backend/migrations/NNN_*.sql` in order and records each file’s SHA-256 in the `schema_migrations` table. If a migration file changes after apply, the process **refuses to start** (checksum mismatch). Add new DDL only as a new numbered SQL file.
+On startup, `log_service.init_db` runs **`backend/services/db_migrations.apply_migrations`**, which executes `backend/migrations/NNN_*.sql` in order and records each file's SHA-256 in the `schema_migrations` table. If a migration file changes after apply, the process **refuses to start** on checksum mismatch. Add new DDL only as a new numbered SQL file.
 
 API error responses use a stable envelope (`detail`, `code`, optional `request_id`); see [API_ERRORS.md](API_ERRORS.md).
 
@@ -116,8 +116,10 @@ This project is designed for an unprivileged JupyterHub-style server environment
 ### Structured logging (Phase 13 Wave A)
 
 - Inbound `X-Request-ID` is honored; otherwise the server assigns one. It is bound for the request in a context var and appears on log lines and JSON error bodies.
-- With `GOAT_LOG_JSON=1`, root logs are JSON objects. Access-style lines from `goat_ai.access` include `route`, `status`, and `duration_ms`. Error responses from exception handlers include the same `X-Request-ID` as log correlation.
-- Example line (pretty-printed; production is one line per event):
+- With `GOAT_LOG_JSON=1`, root logs are JSON objects. Access-style lines from `goat_ai.access` include `route`, `status`, and `duration_ms`.
+- Error responses from exception handlers include the same `X-Request-ID` used for log correlation.
+
+Example line:
 
 ```json
 {"ts": "2026-04-07 12:00:00,000", "level": "INFO", "logger": "goat_ai.access", "message": "http_request", "request_id": "550e8400-e29b-41d4-a716-446655440000", "route": "/api/history", "status": 200, "duration_ms": 2.145}
@@ -125,40 +127,47 @@ This project is designed for an unprivileged JupyterHub-style server environment
 
 ### Metrics (Prometheus)
 
-- `GET /api/system/metrics` returns Prometheus text (same auth as other protected APIs when `GOAT_API_KEY` is set).
-- Scrape with the API key header, for example: `curl -sS -H "X-GOAT-API-Key: $GOAT_API_KEY" http://127.0.0.1:62606/api/system/metrics`
+- `GET /api/system/metrics` returns Prometheus text
+- Same auth rules apply as other protected APIs when `GOAT_API_KEY` is set
+- Scrape example:
+
+```bash
+curl -sS -H "X-GOAT-API-Key: $GOAT_API_KEY" http://127.0.0.1:62606/api/system/metrics
+```
+
 - Histogram contract: `http_request_duration_seconds` is exposed as standard Prometheus histogram series:
   - `http_request_duration_seconds_bucket{le="..."}`
   - `http_request_duration_seconds_sum`
   - `http_request_duration_seconds_count`
-- Counter semantics: `chat_stream_completed_total` counts only successful assistant completions (token path followed by `done`), not safeguard-blocked refusal flows.
+- Counter semantics: `chat_stream_completed_total` counts only successful assistant completions, not safeguard-blocked refusal flows
 
 ### Ollama client resilience policy (Phase 13 Wave B)
 
-- Scope: only idempotent metadata reads (`GET /api/tags`, `POST /api/show`).
-- Retries: exponential backoff + jitter using `GOAT_OLLAMA_READ_RETRY_*`.
-- Circuit breaker: `closed -> open -> half_open` using `GOAT_OLLAMA_CIRCUIT_BREAKER_*`.
-- Timeouts remain unchanged (`timeout=5` for tags/show probes). Streamed chat uses `OLLAMA_CHAT_FIRST_EVENT_TIMEOUT` for the first response chunk, while non-stream generation keeps `OLLAMA_GENERATE_TIMEOUT`.
-- Retryability registry source remains `backend/api_errors.py` (documented stable codes); this policy does not change API error envelope semantics.
+- Scope: only idempotent metadata reads (`GET /api/tags`, `POST /api/show`)
+- Retries: exponential backoff + jitter using `GOAT_OLLAMA_READ_RETRY_*`
+- Circuit breaker: `closed -> open -> half_open` using `GOAT_OLLAMA_CIRCUIT_BREAKER_*`
+- Timeouts remain unchanged (`timeout=5` for tags/show probes)
+- Streamed chat uses `OLLAMA_CHAT_FIRST_EVENT_TIMEOUT` for the first response chunk, while non-stream generation keeps `OLLAMA_GENERATE_TIMEOUT`
+- Retryability registry source remains `backend/api_errors.py`; this policy does not change API error envelope semantics
 
 ### Idempotency keys (Phase 13 Wave B)
 
-- `POST /api/upload/analyze`: accepts optional `Idempotency-Key`.
-- `POST /api/chat`: accepts optional `Idempotency-Key` when `session_id` is present (session append path).
-- Same key + same payload returns the same response body.
-- Same key + different payload returns `409` (`code = IDEMPOTENCY_CONFLICT`).
-- Storage: SQLite `idempotency_keys` table (TTL cleanup on claim), suited to single-process deployment.
+- `POST /api/upload/analyze`: accepts optional `Idempotency-Key`
+- `POST /api/chat`: accepts optional `Idempotency-Key` when `session_id` is present
+- Same key + same payload returns the same response body
+- Same key + different payload returns `409` (`code = IDEMPOTENCY_CONFLICT`)
+- Storage: SQLite `idempotency_keys` table with TTL cleanup on claim
 
 ### Multi-instance stance (honest limits)
 
-- Rate limiting in `backend/http_security.py` is in-memory and per-process.
-- Rolling latency samples (`/api/system/inference`) are process-local.
-- Idempotency cache is SQLite-backed in this release; concurrent multi-writer behavior across many app instances is not treated as a cluster-wide guarantee.
+- Rate limiting in `backend/http_security.py` is in-memory and per-process
+- Rolling latency samples (`/api/system/inference`) are process-local
+- Idempotency cache is SQLite-backed in this release; concurrent multi-writer behavior across many app instances is not treated as a cluster-wide guarantee
 - Mitigations without Redis/Postgres:
-  - Use sticky sessions at the proxy layer.
-  - Lower per-instance rate limits to preserve global headroom.
-  - Aggregate metrics externally (Prometheus scrape per instance, then sum/quantile at query level).
-  - Keep one writable app process for SQLite when possible.
+  - Use sticky sessions at the proxy layer
+  - Lower per-instance rate limits to preserve global headroom
+  - Aggregate metrics externally (Prometheus scrape per instance, then sum/quantile at query level)
+  - Keep one writable app process for SQLite when possible
 
 ### Performance and capacity (Phase 13.3)
 
@@ -233,7 +242,7 @@ Treat the following as operational stop signs during Phase 13 rollout work:
 | Trigger | Response |
 |---------|----------|
 | Repeated SSE failure or timeout in post-deploy contract checks | Pause Wave B work, inspect `logs/fastapi.log` and Ollama logs, and do not advance the rollout until `/api/chat` emits SSE again. |
-| `/api/ready` flapping or sustained non-200 responses | Block Phase 14 structural refactors until readiness and deploy checks are stable across a full deploy cycle. |
+| `/api/ready` flapping or sustained non-200 responses | Block Phase 15 structural refactors until readiness and deploy checks are stable across a full deploy cycle. |
 | `sqlite_log_write_failures_total` rising over a sustained window | Prioritize backup/restore drill and recovery work before any new persistence feature lands. |
 
 ## API ops summary
@@ -256,5 +265,5 @@ Treat the following as operational stop signs during Phase 13 rollout work:
 | GET | `/api/system/inference` |
 | GET | `/api/system/runtime-target` |
 
-For exact request and response details, use [API_REFERENCE.md](API_REFERENCE.md).
+For exact request and response details, use [API_REFERENCE.md](API_REFERENCE.md).  
 For current upload/API threat notes, use [SECURITY.md](SECURITY.md).

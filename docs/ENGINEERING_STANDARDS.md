@@ -355,7 +355,7 @@ jobs:
 | Category | Rule | Example |
 |----------|------|---------|
 | **Paths** | `pathlib.Path`, never string concat | `Path(__file__).parent / "static"` |
-| **Ports** | Env var with safe dev/prod defaults | `GOAT_PORT=8002` (dev), `62606` behind nginx in prod |
+| **Ports** | Env var with safe dev/prod defaults | `GOAT_SERVER_PORT=62606` for dev/prod parity behind the current single-port runtime-target policy |
 | **Base URLs** | Env var, never `localhost` hardcoded | `OLLAMA_BASE_URL=http://127.0.0.1:11434` |
 | **Node version** | Pin in `.nvmrc` and CI matrix | `24.14.1` |
 | **Python version** | Keep runtime/docs/CI aligned | `3.12` |

@@ -1,6 +1,6 @@
 ﻿# GOAT AI Roadmap
 
-> Last updated: 2026-04-07 — **Phase 11 shipped** in v1.3.0; **Phases 13-14**: 13 = §13.0 + Wave A/B (stable `request_id`, **liveness**/**readiness**, error `code`); 14 = semantics before directory migration (**consumes** §13.0 error model; **does not redefine** it)
+> Last updated: 2026-04-08 — **Phase 11 shipped** in v1.3.0; **Phases 13-15**: 13 = §13.0 + Wave A/B (stable `request_id`, **liveness**/**readiness**, error `code`); 14 = RAG-first capability expansion + vision MVP; 15 = semantics before directory migration (**consumes** §13.0 error model; **does not redefine** it)
 > Current release: **v1.3.0**
 > Compact snapshot: [PROJECT_STATUS.md](PROJECT_STATUS.md)
 
@@ -41,8 +41,9 @@ Aligned with `AGENTS.md` and **no-root / JupyterHub-style** production (`docs/OP
 | Horizon | Focus |
 |---------|--------|
 | **v1.3.x** | Ops hardening from Phase 12 backlog: systemd vs nohup playbook, SQLite backup/migration thresholds, security/audit as exposure grows. |
-| **v1.4.x** | **Phase 13** — §13.0 (migrations + error model), **Wave A** (structured logs + `request_id`, Prometheus metrics, **readiness** vs **liveness**, persistence failure signals), then **Wave B** (Ollama resilience, **idempotency**); SLO/load, backup, security/CI. **Postgres / multi-instance** only after Phase 13 exit criteria and v1.3.x ops gates are stable. Low-risk Phase 14 doc-only items may run in parallel when isolated. |
-| **v1.5+** | **Phase 14** —domain/application split, test harness + integration tier, optional message normalization & distributed tracing (**consumes** Phase 13 §13.0 error model; **does not redefine** it). |
+| **v1.4.x** | **Phase 13** — §13.0 (migrations + error model), **Wave A** (structured logs + `request_id`, Prometheus metrics, **readiness** vs **liveness**, persistence failure signals), then **Wave B** (Ollama resilience, **idempotency**); SLO/load, backup, security/CI. **Postgres / multi-instance** only after Phase 13 exit criteria and v1.3.x ops gates are stable. |
+| **v1.5.x** | **Phase 14** —RAG-first capability expansion in this order: **RAG-0 -> RAG-1 -> RAG-2 -> Vision MVP -> RAG-3**. |
+| **v1.6+** | **Phase 15** —domain/application split, test harness + integration tier, optional message normalization & distributed tracing (**consumes** Phase 13 §13.0 error model; **does not redefine** it). |
 
 ---
 
@@ -64,7 +65,7 @@ Aligned with `AGENTS.md` and **no-root / JupyterHub-style** production (`docs/OP
 ## Phase 13: Industrial 9/10 — Priority 1 (Run, Observe, Recover)
 
 **Target release band:** **v1.4.x**  
-**Goal:** Production-grade **signals**, **stable error semantics**, **deploy** (**liveness** / **readiness**), **capacity clarity**, and **data/security baselines** on **SQLite + no-root + Ollama**—without large directory refactors (those stay in Phase 14).
+**Goal:** Production-grade **signals**, **stable error semantics**, **deploy** (**liveness** / **readiness**), **capacity clarity**, and **data/security baselines** on **SQLite + no-root + Ollama**—without large directory refactors (those stay in Phase 15).
 
 **Done for Phase 13:** exit criteria met per subsection; `PROJECT_STATUS.md` / release notes cite which boxes closed.
 
@@ -137,92 +138,119 @@ These are **not** "nice-to-have data tasks" — they unblock schema evolution an
 | Trigger | Response |
 |---------|----------|
 | **SSE** error rate or timeout above agreed threshold | Pause **Wave B** (client retry / **idempotency**) until root cause triaged. |
-| **`/api/ready`** flapping or sustained non-200 in prod | Block **Phase 14** structural refactors until **readiness** and deploy checks are stable. |
+| **`/api/ready`** flapping or sustained non-200 in prod | Block **Phase 15** structural refactors until **readiness** and deploy checks are stable. |
 | **`sqlite_log_write_failures_total`** (or equivalent) abnormal for a sustained window | Prioritize recovery + backup/restore drill before new persistence features. |
 
 ---
 
-## Phase 13.9: Native Multimodal Capability Expansion
+## Phase 14: RAG-first Capability Expansion
 
-**Target release band:** **late v1.4.x**, after Phase 13 exit criteria are stable and before Phase 14 structural refactors begin.
-**Goal:** Add **native image and video understanding** for Ollama models that explicitly support multimodal inputs, without weakening the existing text/chat contract or introducing silent fallback behavior.
+**Target release band:** **v1.5.x**, after Phase 13 exit criteria are stable and before Phase 15 structural refactors begin.  
+**Goal:** Make GOAT AI a real retrieval-augmented system before broader multimodal expansion by implementing RAG as a **new subsystem** with dedicated contracts, storage, and service boundaries, then add a tightly scoped **Vision MVP** only after the retrieval path exists.
 
-**Ordering principle:** **vision first, video second**. Treat image support as the MVP and video as a follow-on that can reuse the same capability contract, media-context pipeline, and SSE response model.
+**Priority order:** **Phase 13 closeout -> RAG-0 -> RAG-1 -> RAG-2 -> Vision MVP -> RAG-3**.
 
-### 13.9.1 Capability contract and model gating
+### 14.1 RAG baseline assessment and non-goals
 
-- `[ ]` **Explicit multimodal capabilities** —Extend model capability probing so the backend can distinguish `text`, `vision`, `video`, and `multimodal` support.
-- `[ ]` **Contract-first gating** —Expose multimodal support through the same black-box style contract used for chat/model capabilities; the UI must disable unsupported media flows instead of silently degrading them.
-- `[ ]` **Capability-aware model selection** —Surface a clear capability badge or equivalent UI signal so users can tell whether the currently selected model can read images or video.
+**Current assessment:** the repository is **not yet at a "RAG baseline implementation" stage**. It is closer to **general chat + CSV/XLSX file-context injection + engineering/operations hardening**.
 
-### 13.9.2 Image understanding MVP
+**Why this matters:** the current `POST /api/upload` path parses tabular files and returns `file_context` for prompt injection, but it does **not** constitute a retrieval system. There is currently no persisted ingestion/indexing pipeline, no document chunking strategy, no embeddings lifecycle, no vector index/store, no retriever, no reranker, and no query-rewrite layer.
 
+**Fit assessment:** the project is still a good candidate for RAG, but this should be planned as a **new subsystem**, not treated as a small extension of the existing upload flow.
+
+- `[ ]` **Explicit non-goal for current upload flow** —Document that `upload -> file_context` is prompt-context assistance, not knowledge-base indexing. Do not market the current CSV/XLSX path as RAG.
+- `[ ]` **Foundation is sufficient** —Leverage the existing API/service layering, SSE streaming path, error model, readiness/metrics work, and the current `upload + chat + history` surface as the platform on which RAG APIs can be introduced.
+- `[ ]` **Separate API family** —When RAG begins, add a contract-first API family such as `knowledge/uploads`, `knowledge/ingestions`, `knowledge/search`, and `knowledge/answers`, rather than overloading the existing upload contract with hidden indexing side effects.
+- `[ ]` **Contract-first boundary** —Before implementation, define black-box contracts for ingestion status, retrieval result shape, citation metadata, and "no relevant context found" behavior, following the same contract discipline used elsewhere in the repo.
+- `[ ]` **Core backend components** —Introduce typed service boundaries for document normalization, chunking, embedding generation, vector-store writes/reads, retrieval orchestration, optional reranking, and optional query rewrite.
+- `[ ]` **Storage decision gate** —Make vector-store choice an explicit design decision with documented single-node/no-root operational constraints; do not couple the first RAG slice to infra that the current deployment model cannot operate reliably.
+
+### 14.2 RAG-0 — capability framing and contract design
+
+- `[ ]` **Architecture draft landed** —Keep `docs/RAG_ARCHITECTURE.md` aligned with roadmap, including API family, SQLite metadata tables, local file layout, and vector-store constraints.
+- `[ ]` **OpenAPI-first route design** —Add request/response schemas for `POST /api/knowledge/uploads`, `POST /api/knowledge/ingestions`, `GET /api/knowledge/ingestions/{id}`, and `POST /api/knowledge/search` before feature-complete implementation.
+- `[ ]` **Error semantics** —Reuse the stable `{ "detail", "code", "request_id" }` envelope for ingestion/search failures and unsupported retrieval states.
+- `[ ]` **Chat contract isolation** —`POST /api/chat` remains a chat API and consumes retrieval only through services, not route sharing.
+
+### 14.3 RAG-1 — ingestion MVP
+
+- `[ ]` **Raw file persistence** —Store uploaded knowledge files under a dedicated local storage root (`GOAT_DATA_DIR`) rather than the current ad hoc upload path.
+- `[ ]` **SQLite metadata and lifecycle** —Add `knowledge_documents`, `knowledge_ingestions`, and `knowledge_chunks` through numbered migrations.
+- `[ ]` **Parser and chunking pipeline** —Implement typed document normalization and chunk generation for a narrow file set first.
+- `[ ]` **Embedding generation** —Generate embeddings through a dedicated service boundary, not in routers or ad hoc upload handlers.
+- `[ ]` **Persistent local vector index** —Write vectors to a local persistent backend that fits the current no-root, single-node deployment model.
+- `[ ]` **Status visibility** —Expose ingestion progress and errors through `GET /api/knowledge/ingestions/{id}`.
+
+### 14.4 RAG-2 — retrieval MVP
+
+- `[ ]` **Pure retrieval API** —Add `POST /api/knowledge/search` that returns ranked chunks, document metadata, and citation payloads without answer generation.
+- `[ ]` **Answer API** —Add `POST /api/knowledge/answers` as a retrieval-backed answer path outside the chat session contract.
+- `[ ]` **Chat integration through services** —Allow `POST /api/chat` to call retrieval orchestration through `RetrieverService` / `AnswerOrchestrator` only after the standalone knowledge APIs are stable.
+- `[ ]` **No-hit behavior** —Define and test explicit "no relevant context found" behavior instead of silent fallback to fabricated citations.
+- `[ ]` **Black-box coverage** —Add API-boundary tests for upload, ingestion, search, answer, and clean failure modes.
+
+### 14.5 Vision MVP (after retrieval exists)
+
+**Scope rule:** image support is the only multimodal slice in this roadmap. Video implementation is intentionally excluded because too many target models do not support it reliably.
+
+- `[ ]` **Explicit vision capability contract** —Extend model capability probing so the backend can distinguish `text` and `vision` support, and gate image flows cleanly.
+- `[ ]` **Capability-aware model selection** —Surface a clear UI signal showing whether the current model can inspect images.
 - `[ ]` **Image upload path** —Add a typed upload flow for images (`png`, `jpg/jpeg`, `webp` initially) with size limits, preview, and explicit attachment state.
-- `[ ]` **Media context service** —Create a backend service that normalizes image inputs, applies safe resizing/encoding, and converts them into the Ollama message format expected by native multimodal models.
+- `[ ]` **Media context service** —Create a backend service that normalizes image inputs, applies safe resizing/encoding, and converts them into the Ollama message format expected by native vision-capable models.
 - `[ ]` **Chat integration** —Extend `POST /api/chat` so image attachments become first-class chat context instead of ad hoc prompt text.
 - `[ ]` **Failure behavior** —If the selected model does not support vision, return a clear, sanitized error and keep the text-only chat path intact.
+- `[ ]` **Frontend experience** —Add image attachment UX with preview, removal, and user-facing capability hints.
+- `[ ]` **Vision tests and ops limits** —Cover supported and unsupported image requests at the API boundary, and document image timeout/size/format limits in OPERATIONS before enabling the UI entry points.
 
-### 13.9.3 Video understanding follow-on
+### 14.6 RAG-3 — quality layer
 
-- `[ ]` **Video upload path** —Add a typed upload flow for video files with clear size/duration guardrails.
-- `[ ]` **Frame extraction pipeline** —Implement a backend media pipeline that extracts representative frames and timestamps, then packages them as ordered multimodal context.
-- `[ ]` **Optional audio companion context** —If supported by the chosen implementation, add transcript or scene-summary context as a separate structured input rather than mixing it into the chat prompt.
-- `[ ]` **Native video gating** —Only enable direct video understanding when the selected model and backend pipeline both explicitly support it; otherwise, keep the feature disabled.
-
-### 13.9.4 Frontend experience
-
-- `[ ]` **Attachment UX** —Add image/video attachments to the chat composer with preview, removal, and clear status labels.
-- `[ ]` **User-facing model hints** —Show whether the current model can inspect uploaded media, and explain when an attachment is not usable by the selected model.
-- `[ ]` **No silent fallback** —Do not auto-convert media into hidden OCR/ASR text unless that behavior is intentionally exposed as a separate, explicit feature.
-
-### 13.9.5 Tests and release criteria
-
-- `[ ]` **Black-box contract tests** —Cover supported and unsupported multimodal requests at the API boundary, including image input success, video input success, and clean rejection for unsupported models.
-- `[ ]` **Service tests** —Unit test media normalization, capability gating, frame selection, and error handling without live Ollama dependencies.
-- `[ ]` **Operational readiness** —Document multimodal timeout, size, and format limits in OPERATIONS before enabling the UI entry points.
+- `[ ]` **Optional reranker** —Add reranking behind a dedicated service boundary rather than folding it into basic retrieval logic.
+- `[ ]` **Optional query rewrite** —Add query rewriting only after retrieval metrics show it solves a measurable failure pattern.
+- `[ ]` **Retrieval evaluation** —Create a small evaluation set and regression process for retrieval precision, citation correctness, and no-hit behavior.
+- `[ ]` **Quality gate before claims** —Do not describe the system as "RAG-ready" in README or PROJECT_STATUS until retrieval quality thresholds are documented and regression-tested.
 
 ---
 
-## Phase 14: Industrial 9/10 —Priority 2 (Semantics, Then Structure)
+## Phase 15: Industrial 9/10 —Priority 2 (Semantics, Then Structure)
 
-**Target release band:** **v1.5+** (may overlap **late v1.4.x** for low-risk doc-only items)  
-**Goal:** **Semantic convergence first, directory migration second**—policies and invariants stabilize meaning before `application/` vs `domain/` vs `infra/` reshaping. Phase 14 **consumes** the Phase 13 §13.0 **error model** (stable `code`, `request_id`, handlers); it **does not redefine** that contract—only uses it for policies, tests, and optional tracing.
+**Target release band:** **v1.6+** (may overlap **late v1.5.x** for low-risk doc-only items)  
+**Goal:** **Semantic convergence first, directory migration second**—policies and invariants stabilize meaning before `application/` vs `domain/` vs `infra/` reshaping. Phase 15 **consumes** the Phase 13 §13.0 **error model** (stable `code`, `request_id`, handlers); it **does not redefine** that contract—only uses it for policies, tests, and optional tracing.
 
 **Ordering principle (industrial default):** policy objects + invariants = **narrow, testable moves**; package reshuffle = **wide blast radius**. Do the former first.
 
-### 14.1 Domain semantics and policy objects (before big split)
+### 15.1 Domain semantics and policy objects (before big split)
 
 - `[ ]` **`docs/DOMAIN.md`** —Ubiquitous language: Session, Turn, FileContext, ChartIntent, ChartSpec, ToolCall, SafeguardDecision. **Exit:** PR template links for user-visible behavior changes.
 - `[ ]` **`SafeguardPolicy`** (or equivalent) —Typed inputs →decision; unit tests **without** HTTP. **Exit:** orchestration calls policy object, not ad hoc string rules.
 - `[ ]` **`ChartDataProvenancePolicy`** —Same: explicit provenance decisions vs implicit marker logic. **Exit:** tests without HTTP.
 - `[ ]` **Invariants** —Small pure helpers: e.g. chart spec persisted only with version; at most one file-context row semantics; failures are test-visible. **Exit:** tests fail when invariant broken.
 
-### 14.2 Large structural migration (after §14.1)
+### 15.2 Large structural migration (after §15.1)
 
 - `[ ]` **Application / domain / infrastructure layout** —`backend/application/`, `backend/domain/`, adapters under clear names; `services/` as facades during migration; **update `import-linter` layers**. **Exit:** dependency graph doc; no new business rules in `routers/`.
 - `[ ]` **Session schema contract** —`docs/SESSION_SCHEMA.md`: message JSON version, read N- / write N, codec upgrade tests. **Exit:** round-trip old →new row tests (builds on Phase 13 migrations).
 - `[ ]` **Ports list** —AGENTS.md: stable `Protocol`s (`SessionRepository`, `LLMClient`, telemetry sink); one **fake repository** test without SQLite file.
 
-### 14.3 Testability
+### 15.3 Testability
 
 - `[ ]` **Clock / random injection** —`Clock` (wall + monotonic) for TTL, rate limit, title paths; optional seeded RNG. **Exit:** no `time.sleep` for those behaviors.
 - `[ ]` **Single primary test entry** —**pytest** as primary for `__tests__/`; unittest shimmed where needed. **Exit:** one CI command documented.
 - `[ ]` **Integration tier** —`__tests__/integration/`: temp SQLite + `TestClient` for session + migrations (no Ollama). **Exit:** CI or optional job; under 30s runtime budget documented.
 
-### 14.4 Data (deep)
+### 15.4 Data (deep)
 
 - `[ ]` **Message store normalization** —`session_messages` (append-only); dual-read from legacy JSON until cutover. **Exit:** migration doc + integration tests.
 
-### 14.5 Security (deeper)
+### 15.5 Security (deeper)
 
 - `[ ]` **AuthZ roadmap + enforcement** —Scoped keys or session ownership in **service** layer; Decision Log entry. **Exit:** minimal cross-session denial tests.
 - `[ ]` **Secrets hygiene automation** —Optional Gitleaks/trufflehog in CI; CONTRIBUTING: `.env.example` review on env changes.
 
-### 14.6 Observability (optional stretch)
+### 15.6 Observability (optional stretch)
 
 - `[ ]` **Distributed tracing** —OpenTelemetry + W3C `traceparent`; spans around Ollama; off by default, near-zero cost when disabled. **Exit:** one documented trace export path.
 
-### 14.7 Phase 14 references
+### 15.7 Phase 15 references
 
 - [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) · [OPERATIONS.md](OPERATIONS.md) · [AGENTS.md](../AGENTS.md)
 
@@ -254,6 +282,8 @@ These are **not** "nice-to-have data tasks" — they unblock schema evolution an
 | 2026-04-07 | Process mgmt: systemd is additive, not a drop-in for nohup | Shared host may lack reliable `systemctl --user`; deploy contract keeps nohup + PID as permanent fallback per `AGENTS.md` / `OPERATIONS.md` |
 | 2026-04-07 | Phase 11 closed in v1.3.0 | `ChatStreamService` + orchestration split; tabular/title injection; log_service adapter-only guard; wire constants centralized; 79 unittest + 13 black-box OK |
 | 2026-04-07 | Phases 13-14 split from prior monolithic Phase 13 | **13** = priority 1; **14** = priority 2 (semantics before package reshuffle). |
-| 2026-04-07 | Phase 13 sequencing tightened | **§13.0** = migrations-as-artifacts + error model/registry **before** Wave A. **Wave A** = only four ops items (structured logs+`request_id`, metrics, **liveness**/**readiness**, persistence signals). **Ollama retry/circuit breaker** deferred to **Wave B** after Wave A. **Phase 14** = policy objects + invariants **before** `application/`/`domain/` split; **consumes** §13.0 error model, **does not redefine** it. |
+| 2026-04-07 | Phase 13 sequencing tightened | **§13.0** = migrations-as-artifacts + error model/registry **before** Wave A. **Wave A** = only four ops items (structured logs+`request_id`, metrics, **liveness**/**readiness**, persistence signals). **Ollama retry/circuit breaker** deferred to **Wave B** after Wave A. **Phase 15** = policy objects + invariants **before** `application/`/`domain/` split; **consumes** §13.0 error model, **does not redefine** it. |
 | 2026-04-08 | Phase 13.5 closed | `pip-audit` added to CI, `ruff check` added to CI, changed-file `ruff format` gate added, `docs/SECURITY.md` published, and known vulnerable dependency pins updated (`requests`, `python-multipart`). |
 | 2026-04-08 | Phase 13.6-13.8 closed | Graceful shutdown is now documented and implemented in deploy scripts; rollback has an explicit ref-aware runbook; Phase 13 risk triggers are documented in OPERATIONS. |
+| 2026-04-08 | RAG classified as a future subsystem, not current baseline capability | Current `/api/upload` remains file-context parsing for prompt injection; roadmap now distinguishes that from true RAG requirements such as chunking, embeddings, vector retrieval, reranking, and retrieval contracts. |
+| 2026-04-08 | RAG elevated ahead of multimodal expansion; original Phase 14 moved to Phase 15 | Priority order is now **Phase 13 closeout -> RAG-0 -> RAG-1 -> RAG-2 -> Vision MVP -> RAG-3**. Video implementation was removed from the roadmap because target model support is too inconsistent for the near-term plan. |

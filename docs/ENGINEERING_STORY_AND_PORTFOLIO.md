@@ -6,7 +6,7 @@ This document is a **durable narrative and checklist** for presenting GOAT AI on
 - **Shared, no-root host** - deployable where you do not own the machine.
 - **SQLite-first** - honest data posture for the current scale and ops model.
 - **Ollama-backed** - local inference boundary, not a thin wrapper around a hosted API only.
-- **Ten-axis industrial bar toward ~9/10 *for this codebase*** - as defined in [ROADMAP.md](ROADMAP.md) Phases 13-4 (prerequisites, Wave A/B, semantics-before-structure).
+- **Ten-axis industrial bar toward ~9/10 *for this codebase*** - as defined in [ROADMAP.md](ROADMAP.md) Phases 13-15 (Phase 13 operations hardening, Phase 14 RAG-first expansion, Phase 15 semantics-before-structure).
 
 **Homepage signal:** you are not claiming "I called an LLM." You are claiming **you can run an AI product as an engineering system under real constraints**.
 
@@ -55,7 +55,7 @@ Use this arc on a homepage or case-study page. Dates and scores are **yours to f
 4. **From operable -> resilient and governable** (Phase 13 Wave B landed)  
    Ollama read-policy now includes retries/backoff/jitter plus circuit-breaker states (`closed` / `open` / `half_open`) for `/api/tags` and `/api/show`; idempotency now protects upload-analyze JSON and chat session append retries; OPERATIONS now documents explicit multi-instance limits for per-process rate limiting and rolling metrics.
 
-5. **From governable -> semantically stable** (Phase 14)  
+5. **From governable -> semantically stable** (Phase 15)  
    Policy objects and invariants **before** large `application/` / `domain/` moves; session schema contract and normalization when migrations are already a first-class artifact.
 
 **Portfolio line:** *I did not optimize for demo screenshots; I optimized for the next engineer (often me in six months) to change the system safely.*
@@ -72,7 +72,7 @@ These are worth a **"Trade-offs"** subsection on a homepage. Align wording with 
 | **Wave A = observe + ready + persistence signals first** | Without logs, metrics, and readiness, retries and breakers are blind; client resilience is **Wave B** so it does not block operational lift. |
 | **Migrations as artifacts (Phase 13 §13.0)** | Schema and session evolution are continuous; ad-hoc `ALTER` chains do not scale with feature velocity. |
 | **Error model before / alongside observability** | Stable `code`s feed metrics labels and retry policy; runbooks reference the same taxonomy. |
-| **Policies and invariants before big package split** | Semantic convergence reduces blast radius of directory refactors (Phase 14 ordering). |
+| **Policies and invariants before big package split** | Semantic convergence reduces blast radius of directory refactors (Phase 15 ordering). |
 | **Single-tenant / shared API key** | Threat model documented honestly; authz roadmap separated from "looks secure" shortcuts. |
 
 ---
@@ -102,9 +102,9 @@ Wave B evidence anchors in this repo:
 
 ---
 
-## 6. "Homepage-ready" bar (not tied to v1.5)
+## 6. "Homepage-ready" bar (not tied to v1.5/v1.6)
 
-Treat the project as **homepage-worthy** when **most** of the following are true -grounded in **Phase 13/14 exit criteria**, not a version string:
+Treat the project as **homepage-worthy** when **most** of the following are true -grounded in **Phase 13/14/15 exit criteria**, not a version string:
 
 - [ ] Clear **README** + **architecture overview** (diagram or layered description).
 - [ ] **Demo** (short video or screenshots) showing chat + upload + chart path -product, not only infra.
@@ -114,7 +114,7 @@ Treat the project as **homepage-worthy** when **most** of the following are true
 - [ ] **Operational evidence**: how logs and metrics are consumed; how readiness and rollback are run; how migrations are validated.
 - [ ] **Honest constraint paragraph**: shared host, no root, SQLite-first -and why that is **reasonable**, not accidental.
 
-**Optional stretch (strong portfolio):** one paragraph on **what you would do next** if the product gained ten times the traffic (without hand-waving -reference Phase 14 normalization, Postgres gate, etc.).
+**Optional stretch (strong portfolio):** one paragraph on **what you would do next** if the product gained ten times the traffic (without hand-waving -reference Phase 15 normalization, Postgres gate, etc.).
 
 ---
 
@@ -130,15 +130,14 @@ The differentiator is not the stack list; it is **the documented path from demo-
 
 ## Related documents
 
-- [ROADMAP.md](ROADMAP.md) -Phase 13 (§13.0, Wave A/B) and Phase 14 sequencing.
+- [ROADMAP.md](ROADMAP.md) -Phase 13 (§13.0, Wave A/B), Phase 14 RAG-first sequencing, and Phase 15 structural semantics.
 - [OPERATIONS.md](OPERATIONS.md) -deploy, env, host constraints (keep aligned with claims on your homepage).
 - [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) -day-to-day engineering contract.
 - [AGENTS.md](../AGENTS.md) -durable repo memory for automation and contributors.
 
 ---
 
-*Last updated: 2026-04-08 -created to anchor portfolio narrative to **industrial outcomes**, not version marketing.*
-
+*Last updated: 2026-04-08 - created to anchor portfolio narrative to **industrial outcomes**, not version marketing.*
 
 
 
