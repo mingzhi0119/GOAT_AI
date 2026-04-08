@@ -6,13 +6,14 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 
 from backend.config import get_settings
 from backend.models.common import ErrorResponse
-from backend.models.system import GPUStatusResponse, InferenceLatencyResponse, RuntimeTargetResponse
+from backend.models.system import GPUStatusResponse, InferenceLatencyResponse, RuntimeTargetResponse, SystemFeaturesResponse
 from backend.prometheus_metrics import render_prometheus_text
 from backend.readiness_service import evaluate_readiness
 from backend.services.gpu_service import read_gpu_status
 from backend.services.system_telemetry_service import (
     build_inference_latency_response,
     build_runtime_target_response,
+    build_system_features_response,
 )
 from backend.types import Settings
 
@@ -39,6 +40,17 @@ def get_gpu_status(settings: Settings = Depends(get_settings)) -> GPUStatusRespo
 def get_inference_latency() -> InferenceLatencyResponse:
     """Rolling average duration of completed chat streams (milliseconds)."""
     return build_inference_latency_response()
+
+
+@router.get(
+    "/system/features",
+    response_model=SystemFeaturesResponse,
+    summary="Read capability-gated feature flags",
+    responses={401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
+)
+def get_system_features(settings: Settings = Depends(get_settings)) -> SystemFeaturesResponse:
+    """Return config + host probes for optional high-risk features (see docs/ENGINEERING_STANDARDS.md §15)."""
+    return build_system_features_response(settings)
 
 
 @router.get(

@@ -26,10 +26,12 @@ export function hydrateHistorySession(session: HistorySessionDetail): Message[] 
 
   for (const message of session.messages) {
     if (message.role !== 'user' && message.role !== 'assistant') continue
+    const ids = message.image_attachment_ids
     mapped.push({
       id: crypto.randomUUID(),
       role: message.role,
       content: message.content,
+      ...(ids && ids.length > 0 ? { image_attachment_ids: ids } : {}),
     })
   }
 

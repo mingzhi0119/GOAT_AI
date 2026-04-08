@@ -37,6 +37,7 @@ export interface UseChatReturn {
     systemInstruction?: string,
     ollamaOptions?: OllamaOptionsPayload,
     onChartSpec?: (spec: ChartSpec) => void,
+    imageAttachmentIds?: string[],
   ) => Promise<void>
   streamToChat: (gen: AsyncGenerator<ChatStreamEvent>) => Promise<void>
   clearMessages: () => void
@@ -150,11 +151,18 @@ export function useChat(): UseChatReturn {
       systemInstruction?: string,
       ollamaOptions?: OllamaOptionsPayload,
       onChartSpec?: (spec: ChartSpec) => void,
+      imageAttachmentIds?: string[],
     ) => {
       if (isStreaming) return
 
       const activeSessionId = sessionId ?? crypto.randomUUID()
       if (!sessionId) setSessionId(activeSessionId)
+
+      const userText =
+        content.trim() ||
+        (imageAttachmentIds && imageAttachmentIds.length > 0
+          ? 'What do you see in this image?'
+          : '')
 
       let baseHistory: ChatMessage[] = messagesRef.current.map(m => ({
         role: m.role,
@@ -163,9 +171,16 @@ export function useChat(): UseChatReturn {
       }))
       const history: ChatMessage[] = [
         ...baseHistory,
-        { role: 'user' as const, content },
+        { role: 'user' as const, content: userText },
       ]
-      const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content }
+      const userMsg: Message = {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content: userText,
+        ...(imageAttachmentIds && imageAttachmentIds.length > 0
+          ? { image_attachment_ids: imageAttachmentIds }
+          : {}),
+      }
 
       const ctrl = new AbortController()
       abortControllerRef.current = ctrl
@@ -177,6 +192,9 @@ export function useChat(): UseChatReturn {
               messages: history,
               ...(knowledgeDocumentIds && knowledgeDocumentIds.length > 0
                 ? { knowledge_document_ids: knowledgeDocumentIds }
+                : {}),
+              ...(imageAttachmentIds && imageAttachmentIds.length > 0
+                ? { image_attachment_ids: imageAttachmentIds }
                 : {}),
               session_id: activeSessionId,
               ...(systemInstruction?.trim()

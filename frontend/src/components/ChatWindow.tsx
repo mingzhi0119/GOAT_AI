@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type FC, type KeyboardEvent } from 'react'
+import { uploadMediaImage } from '../api/media'
 import type { ChartSpec, Message } from '../api/types'
 import type { GPUStatus, InferenceLatency } from '../api/system'
 import type { FileContext } from '../hooks/useFileContext'
@@ -23,8 +24,10 @@ interface Props {
   chartSpec: ChartSpec | null
   isStreaming: boolean
   selectedModel: string
+  /** When true, show image attach control (model reports Ollama ``vision`` capability). */
+  supportsVision?: boolean
   fileContext: FileContext | null
-  onSendMessage: (content: string) => void
+  onSendMessage: (content: string, imageAttachmentIds?: string[]) => void
   onStop: () => void
   gpuStatus: GPUStatus | null
   gpuError: string | null
@@ -37,6 +40,7 @@ const ChatWindow: FC<Props> = ({
   chartSpec,
   isStreaming,
   selectedModel,
+  supportsVision = false,
   fileContext,
   onSendMessage,
   onStop,
@@ -45,6 +49,10 @@ const ChatWindow: FC<Props> = ({
   inferenceLatency,
 }) => {
   const [input, setInput] = useState('')
+  const [pendingImageIds, setPendingImageIds] = useState<string[]>([])
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null)
+  const [imageUploading, setImageUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -73,11 +81,35 @@ const ChatWindow: FC<Props> = ({
 
   const handleSubmit = () => {
     const trimmed = input.trim()
-    if (!trimmed || isStreaming) return
-    onSendMessage(trimmed)
+    if ((!trimmed && !pendingImageIds.length) || isStreaming) return
+    const text =
+      trimmed || (pendingImageIds.length > 0 ? 'What do you see in this image?' : '')
+    onSendMessage(text, pendingImageIds.length > 0 ? pendingImageIds : undefined)
     setInput('')
+    setPendingImageIds([])
+    setImageUploadError(null)
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
+    }
+  }
+
+  const handleImagePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files?.length) return
+    setImageUploadError(null)
+    setImageUploading(true)
+    try {
+      const next: string[] = [...pendingImageIds]
+      for (const f of Array.from(files)) {
+        const res = await uploadMediaImage(f)
+        next.push(res.attachment_id)
+      }
+      setPendingImageIds(next)
+    } catch (err) {
+      setImageUploadError(err instanceof Error ? err.message : 'Image upload failed')
+    } finally {
+      setImageUploading(false)
+      e.target.value = ''
     }
   }
 
@@ -95,7 +127,7 @@ const ChatWindow: FC<Props> = ({
     e.target.style.height = `${Math.min(e.target.scrollHeight, 180)}px`
   }
 
-  const canSend = input.trim().length > 0 && !isStreaming
+  const canSend = (input.trim().length > 0 || pendingImageIds.length > 0) && !isStreaming
 
   return (
     <div
@@ -144,6 +176,11 @@ const ChatWindow: FC<Props> = ({
               {selectedModel && (
                 <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
                   Model: <span style={{ color: 'var(--gold)' }}>{selectedModel}</span>
+                  {supportsVision && (
+                    <span className="ml-2" title="This model reports vision support in Ollama">
+                      · vision
+                    </span>
+                  )}
                 </p>
               )}
             </div>
@@ -154,7 +191,7 @@ const ChatWindow: FC<Props> = ({
                 return (
                   <button
                     key={prompt}
-                    onClick={() => onSendMessage(prompt)}
+                    onClick={() => onSendMessage(prompt, undefined)}
                     className="text-xs px-3 py-2 rounded-xl text-left transition-colors hover:opacity-80"
                     style={{
                       border: isFilePrompt
@@ -194,6 +231,30 @@ const ChatWindow: FC<Props> = ({
         style={{ borderColor: 'var(--border-color)', background: 'var(--bg-chat)' }}
       >
         <div className="flex items-center gap-2 max-w-4xl mx-auto">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,image/webp"
+            multiple
+            className="hidden"
+            onChange={handleImagePick}
+          />
+          {supportsVision && (
+            <button
+              type="button"
+              disabled={isStreaming || imageUploading}
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-shrink-0 px-2 py-2 rounded-xl text-lg leading-none disabled:opacity-40"
+              style={{
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-muted)',
+                background: 'var(--bg-asst-bubble)',
+              }}
+              title="Attach images (PNG, JPEG, WebP)"
+            >
+              {imageUploading ? '…' : '📎'}
+            </button>
+          )}
           <GpuStatusDot
             gpuStatus={gpuStatus}
             gpuError={gpuError}
@@ -231,6 +292,29 @@ const ChatWindow: FC<Props> = ({
             {isStreaming ? 'Stop' : 'Send'}
           </button>
         </div>
+        {pendingImageIds.length > 0 && (
+          <div className="max-w-4xl mx-auto flex flex-wrap gap-1.5 mt-2 justify-center">
+            {pendingImageIds.map((id, i) => (
+              <button
+                key={`${id}-${i}`}
+                type="button"
+                onClick={() => setPendingImageIds(prev => prev.filter((_, j) => j !== i))}
+                className="text-[10px] px-2 py-0.5 rounded-lg"
+                style={{
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-muted)',
+                  background: 'var(--bg-asst-bubble)',
+                }}
+                title="Remove"
+              >
+                Image {i + 1} ✕
+              </button>
+            ))}
+          </div>
+        )}
+        {imageUploadError && (
+          <p className="text-center text-xs mt-1 text-red-600">{imageUploadError}</p>
+        )}
         <p className="text-center text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
           AI may make mistakes. Verify important information.
         </p>

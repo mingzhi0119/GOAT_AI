@@ -1,11 +1,11 @@
 ---
-description: Project direction, five non-negotiables, and cross-environment rules (mirrors AGENTS.md top sections)
+description: Project direction, five non-negotiables, and cross-environment rules (aligned with docs/ENGINEERING_STANDARDS.md)
 alwaysApply: true
 ---
 
 # GOAT AI — Core principles
 
-Canonical durable summary: repo root `AGENTS.md`. Keep these rules aligned when either file changes.
+Canonical engineering rules: **`docs/ENGINEERING_STANDARDS.md`**. Repo root `AGENTS.md` is a short index; keep `.cursor/rules/` aligned when standards change.
 
 ## Purpose (why these rules exist)
 
@@ -35,3 +35,7 @@ Canonical durable summary: repo root `AGENTS.md`. Keep these rules aligned when 
 - Deps: exact pins in `requirements.txt`; `package-lock.json` committed; CI/deploy uses `npm ci`.
 - Secrets: `.env` gitignored; `.env.example` committed; never in scripts or source.
 - Startup: validate env/config at import or app factory time — `pydantic_settings.BaseSettings` for new services, or existing `goat_ai/config.py` `@dataclass` + `load_settings()`. Crash with a clear message at startup, never lazily on first request.
+
+## Documentation language
+
+- **`docs/`** and **`README.md`**: committed prose must be **English** only (see also `documentation-workflow.mdc` and `AGENTS.md`).

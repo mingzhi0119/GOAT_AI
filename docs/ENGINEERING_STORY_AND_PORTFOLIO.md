@@ -18,7 +18,7 @@ Keep these artifacts **current** as Phase 13 items land. They become your "befor
 
 | Record | Why it matters for a portfolio |
 |--------|----------------------------------|
-| **Dated snapshots of constraints** | Shared host, no `sudo`, single port via nginx, JupyterHub-style path - proves the design is situational, not generic tutorial stack. |
+| **Dated snapshots of constraints** | Example: shared host, no `sudo`, reverse proxy + single port, sub-path deployment—proves the design fits **real** constraints, not only a greenfield stack. |
 | **Phase 13 exit criteria -> evidence** | Each checkbox in Phase 13 should map to a **PR, doc section, or runbook command** - not "we improved logging" in the abstract. |
 | **Before/after bullets** | Short list: what was true *before* Wave A (e.g. text logs only, no `/ready`, silent persistence failures) vs *after*. |
 | **Trade-off log** | Link to [ROADMAP.md](ROADMAP.md) Decision Log; add 1-2 sentences per major choice (Postgres deferred, error model before big split, policies before directory migration). |
@@ -32,7 +32,7 @@ Keep these artifacts **current** as Phase 13 items land. They become your "befor
 ## 2. The problem (portfolio framing)
 
 **One-line pitch (refine for your voice):**  
-A strategic-analysis chat product that must run on **school/shared infrastructure** - no root, predictable port, browser-friendly SPA - with **local Ollama** inference and **durable session history**, without pretending the ops environment is a greenfield Kubernetes cluster.
+A strategic-analysis chat product whose **reference** deployment includes **shared, unprivileged** infrastructure (no root, predictable port, browser-friendly SPA)—while the **same codebase** targets dev machines and other server layouts—with **local Ollama** inference and **durable session history**, without pretending every environment is a greenfield Kubernetes cluster.
 
 **Why SQLite + Ollama + shared host is a feature in the story:**  
 They are **constraints that force** clear boundaries, observable failure modes, and migration discipline. The portfolio reads better when you say **what you refused to fake** (e.g. swapping Postgres "for show" and **what you built instead** (migrations as artifacts, backup runbook, metrics under single-process limits).
@@ -132,8 +132,8 @@ The differentiator is not the stack list; it is **the documented path from demo-
 
 - [ROADMAP.md](ROADMAP.md) -Phase 13 (§13.0, Wave A/B), Phase 14 RAG-first sequencing, and Phase 15 structural semantics.
 - [OPERATIONS.md](OPERATIONS.md) -deploy, env, host constraints (keep aligned with claims on your homepage).
-- [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) -day-to-day engineering contract.
-- [AGENTS.md](../AGENTS.md) -durable repo memory for automation and contributors.
+- [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) — canonical engineering contract.
+- [AGENTS.md](../AGENTS.md) — short index; full rules in ENGINEERING_STANDARDS.
 
 ---
 

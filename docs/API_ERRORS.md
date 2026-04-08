@@ -25,9 +25,13 @@ JSON error responses use a **stable envelope** so logs, metrics, and clients sha
 | `REQUEST_VALIDATION_ERROR` | 422 | no | Body / query validation failed |
 | `NOT_FOUND` | 404 | no | Resource does not exist |
 | `KNOWLEDGE_NOT_FOUND` | 404 | no | Knowledge document or ingestion record does not exist |
+| `MEDIA_NOT_FOUND` | 404 | no | Vision image attachment id missing or invalid |
+| `VISION_NOT_SUPPORTED` | 422 | no | Image attachments sent but the model does not report Ollama `vision` capability |
 | `NOT_IMPLEMENTED` | 501 | no | Contract exists but the feature has not landed yet |
 | `INFERENCE_BACKEND_UNAVAILABLE` | 503 | yes | Ollama (or equivalent) unreachable |
 | `INTERNAL_ERROR` | 500 | no | Unhandled server error (detail sanitized) |
+| `FEATURE_DISABLED` | 403 | no | Policy / AuthZ: caller is not allowed to use this capability (see §15 in `docs/ENGINEERING_STANDARDS.md`) |
+| `FEATURE_UNAVAILABLE` | 503 | yes | Runtime / deployment: feature is off or a dependency (e.g. Docker) is not ready on this host—not an authorization decision |
 
 \*Retry hint is **documentary** for Wave B client policy; server behavior is defined per endpoint.
 
@@ -40,4 +44,4 @@ JSON error responses use a **stable envelope** so logs, metrics, and clients sha
 ## Related
 
 - [ROADMAP.md](ROADMAP.md) Phase 13 §13.0  
-- [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md)
+- [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) · [AGENTS.md](../AGENTS.md) (index)

@@ -1,8 +1,8 @@
 # GOAT AI — Engineering Standards
 
-> **This document is the authoritative reference for all code written in this project.**  
-> Every AI assistant, contributor, or reviewer must follow these standards.  
-> Last updated: 2026-04-07
+> **Single source of truth for engineering rules in this repo.**  
+> Repo root [`AGENTS.md`](../AGENTS.md) is a short durable index for automation; it must stay aligned with this file.  
+> Last updated: 2026-04-08
 
 ---
 
@@ -157,6 +157,7 @@ backend/
 
 **Rules**:
 - `routers/` only: validate input, call service, return response.
+- **Never read `os.environ` inside request handlers** — use injected `Settings` / dependencies.
 - `services/` only: orchestrate, no HTTP primitives.
 - **Tabular context for charts**: resolve upload-embedded tables through injectable `TabularContextExtractor` (`tabular_context.py`), not ad hoc regex scattered in orchestration.
 - **`log_service` imports:** under `backend/services/`, only `log_service.py` and `chat_runtime.py` may import `log_service` (enforced by `__tests__/test_architecture_boundaries.py`).
@@ -413,6 +414,7 @@ def create_app() -> FastAPI:
 ## 5. API Design Rules
 
 - **SSE for streaming**, not WebSocket — simpler, works through more proxies, native `EventSource` in browser.
+- **Charts:** backend compiles `ChartIntentV2` → `ChartSpecV2` / ECharts options; models must not emit raw chart-library JSON. If the model does not report native tool support, keep chart rendering **disabled** (no pseudo chart markup fallback).
 - Every endpoint returns a typed Pydantic response model — never `dict` or `Response(content=...)` unless it's a stream.
 - Use `Depends()` for all cross-cutting concerns (auth, settings, LLM client) — no global state.
 - Prefix all API routes with `/api/` — frontend SPA handles everything else.
@@ -470,3 +472,129 @@ Before every commit ask:
 - [ ] `requirements.txt` / `package-lock.json` updated if dependencies changed.
 - [ ] The change runs with `python -m pytest __tests__/ -v` green and `npm test -- --run` green.
 - [ ] `OPERATIONS.md` updated if a new env var or startup step was added.
+
+---
+
+## 8. API contract workflow (prefer contracts over source spelunking)
+
+- Treat the API surface as a **black-box contract** first, not a source-reading exercise.
+- For existing APIs, prefer these artifacts before opening implementation files:
+  - `__tests__/test_api_blackbox_contract.py`
+  - `__tests__/test_api_auth.py`
+  - `__tests__/test_api_security.py`
+  - `docs/openapi.json`
+  - `docs/api.llm.yaml`
+- Open implementation only when changing behavior, when contract tests/docs disagree with runtime, or when debugging needs details not visible from the contract layer.
+
+---
+
+## 9. Project snapshot (environment targets)
+
+| Item | Value |
+|------|--------|
+| Repo | `GOAT_AI` |
+| Supported environments | **Windows, macOS, Linux** for development; Linux or containerized hosts for production—**not** limited to one campus image (see `README.md` **Environments**) |
+| Example reference deployment | Unprivileged shared Linux with GPU (e.g. A100) + Ollama + reverse proxy—one real ops profile, not a global requirement |
+| App shape | FastAPI backend serving a React SPA |
+| Default bind port | `62606` (`GOAT_SERVER_PORT`; override per environment) |
+| Frontend build | Vite |
+| Frontend runtime (server/CI) | Node 24 (see `.nvmrc`) |
+| Backend runtime | Python 3.12 |
+
+---
+
+## 10. Production host and deploy constraints
+
+- The bullets below describe **a common production profile** (shared, **no root**, no control of system nginx). **Other** deployments (full VM, Docker Compose, Kubernetes, rootful single-tenant) may differ; behavior must remain **env-driven**, not hardcoded to one school host.
+- Shared / JupyterHub-style environment: **no `sudo`**, no assumed system-wide `systemctl`, nginx reloads, or `/etc/*` edits.
+- `systemctl --user` may work but can fail over SSH; keep **`nohup` + `logs/fastapi.pid`** as a permanent fallback.
+- Uvicorn on `0.0.0.0:62606` is valid for this user.
+- Prefer `GOAT_GPU_UUID` for the A100; do not silently bind to the wrong GPU (e.g. GT 1030).
+- Develop/deploy from the **current checkout** by default; `deploy.sh` must not assume `git pull` / `git reset --hard` unless **`SYNC_GIT=1`** (explicit opt-in).
+- Runtime target resolution: `GOAT_DEPLOY_TARGET=auto` prefers `GOAT_SERVER_PORT` (default `62606`) and falls back to `GOAT_LOCAL_PORT` only when the server port cannot be used; keep **`GET /api/system/runtime-target`** aligned with scripts.
+
+---
+
+## 11. Theme (frontend)
+
+- Light/dark mode uses a `.dark` class on `<html>`.
+- Theme state persists in `localStorage`.
+- Global theme tokens live in `frontend/src/styles/global.css`.
+
+---
+
+## 12. Documentation update rules
+
+- **Language** — All prose in **`docs/`** and **`README.md`** must be **English**. Do not commit Chinese or other non-English text in those paths.
+
+When behavior changes, update:
+
+- `README.md` — architecture, structure, or developer workflow
+- `docs/openapi.json` — committed OpenAPI from FastAPI (`backend.main:app`)
+- `docs/api.llm.yaml` — regenerate via `python tools/generate_llm_api_yaml.py`
+- `docs/API_REFERENCE.md` — human-readable endpoint reference
+- `docs/OPERATIONS.md` — env vars, deploy, startup, host operations
+- `docs/PROJECT_STATUS.md` — current shipped state
+- `docs/ROADMAP.md` — phase completion and future work
+- Optional / capability-gated features — follow **§15**; update **`.env.example`** and **`docs/OPERATIONS.md`** for new `GOAT_*` flags
+
+---
+
+## 13. API contract artifacts
+
+- Canonical machine-readable contract: **`docs/openapi.json`** (OpenAPI **3.2.0**), regenerated when endpoints/schemas change.
+- Canonical LLM-facing compact contract: **`docs/api.llm.yaml`** (generated, not hand-maintained except via generator changes).
+- Canonical **executable** contract: black-box suites under `__tests__/`, especially `test_api_blackbox_contract.py`.
+
+---
+
+## 14. Recovery and commit hygiene
+
+- If work appears lost, check **`git reflog`** before assuming it is gone.
+- Be careful with **`git reset --hard`** when development happens on the shared host.
+- Do not commit `.venv/`, PID files, SQLite runtime files, notebook checkpoints, or other machine-local artifacts.
+- Before committing: no `print()` in production paths, no commented-out code, no hardcoded secrets/ports/paths; new functions typed; tests where practical; dependency locks updated when deps change.
+
+---
+
+## 15. Feature enable/disable and gating (industrial pattern)
+
+Industrial-grade **feature on/off (including authorization and runtime capability gating)** must be **layered**; hiding buttons in the frontend alone is not sufficient.
+
+### 15.1 Two kinds of gates (do not conflate)
+
+| Kind | Meaning | Typical inputs | How to model in the API |
+|------|---------|----------------|-------------------------|
+| **Authorization / policy** | Whether **this user, role, or tenant** is **allowed** to use the feature | API key scope, session ownership, RBAC | `{ policy_allowed, deny_reason }`; denial tends toward **403** |
+| **Capability / runtime** | Whether **deployment policy, Docker, GPU, sandbox, external deps** are **ready right now** | `GOAT_*`, socket probes, `/api/ready`-style checks | `{ effective_enabled, deny_reason }`; denial tends toward **503** |
+
+Both can look like **`{ enabled, reason }`, but the semantics differ**: Docker socket probes and operator kill-switches are **runtime / feature availability**, not the same meaning as **“permission”** in the AuthZ sense. This repo’s AuthZ roadmap is in `docs/ROADMAP.md` Phase 15; **readiness** and **`/api/ready`** have their own semantics—do not mix them with feature gates in documentation.
+
+### 15.2 HTTP semantics and stable `code` (avoid implementation drift)
+
+- **`403 Forbidden`** — The **caller is not authorized** to use this feature (policy / AuthZ denial).
+- **`503 Service Unavailable`** — The feature is **not available on this deployment/runtime**, or a **dependency is not ready** (runtime / capability / operator-disabled capability that applies to the whole deployment).
+- **`422` / `409`** — Use only in the **few** cases where the request is **well-formed but conflicts with current **feature state**; do **not** overuse them.
+- Stay consistent with global readiness: behaviors such as **`/api/ready`** when a global dependency is down remain **503** per existing rules.
+
+Routes must **translate** the service’s gate decision into the HTTP semantics and **`code`** above (see `docs/API_ERRORS.md`), e.g. **`FEATURE_DISABLED`** (403) vs **`FEATURE_UNAVAILABLE`** (503).
+
+### 15.3 `deny_reason` (controlled enum, safe for clients)
+
+- **`deny_reason` must be a stable, documentable, enumerable public value**; logs may carry richer internal context, but the **API must not echo raw exception strings**.
+- Client-facing **`detail`** should use **fixed short phrases** mapped server-side from `deny_reason` + gate kind, not stacks or internal diagnostics in JSON.
+
+### 15.4 Five layers (not frontend-only)
+
+1. **Configuration (startup)** — Express whether the **deployment policy allows** the feature via `GOAT_*` and related env vars; **fail fast** in `load_settings()` on contradictory combinations (e.g. sandbox enabled in config but required paths missing when you enforce strict validation).
+2. **Runtime probing** — At startup or first use, probe Docker socket / runtime dependencies for **actual availability**, producing **`effective_enabled`** and an **enumerated `deny_reason`**; do not return raw exception strings to clients.
+3. **Three enforcement layers**
+   - **Service** — **Single place** to validate before any side effect (spawn process, disk, outbound network); this is the **primary enforcement** point.
+   - **Route** — Map gate decisions to stable HTTP semantics and **`code`**. **Not authorized → 403**; **dependency not ready / feature unavailable on this deployment → 503**.
+   - **Frontend** — Consumes public **capability / feature** payloads for UI only; this is **UX**, **not** a security boundary.
+4. **API contract** — Expose stable shapes via **`GET /api/system/features`** (or equivalent); schema changes must stay in sync with **OpenAPI** and the **black-box contract**.
+5. **Observability and tests** — Add metrics such as `feature_gate_denials_total{feature,reason}`; cover contradictory config, missing deps, policy denial, and closed-feature status codes in a **test matrix**, with black-box assertions.
+
+### 15.5 Documentation and operations
+
+- Document each **`GOAT_*` flag in **`.env.example`** and **`docs/OPERATIONS.md`**, including whether it is **runtime vs policy** when that distinction matters.

@@ -1,0 +1,3 @@
+{"id": "rewrite_whitespace", "op": "rewrite", "input": "  Porter's   Five   Forces  ", "expected": "Porter's Five Forces"}
+{"id": "lexical_prefers_overlap", "op": "lexical_rerank", "query": "alpha beta", "hits": [{"chunk_id": "low", "document_id": "d1", "filename": "f.txt", "snippet": "unrelated gamma text", "score": 0.95}, {"chunk_id": "high", "document_id": "d1", "filename": "f.txt", "snippet": "alpha beta and more", "score": 0.1}], "expect_top_chunk_id": "high"}
+{"id": "passthrough_order", "op": "passthrough", "query": "q", "hits": [{"chunk_id": "first", "document_id": "d1", "filename": "f.txt", "snippet": "x", "score": 0.1}, {"chunk_id": "second", "document_id": "d1", "filename": "f.txt", "snippet": "y", "score": 0.9}], "expect_top_chunk_id": "first"}

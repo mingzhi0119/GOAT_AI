@@ -38,6 +38,7 @@ class CountingLLM:
         system_prompt: str,
         *,
         ollama_options: dict[str, float | int] | None = None,
+        last_user_images_base64: list[str] | None = None,
     ) -> Generator[str, None, None]:
         self.calls += 1
         yield self._response

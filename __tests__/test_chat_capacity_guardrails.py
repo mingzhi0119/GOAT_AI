@@ -37,6 +37,7 @@ class _FakeLLM:
         system_prompt: str,
         *,
         ollama_options: dict[str, float | int] | None = None,
+        last_user_images_base64: list[str] | None = None,
     ):
         yield "ok"
 

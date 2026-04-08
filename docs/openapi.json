@@ -997,6 +997,88 @@
         }
       }
     },
+    "/api/media/uploads": {
+      "post": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Upload an image for vision chat",
+        "description": "Persist and normalize a PNG/JPEG/WebP image for use with POST /api/chat.",
+        "operationId": "post_media_upload_api_media_uploads_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_post_media_upload_api_media_uploads_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/system/gpu": {
       "get": {
         "tags": [
@@ -1054,6 +1136,48 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InferenceLatencyResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/system/features": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Read capability-gated feature flags",
+        "description": "Return config + host probes for optional high-risk features (see docs/ENGINEERING_STANDARDS.md §15).",
+        "operationId": "get_system_features_api_system_features_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemFeaturesResponse"
                 }
               }
             }
@@ -1188,6 +1312,75 @@
         }
       }
     },
+    "/api/code-sandbox/exec": {
+      "post": {
+        "tags": [
+          "code_sandbox"
+        ],
+        "summary": "Execute code in sandbox (not implemented)",
+        "description": "Scaffold: enforces the feature gate; returns 501 when the gate passes and execution is not built yet.",
+        "operationId": "post_code_sandbox_exec_api_code_sandbox_exec_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Post Code Sandbox Exec Api Code Sandbox Exec Post"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Policy denied (FEATURE_DISABLED)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Runtime gate closed (FEATURE_UNAVAILABLE)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Execution engine not implemented"
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "tags": [
@@ -1244,6 +1437,20 @@
         ],
         "title": "Body_post_knowledge_upload_api_knowledge_uploads_post"
       },
+      "Body_post_media_upload_api_media_uploads_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_post_media_upload_api_media_uploads_post"
+      },
       "Body_upload_and_parse_api_upload_post": {
         "properties": {
           "file": {
@@ -1274,6 +1481,14 @@
             "title": "File Context",
             "description": "True when this user message is upload-derived tabular file context.",
             "default": false
+          },
+          "image_attachment_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Image Attachment Ids",
+            "description": "Optional image attachment ids (vision) associated with this user turn."
           }
         },
         "type": "object",
@@ -1307,6 +1522,14 @@
             "type": "array",
             "title": "Knowledge Document Ids",
             "description": "Optional indexed knowledge documents to use for retrieval-augmented answering."
+          },
+          "image_attachment_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Image Attachment Ids",
+            "description": "Optional uploaded image attachments for the current turn (last user message)."
           },
           "session_id": {
             "anyOf": [
@@ -1381,6 +1604,57 @@
         ],
         "title": "ChatRequest",
         "description": "Body for POST /api/chat."
+      },
+      "CodeSandboxFeaturePayload": {
+        "properties": {
+          "policy_allowed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Allowed",
+            "description": "Reserved for authorization; null until AuthZ lands."
+          },
+          "allowed_by_config": {
+            "type": "boolean",
+            "title": "Allowed By Config",
+            "description": "Operator enabled the feature in deployment config."
+          },
+          "available_on_host": {
+            "type": "boolean",
+            "title": "Available On Host",
+            "description": "Probed runtime dependency (e.g. Docker) appears usable."
+          },
+          "effective_enabled": {
+            "type": "boolean",
+            "title": "Effective Enabled",
+            "description": "Both config and probe satisfied."
+          },
+          "deny_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deny Reason",
+            "description": "Controlled enum for runtime gate only; never raw exception text."
+          }
+        },
+        "type": "object",
+        "required": [
+          "allowed_by_config",
+          "available_on_host",
+          "effective_enabled"
+        ],
+        "title": "CodeSandboxFeaturePayload",
+        "description": "Runtime / dependency readiness for the code sandbox (§15).\n\n**Policy / AuthZ** (per-user, per-role) is separate: use ``policy_allowed`` when implemented;\nuntil then it stays ``null``. Do not confuse with Docker/runtime probes below."
       },
       "ErrorResponse": {
         "properties": {
@@ -1683,6 +1957,14 @@
           "content": {
             "type": "string",
             "title": "Content"
+          },
+          "image_attachment_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Image Attachment Ids",
+            "description": "Vision image attachment ids stored for this user turn."
           }
         },
         "type": "object",
@@ -2081,6 +2363,18 @@
             },
             "type": "array",
             "title": "Hits"
+          },
+          "effective_query": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Query",
+            "description": "When query rewrite is active, the normalized string used for retrieval."
           }
         },
         "type": "object",
@@ -2182,6 +2476,58 @@
         "title": "KnowledgeUploadStatusResponse",
         "description": "Lookup response for one persisted knowledge upload."
       },
+      "MediaUploadResponse": {
+        "properties": {
+          "attachment_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Attachment Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type"
+          },
+          "byte_size": {
+            "type": "integer",
+            "title": "Byte Size"
+          },
+          "width_px": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width Px"
+          },
+          "height_px": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height Px"
+          }
+        },
+        "type": "object",
+        "required": [
+          "attachment_id",
+          "filename",
+          "mime_type",
+          "byte_size"
+        ],
+        "title": "MediaUploadResponse",
+        "description": "Response for POST /api/media/uploads."
+      },
       "ModelCapabilitiesResponse": {
         "properties": {
           "model": {
@@ -2202,6 +2548,10 @@
           "supports_chart_tools": {
             "type": "boolean",
             "title": "Supports Chart Tools"
+          },
+          "supports_vision": {
+            "type": "boolean",
+            "title": "Supports Vision"
           }
         },
         "type": "object",
@@ -2209,7 +2559,8 @@
           "model",
           "capabilities",
           "supports_tool_calling",
-          "supports_chart_tools"
+          "supports_chart_tools",
+          "supports_vision"
         ],
         "title": "ModelCapabilitiesResponse",
         "description": "Capabilities for one Ollama model."
@@ -2290,6 +2641,19 @@
         ],
         "title": "RuntimeTargetResponse",
         "description": "Resolved runtime target metadata used by deploy/ops tooling."
+      },
+      "SystemFeaturesResponse": {
+        "properties": {
+          "code_sandbox": {
+            "$ref": "#/components/schemas/CodeSandboxFeaturePayload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code_sandbox"
+        ],
+        "title": "SystemFeaturesResponse",
+        "description": "Public feature flags derived from config + host probes."
       },
       "UploadAnalysisResponse": {
         "properties": {
@@ -2400,6 +2764,14 @@
     {
       "name": "knowledge",
       "description": "Contract-first knowledge ingestion and retrieval endpoints."
+    },
+    {
+      "name": "media",
+      "description": "Image uploads for vision-capable chat."
+    },
+    {
+      "name": "code_sandbox",
+      "description": "Capability-gated code execution (scaffold)."
     }
   ]
 }

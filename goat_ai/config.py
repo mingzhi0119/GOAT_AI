@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import Final, Literal, cast
 
 _PACKAGE_ROOT = Path(__file__).resolve().parent
 APP_ROOT = _PACKAGE_ROOT.parent
@@ -110,6 +110,11 @@ class Settings:
     max_chat_messages: int = 120
     max_chat_payload_bytes: int = 512000
     chat_first_event_timeout_sec: int = 90
+    max_image_media_bytes: int = 12 * 1024 * 1024
+    max_image_edge_px: int = 2048
+    rag_rerank_mode: Literal["passthrough", "lexical"] = "passthrough"
+    feature_code_sandbox_enabled: bool = False
+    docker_socket_path: str = ""
 
     @property
     def user_facing_error(self) -> str:
@@ -178,6 +183,17 @@ def load_settings() -> Settings:
         raise ValueError("GOAT_MAX_CHAT_PAYLOAD_BYTES must be >= 1024")
     if _chat_first_event_timeout_sec < 1:
         raise ValueError("OLLAMA_CHAT_FIRST_EVENT_TIMEOUT must be >= 1")
+    _max_image_media_bytes = int(os.environ.get("GOAT_MAX_IMAGE_MEDIA_BYTES", str(12 * 1024 * 1024)))
+    _max_image_edge_px = int(os.environ.get("GOAT_MAX_IMAGE_EDGE_PX", "2048"))
+    if _max_image_media_bytes < 1024:
+        raise ValueError("GOAT_MAX_IMAGE_MEDIA_BYTES must be >= 1024")
+    if _max_image_edge_px < 64:
+        raise ValueError("GOAT_MAX_IMAGE_EDGE_PX must be >= 64")
+    _rag_rerank = os.environ.get("GOAT_RAG_RERANK_MODE", "passthrough").strip().lower()
+    if _rag_rerank not in ("passthrough", "lexical"):
+        raise ValueError("GOAT_RAG_RERANK_MODE must be one of: passthrough, lexical")
+    _feature_sandbox = _env_bool("GOAT_FEATURE_CODE_SANDBOX", "false")
+    _docker_sock = os.environ.get("GOAT_DOCKER_SOCKET", "").strip()
     return Settings(
         ollama_base_url=base,
         generate_timeout=int(os.environ.get("OLLAMA_GENERATE_TIMEOUT", "120")),
@@ -210,4 +226,9 @@ def load_settings() -> Settings:
         max_chat_messages=_max_chat_messages,
         max_chat_payload_bytes=_max_chat_payload_bytes,
         chat_first_event_timeout_sec=_chat_first_event_timeout_sec,
+        max_image_media_bytes=_max_image_media_bytes,
+        max_image_edge_px=_max_image_edge_px,
+        rag_rerank_mode=cast(Literal["passthrough", "lexical"], _rag_rerank),
+        feature_code_sandbox_enabled=_feature_sandbox,
+        docker_socket_path=_docker_sock,
     )

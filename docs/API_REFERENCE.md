@@ -35,6 +35,7 @@ Base path: `/api`
 | `GET` | `/api/knowledge/ingestions/{ingestion_id}` | Read one ingestion job |
 | `POST` | `/api/knowledge/search` | Search indexed knowledge chunks |
 | `POST` | `/api/knowledge/answers` | Retrieval-backed answer with citations |
+| `POST` | `/api/media/uploads` | Register a vision image attachment (PNG/JPEG/WebP) for `image_attachment_ids` on chat |
 | `GET` | `/api/history` | List saved sessions |
 | `GET` | `/api/history/{session_id}` | Read one session |
 | `DELETE` | `/api/history` | Delete all sessions |
@@ -42,6 +43,8 @@ Base path: `/api`
 | `GET` | `/api/system/gpu` | GPU telemetry |
 | `GET` | `/api/system/inference` | Rolling chat latency |
 | `GET` | `/api/system/runtime-target` | Runtime target resolution |
+| `GET` | `/api/system/features` | Capability-gated feature flags (config + host probe) |
+| `POST` | `/api/code-sandbox/exec` | Code sandbox scaffold (503 when runtime gate closed; 403 when policy denies; 501 when enabled but not implemented) |
 
 ## `GET /api/health`
 
@@ -260,6 +263,7 @@ Current behavior:
 
 - Returns ranked hits with `document_id`, `chunk_id`, `filename`, `snippet`, and `score`
 - Supports `document_ids` filtering and `top_k`
+- `retrieval_profile` selects quality behavior: `default` (vector order; optional `GOAT_RAG_RERANK_MODE=lexical` for the default profile), `rag3_lexical` (lexical overlap rerank), `rag3_quality` (lexical rerank plus conservative whitespace query normalization). When rewrite applies, `effective_query` echoes the normalized query used for retrieval.
 
 ## `POST /api/knowledge/answers`
 
@@ -270,6 +274,16 @@ Current behavior:
 - Returns a retrieval-backed answer plus citation payloads
 - Defines explicit no-hit behavior: `No relevant context found in the indexed knowledge base.`
 - When `document_ids` are provided and lexical retrieval misses, the first indexed chunks from those attached documents are used as a bounded fallback scope
+
+## `POST /api/media/uploads`
+
+Multipart upload of one image for vision chat.
+
+Current behavior:
+
+- Accepts **PNG**, **JPEG**, or **WebP**; validates size/type and persists under `GOAT_DATA_DIR` for the lifetime of the attachment id
+- Returns `attachment_id`, `filename`, `mime_type`, `byte_size`, and optional `width_px` / `height_px`
+- Use the `attachment_id` values in `image_attachment_ids` on `POST /api/chat` when the model reports Ollama **vision** capability; otherwise the chat request may fail validation (`422`, `VISION_NOT_SUPPORTED`)
 
 ## `GET /api/history`
 
@@ -394,6 +408,28 @@ Returns deploy target resolution information:
   ]
 }
 ```
+
+## `GET /api/system/features`
+
+Returns machine-readable flags for optional high-risk features (see `docs/ENGINEERING_STANDARDS.md` §15). Example:
+
+```json
+{
+  "code_sandbox": {
+    "policy_allowed": null,
+    "allowed_by_config": false,
+    "available_on_host": false,
+    "effective_enabled": false,
+    "deny_reason": "disabled_by_operator"
+  }
+}
+```
+
+`policy_allowed` is reserved for future per-caller authorization; until then it is **`null`**. `deny_reason` when the **runtime** gate is closed is one of: `disabled_by_operator`, `docker_unavailable` (controlled enum; not raw exception text).
+
+## `POST /api/code-sandbox/exec`
+
+Scaffold endpoint: enforces the code-sandbox gate. When the **runtime** gate fails (operator off or Docker unavailable), returns **`503`** with `code: FEATURE_UNAVAILABLE` and a stable `detail` string mapped from `deny_reason`. When **policy** denies the caller (future AuthZ), expect **`403`** with `code: FEATURE_DISABLED`. Returns **`501`** when the gate passes but execution is not implemented yet.
 
 ## Canonical sources
 

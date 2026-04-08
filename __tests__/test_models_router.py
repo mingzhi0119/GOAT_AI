@@ -37,6 +37,7 @@ class FakeModelsLLMClient:
         system_prompt: str,
         *,
         ollama_options: dict[str, float | int] | None = None,
+        last_user_images_base64: list[str] | None = None,
     ) -> Generator[str, None, None]:
         if False:
             yield ""
@@ -108,6 +109,7 @@ class ModelsRouterIntegrationTests(unittest.TestCase):
         self.assertEqual(["completion", "tools"], payload["capabilities"])
         self.assertTrue(payload["supports_tool_calling"])
         self.assertTrue(payload["supports_chart_tools"])
+        self.assertFalse(payload["supports_vision"])
 
 
 if __name__ == "__main__":

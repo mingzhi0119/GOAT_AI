@@ -68,16 +68,24 @@ Important behavior:
 - Windows deploy reuses Ollama on `127.0.0.1:11434` when available unless `OLLAMA_BASE_URL` is explicitly set
 - Deploy now includes a post-deploy contract check (`scripts/post_deploy_check.py`) before success is reported
 
-## Shared-host constraints
+## Deployment profiles
 
-This project is designed for an unprivileged JupyterHub-style server environment:
+The app is **portable** across environments (see `README.md` **Environments**). The following sections describe **common** profiles, not exclusive ones.
+
+### Shared unprivileged host (reference profile)
+
+Many production installs match an **unprivileged** server (e.g. JupyterHub-style lab user): no root, no system nginx control, optional user systemd.
 
 - No `sudo` / no root
 - Do not assume nginx reload access
 - `systemctl --user` may work, but may also be unavailable in SSH sessions
-- `nohup` fallback must remain supported
-- Preferred GPU target is the A100:
+- `nohup` fallback must remain supported for deploy scripts
+- On multi-GPU hosts, set a **GPU UUID** so telemetry/UI do not bind to the wrong card (example A100):
   - `GOAT_GPU_UUID=GPU-fb2cf8f7-e9bf-f136-a3bb-e150426598e8`
+
+### Other environments
+
+Self-managed VMs, Docker Compose, Kubernetes, or developer laptops use the same codebase with **env-driven** ports and paths. Features that need **strong isolation** (e.g. a future **code-execution sandbox**) must be **off** unless Docker (or an approved runtime) is available and explicitly enabled—see **`docs/ENGINEERING_STANDARDS.md` §15** and `README.md` **Capability-based / high-risk features**.
 
 ## Key environment variables
 
@@ -91,7 +99,7 @@ This project is designed for an unprivileged JupyterHub-style server environment
 | `GOAT_SYSTEM_PROMPT` | Override system prompt | built-in default |
 | `GOAT_SYSTEM_PROMPT_FILE` | Path to UTF-8 prompt file | empty |
 | `GOAT_LOG_PATH` | SQLite path | `<project>/chat_logs.db` |
-| `GOAT_DATA_DIR` | Root directory for persisted uploads, normalized knowledge text, and local vector indexes | `<project>/data` |
+| `GOAT_DATA_DIR` | Root directory for persisted uploads, normalized knowledge text, vector indexes, and vision attachments | `<project>/data` (gitignored by default; do not commit) |
 | `GOAT_API_KEY` | Protect non-health APIs via `X-GOAT-API-Key` | empty |
 | `GOAT_RATE_LIMIT_WINDOW_SEC` | Rate limit window | `60` |
 | `GOAT_RATE_LIMIT_MAX_REQUESTS` | Max requests per window | `60` |
@@ -113,6 +121,8 @@ This project is designed for an unprivileged JupyterHub-style server environment
 | `GOAT_IDEMPOTENCY_TTL_SEC` | Idempotency record TTL (seconds) for upload analyze + chat session append | `300` |
 | `GOAT_MAX_CHAT_MESSAGES` | Max message count accepted by `POST /api/chat` (422 if exceeded) | `120` |
 | `GOAT_MAX_CHAT_PAYLOAD_BYTES` | Max UTF-8 request payload bytes accepted by `POST /api/chat` (422 if exceeded) | `512000` |
+| `GOAT_FEATURE_CODE_SANDBOX` | Operator allows code-sandbox feature (`0`/`1`); `effective_enabled` still requires Docker probe | `0` |
+| `GOAT_DOCKER_SOCKET` | Override Docker socket/pipe path (empty = defaults: Unix `/var/run/docker.sock`, Windows `\\.\pipe\docker_engine`) | empty |
 
 ### Structured logging (Phase 13 Wave A)
 

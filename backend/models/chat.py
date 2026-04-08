@@ -13,6 +13,10 @@ class ChatMessage(BaseModel):
         default=False,
         description="True when this user message is upload-derived tabular file context.",
     )
+    image_attachment_ids: list[str] = Field(
+        default_factory=list,
+        description="Optional image attachment ids (vision) associated with this user turn.",
+    )
 
 
 class ChatRequest(BaseModel):
@@ -23,6 +27,10 @@ class ChatRequest(BaseModel):
     knowledge_document_ids: list[str] = Field(
         default_factory=list,
         description="Optional indexed knowledge documents to use for retrieval-augmented answering.",
+    )
+    image_attachment_ids: list[str] = Field(
+        default_factory=list,
+        description="Optional uploaded image attachments for the current turn (last user message).",
     )
     session_id: str | None = None
     system_instruction: str | None = Field(
@@ -63,3 +71,4 @@ class ModelCapabilitiesResponse(BaseModel):
     capabilities: list[str]
     supports_tool_calling: bool
     supports_chart_tools: bool
+    supports_vision: bool

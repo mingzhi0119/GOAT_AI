@@ -1,5 +1,5 @@
 ---
-description: Python typing, Pydantic, logging, layered errors, and backend folder boundaries (AGENTS.md backend sections)
+description: Python typing, Pydantic, logging, layered errors, and backend folder boundaries (docs/ENGINEERING_STANDARDS.md §1)
 globs: **/*.py
 alwaysApply: false
 ---

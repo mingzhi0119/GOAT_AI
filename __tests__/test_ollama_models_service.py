@@ -35,6 +35,13 @@ class OllamaModelsServiceTests(unittest.TestCase):
         out = model_capabilities_for_api(llm, "m")
         self.assertTrue(out.supports_tool_calling)
         self.assertTrue(out.supports_chart_tools)
+        self.assertFalse(out.supports_vision)
+
+    def test_capabilities_sets_vision_flag(self) -> None:
+        llm = MagicMock()
+        llm.get_model_capabilities.return_value = ["completion", "vision"]
+        out = model_capabilities_for_api(llm, "m")
+        self.assertTrue(out.supports_vision)
 
 
 if __name__ == "__main__":

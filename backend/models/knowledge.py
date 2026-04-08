@@ -69,6 +69,10 @@ class KnowledgeSearchResponse(BaseModel):
 
     query: str
     hits: list[KnowledgeCitation] = Field(default_factory=list)
+    effective_query: str | None = Field(
+        default=None,
+        description="When query rewrite is active, the normalized string used for retrieval.",
+    )
 
 
 class KnowledgeAnswerRequest(BaseModel):

@@ -39,6 +39,7 @@ class FakeLLMClient:
         system_prompt: str,
         *,
         ollama_options: dict[str, float | int] | None = None,
+        last_user_images_base64: list[str] | None = None,
     ) -> Generator[str, None, None]:
         yield "Hello"
         yield "!"
@@ -155,6 +156,7 @@ class FakeLongStreamingLLMClient(FakeLLMClient):
         system_prompt: str,
         *,
         ollama_options: dict[str, float | int] | None = None,
+        last_user_images_base64: list[str] | None = None,
     ) -> Generator[str, None, None]:
         yield "This is the first chunk."
         yield " Here is the second chunk."
@@ -264,6 +266,7 @@ def test_stream_chat_sse_does_not_emit_chart_from_legacy_pseudo_block_when_tools
             system_prompt: str,
             *,
             ollama_options: dict[str, float | int] | None = None,
+            last_user_images_base64: list[str] | None = None,
         ) -> Generator[str, None, None]:
             yield "Analysis summary.\n\n:::chart\n"
             yield '{"type":"line","title":"Revenue trend","xKey":"month","series":[{"key":"revenue","name":"Revenue"}]}\n:::'

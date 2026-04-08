@@ -11,14 +11,22 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.api_errors import (
+    FEATURE_DISABLED,
+    FEATURE_UNAVAILABLE,
     INFERENCE_BACKEND_UNAVAILABLE,
     KNOWLEDGE_NOT_FOUND,
+    MEDIA_NOT_FOUND,
+    VISION_NOT_SUPPORTED,
     build_error_body,
     default_code_for_http_status,
 )
+from backend.services.exceptions import FeatureNotAvailable
 from backend.services.exceptions import InferenceBackendUnavailable
 from backend.services.exceptions import KnowledgeDocumentNotFound
 from backend.services.exceptions import KnowledgeFeatureNotImplemented
+from backend.services.exceptions import MediaNotFound
+from backend.services.exceptions import VisionNotSupported
+from goat_ai.feature_gates import feature_gate_public_detail
 from goat_ai.request_context import get_request_id
 
 logger = logging.getLogger(__name__)
@@ -70,6 +78,62 @@ def register_exception_handlers(app: FastAPI) -> None:
                     detail=str(exc),
                     code=KNOWLEDGE_NOT_FOUND,
                     status_code=404,
+                ),
+            ),
+        )
+
+    @app.exception_handler(MediaNotFound)
+    def _media_not_found(_request: Request, exc: MediaNotFound) -> JSONResponse:
+        return _attach_request_id(
+            JSONResponse(
+                status_code=404,
+                content=build_error_body(
+                    detail=str(exc),
+                    code=MEDIA_NOT_FOUND,
+                    status_code=404,
+                ),
+            ),
+        )
+
+    @app.exception_handler(FeatureNotAvailable)
+    def _feature_not_available(_request: Request, exc: FeatureNotAvailable) -> JSONResponse:
+        if exc.gate_kind == "policy":
+            status_code = 403
+            code = FEATURE_DISABLED
+        else:
+            status_code = 503
+            code = FEATURE_UNAVAILABLE
+        detail = feature_gate_public_detail(
+            feature_id=exc.feature_id,
+            deny_reason=exc.deny_reason,
+            gate_kind=exc.gate_kind,
+        )
+        logger.info(
+            "feature gate denied: feature=%s gate_kind=%s reason=%s",
+            exc.feature_id,
+            exc.gate_kind,
+            exc.deny_reason,
+        )
+        return _attach_request_id(
+            JSONResponse(
+                status_code=status_code,
+                content=build_error_body(
+                    detail=detail,
+                    code=code,
+                    status_code=status_code,
+                ),
+            ),
+        )
+
+    @app.exception_handler(VisionNotSupported)
+    def _vision_not_supported(_request: Request, exc: VisionNotSupported) -> JSONResponse:
+        return _attach_request_id(
+            JSONResponse(
+                status_code=422,
+                content=build_error_body(
+                    detail=str(exc),
+                    code=VISION_NOT_SUPPORTED,
+                    status_code=422,
                 ),
             ),
         )

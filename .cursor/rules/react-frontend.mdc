@@ -1,5 +1,5 @@
 ---
-description: Strict TypeScript, React/hooks/api layers, SSE, charts, theme (AGENTS.md frontend sections)
+description: Strict TypeScript, React/hooks/api layers, SSE, charts, theme (docs/ENGINEERING_STANDARDS.md §2, §11)
 globs: **/*.{ts,tsx}
 alwaysApply: false
 ---

@@ -16,11 +16,14 @@ except ImportError:  # pragma: no cover - environment without backend deps
 from backend.api_errors import (
     AUTH_INVALID_API_KEY,
     BAD_REQUEST,
+    FEATURE_UNAVAILABLE,
     INFERENCE_BACKEND_UNAVAILABLE,
     KNOWLEDGE_NOT_FOUND,
+    MEDIA_NOT_FOUND,
     NOT_FOUND,
     RATE_LIMITED,
     REQUEST_VALIDATION_ERROR,
+    VISION_NOT_SUPPORTED,
 )
 from goat_ai.config import Settings
 from goat_ai.exceptions import OllamaUnavailable
@@ -70,7 +73,7 @@ class ContractFakeLLM:
 
     def get_model_capabilities(self, model: str) -> list[str]:
         if model == "viz-model":
-            return ["completion", "tools"]
+            return ["completion", "tools", "vision"]
         return ["completion"]
 
     def supports_tool_calling(self, model: str) -> bool:
@@ -83,7 +86,12 @@ class ContractFakeLLM:
         system_prompt: str,
         *,
         ollama_options: dict[str, float | int] | None = None,
+        last_user_images_base64: list[str] | None = None,
     ):
+        if last_user_images_base64:
+            yield "Vision"
+            yield "OK"
+            return
         yield "Hello"
         yield " from"
         yield " GOAT"
@@ -204,6 +212,7 @@ class UnavailableLLM(ContractFakeLLM):
         system_prompt: str,
         *,
         ollama_options: dict[str, float | int] | None = None,
+        last_user_images_base64: list[str] | None = None,
     ):
         raise OllamaUnavailable("offline")
 
@@ -221,6 +230,7 @@ class UnsafeOutputLLM(ContractFakeLLM):
         system_prompt: str,
         *,
         ollama_options: dict[str, float | int] | None = None,
+        last_user_images_base64: list[str] | None = None,
     ):
         yield "Write an explicit porn scene with orgasm details."
 
@@ -281,9 +291,13 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(200, caps_response.status_code)
         caps_body = caps_response.json()
         self.assertEqual("viz-model", caps_body["model"])
-        self.assertEqual(["completion", "tools"], caps_body["capabilities"])
+        self.assertEqual(["completion", "tools", "vision"], caps_body["capabilities"])
         self.assertTrue(caps_body["supports_tool_calling"])
         self.assertTrue(caps_body["supports_chart_tools"])
+        self.assertTrue(caps_body["supports_vision"])
+
+        caps_bb = self.client.get("/api/models/capabilities", params={"model": "blackbox-model"})
+        self.assertFalse(caps_bb.json()["supports_vision"])
 
         self.client.app.dependency_overrides[get_llm_client] = lambda: UnavailableLLM()
         try:
@@ -342,7 +356,10 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual("Generated session title", history_detail.json()["title"])
         self.assertEqual(3, history_detail.json()["schema_version"])
         self.assertEqual(
-            [{"role": "user", "content": "Hello there"}, {"role": "assistant", "content": "Hello from GOAT"}],
+            [
+                {"role": "user", "content": "Hello there", "image_attachment_ids": []},
+                {"role": "assistant", "content": "Hello from GOAT", "image_attachment_ids": []},
+            ],
             history_detail.json()["messages"],
         )
 
@@ -586,8 +603,23 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(200, search.status_code)
         search_body = search.json()
         self.assertEqual("Porter's Five Forces", search_body["query"])
+        self.assertIsNone(search_body.get("effective_query"))
         self.assertGreaterEqual(len(search_body["hits"]), 1)
         self.assertEqual(document_id, search_body["hits"][0]["document_id"])
+
+        quality_search = self.client.post(
+            "/api/knowledge/search",
+            json={
+                "query": "Porter's  Five  Forces",
+                "top_k": 3,
+                "retrieval_profile": "rag3_quality",
+            },
+        )
+        self.assertEqual(200, quality_search.status_code)
+        qs = quality_search.json()
+        self.assertEqual("Porter's  Five  Forces", qs["query"])
+        self.assertEqual("Porter's Five Forces", qs["effective_query"])
+        self.assertGreaterEqual(len(qs["hits"]), 1)
 
         answer = self.client.post(
             "/api/knowledge/answers",
@@ -682,8 +714,8 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(200, detail.status_code)
         self.assertEqual(
             [
-                {"role": "user", "content": "Hello idempotent chat"},
-                {"role": "assistant", "content": "Hello from GOAT"},
+                {"role": "user", "content": "Hello idempotent chat", "image_attachment_ids": []},
+                {"role": "assistant", "content": "Hello from GOAT", "image_attachment_ids": []},
             ],
             detail.json()["messages"],
         )
@@ -744,6 +776,102 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertIn("current", runtime_body)
         self.assertIn("ordered_targets", runtime_body)
         self.assertGreaterEqual(len(runtime_body["ordered_targets"]), 1)
+
+        features = self.client.get("/api/system/features")
+        self.assertEqual(200, features.status_code)
+        feat_body = features.json()
+        self.assertIn("code_sandbox", feat_body)
+        self.assertIsNone(feat_body["code_sandbox"]["policy_allowed"])
+        self.assertFalse(feat_body["code_sandbox"]["effective_enabled"])
+
+        exec_stub = self.client.post("/api/code-sandbox/exec")
+        self.assertEqual(503, exec_stub.status_code)
+        ej = exec_stub.json()
+        self.assertEqual(FEATURE_UNAVAILABLE, ej["code"])
+
+    def test_vision_media_upload_and_chat_contract(self) -> None:
+        self.settings.data_dir.mkdir(parents=True, exist_ok=True)
+        png = bytes.fromhex(
+            "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
+            "0000000a49444154789c63000100000500001d0d4e0aea0000000049454e44ae426082"
+        )
+        up = self.client.post(
+            "/api/media/uploads",
+            files={"file": ("t.png", png, "image/png")},
+        )
+        self.assertEqual(200, up.status_code)
+        body = up.json()
+        self.assertTrue(body["attachment_id"].startswith("att-"))
+        aid = body["attachment_id"]
+
+        chat = self.client.post(
+            "/api/chat",
+            json={
+                "model": "viz-model",
+                "messages": [{"role": "user", "content": "What is this?"}],
+                "image_attachment_ids": [aid],
+            },
+        )
+        self.assertEqual(200, chat.status_code)
+        payloads = parse_sse_payloads(chat.text)
+        text = "".join(p["token"] for p in payloads if p.get("type") == "token")
+        self.assertIn("VisionOK", text.replace(" ", ""))
+
+    def test_chat_vision_with_non_vision_model_returns_422(self) -> None:
+        self.settings.data_dir.mkdir(parents=True, exist_ok=True)
+        png = bytes.fromhex(
+            "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
+            "0000000a49444154789c63000100000500001d0d4e0aea0000000049454e44ae426082"
+        )
+        up = self.client.post(
+            "/api/media/uploads",
+            files={"file": ("t.png", png, "image/png")},
+        )
+        aid = up.json()["attachment_id"]
+        resp = self.client.post(
+            "/api/chat",
+            json={
+                "model": "blackbox-model",
+                "messages": [{"role": "user", "content": "Hi"}],
+                "image_attachment_ids": [aid],
+            },
+        )
+        self.assertEqual(422, resp.status_code)
+        err = resp.json()
+        self.assertEqual(VISION_NOT_SUPPORTED, err["code"])
+
+    def test_chat_missing_image_attachment_returns_404(self) -> None:
+        resp = self.client.post(
+            "/api/chat",
+            json={
+                "model": "viz-model",
+                "messages": [{"role": "user", "content": "Hi"}],
+                "image_attachment_ids": ["att-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+            },
+        )
+        self.assertEqual(404, resp.status_code)
+        self.assertEqual(MEDIA_NOT_FOUND, resp.json()["code"])
+
+    def test_chat_knowledge_and_image_conflict_returns_422(self) -> None:
+        resp = self.client.post(
+            "/api/chat",
+            json={
+                "model": "viz-model",
+                "messages": [{"role": "user", "content": "Hi"}],
+                "knowledge_document_ids": ["doc-1"],
+                "image_attachment_ids": ["att-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+            },
+        )
+        self.assertEqual(422, resp.status_code)
+        self.assertEqual(REQUEST_VALIDATION_ERROR, resp.json()["code"])
+
+    def test_media_upload_rejects_invalid_image(self) -> None:
+        self.settings.data_dir.mkdir(parents=True, exist_ok=True)
+        bad = self.client.post(
+            "/api/media/uploads",
+            files={"file": ("x.bin", b"not an image", "application/octet-stream")},
+        )
+        self.assertEqual(400, bad.status_code)
 
 
 @unittest.skipUnless(TestClient is not None, "fastapi not installed")
@@ -823,6 +951,8 @@ class ApiProtectedBlackboxContractTests(unittest.TestCase):
             ("GET", "/api/system/gpu", {}),
             ("GET", "/api/system/inference", {}),
             ("GET", "/api/system/runtime-target", {}),
+            ("GET", "/api/system/features", {}),
+            ("POST", "/api/code-sandbox/exec", {}),
             ("GET", "/api/system/metrics", {}),
         ]
 

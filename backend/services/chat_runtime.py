@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from backend.services import log_service
 from backend.services.session_message_codec import decode_session_payload
@@ -26,7 +26,7 @@ class SessionSummaryRecord:
 class SessionDetailRecord(SessionSummaryRecord):
     """Typed session detail returned by the history repository."""
 
-    messages: list[dict[str, str]]
+    messages: list[dict[str, Any]]
     chart_spec: dict[str, object] | None = None
     file_context_prompt: str | None = None
     knowledge_documents: list[dict[str, str]] | None = None

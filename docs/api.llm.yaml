@@ -38,6 +38,7 @@ schemas:
       role: string
       content: string
       file_context: boolean
+      image_attachment_ids: string[]
   ChatRequest:
     type: object
     required:
@@ -46,11 +47,24 @@ schemas:
       model: string
       messages: ChatMessage[]
       knowledge_document_ids: string[]
+      image_attachment_ids: string[]
       session_id: string|null
       system_instruction: string|null
       temperature: number|null
       max_tokens: integer|null
       top_p: number|null
+  CodeSandboxFeaturePayload:
+    type: object
+    required:
+      - allowed_by_config
+      - available_on_host
+      - effective_enabled
+    properties:
+      policy_allowed: boolean|null
+      allowed_by_config: boolean
+      available_on_host: boolean
+      effective_enabled: boolean
+      deny_reason: string|null
   ErrorResponse:
     type: object
     required:
@@ -129,6 +143,7 @@ schemas:
     properties:
       role: string
       content: string
+      image_attachment_ids: string[]
   HistorySessionSummary:
     type: object
     required:
@@ -246,6 +261,7 @@ schemas:
     properties:
       query: string
       hits: KnowledgeCitation[]
+      effective_query: string|null
   KnowledgeUploadResponse:
     type: object
     required:
@@ -278,6 +294,20 @@ schemas:
       filename: string
       mime_type: string
       byte_size: integer
+  MediaUploadResponse:
+    type: object
+    required:
+      - attachment_id
+      - filename
+      - mime_type
+      - byte_size
+    properties:
+      attachment_id: string
+      filename: string
+      mime_type: string
+      byte_size: integer
+      width_px: integer|null
+      height_px: integer|null
   ModelCapabilitiesResponse:
     type: object
     required:
@@ -285,11 +315,13 @@ schemas:
       - capabilities
       - supports_tool_calling
       - supports_chart_tools
+      - supports_vision
     properties:
       model: string
       capabilities: string[]
       supports_tool_calling: boolean
       supports_chart_tools: boolean
+      supports_vision: boolean
   ModelsResponse:
     type: object
     required:
@@ -320,6 +352,12 @@ schemas:
       deploy_target: string
       current: RuntimeTargetItemResponse
       ordered_targets: RuntimeTargetItemResponse[]
+  SystemFeaturesResponse:
+    type: object
+    required:
+      - code_sandbox
+    properties:
+      code_sandbox: CodeSandboxFeaturePayload
   UploadAnalysisResponse:
     type: object
     required:
@@ -521,6 +559,21 @@ endpoints:
       errors:
         - 401
         - 429
+  - op: post_media_upload
+    method: POST
+    path: /media/uploads
+    body:
+      content_type: multipart/form-data
+      fields:
+        file: binary
+      schema: Body_post_media_upload_api_media_uploads_post
+    response:
+      200: MediaUploadResponse
+      errors:
+        - 400
+        - 401
+        - 404
+        - 429
   - op: get_gpu_status
     method: GET
     path: /system/gpu
@@ -534,6 +587,14 @@ endpoints:
     path: /system/inference
     response:
       200: InferenceLatencyResponse
+      errors:
+        - 401
+        - 429
+  - op: get_system_features
+    method: GET
+    path: /system/features
+    response:
+      200: SystemFeaturesResponse
       errors:
         - 401
         - 429
@@ -559,6 +620,17 @@ endpoints:
       errors:
         - 401
         - 429
+  - op: post_code_sandbox_exec
+    method: POST
+    path: /code-sandbox/exec
+    response:
+      200: map[string,string]
+      errors:
+        - 401
+        - 403
+        - 429
+        - 501
+        - 503
   - op: health
     method: GET
     path: /health

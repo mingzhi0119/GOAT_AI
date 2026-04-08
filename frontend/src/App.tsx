@@ -119,9 +119,10 @@ export default function App() {
             chartSpec={session.chartSpec}
             isStreaming={session.isStreaming}
             selectedModel={models.selectedModel}
+            supportsVision={models.capabilities?.supports_vision ?? false}
             fileContext={session.fileContext}
-            onSendMessage={content => {
-              void session.sendMessage(content)
+            onSendMessage={(content, imageIds) => {
+              void session.sendMessage(content, imageIds)
             }}
             onStop={session.stopStreaming}
             gpuStatus={gpu.status}

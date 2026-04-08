@@ -21,12 +21,16 @@ from backend.models.common import ErrorResponse
 from backend.models.chat import ChatRequest
 from backend.routers.chat_options import ollama_options_from_chat_request
 from backend.services.chat_capacity_service import ChatCapacityError, validate_chat_capacity
+from backend.services.chat_message_merge import merge_request_image_attachments
 from backend.services.idempotency_service import SQLiteIdempotencyStore, build_request_hash
 from backend.services.chat_service import stream_chat_sse
 from backend.services.chat_runtime import ConversationLogger, SessionRepository, TitleGenerator
+from backend.services.media_service import load_images_base64_for_chat
+from backend.services.exceptions import VisionNotSupported
 from backend.services.tabular_context import TabularContextExtractor
 from backend.services.safeguard_service import SafeguardService
 from backend.types import LLMClient, Settings
+from goat_ai.exceptions import OllamaUnavailable
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -82,18 +86,42 @@ def chat_stream(
         validate_chat_capacity(req=req, settings=settings)
     except ChatCapacityError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    if req.knowledge_document_ids and req.image_attachment_ids:
+        raise HTTPException(
+            status_code=422,
+            detail="Cannot combine knowledge retrieval and image attachments in one request.",
+        )
+
+    merged_messages = merge_request_image_attachments(req)
+    vision_b64: list[str] | None = None
+    if req.image_attachment_ids:
+        if not settings.use_chat_api:
+            raise VisionNotSupported("Vision chat requires GOAT_USE_CHAT_API=true.")
+        vision_b64 = load_images_base64_for_chat(
+            attachment_ids=req.image_attachment_ids,
+            settings=settings,
+        )
+        try:
+            caps = llm.get_model_capabilities(req.model)
+        except OllamaUnavailable as exc:
+            logger.warning("Ollama unreachable during vision capability check: %s", exc)
+            raise HTTPException(status_code=503, detail="AI backend unavailable") from exc
+        if "vision" not in caps:
+            raise VisionNotSupported()
+
     o_opts = ollama_options_from_chat_request(req)
 
     source_stream = stream_chat_sse(
         llm=llm,
         model=req.model,
-        messages=req.messages,
+        messages=merged_messages,
         system_prompt=settings.system_prompt,
         ip=client_ip,
         conversation_logger=conversation_logger,
         user_name=user_name,
         session_id=req.session_id,
-        all_messages=req.messages,
+        all_messages=merged_messages,
         session_repository=session_repository,
         title_generator=title_generator,
         safeguard_service=safeguard_service,
@@ -102,6 +130,7 @@ def chat_stream(
         tabular_extractor=tabular_extractor,
         settings=settings,
         knowledge_document_ids=req.knowledge_document_ids,
+        vision_last_user_images_base64=vision_b64,
     )
 
     if not idempotency_key or not req.session_id:

@@ -1,0 +1,28 @@
+"""Placeholder routes for future model code execution (§15 gate enforcement)."""
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, HTTPException
+
+from backend.config import get_settings
+from backend.models.common import ErrorResponse
+from backend.services.feature_gate_service import require_code_sandbox_enabled
+from backend.types import Settings
+
+router = APIRouter()
+
+
+@router.post(
+    "/code-sandbox/exec",
+    summary="Execute code in sandbox (not implemented)",
+    responses={
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse, "description": "Policy denied (FEATURE_DISABLED)"},
+        429: {"model": ErrorResponse},
+        503: {"model": ErrorResponse, "description": "Runtime gate closed (FEATURE_UNAVAILABLE)"},
+        501: {"description": "Execution engine not implemented"},
+    },
+)
+def post_code_sandbox_exec(settings: Settings = Depends(get_settings)) -> dict[str, str]:
+    """Scaffold: enforces the feature gate; returns 501 when the gate passes and execution is not built yet."""
+    require_code_sandbox_enabled(settings)
+    raise HTTPException(status_code=501, detail="Code sandbox execution is not implemented yet.")

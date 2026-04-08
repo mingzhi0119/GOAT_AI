@@ -45,6 +45,8 @@ dist-ssr
 .venv/
 
 # Local runtime artifacts
+# Default GOAT_DATA_DIR — uploads, vector index, media (do not commit)
+data/
 chat_logs.db
 chat_logs.db-*
 *.pid

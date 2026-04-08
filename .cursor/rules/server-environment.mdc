@@ -1,5 +1,5 @@
 ---
-description: Project snapshot, production host constraints, and deploy rules (AGENTS.md server/deploy sections)
+description: Project snapshot, production host constraints, and deploy rules (docs/ENGINEERING_STANDARDS.md §9–10)
 globs: deploy.sh,docs/OPERATIONS.md,docs/PROJECT_STATUS.md,goat-ai.service,scripts/rotate_fastapi_log.py,scripts/backup_chat_db.py,scripts/healthcheck.sh,scripts/watchdog.sh
 alwaysApply: false
 ---
@@ -11,9 +11,10 @@ Use when changing deploy, process management, host-only docs, or runtime target 
 ## Project snapshot (ops)
 
 - Repo: `GOAT_AI`
-- Main deploy target: Ubuntu A100 shared host
+- Deployments: **portable** (Windows/macOS/Linux dev; varied Linux/server layouts in prod)—see `README.md` **Environments**
+- Example reference: GPU Linux host + Ollama + reverse proxy (not the only topology)
 - App: FastAPI backend + React SPA
-- Production port: **62606**
+- Default port: **62606** (`GOAT_SERVER_PORT`)
 - Frontend: Vite; Node **24** on server/CI
 - Backend: Python **3.12**
 

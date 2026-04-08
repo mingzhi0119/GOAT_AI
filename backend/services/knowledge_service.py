@@ -19,6 +19,12 @@ from backend.models.knowledge import (
     KnowledgeUploadStatusResponse,
 )
 from backend.services.exceptions import KnowledgeDocumentNotFound, KnowledgeValidationError
+from backend.services.retrieval_quality import (
+    apply_rerank_hits,
+    prepare_search_query,
+    resolve_query_rewrite_enabled,
+    resolve_rerank_mode,
+)
 from backend.services.knowledge_pipeline import (
     chunk_text,
     normalize_document,
@@ -222,14 +228,20 @@ def get_knowledge_ingestion_status(*, ingestion_id: str, settings: Settings) -> 
 
 def search_knowledge(*, request: KnowledgeSearchRequest, settings: Settings) -> KnowledgeSearchResponse:
     """Search indexed chunks using the local simple vector backend."""
+    rewrite_enabled = resolve_query_rewrite_enabled(retrieval_profile=request.retrieval_profile)
+    effective_query = prepare_search_query(original_query=request.query, rewrite_enabled=rewrite_enabled)
+    mode = resolve_rerank_mode(retrieval_profile=request.retrieval_profile, settings=settings)
     hits = search_vector_index(
         settings=settings,
         backend_name=_VECTOR_BACKEND,
-        query=request.query,
+        query=effective_query,
         document_filters=request.document_ids,
     )
+    ranked = apply_rerank_hits(query=effective_query, mode=mode, hits=hits)
+    effective_out: str | None = effective_query if effective_query != request.query else None
     return KnowledgeSearchResponse(
         query=request.query,
+        effective_query=effective_out,
         hits=[
             KnowledgeCitation(
                 document_id=hit.document_id,
@@ -238,7 +250,7 @@ def search_knowledge(*, request: KnowledgeSearchRequest, settings: Settings) -> 
                 snippet=hit.snippet,
                 score=hit.score,
             )
-            for hit in hits[: request.top_k]
+            for hit in ranked[: request.top_k]
         ],
     )
 

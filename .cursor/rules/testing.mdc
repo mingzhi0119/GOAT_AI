@@ -1,5 +1,5 @@
 ---
-description: Python and TypeScript testing — boundaries, mocks, runners (AGENTS.md testing standards)
+description: Python and TypeScript testing — boundaries, mocks, runners (docs/ENGINEERING_STANDARDS.md §3)
 globs: __tests__/**,**/__tests__/**,**/*.test.*,**/conftest.py
 alwaysApply: false
 ---
@@ -46,4 +46,4 @@ const { result } = renderHook(() => useChat());
 ## CI reference (versions)
 
 - Python **3.12** (match backend target).
-- Node **24** (match server/CI per `AGENTS.md`).
+- Node **24** (match server/CI per `.nvmrc` / docs/ENGINEERING_STANDARDS.md).

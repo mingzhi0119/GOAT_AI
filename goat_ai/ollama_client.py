@@ -15,7 +15,11 @@ import requests
 from goat_ai.config import Settings
 from goat_ai.exceptions import OllamaUnavailable
 from goat_ai.telemetry_counters import OLLAMA_ERROR_API_CODE, inc_ollama_error
-from goat_ai.tools import conversation_transcript, messages_for_ollama
+from goat_ai.tools import (
+    conversation_transcript,
+    messages_for_ollama,
+    messages_for_ollama_with_images,
+)
 from goat_ai.types import ChatTurn
 
 logger = logging.getLogger(__name__)
@@ -53,6 +57,7 @@ class LLMClient(Protocol):
         system_prompt: str,
         *,
         ollama_options: dict[str, float | int] | None = None,
+        last_user_images_base64: list[str] | None = None,
     ) -> Generator[str, None, None]: ...
 
     def stream_tokens_with_tools(
@@ -314,7 +319,7 @@ class OllamaService:
     def yield_chat_tokens(
         self,
         model: str,
-        api_messages: list[dict[str, str]],
+        api_messages: list[dict[str, Any]],
         *,
         ollama_options: dict[str, float | int] | None = None,
     ) -> Generator[str, None, None]:
@@ -403,10 +408,20 @@ class OllamaService:
         system_prompt: str,
         *,
         ollama_options: dict[str, float | int] | None = None,
+        last_user_images_base64: list[str] | None = None,
     ) -> Generator[str, None, None]:
         """Unified token stream for the FastAPI layer (satisfies LLMClient Protocol)."""
+        if last_user_images_base64 and not self._s.use_chat_api:
+            raise ValueError("Vision chat requires GOAT_USE_CHAT_API=true")
         if self._s.use_chat_api:
-            api_messages = messages_for_ollama(messages, system_prompt)
+            if last_user_images_base64:
+                api_messages = messages_for_ollama_with_images(
+                    messages,
+                    system_prompt,
+                    last_user_images_base64=last_user_images_base64,
+                )
+            else:
+                api_messages = messages_for_ollama(messages, system_prompt)
             yield from self.yield_chat_tokens(
                 model, api_messages, ollama_options=ollama_options
             )

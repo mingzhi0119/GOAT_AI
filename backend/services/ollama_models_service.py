@@ -30,9 +30,11 @@ def model_capabilities_for_api(llm: LLMClient, model: str) -> ModelCapabilitiesR
         logger.warning("Ollama unreachable during model capability lookup: %s", exc)
         raise InferenceBackendUnavailable from exc
     supports_tool_calling = "tools" in capabilities
+    supports_vision = "vision" in capabilities
     return ModelCapabilitiesResponse(
         model=model,
         capabilities=capabilities,
         supports_tool_calling=supports_tool_calling,
         supports_chart_tools=supports_tool_calling,
+        supports_vision=supports_vision,
     )

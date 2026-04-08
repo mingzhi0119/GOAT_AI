@@ -7,11 +7,13 @@ Last updated: 2026-04-08
 - **Current release:** `v1.3.0`
 - **Shipped release milestone:** Phase 11 (industrialization / decoupling) is complete.
 - **Main-branch status:** Phase 13 closeout work is landed across migrations, error semantics, readiness/liveness split, metrics, idempotency, rollback/backup runbooks, and CI hardening. See [ROADMAP.md](ROADMAP.md).
-- **Phase 14 status:** RAG-0 is complete, and the first RAG-1/RAG-2 slice is landed with persisted uploads, SQLite metadata, a local simple vector index, retrieval-backed chat attachment support, and working knowledge search/answer endpoints.
+- **Phase 14 status:** RAG-0 through **RAG-3** are complete on main: persisted uploads, SQLite metadata, local `simple_local_v1` vector index, retrieval-backed chat, optional **lexical rerank** and **conservative query rewrite** via `retrieval_profile` (`default` / `rag3_lexical` / `rag3_quality`), plus `tools/run_rag_eval.py` over `evaldata/rag_eval_cases.jsonl`. **Vision MVP** (`POST /api/media/uploads`, `image_attachment_ids` on chat when the model reports vision) is landed.
+- **Feature gates (§15):** `GET /api/system/features` exposes a stable `code_sandbox` snapshot (config + Docker probe; `policy_allowed` reserved for future AuthZ). `POST /api/code-sandbox/exec` is a scaffold: **503** + `FEATURE_UNAVAILABLE` when the **runtime** gate is closed; **403** + `FEATURE_DISABLED` reserved for **policy** denial; **501** when the gate passes but execution is not implemented.
+- **RAG-ready wording:** use the term **RAG-ready** in release notes or marketing only after `python tools/run_rag_eval.py` passes in CI or pre-release checks and this file still documents the same threshold.
 
 ## What is shipped
 
-- React SPA + FastAPI backend, deployed behind school nginx at `https://ai.simonbb.com/mingzhi/`
+- React SPA + FastAPI backend; reference deployment behind nginx at `https://ai.simonbb.com/mingzhi/` (the codebase targets multiple environments; see README **Environments**)
 - Production bind target `:62606`, with runtime-target introspection at `GET /api/system/runtime-target`
 - Split health model with liveness at `GET /api/health` and readiness at `GET /api/ready`
 - Prometheus-style metrics at `GET /api/system/metrics`
@@ -31,6 +33,7 @@ Last updated: 2026-04-08
 - Latency telemetry includes p50/p95 and model-scoped buckets for completion and first-token metrics
 - Model capability detection via `GET /api/models/capabilities`
 - Native chart-tool path: charts are emitted only from real Ollama tool calls, never pre-rendered before the LLM responds
+- Vision images: `POST /api/media/uploads` stores PNG/JPEG/WebP for use with `image_attachment_ids` on `POST /api/chat` when the selected model reports vision capability
 - Typed SSE protocol: `token`, `chart_spec`, `error`, `done`
 - Black-box API contract coverage through `__tests__/test_api_blackbox_contract.py`
 - Architecture guard suite (`__tests__/test_architecture_boundaries.py`) included in standard `unittest discover` runs
@@ -68,6 +71,7 @@ Last updated: 2026-04-08
 | GET | `/api/knowledge/ingestions/{ingestion_id}` |
 | POST | `/api/knowledge/search` |
 | POST | `/api/knowledge/answers` |
+| POST | `/api/media/uploads` |
 | GET | `/api/history` |
 | GET | `/api/history/{session_id}` |
 | DELETE | `/api/history` |
@@ -75,6 +79,8 @@ Last updated: 2026-04-08
 | GET | `/api/system/gpu` |
 | GET | `/api/system/inference` |
 | GET | `/api/system/runtime-target` |
+| GET | `/api/system/features` |
+| POST | `/api/code-sandbox/exec` |
 
 ## Important behavior notes
 
@@ -95,6 +101,7 @@ Last updated: 2026-04-08
 
 ## Recommended reference docs
 
+- [AGENTS.md](../AGENTS.md) (short index) · [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) (canonical rules)
 - [OPERATIONS.md](OPERATIONS.md)
 - [API_REFERENCE.md](API_REFERENCE.md)
 - [API_ERRORS.md](API_ERRORS.md)
@@ -102,4 +109,3 @@ Last updated: 2026-04-08
 - [ROLLBACK.md](ROLLBACK.md)
 - [SECURITY.md](SECURITY.md)
 - [ROADMAP.md](ROADMAP.md)
-- [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md)

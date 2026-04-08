@@ -98,7 +98,15 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false }) => {
               </div>
             </div>
           ) : isUser ? (
-            <p className="text-sm whitespace-pre-wrap break-words">{displayContent}</p>
+            <>
+              <p className="text-sm whitespace-pre-wrap break-words">{displayContent}</p>
+              {message.image_attachment_ids && message.image_attachment_ids.length > 0 && (
+                <p className="text-[10px] mt-1.5 opacity-75" aria-label="Image attachments">
+                  📷 {message.image_attachment_ids.length} image
+                  {message.image_attachment_ids.length > 1 ? 's' : ''} attached
+                </p>
+              )}
+            </>
           ) : (
             <div className="prose-msg">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>

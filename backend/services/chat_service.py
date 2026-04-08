@@ -41,6 +41,7 @@ def stream_chat_sse(
     tabular_extractor: TabularContextExtractor | None = None,
     settings: Settings | None = None,
     knowledge_document_ids: list[str] | None = None,
+    vision_last_user_images_base64: list[str] | None = None,
 ) -> Generator[str, None, None]:
     """Yield SSE-formatted events for a chat completion."""
     if knowledge_document_ids and settings is not None:
@@ -77,6 +78,7 @@ def stream_chat_sse(
         system_instruction=system_instruction,
         ollama_options=ollama_options,
         tabular_extractor=tabular_extractor,
+        vision_last_user_images_base64=vision_last_user_images_base64,
     )
 
 

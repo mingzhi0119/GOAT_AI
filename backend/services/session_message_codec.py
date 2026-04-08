@@ -23,7 +23,7 @@ FILE_CONTEXT_REQUESTED_PREFIX = "[User requested analysis of uploaded tabular da
 class DecodedSessionPayload:
     """Normalized session payload exposed above the storage layer."""
 
-    messages: list[dict[str, str]]
+    messages: list[dict[str, Any]]
     chart_spec: dict[str, object] | None
     file_context_prompt: str | None
     knowledge_documents: list[dict[str, str]]
@@ -47,7 +47,7 @@ def _legacy_sniff_file_context_content(content: str) -> bool:
     )
 
 
-def _normalize_message_dict(message: object) -> dict[str, str] | None:
+def _normalize_message_dict(message: object) -> dict[str, Any] | None:
     """Normalize a raw storage row into a standard chat message."""
     if not isinstance(message, dict):
         return None
@@ -55,7 +55,16 @@ def _normalize_message_dict(message: object) -> dict[str, str] | None:
     content = message.get("content")
     if role not in {"user", "assistant", "system"} or not isinstance(content, str):
         return None
-    return {"role": str(role), "content": content}
+    out: dict[str, Any] = {"role": str(role), "content": content}
+    raw_ids = message.get("image_attachment_ids")
+    if isinstance(raw_ids, list) and raw_ids:
+        ids: list[str] = []
+        for item in raw_ids:
+            if isinstance(item, str) and item.strip():
+                ids.append(item.strip())
+        if ids:
+            out["image_attachment_ids"] = ids
+    return out
 
 
 def build_session_payload(
@@ -67,7 +76,7 @@ def build_session_payload(
     chart_data_source: ChartDataSource = "none",
 ) -> dict[str, object]:
     """Build the versioned storage payload for new session snapshots."""
-    visible_messages: list[dict[str, str]] = []
+    visible_messages: list[dict[str, object]] = []
     file_context_prompt: str | None = None
 
     for message in [*messages, ChatMessage(role="assistant", content=assistant_text)]:
@@ -76,7 +85,10 @@ def build_session_payload(
             continue
         if message.role == "assistant" and message.content == FILE_CONTEXT_REPLY:
             continue
-        visible_messages.append({"role": message.role, "content": message.content})
+        row: dict[str, object] = {"role": message.role, "content": message.content}
+        if message.image_attachment_ids:
+            row["image_attachment_ids"] = list(message.image_attachment_ids)
+        visible_messages.append(row)
 
     payload: dict[str, object] = {
         "version": SESSION_PAYLOAD_VERSION,

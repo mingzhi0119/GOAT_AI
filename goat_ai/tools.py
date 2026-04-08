@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Any, Sequence
 
 import pandas as pd
 
@@ -74,6 +74,37 @@ def messages_for_ollama(
         role = m.get("role")
         content = m.get("content", "")
         if role in ("user", "assistant") and isinstance(content, str):
+            out.append({"role": role, "content": content})
+    return out
+
+
+def messages_for_ollama_with_images(
+    state_messages: Sequence[ChatTurn],
+    system_prompt: str,
+    *,
+    last_user_images_base64: list[str],
+) -> list[dict[str, Any]]:
+    """Build Ollama /api/chat messages with vision images on the last user turn only."""
+    out: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
+    last_user_index: int | None = None
+    for i in range(len(state_messages) - 1, -1, -1):
+        if state_messages[i].get("role") == "user":
+            last_user_index = i
+            break
+    for i, m in enumerate(state_messages):
+        role = m.get("role")
+        content = m.get("content", "")
+        if role not in ("user", "assistant") or not isinstance(content, str):
+            continue
+        if role == "user" and i == last_user_index and last_user_images_base64:
+            out.append(
+                {
+                    "role": "user",
+                    "content": content,
+                    "images": last_user_images_base64,
+                }
+            )
+        else:
             out.append({"role": role, "content": content})
     return out
 

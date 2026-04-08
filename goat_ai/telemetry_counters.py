@@ -12,6 +12,7 @@ OLLAMA_ERROR_API_CODE: str = "INFERENCE_BACKEND_UNAVAILABLE"
 
 _lock = threading.Lock()
 _counts: dict[tuple[str, str, str], int] = defaultdict(int)
+_feature_gate_denials: dict[tuple[str, str], int] = defaultdict(int)
 
 
 def inc_ollama_error(*, code: str, endpoint: str, http_status: str = "none") -> None:
@@ -25,3 +26,16 @@ def snapshot_ollama_errors() -> dict[tuple[str, str, str], int]:
     """Return a shallow copy of Ollama error counts for metrics rendering."""
     with _lock:
         return dict(_counts)
+
+
+def inc_feature_gate_denial(*, feature: str, reason: str) -> None:
+    """Increment when a feature gate denies an operation (§15 observability)."""
+    key = (feature, reason)
+    with _lock:
+        _feature_gate_denials[key] += 1
+
+
+def snapshot_feature_gate_denials() -> dict[tuple[str, str], int]:
+    """Return a shallow copy of feature gate denial counts for metrics rendering."""
+    with _lock:
+        return dict(_feature_gate_denials)

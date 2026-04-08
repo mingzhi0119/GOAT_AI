@@ -9,6 +9,10 @@ class HistorySessionMessage(BaseModel):
 
     role: str = Field(..., pattern="^(user|assistant|system)$")
     content: str
+    image_attachment_ids: list[str] = Field(
+        default_factory=list,
+        description="Vision image attachment ids stored for this user turn.",
+    )
 
 
 class HistorySessionFileContext(BaseModel):

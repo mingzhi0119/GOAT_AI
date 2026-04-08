@@ -22,7 +22,7 @@ export interface UseChatSessionReturn {
   historySessions: ReturnType<typeof useHistory>['sessions']
   isLoadingHistory: boolean
   historyError: string | null
-  sendMessage: (content: string) => Promise<void>
+  sendMessage: (content: string, imageAttachmentIds?: string[]) => Promise<void>
   stopStreaming: () => void
   clearChatSession: () => void
   loadHistorySession: (sessionId: string) => Promise<void>
@@ -91,15 +91,16 @@ export function useChatSession({
   )
 
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, imageAttachmentIds?: string[]) => {
       await chat.sendMessage(
         content,
         selectedModel,
         userName,
-        fileContext ? [fileContext.documentId] : undefined,
+        fileContext && !imageAttachmentIds?.length ? [fileContext.documentId] : undefined,
         systemInstruction,
         ollamaOptions,
         setChartSpec,
+        imageAttachmentIds,
       )
       await history.refresh()
     },

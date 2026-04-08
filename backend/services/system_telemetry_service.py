@@ -2,8 +2,15 @@
 from __future__ import annotations
 
 from backend.config import BACKEND_HOST, BACKEND_PORT
-from backend.models.system import InferenceLatencyResponse, RuntimeTargetItemResponse, RuntimeTargetResponse
+from backend.models.system import (
+    CodeSandboxFeaturePayload,
+    InferenceLatencyResponse,
+    RuntimeTargetItemResponse,
+    RuntimeTargetResponse,
+    SystemFeaturesResponse,
+)
 from backend.types import Settings
+from goat_ai.feature_gates import compute_code_sandbox_snapshot
 from goat_ai.latency_metrics import get_inference_snapshot
 from goat_ai.runtime_target import current_runtime_target, ordered_runtime_targets
 
@@ -21,6 +28,20 @@ def build_inference_latency_response() -> InferenceLatencyResponse:
         first_token_p50_ms=float(snap["first_token_p50_ms"]),
         first_token_p95_ms=float(snap["first_token_p95_ms"]),
         model_buckets=dict(snap["model_buckets"]),
+    )
+
+
+def build_system_features_response(settings: Settings) -> SystemFeaturesResponse:
+    """Expose machine-readable capability flags for optional / high-risk features."""
+    snap = compute_code_sandbox_snapshot(settings)
+    return SystemFeaturesResponse(
+        code_sandbox=CodeSandboxFeaturePayload(
+            policy_allowed=None,
+            allowed_by_config=snap.allowed_by_config,
+            available_on_host=snap.available_on_host,
+            effective_enabled=snap.effective_enabled,
+            deny_reason=snap.deny_reason,
+        ),
     )
 
 

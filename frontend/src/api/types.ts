@@ -10,12 +10,15 @@ export interface ChatMessage {
 export interface HistorySessionMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
+  image_attachment_ids?: string[]
 }
 
 export interface ChatRequest {
   model: string
   messages: ChatMessage[]
   knowledge_document_ids?: string[]
+  /** Uploaded vision image attachment ids for the current user turn. */
+  image_attachment_ids?: string[]
   session_id?: string
   /** Optional user-defined instructions merged into the server system prompt. */
   system_instruction?: string
@@ -34,6 +37,7 @@ export interface ModelCapabilitiesResponse {
   capabilities: string[]
   supports_tool_calling: boolean
   supports_chart_tools: boolean
+  supports_vision: boolean
 }
 
 /** Ollama sampling options (Advanced settings); maps to backend ChatRequest fields. */
@@ -107,6 +111,8 @@ export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+  /** Set when this user turn included vision image attachments (for UI hints). */
+  image_attachment_ids?: string[]
   /** Mirrors API `file_context` when sending hidden upload context to the backend. */
   file_context?: boolean
   isStreaming?: boolean

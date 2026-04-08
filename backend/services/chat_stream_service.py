@@ -126,6 +126,7 @@ class ChatStreamService:
         system_instruction: str = "",
         ollama_options: dict[str, float | int] | None = None,
         tabular_extractor: TabularContextExtractor | None = None,
+        vision_last_user_images_base64: list[str] | None = None,
     ) -> Generator[str, None, None]:
         """Yield SSE-formatted events for a chat completion."""
         run = self._phase_prepare_runtime(
@@ -144,6 +145,7 @@ class ChatStreamService:
             system_instruction=system_instruction,
             ollama_options=ollama_options,
             tabular_extractor=tabular_extractor,
+            vision_last_user_images_base64=vision_last_user_images_base64,
         )
         yield from self._phase_input_guard(run)
         error_message: str | None = None
@@ -178,6 +180,7 @@ class ChatStreamService:
         system_instruction: str,
         ollama_options: dict[str, float | int] | None,
         tabular_extractor: TabularContextExtractor | None,
+        vision_last_user_images_base64: list[str] | None,
     ) -> SimpleNamespace:
         """Assemble collaborators, derived turns, and mutable stream state."""
         prompt_composer = PromptComposer()
@@ -198,11 +201,15 @@ class ChatStreamService:
             latest_user_text,
             holdback_tokens=holdback_tokens,
         )
-        should_use_native_chart_tools = chart_orchestrator.should_use_tools(
-            messages=messages,
-            llm=llm,
-            model=model,
-        )
+        vision_b64 = vision_last_user_images_base64 or []
+        if vision_b64:
+            should_use_native_chart_tools = False
+        else:
+            should_use_native_chart_tools = chart_orchestrator.should_use_tools(
+                messages=messages,
+                llm=llm,
+                model=model,
+            )
         chart_dataframe: pd.DataFrame | None = None
         chart_data_source: ChartDataSource = "none"
         if should_use_native_chart_tools:
@@ -237,6 +244,7 @@ class ChatStreamService:
             first_token_emitted_at=None,
             emitted_chart_spec=None,
             buffer=[],
+            vision_last_user_images_base64=vision_last_user_images_base64,
         )
 
     def _phase_input_guard(self, run: SimpleNamespace) -> Generator[str, None, None]:
@@ -333,6 +341,7 @@ class ChatStreamService:
             run.turns,
             run.effective_prompt,
             ollama_options=run.ollama_options,
+            last_user_images_base64=run.vision_last_user_images_base64,
         ):
             run.buffer.append(token)
             for token_event in run.output_buffer.push(token):

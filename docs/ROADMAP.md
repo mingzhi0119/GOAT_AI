@@ -1,8 +1,8 @@
 ﻿# GOAT AI Roadmap
 
-> Last updated: 2026-04-08 — **Phase 11 shipped** in v1.3.0; **Phases 13-15**: 13 = §13.0 + Wave A/B (stable `request_id`, **liveness**/**readiness**, error `code`); 14 = RAG-first capability expansion + vision MVP; 15 = semantics before directory migration (**consumes** §13.0 error model; **does not redefine** it)
-> Current release: **v1.3.0**
-> Compact snapshot: [PROJECT_STATUS.md](PROJECT_STATUS.md)
+> Last updated: 2026-04-08 — **v1.3.0** tags Phase **11–12**; **main** additionally ships **Phase 13** (full closeout) and **Phase 14** through **14.6 RAG-3**. **Next:** Phase **15** (semantics then structure — sections below).
+> Current release tag: **v1.3.0**
+> Compact snapshot: [PROJECT_STATUS.md](PROJECT_STATUS.md) · Engineering standards: [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md)
 
 ---
 
@@ -29,187 +29,113 @@
 | 9 | Access and security: API key protection, rate limiting, `request_id` (`X-Request-ID`), production-safe access controls |
 | 10 | Native chart-tool path: constrained `ChartIntentV2` -> `ChartSpecV2` compiler, Ollama tool-capability checks, tool-call-only chart rendering |
 
-### Phase 11 (archived objective — met)
+### Archived objectives (met; detail folded into phase tables above)
 
-- Align with `AGENTS.md`: typed boundaries, router-thin API, orchestration in services, portable dev/prod.
-- **Follow-up (post-Phase 11):** optional deeper migration of legacy session **content** markers (`__chart__`, etc.) into versioned payload-only fields without breaking SQLite rows —not blocking; v2 payload + codec already separate display roles from chat turns.
+| Phase | One-line outcome |
+|-------|------------------|
+| 11 | Typed boundaries, thin routers, orchestration in services, portable dev/prod per [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md). Optional follow-up: migrate legacy session content markers into versioned payload fields — not blocking. |
+| 12 | Architecture boundary guardrails, telemetry quality, API contract stability, deploy acceptance checks. |
+
+---
+
+## Completed on main (post–v1.3.0 tag)
+
+Work below is **landed on main**; see [PROJECT_STATUS.md](PROJECT_STATUS.md) for the live inventory. Release tagging may trail.
+
+### Phase 13 — Industrial 9/10 (Priority 1): **complete**
+
+| Slice | Status | Summary |
+|-------|--------|---------|
+| **§13.0** | Done | Numbered SQL migrations + `schema_migrations` checksums; stable JSON errors `{ detail, code, request_id }` + handlers; `X-Request-ID` honored. |
+| **Wave A** | Done | Structured logging + `request_id`; Prometheus metrics (`http_requests_total`, durations, `chat_stream_completed_total`, `ollama_errors_total`, `sqlite_log_write_failures_total`); liveness `/api/health` vs readiness `/api/ready`; persistence failure signals + tests. |
+| **Wave B** | Done | Ollama retries + circuit breaker on idempotent reads; optional `Idempotency-Key` (upload analyze + session append); multi-instance limitations documented in OPERATIONS. |
+| **13.3** | Done | SLO table, load smoke (`tools/load_chat_smoke.py`), chat hot-path size/count guardrails (`422` / explicit behavior). |
+| **13.4** | Done | Session audit fields (`schema_version`, `updated_at`); backup/restore runbook. |
+| **13.5** | Done | `pip-audit` + `ruff` in CI; [SECURITY.md](SECURITY.md). |
+| **13.6** | Done | Graceful shutdown + rollback runbook. |
+
+### Phase 14 — RAG-first expansion: **through RAG-3 complete**
+
+| Slice | Status | Summary |
+|-------|--------|---------|
+| **14.1 Baseline** | Done | Non-goals retired; `knowledge/*` API family; contract-first black-box coverage; `simple_local_v1` storage gate documented. |
+| **14.2 RAG-0** | Done | Dedicated `/api/knowledge/*` family; OpenAPI routes for uploads, ingestions, search, answers; chat uses explicit `knowledge_document_ids` only. |
+| **14.3 RAG-1** | Done | Persisted uploads under `GOAT_DATA_DIR`, migration `007`, normalize/chunk CSV/XLSX/TXT/MD/PDF/DOCX, embeddings + local vector index, ingestion status API; legacy `/api/upload` + `/api/upload/analyze` on knowledge pipeline. |
+| **14.4 RAG-2** | Done | `POST /api/knowledge/search`, `POST /api/knowledge/answers`, chat integration, no-hit + fallback behaviors, black-box coverage. |
+| **14.5 Vision MVP** | Done | Capability signal + `POST /api/media/uploads`, `image_attachment_ids` on chat, media service + vision routing, frontend attach UX, black-box + ops limits. |
+| **14.6 RAG-3** | Done | Rerank + query-rewrite `Protocol` seams, `retrieval_profile` (`default` / `rag3_lexical` / `rag3_quality`), `evaldata/` + `tools/run_rag_eval.py`, README/PROJECT_STATUS quality gate. |
+
+---
+
+## Next implementation direction
+
+Program order for remaining roadmap:
+
+| Order | Focus | Notes |
+|-------|--------|--------|
+| **1** | **Phase 15** | `DOMAIN.md`, policy objects, then one-time `application` / `domain` / `infrastructure` split; pytest-first, integration tier; optional `session_messages`, minimal AuthZ, optional OpenTelemetry. |
 
 ### Near-term execution order (project-calibrated)
 
-Aligned with `AGENTS.md` and **no-root / JupyterHub-style** production (`docs/OPERATIONS.md`): `systemd --user` when D-Bus works; **nohup + PID remains a permanent fallback**.
+Aligned with [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) and **reference** no-root / JupyterHub-style deployments among others (`docs/OPERATIONS.md` **Deployment profiles**): `systemd --user` when D-Bus works; **nohup + PID remains a permanent fallback** where applicable.
 
 | Horizon | Focus |
 |---------|--------|
 | **v1.3.x** | Ops hardening from Phase 12 backlog: systemd vs nohup playbook, SQLite backup/migration thresholds, security/audit as exposure grows. |
-| **v1.4.x** | **Phase 13** — §13.0 (migrations + error model), **Wave A** (structured logs + `request_id`, Prometheus metrics, **readiness** vs **liveness**, persistence failure signals), then **Wave B** (Ollama resilience, **idempotency**); SLO/load, backup, security/CI. **Postgres / multi-instance** only after Phase 13 exit criteria and v1.3.x ops gates are stable. |
-| **v1.5.x** | **Phase 14** —RAG-first capability expansion in this order: **RAG-0 -> RAG-1 -> RAG-2 -> Vision MVP -> RAG-3**. |
-| **v1.6+** | **Phase 15** —domain/application split, test harness + integration tier, optional message normalization & distributed tracing (**consumes** Phase 13 §13.0 error model; **does not redefine** it). |
+| **v1.4.x** | Phase 13 is **done on main**; any follow-up is maintenance. Postgres / multi-instance only after ops gates stable. |
+| **v1.5.x** | Phase **14** (through **14.6 RAG-3**) and **Vision MVP** are **ship-complete on main**; follow-up is maintenance until **Phase 15**. |
+| **v1.6+** | **Phase 15** — semantics and structural overhaul, optional normalization & tracing (**consumes** Phase 13 §13.0 error model; **does not redefine** it). |
 
 ---
 
-### Phase 12 (archived objective — met)
-
-- Scope achieved: guardrails for architecture boundaries, telemetry quality, API contract stability, and deploy acceptance checks are in place.
-- Verification artifacts:
-  - Orchestration split and collaborators: `backend/services/chat_stream_service.py`, `backend/services/chat_orchestration.py`, `backend/services/chat_service.py`
-  - Chart source policy and persistence: `backend/services/session_message_codec.py`, `backend/services/session_service.py`
-  - Architecture boundaries: `__tests__/test_architecture_boundaries.py`
-  - Latency p50/p95 + model buckets: `goat_ai/latency_metrics.py`, `backend/services/system_telemetry_service.py`
-  - `/api/chat` black-box matrix: `__tests__/test_api_blackbox_contract.py`
-  - Deploy post-check: `scripts/post_deploy_check.py`
-  - Contract CI gate: `tools/check_api_contract_sync.py`, `.github/workflows/ci.yml`
-  - Model capability TTL cache: `goat_ai/ollama_client.py`, `__tests__/test_ollama_client_cache.py`
-
----
-
-## Phase 13: Industrial 9/10 — Priority 1 (Run, Observe, Recover)
+## Phase 13: Industrial 9/10 — Priority 1 (Run, Observe, Recover) — **closed**
 
 **Target release band:** **v1.4.x**  
-**Goal:** Production-grade **signals**, **stable error semantics**, **deploy** (**liveness** / **readiness**), **capacity clarity**, and **data/security baselines** on **SQLite + no-root + Ollama**—without large directory refactors (those stay in Phase 15).
+**Status:** Exit criteria met; summary table above. Detail: migrations, error model, Wave A/B, SLOs, backup, CI security, graceful shutdown — see [PROJECT_STATUS.md](PROJECT_STATUS.md) and [OPERATIONS.md](OPERATIONS.md).
 
-**Done for Phase 13:** exit criteria met per subsection; `PROJECT_STATUS.md` / release notes cite which boxes closed.
-
-### 13.0 Cross-cutting prerequisites (before Wave A)
-
-These are **not** "nice-to-have data tasks" — they unblock schema evolution and every downstream observability/reliability decision.
-
-- `[x]` **Migrations as artifacts** —`backend/migrations/` numbered SQL, applied in order at startup via `backend.services.db_migrations`; `schema_migrations` table stores SHA-256 checksums (tamper detection). **Landed:** `log_service.init_db` delegates to `apply_migrations`; `__tests__/test_db_migrations.py`.
-- `[x]` **Error model + exception registry** —Stable JSON `{ "detail", "code", "request_id" }`; `backend/api_errors.py` + `register_exception_handlers` in `backend/exception_handlers.py`; middleware 401/429 use same envelope; `X-Request-ID` honored when client sends it. **Landed:** `docs/API_ERRORS.md`, OpenAPI `ErrorResponse`, black-box assertions. **Follow-up:** per-route log level / metric label table remains Wave A-B.
-
-*Why this order:* structured logs and metrics need **stable `code` / classification**; **readiness** / **liveness** and runbooks need **consistent failure surface**; later Wave B retries need **explicit retryability** on errors.
-
-### Wave A — operational lift (exactly four)
-
-**Scope lock:** Wave A is **only** these four. Do **not** bundle Ollama retry/circuit breaker here — client resilience is **Wave B** so it does not steal observability delivery rhythm.
-
-**Terminology:** Use **`request_id`** (header `X-Request-ID`, context `goat_ai.request_context`), **liveness** (`GET /api/health`), **readiness** (`GET /api/ready`), and **idempotency** (Wave B) consistently — not loose synonyms.
-
-#### Verifiable thresholds (Wave A)
-
-- **A1** —At least one documented structured log line includes fields **`ts`**, **`level`**, **`message`**, **`request_id`** (when bound); ERROR / persistence lines SHOULD also carry **`code`** and **`event`** where applicable (see `docs/OPERATIONS.md`).
-- **A2** —Minimum Prometheus **label** sets: `http_requests_total` →`method`, `route`, `status`; `http_request_duration_seconds` histogram →`le` on buckets (plus `_sum` / `_count`); `chat_stream_completed_total` →none (**successful completion only; safeguard-blocked refusal flows excluded**); `ollama_errors_total` →`code`, `endpoint`, `http_status`; `sqlite_log_write_failures_total` →`operation`, `code`.
-- **A3** —**`/ready` not ready:** HTTP **503**; JSON body **`{ "ready": false, "checks": { ... } }`** with stable keys `settings`, `sqlite`, `ollama`. Structured ERROR logs for probe failures use fixed **`code`** values **`SQLITE_READINESS_FAILED`** and **`OLLAMA_READINESS_FAILED`** (see `backend/readiness_service.py`).
-- **A4** —Failure injection / proof: **`__tests__/test_log_service_wave_a.py`** (mocked SQLite fault + metric hook assertion); counter appears in `GET /api/system/metrics` text in integration/black-box runs.
-
-| # | Deliverable | Primary artifact | Owner | Exit criterion |
-|---|-------------|------------------|-------|----------------|
-| **A1** | **`[x]` Structured logging + `request_id` context** —JSON (or key=value) behind `GOAT_LOG_JSON=1`; honor inbound `X-Request-ID`; bind id in `contextvars` (`goat_ai.request_context`). | `docs/OPERATIONS.md`; `goat_ai/logging_config.py`; `goat_ai/request_context.py`; `backend/exception_handlers.py` | Backend + ops | Sample + field contract in OPERATIONS; ERROR / JSON errors share `request_id`; handlers set `X-Request-ID`. |
-| **A2** | **`[x]` Metrics** —`GET /api/system/metrics` (Prometheus text): `http_requests_total`, `http_request_duration_seconds`, `chat_stream_completed_total`, `ollama_errors_total`, `sqlite_log_write_failures_total`. | `backend/prometheus_metrics.py`; `goat_ai/telemetry_counters.py`; `__tests__/test_api_blackbox_contract.py` (`test_metrics_endpoint_prometheus_text`) | Backend + ops | OPERATIONS scrape note; black-box asserts required metric names. |
-| **A3** | **`[x]` Readiness vs liveness** —**`/api/health`** = **liveness**; **`GET /api/ready`** = **readiness** (SQLite + optional Ollama probe; `GOAT_READY_SKIP_OLLAMA_PROBE`). | `backend/readiness_service.py`; `scripts/post_deploy_check.py`; `__tests__/test_api_blackbox_contract.py` (`test_ready_endpoint_contract`) | Backend + ops | Post-deploy script requires `/ready`; black-box tests public **readiness** path. |
-| **A4** | **`[x]` Persistence failure signals** —On `log_service` session/conversation write failure: structured ERROR + `sqlite_log_write_failures_total` (**SSE** may still complete). | `backend/services/log_service.py`; `__tests__/test_log_service_wave_a.py` | Backend | Tests + metrics text include `sqlite_log_write_failures_total`. |
-
-### Wave B — client & API resilience (after Wave A)
-
-| # | Deliverable | Verifiable threshold (target) | Primary artifact | Owner | Exit |
-|---|-------------|-------------------------------|------------------|-------|------|
-| **B1** | `[x]` **Ollama client policy** —Retries with backoff + jitter for **idempotent** reads (`/api/tags`, `/api/show`); timeouts unchanged; circuit breaker (open / half-open). Registry **retryability** from §13.0. | Mocked HTTP tests prove backoff + breaker states without live Ollama. | `goat_ai/ollama_client.py`; `__tests__/` (new or extended); `docs/OPERATIONS.md` | Backend | OPERATIONS table + tests. |
-| **B2** | `[x]` **Idempotency** —Optional `Idempotency-Key` for **upload analyze JSON** and **session append** (SQLite TTL table or in-process LRU for single-node). | Duplicate key →same response body / no double write (black-box). | Relevant routers + services; `__tests__/test_api_blackbox_contract.py` (or sibling) | Backend | Black-box duplicate-key test. |
-| **B3** | `[x]` **Multi-instance stance** —OPERATIONS: in-memory limiter + rolling metrics are **per-process**; mitigations without Redis (sticky sessions, lower per-instance limits, external metrics aggregation). | Doc lists limitations + mitigations; no false "cluster-wide" claims. | `docs/OPERATIONS.md` | Ops + backend | Published limitations. |
-
-### 13.3 Performance and capacity
-
-- `[x]` **Published SLOs** —Table in OPERATIONS: first-token p95 budget, max concurrent SSE, max session payload / message count, upload time budget. **Exit:** linked from README.
-- `[x]` **Load script** —`tools/load_chat_smoke.py` or k6 + runbook; p50/p95 from `/api/system/inference` + RSS note. **Exit:** one command documented.
-- `[x]` **Hot path guardrails** —Profile chart compile + session JSON path; **max messages** or size →**422 or explicit truncate** (no silent corruption). **Exit:** documented + test.
-
-### 13.4 Data and state (post-migration-tooling)
-
-- `[x]` **Audit fields on sessions** —`schema_version`, `updated_at` (and safe extras); history API exposes only non-sensitive fields. **Exit:** contract + test (migrations from §13.0 carry the DDL).
-- `[x]` **Backup / restore runbook** —`test_backup_chat_db` →OPERATIONS (`sqlite3 .backup`, integrity, restore drill). **Exit:** linked one-pager.
-
-### 13.5 Security and tooling
-
-- `[x]` **Dependency audit in CI** —`pip-audit` on `requirements.txt`; fail vs warn policy documented. **Landed:** CI workflow step, pinned vulnerable dependencies updated, audit passes clean on the current lock set.
-- `[x]` **Upload / API threat notes** —`docs/SECURITY.md`: extensions vs sniff, zip bombs, CSV formula injection, shared API key model. **Landed:** OPERATIONS links it and documents the shared-key trust model.
-- `[x]` **Python lint/format in CI** —`ruff check` + `ruff format` on changed Python files (equivalent to a full-repo rewrite-free formatting gate). **Landed:** CI workflow step plus `ruff` config-compatible checks.
-
-### 13.6 Release and operations (beyond Wave A)
-
-- `[x]` **Graceful shutdown** —Uvicorn/SSE drain expectations and max wait. **Exit:** OPERATIONS.
-- `[x]` **Rollback runbook** —Previous tag + venv + DB backup + post-deploy check. **Exit:** OPERATIONS link.
-
-### 13.7 Phase 13 non-goals
-
-- Postgres / Redis **solely** to close Phase 13 —optional; Decision Log if introduced.
-- Full multi-tenant IAM —optional one-page threat model for shared API key is enough for Phase 13.
-
-### 13.8 Risk triggers (Phase 13 execution)
+### Phase 13 risk triggers (retained)
 
 | Trigger | Response |
 |---------|----------|
-| **SSE** error rate or timeout above agreed threshold | Pause **Wave B** (client retry / **idempotency**) until root cause triaged. |
+| **SSE** error rate or timeout above agreed threshold | Pause **Wave B** work until root cause triaged. |
 | **`/api/ready`** flapping or sustained non-200 in prod | Block **Phase 15** structural refactors until **readiness** and deploy checks are stable. |
 | **`sqlite_log_write_failures_total`** (or equivalent) abnormal for a sustained window | Prioritize recovery + backup/restore drill before new persistence features. |
+
+### Phase 13 non-goals (unchanged)
+
+- Postgres / Redis **solely** to close Phase 13 — optional; Decision Log if introduced.
+- Full multi-tenant IAM — optional one-page threat model for shared API key is enough for Phase 13.
 
 ---
 
 ## Phase 14: RAG-first Capability Expansion
 
-**Target release band:** **v1.5.x**, after Phase 13 exit criteria are stable and before Phase 15 structural refactors begin.  
-**Goal:** Make GOAT AI a real retrieval-augmented system before broader multimodal expansion by implementing RAG as a **new subsystem** with dedicated contracts, storage, and service boundaries, then add a tightly scoped **Vision MVP** only after the retrieval path exists.
+**Target release band:** **v1.5.x**  
+**Goal:** RAG subsystem with dedicated contracts; **Vision MVP** and **RAG-3 quality** are complete on main.
 
-**Priority order:** **Phase 13 closeout -> RAG-0 -> RAG-1 -> RAG-2 -> Vision MVP -> RAG-3**.
+**Status:** **RAG-0 → RAG-3 complete** on main (tables above). **Next:** Phase 15.
 
-### 14.1 RAG baseline assessment and non-goals
+**Priority order (remaining):** **Phase 15**.
 
-**Historical baseline:** at the start of Phase 14, the repository was **not yet at a "RAG baseline implementation" stage**. It was closer to **general chat + CSV/XLSX file-context injection + engineering/operations hardening**.
+### 14.5 Vision MVP (after retrieval exists) — **complete**
 
-**Why this mattered:** the earlier `POST /api/upload` path parsed tabular files and returned `file_context` for prompt injection, which did **not** constitute a retrieval system. The missing pieces were persisted ingestion/indexing, chunking, embeddings, a vector backend, retrieval contracts, and quality layers such as rerank/query rewrite.
+**Scope rule:** image support is the only multimodal slice in this roadmap. Video is out of scope.
 
-**Fit assessment:** the project is still a good candidate for RAG, but this should be planned as a **new subsystem**, not treated as a small extension of the existing upload flow.
+- `[x]` **Explicit vision capability contract** —Extend model capability probing so the backend can distinguish `text` and `vision` support, and gate image flows cleanly.
+- `[x]` **Capability-aware model selection** —Surface a clear UI signal showing whether the current model can inspect images.
+- `[x]` **Image upload path** —Add a typed upload flow for images (`png`, `jpg/jpeg`, `webp` initially) with size limits, preview, and explicit attachment state.
+- `[x]` **Media context service** —Create a backend service that normalizes image inputs, applies safe resizing/encoding, and converts them into the Ollama message format expected by native vision-capable models.
+- `[x]` **Chat integration** —Extend `POST /api/chat` so image attachments become first-class chat context instead of ad hoc prompt text.
+- `[x]` **Failure behavior** —If the selected model does not support vision, return a clear, sanitized error and keep the text-only chat path intact.
+- `[x]` **Frontend experience** —Add image attachment UX with preview, removal, and user-facing capability hints.
+- `[x]` **Vision tests and ops limits** —Cover supported and unsupported image requests at the API boundary, and document image timeout/size/format limits in OPERATIONS before enabling the UI entry points.
 
-- `[x]` **Explicit non-goal retired by implementation** —The legacy `upload -> file_context` prompt-injection path is now superseded for active uploads by synchronous knowledge ingestion plus retrieval-backed chat attachment. Legacy `file_context` remains readable only for backward-compatible session history.
-- `[x]` **Foundation is sufficient** —Leverage the existing API/service layering, SSE streaming path, error model, readiness/metrics work, and the current `upload + chat + history` surface as the platform on which RAG APIs can be introduced.
-- `[x]` **Separate API family** —RAG now uses a dedicated `knowledge/*` API family rather than overloading the existing upload contract with hidden indexing side effects.
-- `[x]` **Contract-first boundary** —Black-box contracts now exist for upload, ingestion status, retrieval result shape, and "no relevant context found" behavior.
-- `[x]` **Core backend components** —Typed service boundaries now exist for document persistence, normalization, chunking, simple embedding/index writes, retrieval, and answer composition.
-- `[x]` **Storage decision gate** —The first RAG slice now uses a documented single-node local persistent backend (`simple_local_v1`) rather than introducing a separate vector service.
+### 14.6 RAG-3 — quality layer — **complete**
 
-### 14.2 RAG-0 — capability framing and contract design
-
-- `[x]` **Architecture draft landed** —`docs/RAG_ARCHITECTURE.md` now anchors the API family, SQLite metadata tables, local file layout, and vector-store constraints.
-- `[x]` **OpenAPI-first route design** —Schemas now exist for `POST /api/knowledge/uploads`, `GET /api/knowledge/uploads/{document_id}`, `POST /api/knowledge/ingestions`, `GET /api/knowledge/ingestions/{id}`, `POST /api/knowledge/search`, and `POST /api/knowledge/answers`.
-- `[x]` **Error semantics** —The stable `{ "detail", "code", "request_id" }` envelope is now reused for knowledge upload/ingestion failures and not-found states.
-- `[x]` **Chat contract isolation** —`POST /api/chat` remains a chat API; retrieval is enabled only when the caller explicitly supplies `knowledge_document_ids`, rather than overloading hidden upload prompts.
-
-### 14.3 RAG-1 — ingestion MVP
-
-- `[x]` **Raw file persistence** —Knowledge uploads now persist under `GOAT_DATA_DIR/uploads/knowledge/<document_id>/original/`.
-- `[x]` **SQLite metadata and lifecycle** —`knowledge_documents`, `knowledge_ingestions`, and `knowledge_chunks` now exist through numbered migration `007_add_knowledge_tables.sql`.
-- `[x]` **Parser and chunking pipeline** —The normalization and chunking pipeline now supports CSV/XLSX/TXT/MD/PDF/DOCX for the first ingestion slice.
-- `[x]` **Embedding generation** —The first MVP uses a dedicated local simple-embedding path (`simple_local_v1`) rather than embedding logic in routers.
-- `[x]` **Persistent local vector index** —Vectors now persist under `GOAT_DATA_DIR/vector_index/simple_local_v1/`.
-- `[x]` **Status visibility** —Ingestion progress and outcomes are exposed through `GET /api/knowledge/ingestions/{id}`.
-- `[x]` **Legacy tabular upload upgraded** —`POST /api/upload` and `POST /api/upload/analyze` now ingest CSV/XLSX through the knowledge pipeline and return `knowledge_ready` / `document_id` metadata instead of prompt-injection `file_context`.
-
-### 14.4 RAG-2 — retrieval MVP
-
-- `[x]` **Pure retrieval API** —`POST /api/knowledge/search` now returns ranked chunks, document metadata, and citation payloads without answer generation.
-- `[x]` **Answer API** —`POST /api/knowledge/answers` now returns a retrieval-backed answer path outside the chat session contract.
-- `[x]` **Chat integration through services** —`POST /api/chat` now accepts `knowledge_document_ids` and routes those turns through retrieval-backed answering without collapsing the standalone knowledge API family into the router layer.
-- `[x]` **No-hit behavior** —The answer API now defines and tests explicit "No relevant context found in the indexed knowledge base." behavior.
-- `[x]` **Black-box coverage** —API-boundary tests now cover upload, ingestion, search, answer, and clean not-found/failure modes.
-- `[x]` **Attached-document fallback** —When lexical retrieval misses but the caller explicitly scopes the turn to indexed documents, the first indexed chunks from those documents are used as a bounded fallback answer scope.
-
-### 14.5 Vision MVP (after retrieval exists)
-
-**Scope rule:** image support is the only multimodal slice in this roadmap. Video implementation is intentionally excluded because too many target models do not support it reliably.
-
-- `[ ]` **Explicit vision capability contract** —Extend model capability probing so the backend can distinguish `text` and `vision` support, and gate image flows cleanly.
-- `[ ]` **Capability-aware model selection** —Surface a clear UI signal showing whether the current model can inspect images.
-- `[ ]` **Image upload path** —Add a typed upload flow for images (`png`, `jpg/jpeg`, `webp` initially) with size limits, preview, and explicit attachment state.
-- `[ ]` **Media context service** —Create a backend service that normalizes image inputs, applies safe resizing/encoding, and converts them into the Ollama message format expected by native vision-capable models.
-- `[ ]` **Chat integration** —Extend `POST /api/chat` so image attachments become first-class chat context instead of ad hoc prompt text.
-- `[ ]` **Failure behavior** —If the selected model does not support vision, return a clear, sanitized error and keep the text-only chat path intact.
-- `[ ]` **Frontend experience** —Add image attachment UX with preview, removal, and user-facing capability hints.
-- `[ ]` **Vision tests and ops limits** —Cover supported and unsupported image requests at the API boundary, and document image timeout/size/format limits in OPERATIONS before enabling the UI entry points.
-
-### 14.6 RAG-3 — quality layer
-
-- `[ ]` **Optional reranker** —Add reranking behind a dedicated service boundary rather than folding it into basic retrieval logic.
-- `[ ]` **Optional query rewrite** —Add query rewriting only after retrieval metrics show it solves a measurable failure pattern.
-- `[ ]` **Retrieval evaluation** —Create a small evaluation set and regression process for retrieval precision, citation correctness, and no-hit behavior.
-- `[ ]` **Quality gate before claims** —Do not describe the system as "RAG-ready" in README or PROJECT_STATUS until retrieval quality thresholds are documented and regression-tested.
+- `[x]` **Optional reranker** —Add reranking behind a dedicated service boundary rather than folding it into basic retrieval logic.
+- `[x]` **Optional query rewrite** —Add query rewriting only after retrieval metrics show it solves a measurable failure pattern (conservative whitespace normalization; opt-in via `retrieval_profile=rag3_quality`).
+- `[x]` **Retrieval evaluation** —Create a small evaluation set and regression process for retrieval precision, citation correctness, and no-hit behavior.
+- `[x]` **Quality gate before claims** —Do not describe the system as "RAG-ready" in README or PROJECT_STATUS until retrieval quality thresholds are documented and regression-tested.
 
 ---
 
@@ -231,7 +157,7 @@ These are **not** "nice-to-have data tasks" — they unblock schema evolution an
 
 - `[ ]` **Application / domain / infrastructure layout** —`backend/application/`, `backend/domain/`, adapters under clear names; `services/` as facades during migration; **update `import-linter` layers**. **Exit:** dependency graph doc; no new business rules in `routers/`.
 - `[ ]` **Session schema contract** —`docs/SESSION_SCHEMA.md`: message JSON version, read N- / write N, codec upgrade tests. **Exit:** round-trip old →new row tests (builds on Phase 13 migrations).
-- `[ ]` **Ports list** —AGENTS.md: stable `Protocol`s (`SessionRepository`, `LLMClient`, telemetry sink); one **fake repository** test without SQLite file.
+- `[ ]` **Ports list** —Document stable `Protocol`s (`SessionRepository`, `LLMClient`, telemetry sink) in engineering standards; one **fake repository** test without SQLite file.
 
 ### 15.3 Testability
 
@@ -252,9 +178,21 @@ These are **not** "nice-to-have data tasks" — they unblock schema evolution an
 
 - `[ ]` **Distributed tracing** —OpenTelemetry + W3C `traceparent`; spans around Ollama; off by default, near-zero cost when disabled. **Exit:** one documented trace export path.
 
-### 15.7 Phase 15 references
+### 15.7 Phase 15 — execution defaults and assumptions
 
-- [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) · [OPERATIONS.md](OPERATIONS.md) · [AGENTS.md](../AGENTS.md)
+- **Defaults:** one coordinated refactor window for package layout (not perpetual split); observability-first; AuthZ minimal at service layer; OpenTelemetry optional and default-off.
+- **Assumptions:** vision remains **images only** (`png` / `jpeg` / `webp`); media stays on local disk under `GOAT_DATA_DIR`; **Ollama** remains the inference backend; rerank/rewrite stay pluggable with lightweight local implementations first; tracing must not be a hard startup dependency when disabled.
+
+---
+
+## Appendix: RAG subsystem (architecture snapshot)
+
+This replaces the retired long-form `docs/RAG_ARCHITECTURE.md` (historical draft). Current behavior:
+
+- **API family:** RAG is a **separate** contract under `/api/knowledge/*` (uploads, ingestions, search, answers). Chat consumes knowledge via explicit `knowledge_document_ids`; do not treat legacy `/api/upload` as a hidden indexer.
+- **Storage:** SQLite metadata + normalized files under `GOAT_DATA_DIR`; vector index backend **`simple_local_v1`** (JSON artifacts per document under the knowledge vector directory).
+- **Retrieval quality (RAG-3):** optional **lexical rerank** and **conservative query rewrite** via `retrieval_profile` (`default`, `rag3_lexical`, `rag3_quality`); regression checks in `tools/run_rag_eval.py` / `evaldata/`.
+- **Detail:** endpoint tables and behavior — [API_REFERENCE.md](API_REFERENCE.md); machine contract — [openapi.json](openapi.json).
 
 ---
 
@@ -262,8 +200,8 @@ These are **not** "nice-to-have data tasks" — they unblock schema evolution an
 
 | Item | Current | Target |
 |------|---------|--------|
-| Server | A100 Ubuntu 24.04 | same |
-| Public URL | `https://ai.simonbb.com/mingzhi/` | same (or dedicated subdomain) |
+| Server OS | Linux typical (example: Ubuntu 24.04 + A100) | per operator |
+| Public URL | Example: `https://ai.simonbb.com/mingzhi/` | per deployment |
 | Port | 62606 (nginx proxy) | 62606 |
 | Process mgmt | `nohup` + PID file default on no-root hosts (required fallback) | Try `systemd --user` when D-Bus/session is available; **always** retain nohup/watchdog path for SSH/JupyterHub hosts where user systemd fails |
 | Log files | `logs/fastapi.log` + user-space rotation script | same |
@@ -281,7 +219,7 @@ These are **not** "nice-to-have data tasks" — they unblock schema evolution an
 | 2026-03-30 | SSE over WebSocket | Simpler and more proxy-friendly; native browser support |
 | 2026-03-30 | No React Router | Single-page app; extra routing complexity had little benefit |
 | 2026-03-31 | Dual-port deploy reverted | Production uses `:62606` only |
-| 2026-04-07 | Process mgmt: systemd is additive, not a drop-in for nohup | Shared host may lack reliable `systemctl --user`; deploy contract keeps nohup + PID as permanent fallback per `AGENTS.md` / `OPERATIONS.md` |
+| 2026-04-07 | Process mgmt: systemd is additive, not a drop-in for nohup | Shared host may lack reliable `systemctl --user`; deploy contract keeps nohup + PID as permanent fallback per [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) / [OPERATIONS.md](OPERATIONS.md) |
 | 2026-04-07 | Phase 11 closed in v1.3.0 | `ChatStreamService` + orchestration split; tabular/title injection; log_service adapter-only guard; wire constants centralized; 79 unittest + 13 black-box OK |
 | 2026-04-07 | Phases 13-14 split from prior monolithic Phase 13 | **13** = priority 1; **14** = priority 2 (semantics before package reshuffle). |
 | 2026-04-07 | Phase 13 sequencing tightened | **§13.0** = migrations-as-artifacts + error model/registry **before** Wave A. **Wave A** = only four ops items (structured logs+`request_id`, metrics, **liveness**/**readiness**, persistence signals). **Ollama retry/circuit breaker** deferred to **Wave B** after Wave A. **Phase 15** = policy objects + invariants **before** `application/`/`domain/` split; **consumes** §13.0 error model, **does not redefine** it. |
@@ -291,3 +229,7 @@ These are **not** "nice-to-have data tasks" — they unblock schema evolution an
 | 2026-04-08 | RAG elevated ahead of multimodal expansion; original Phase 14 moved to Phase 15 | Priority order is now **Phase 13 closeout -> RAG-0 -> RAG-1 -> RAG-2 -> Vision MVP -> RAG-3**. Video implementation was removed from the roadmap because target model support is too inconsistent for the near-term plan. |
 | 2026-04-08 | RAG-0 completed; first RAG-1/2 slice landed with a local persistent backend | Knowledge APIs now persist uploads, normalize and chunk narrow document types, write to SQLite metadata tables plus a local `simple_local_v1` vector index, and expose search/answer endpoints with black-box coverage. |
 | 2026-04-08 | CSV/XLSX upload path moved fully onto the RAG pipeline; PDF/DOCX joined RAG normalization | `/api/upload` and `/api/upload/analyze` now perform real ingestion and return knowledge identifiers, `/api/chat` can answer with `knowledge_document_ids`, and `pdf/docx` normalize alongside `csv/xlsx/txt/md` in the first RAG ingestion slice. |
+| 2026-04-08 | ROADMAP: completed Phases 13 and RAG-0–2 summarized in tables; next work Vision MVP → RAG-3 → Phase 15 | Reduce bullet duplication; roadmap is the single program index. |
+| 2026-04-08 | Phase 14.5 Vision MVP and 14.6 RAG-3 closed on main | Vision path shipped; RAG-3 adds rerank/rewrite protocols, `rag3_*` retrieval profiles, `tools/run_rag_eval.py` + `evaldata/` gate documented in README/PROJECT_STATUS. |
+| 2026-04-08 | Engineering standards: single canonical doc | Full rules live in `docs/ENGINEERING_STANDARDS.md`; `AGENTS.md` is a short index. `docs/PLAN.md` retired; content folded into this roadmap. `docs/RAG_ARCHITECTURE.md` retired; RAG snapshot lives in ROADMAP appendix. |
+| 2026-04-08 | Docs: multi-environment portability | README/OPERATIONS/ENGINEERING_STANDARDS clarify the repo is not limited to one school host; optional high-risk features (e.g. code sandbox) are policy-gated per **ENGINEERING_STANDARDS §15**. |

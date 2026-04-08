@@ -5,7 +5,7 @@ import math
 import threading
 from collections import defaultdict
 
-from goat_ai.telemetry_counters import snapshot_ollama_errors
+from goat_ai.telemetry_counters import snapshot_feature_gate_denials, snapshot_ollama_errors
 
 _lock = threading.Lock()
 
@@ -78,6 +78,8 @@ def render_prometheus_text() -> str:
         chat_done = _chat_stream_completed
         sqlite_copy = dict(_sqlite_write_failures)
 
+    fg_copy = snapshot_feature_gate_denials()
+
     lines.append("# HELP http_requests_total Total HTTP requests processed.")
     lines.append("# TYPE http_requests_total counter")
     for (method, route, status), count in sorted(http_copy.items()):
@@ -112,5 +114,12 @@ def render_prometheus_text() -> str:
         op = _escape_label_value(operation)
         c = _escape_label_value(code)
         lines.append(f'sqlite_log_write_failures_total{{operation="{op}",code="{c}"}} {count}')
+
+    lines.append("# HELP feature_gate_denials_total Feature gate denials by feature and reason (§15).")
+    lines.append("# TYPE feature_gate_denials_total counter")
+    for (feature, reason), count in sorted(fg_copy.items()):
+        ff = _escape_label_value(feature)
+        rr = _escape_label_value(reason)
+        lines.append(f'feature_gate_denials_total{{feature="{ff}",reason="{rr}"}} {count}')
 
     return "\n".join(lines) + "\n"

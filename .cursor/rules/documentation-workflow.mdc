@@ -1,10 +1,14 @@
 ---
-description: When to update which docs, commit hygiene, and recovery notes (AGENTS.md workflow sections)
+description: When to update which docs, commit hygiene, and recovery notes (docs/ENGINEERING_STANDARDS.md §12–14)
 globs: README.md,docs/**,AGENTS.md
 alwaysApply: false
 ---
 
 # GOAT AI — Documentation, commits, recovery
+
+## Documentation language
+
+- All prose under **`docs/`** and in **`README.md`** must be **English**. Do not commit Chinese or other non-English text in those paths.
 
 ## Documentation update rules
 
