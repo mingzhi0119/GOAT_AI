@@ -18,13 +18,11 @@ OPENAPI_PATH = REPO_ROOT / "docs" / "openapi.json"
 LLM_API_PATH = REPO_ROOT / "docs" / "api.llm.yaml"
 
 
-def _normalized_json_text(data: dict[str, object]) -> str:
-    return json.dumps(data, ensure_ascii=False, indent=2) + "\n"
-
-
 def main() -> int:
-    generated_openapi = _normalized_json_text(app.openapi())
-    committed_openapi = OPENAPI_PATH.read_text(encoding="utf-8")
+    generated_openapi = app.openapi()
+    committed_text = OPENAPI_PATH.read_text(encoding="utf-8")
+    committed_openapi = json.loads(committed_text)
+    # Deep equality: avoids false failures when Python versions emit different dict key order in dumps.
     if generated_openapi != committed_openapi:
         print("Contract check failed: docs/openapi.json is out of sync.")
         print(
@@ -33,7 +31,7 @@ def main() -> int:
         )
         return 1
 
-    openapi_obj = json.loads(committed_openapi)
+    openapi_obj = committed_openapi
     compact = generate_llm_api_yaml._build_compact_spec(openapi_obj)
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_out = Path(tmpdir) / "api.llm.yaml"
