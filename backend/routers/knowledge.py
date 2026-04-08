@@ -1,0 +1,143 @@
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, UploadFile
+
+from backend.config import get_settings
+from backend.models.common import ErrorResponse
+from backend.models.knowledge import (
+    KnowledgeAnswerRequest,
+    KnowledgeAnswerResponse,
+    KnowledgeIngestionRequest,
+    KnowledgeIngestionResponse,
+    KnowledgeIngestionStatusResponse,
+    KnowledgeSearchRequest,
+    KnowledgeSearchResponse,
+    KnowledgeUploadResponse,
+    KnowledgeUploadStatusResponse,
+)
+from backend.services.knowledge_service import (
+    answer_with_knowledge,
+    create_knowledge_upload,
+    get_knowledge_upload,
+    get_knowledge_ingestion_status,
+    search_knowledge,
+    start_knowledge_ingestion,
+)
+from backend.services.exceptions import KnowledgeDocumentNotFound, KnowledgeValidationError
+from backend.types import Settings
+
+router = APIRouter()
+
+
+def _raise_not_found(exc: KnowledgeDocumentNotFound) -> None:
+    raise exc
+
+
+def _raise_bad_request(exc: KnowledgeValidationError) -> None:
+    from fastapi import HTTPException
+
+    raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post(
+    "/knowledge/uploads",
+    response_model=KnowledgeUploadResponse,
+    summary="Register a knowledge file upload",
+    responses={400: {"model": ErrorResponse}, 401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
+)
+def post_knowledge_upload(
+    file: UploadFile,
+    settings: Settings = Depends(get_settings),
+) -> KnowledgeUploadResponse:
+    """Persist a knowledge upload and register document metadata."""
+    try:
+        return create_knowledge_upload(file=file, settings=settings)
+    except KnowledgeValidationError as exc:
+        _raise_bad_request(exc)
+
+
+@router.get(
+    "/knowledge/uploads/{document_id}",
+    response_model=KnowledgeUploadStatusResponse,
+    summary="Read one persisted knowledge upload",
+    responses={401: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
+)
+def get_knowledge_upload_status(
+    document_id: str,
+    settings: Settings = Depends(get_settings),
+) -> KnowledgeUploadStatusResponse:
+    """Return metadata for one persisted knowledge upload."""
+    try:
+        return get_knowledge_upload(document_id=document_id, settings=settings)
+    except KnowledgeDocumentNotFound as exc:
+        _raise_not_found(exc)
+
+
+@router.post(
+    "/knowledge/ingestions",
+    response_model=KnowledgeIngestionResponse,
+    summary="Start a knowledge ingestion job",
+    responses={400: {"model": ErrorResponse}, 401: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
+)
+def post_knowledge_ingestion(
+    request: KnowledgeIngestionRequest,
+    settings: Settings = Depends(get_settings),
+) -> KnowledgeIngestionResponse:
+    """Start a knowledge ingestion job for one uploaded document."""
+    try:
+        return start_knowledge_ingestion(request=request, settings=settings)
+    except KnowledgeDocumentNotFound as exc:
+        _raise_not_found(exc)
+    except KnowledgeValidationError as exc:
+        _raise_bad_request(exc)
+
+
+@router.get(
+    "/knowledge/ingestions/{ingestion_id}",
+    response_model=KnowledgeIngestionStatusResponse,
+    summary="Read one knowledge ingestion job",
+    responses={401: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
+)
+def get_knowledge_ingestion(
+    ingestion_id: str,
+    settings: Settings = Depends(get_settings),
+) -> KnowledgeIngestionStatusResponse:
+    """Return status for one ingestion attempt."""
+    try:
+        return get_knowledge_ingestion_status(ingestion_id=ingestion_id, settings=settings)
+    except KnowledgeDocumentNotFound as exc:
+        _raise_not_found(exc)
+
+
+@router.post(
+    "/knowledge/search",
+    response_model=KnowledgeSearchResponse,
+    summary="Search indexed knowledge chunks",
+    responses={401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
+)
+def post_knowledge_search(
+    request: KnowledgeSearchRequest,
+    settings: Settings = Depends(get_settings),
+) -> KnowledgeSearchResponse:
+    """Run pure retrieval against indexed knowledge chunks."""
+    try:
+        return search_knowledge(request=request, settings=settings)
+    except KnowledgeValidationError as exc:
+        _raise_bad_request(exc)
+
+
+@router.post(
+    "/knowledge/answers",
+    response_model=KnowledgeAnswerResponse,
+    summary="Generate a retrieval-backed answer",
+    responses={401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
+)
+def post_knowledge_answer(
+    request: KnowledgeAnswerRequest,
+    settings: Settings = Depends(get_settings),
+) -> KnowledgeAnswerResponse:
+    """Return a retrieval-backed answer with citations."""
+    try:
+        return answer_with_knowledge(request=request, settings=settings)
+    except KnowledgeValidationError as exc:
+        _raise_bad_request(exc)

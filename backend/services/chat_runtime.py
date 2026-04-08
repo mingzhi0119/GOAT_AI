@@ -29,6 +29,7 @@ class SessionDetailRecord(SessionSummaryRecord):
     messages: list[dict[str, str]]
     chart_spec: dict[str, object] | None = None
     file_context_prompt: str | None = None
+    knowledge_documents: list[dict[str, str]] | None = None
     chart_data_source: str | None = None
 
 
@@ -126,6 +127,7 @@ class SQLiteSessionRepository:
             messages=decoded.messages,
             chart_spec=decoded.chart_spec,
             file_context_prompt=decoded.file_context_prompt,
+            knowledge_documents=decoded.knowledge_documents,
             chart_data_source=decoded.chart_data_source,
         )
 

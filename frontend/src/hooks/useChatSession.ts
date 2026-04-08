@@ -3,6 +3,7 @@ import type { ChartSpec, OllamaOptionsPayload } from '../api/types'
 import { useChat } from './useChat'
 import { useFileContext } from './useFileContext'
 import { useHistory } from './useHistory'
+import { historyKnowledgeAttachment } from '../utils/sessionHistory'
 
 interface UseChatSessionArgs {
   selectedModel: string
@@ -28,7 +29,12 @@ export interface UseChatSessionReturn {
   deleteHistorySession: (sessionId: string) => Promise<void>
   deleteAllHistory: () => Promise<void>
   refreshHistory: () => Promise<void>
-  setFileContext: (ctx: { filename: string; prompt: string }) => void
+  setFileContext: (ctx: {
+    filename: string
+    documentId: string
+    ingestionId: string
+    retrievalMode: string
+  }) => void
   clearFileContextSession: () => void
 }
 
@@ -77,9 +83,11 @@ export function useChatSession({
       const session = await history.loadSession(sessionId)
       setChartSpec(session.chart_spec)
       chat.loadSession(session)
-      clearFileContext()
+      const attachment = historyKnowledgeAttachment(session)
+      if (attachment) setFileContext(attachment)
+      else clearFileContext()
     },
-    [chat, clearFileContext, history],
+    [chat, clearFileContext, history, setFileContext],
   )
 
   const sendMessage = useCallback(
@@ -88,7 +96,7 @@ export function useChatSession({
         content,
         selectedModel,
         userName,
-        fileContext?.prompt,
+        fileContext ? [fileContext.documentId] : undefined,
         systemInstruction,
         ollamaOptions,
         setChartSpec,
@@ -97,7 +105,7 @@ export function useChatSession({
     },
     [
       chat,
-      fileContext?.prompt,
+      fileContext,
       history,
       ollamaOptions,
       selectedModel,

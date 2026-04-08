@@ -1,13 +1,12 @@
-/** Stream CSV/XLSX upload parse events via Server-Sent Events.
- *
- * The backend returns typed SSE objects. Uploading a file produces
- * `file_context`, optional `error`, and terminal `done` events.
- */
+/** Stream file-ingestion events from the RAG knowledge upload pipeline. */
 
-export interface UploadFileContextEvent {
-  type: 'file_context'
+export interface UploadKnowledgeReadyEvent {
+  type: 'knowledge_ready'
   filename: string
-  prompt: string
+  document_id: string
+  ingestion_id: string
+  status: string
+  retrieval_mode: string
 }
 
 export interface UploadErrorEvent {
@@ -19,20 +18,34 @@ export interface UploadDoneEvent {
   type: 'done'
 }
 
-export type UploadStreamEvent = UploadFileContextEvent | UploadErrorEvent | UploadDoneEvent
+export type UploadStreamEvent = UploadKnowledgeReadyEvent | UploadErrorEvent | UploadDoneEvent
 
 function isUploadStreamEvent(payload: unknown): payload is UploadStreamEvent {
   if (typeof payload !== 'object' || payload === null) return false
-  const event = payload as { type?: string; filename?: unknown; prompt?: unknown; message?: unknown }
-  if (event.type === 'file_context') {
-    return typeof event.filename === 'string' && typeof event.prompt === 'string'
+  const event = payload as {
+    type?: string
+    filename?: unknown
+    document_id?: unknown
+    ingestion_id?: unknown
+    status?: unknown
+    retrieval_mode?: unknown
+    message?: unknown
+  }
+  if (event.type === 'knowledge_ready') {
+    return (
+      typeof event.filename === 'string' &&
+      typeof event.document_id === 'string' &&
+      typeof event.ingestion_id === 'string' &&
+      typeof event.status === 'string' &&
+      typeof event.retrieval_mode === 'string'
+    )
   }
   if (event.type === 'error') return typeof event.message === 'string'
   if (event.type === 'done') return true
   return false
 }
 
-/** Parse a CSV/XLSX file and yield typed metadata events. */
+/** Ingest a supported file and yield typed readiness events. */
 export async function* streamUpload(file: File): AsyncGenerator<UploadStreamEvent> {
   const form = new FormData()
   form.append('file', file)

@@ -10,6 +10,7 @@ from backend.models.common import ErrorResponse
 from backend.models.history import (
     HistorySessionDetailResponse,
     HistorySessionFileContext,
+    HistorySessionKnowledgeDocument,
     HistorySessionListResponse,
 )
 from backend.services.chat_runtime import SessionRepository
@@ -61,11 +62,17 @@ def get_history_session(
         raise HTTPException(status_code=404, detail="Session not found")
     response_body = asdict(session)
     file_context_prompt = response_body.pop("file_context_prompt", None)
+    raw_knowledge_documents = response_body.pop("knowledge_documents", []) or []
     response_body["file_context"] = (
         HistorySessionFileContext(prompt=file_context_prompt)
         if isinstance(file_context_prompt, str) and file_context_prompt.strip()
         else None
     )
+    response_body["knowledge_documents"] = [
+        HistorySessionKnowledgeDocument.model_validate(item)
+        for item in raw_knowledge_documents
+        if isinstance(item, dict)
+    ]
     return HistorySessionDetailResponse.model_validate(response_body)
 
 

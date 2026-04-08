@@ -7,6 +7,7 @@ Last updated: 2026-04-08
 - **Current release:** `v1.3.0`
 - **Shipped release milestone:** Phase 11 (industrialization / decoupling) is complete.
 - **Main-branch status:** Phase 13 closeout work is landed across migrations, error semantics, readiness/liveness split, metrics, idempotency, rollback/backup runbooks, and CI hardening. See [ROADMAP.md](ROADMAP.md).
+- **Phase 14 status:** RAG-0 is complete, and the first RAG-1/RAG-2 slice is landed with persisted uploads, SQLite metadata, a local simple vector index, retrieval-backed chat attachment support, and working knowledge search/answer endpoints.
 
 ## What is shipped
 
@@ -15,9 +16,16 @@ Last updated: 2026-04-08
 - Split health model with liveness at `GET /api/health` and readiness at `GET /api/ready`
 - Prometheus-style metrics at `GET /api/system/metrics`
 - Ollama-backed chat via `POST /api/chat`
-- CSV/XLSX analysis via:
+- Knowledge-file ingestion via:
   - `POST /api/upload` as SSE
   - `POST /api/upload/analyze` as JSON
+- Contract-first knowledge API skeleton via:
+  - `POST /api/knowledge/uploads`
+  - `GET /api/knowledge/uploads/{document_id}`
+  - `POST /api/knowledge/ingestions`
+  - `GET /api/knowledge/ingestions/{ingestion_id}`
+  - `POST /api/knowledge/search`
+  - `POST /api/knowledge/answers`
 - Session history via `GET /api/history`, `GET /api/history/{id}`, `DELETE /api/history`, `DELETE /api/history/{id}`
 - GPU telemetry and rolling inference latency APIs, including first-token latency telemetry
 - Latency telemetry includes p50/p95 and model-scoped buckets for completion and first-token metrics
@@ -31,6 +39,7 @@ Last updated: 2026-04-08
 - Post-deploy contract verification script integrated into Linux and Windows deploy flows
 - Model capability probing includes in-process TTL caching
 - Stable JSON error envelope now uses `detail`, `code`, and `request_id` across exception handlers and protected middleware paths
+- Knowledge uploads now persist to `GOAT_DATA_DIR`, normalize `csv`, `xlsx`, `txt`, `md`, `pdf`, and `docx`, and write retrieval metadata into SQLite plus a local `simple_local_v1` vector index
 - Ollama idempotent-read resilience: retry with backoff+jitter and circuit-breaker states for `/api/tags` and `/api/show`
 - Optional `Idempotency-Key` support for `POST /api/upload/analyze` and chat session append path (`POST /api/chat` with `session_id`)
 - SQLite-backed idempotency TTL table for duplicate request replay and write dedupe
@@ -53,6 +62,12 @@ Last updated: 2026-04-08
 | POST | `/api/chat` |
 | POST | `/api/upload` |
 | POST | `/api/upload/analyze` |
+| POST | `/api/knowledge/uploads` |
+| GET | `/api/knowledge/uploads/{document_id}` |
+| POST | `/api/knowledge/ingestions` |
+| GET | `/api/knowledge/ingestions/{ingestion_id}` |
+| POST | `/api/knowledge/search` |
+| POST | `/api/knowledge/answers` |
 | GET | `/api/history` |
 | GET | `/api/history/{session_id}` |
 | DELETE | `/api/history` |
@@ -64,10 +79,12 @@ Last updated: 2026-04-08
 ## Important behavior notes
 
 - `/api/chat` streams typed JSON SSE objects, not legacy string sentinels
-- `/api/upload` emits `file_context` then `done`; it no longer emits starter charts
-- `/api/upload/analyze` keeps `chart: null` only for backward compatibility
+- `/api/upload` now emits `knowledge_ready` then `done`; it ingests the file into the knowledge subsystem instead of returning prompt-injection `file_context`
+- `/api/upload/analyze` now returns `document_id`, `ingestion_id`, `status`, and `retrieval_mode`; `chart: null` remains only for backward compatibility
+- `/api/chat` accepts `knowledge_document_ids` and uses retrieval-backed answering when indexed documents are attached
+- `/api/knowledge/*` routes now support persisted upload, synchronous ingestion, retrieval, retrieval-backed answers, and attached-document fallback when lexical retrieval misses
 - `/api/health` is liveness only; `/api/ready` is the deploy/readiness probe and returns `503` when SQLite or the optional Ollama probe is not ready
-- History reads are normalized at the backend boundary: `/api/history/{id}` returns standard chat roles plus structured `chart_spec` / `file_context`, while legacy stored payloads remain readable through a dedicated compatibility codec
+- History reads are normalized at the backend boundary: `/api/history/{id}` returns standard chat roles plus structured `chart_spec`, legacy `file_context`, and `knowledge_documents`, while legacy stored payloads remain readable through a dedicated compatibility codec
 - When `GOAT_API_KEY` is configured, every API except `/api/health` and `/api/ready` requires `X-GOAT-API-Key`
 
 ## Operational notes

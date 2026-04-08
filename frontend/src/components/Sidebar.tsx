@@ -36,7 +36,14 @@ interface Props {
   onRefreshHistory: () => void
   onDeleteAllHistory: () => void
   fileContext: FileContext | null
-  onFileContext: (ctx: { type: 'file_context'; filename: string; prompt: string }) => void
+  onFileContext: (ctx: {
+    type: 'knowledge_ready'
+    filename: string
+    document_id: string
+    ingestion_id: string
+    status: string
+    retrieval_mode: string
+  }) => void
   onClearFileContext: () => void
 }
 
@@ -290,7 +297,7 @@ const Sidebar: FC<Props> = ({
         {/* File Upload */}
         <section>
           <p className={sidebarSectionLabelClass} style={{ color: 'rgba(255,255,255,0.45)' }}>
-            Analyze File
+            Knowledge File
           </p>
           <FileUpload
             key={fileContext?.filename ?? 'no-file'}

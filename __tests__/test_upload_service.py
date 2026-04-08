@@ -31,7 +31,7 @@ class UploadServiceTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmpdir.cleanup()
 
-    def test_upload_stream_emits_file_context_event(self) -> None:
+    def test_upload_stream_emits_knowledge_ready_event(self) -> None:
         content = b"col1,col2\n1,2\n"
         events = list(
             stream_upload_analysis_sse(
@@ -45,9 +45,11 @@ class UploadServiceTests(unittest.TestCase):
         first = events[0]
         self.assertTrue(first.startswith("data: "))
         payload = json.loads(first[len("data: "):].strip())
-        self.assertEqual("file_context", payload["type"])
+        self.assertEqual("knowledge_ready", payload["type"])
         self.assertEqual("data.csv", payload["filename"])
-        self.assertIn("col1", payload["prompt"])
+        self.assertEqual("knowledge_rag", payload["retrieval_mode"])
+        self.assertIn("document_id", payload)
+        self.assertIn("ingestion_id", payload)
 
         self.assertFalse(any('"type": "chart_spec"' in event for event in events))
         self.assertTrue(any('"type": "done"' in event for event in events))

@@ -39,6 +39,7 @@ class FakeSessionRepository:
             messages=decoded.messages,
             chart_spec=decoded.chart_spec,
             file_context_prompt=decoded.file_context_prompt,
+            knowledge_documents=decoded.knowledge_documents,
             chart_data_source=decoded.chart_data_source,
         )
 
@@ -93,7 +94,7 @@ class ChatServiceTitleTests(unittest.TestCase):
                     id="sid-2",
                     title="Kept title",
                     model="m",
-                    schema_version=2,
+                    schema_version=3,
                     created_at="2026-01-01T00:00:00+00:00",
                     updated_at="2026-01-01T00:00:01+00:00",
                     messages=[
@@ -160,6 +161,7 @@ class ChatServiceTitleTests(unittest.TestCase):
         self.assertEqual("Done.", stored.messages[1]["content"])
         self.assertIsNotNone(stored.file_context_prompt)
         self.assertEqual("uploaded", stored.chart_data_source)
+        self.assertEqual(3, stored.schema_version)
 
     def test_decode_session_payload_keeps_legacy_storage_compatible(self) -> None:
         decoded = decode_session_payload(

@@ -17,6 +17,7 @@ from backend.api_errors import (
     AUTH_INVALID_API_KEY,
     BAD_REQUEST,
     INFERENCE_BACKEND_UNAVAILABLE,
+    KNOWLEDGE_NOT_FOUND,
     NOT_FOUND,
     RATE_LIMITED,
     REQUEST_VALIDATION_ERROR,
@@ -240,6 +241,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
             app_root=root,
             logo_svg=root / "logo.svg",
             log_db_path=root / "chat_logs.db",
+            data_dir=root / "data",
             ready_skip_ollama_probe=True,
         )
         log_service.init_db(self.settings.log_db_path)
@@ -338,7 +340,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         history_detail = self.client.get("/api/history/chat-1")
         self.assertEqual(200, history_detail.status_code)
         self.assertEqual("Generated session title", history_detail.json()["title"])
-        self.assertEqual(2, history_detail.json()["schema_version"])
+        self.assertEqual(3, history_detail.json()["schema_version"])
         self.assertEqual(
             [{"role": "user", "content": "Hello there"}, {"role": "assistant", "content": "Hello from GOAT"}],
             history_detail.json()["messages"],
@@ -483,17 +485,22 @@ class ApiBlackboxContractTests(unittest.TestCase):
         )
         self.assertEqual(200, upload_response.status_code)
         upload_events = parse_sse_payloads(upload_response.text)
-        self.assertEqual(["file_context", "done"], [event["type"] for event in upload_events])
+        self.assertEqual(["knowledge_ready", "done"], [event["type"] for event in upload_events])
         self.assertEqual("data.csv", upload_events[0]["filename"])
-        self.assertIn("col1", upload_events[0]["prompt"])
+        self.assertEqual("knowledge_rag", upload_events[0]["retrieval_mode"])
+        self.assertIn("document_id", upload_events[0])
+        self.assertIn("ingestion_id", upload_events[0])
 
         upload_invalid = self.client.post(
             "/api/upload",
-            files={"file": ("notes.txt", b"hello", "text/plain")},
+            files={"file": ("image.png", b"not-a-knowledge-file", "image/png")},
         )
         self.assertEqual(400, upload_invalid.status_code)
         uinv = upload_invalid.json()
-        self.assertEqual("Only CSV and XLSX files are supported.", uinv["detail"])
+        self.assertEqual(
+            "Supported knowledge upload types are CSV, XLSX, TXT, MD, PDF, and DOCX.",
+            uinv["detail"],
+        )
         self.assertEqual(BAD_REQUEST, uinv["code"])
 
         upload_missing_name = self.client.post(
@@ -512,16 +519,22 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(200, analyze_response.status_code)
         analyze_body = analyze_response.json()
         self.assertEqual("sales.csv", analyze_body["filename"])
-        self.assertIn("month", analyze_body["prompt"])
+        self.assertEqual("knowledge_rag", analyze_body["retrieval_mode"])
+        self.assertEqual("completed", analyze_body["status"])
+        self.assertIn("document_id", analyze_body)
+        self.assertIn("ingestion_id", analyze_body)
         self.assertIsNone(analyze_body["chart"])
 
         analyze_invalid = self.client.post(
             "/api/upload/analyze",
-            files={"file": ("notes.txt", b"hello", "text/plain")},
+            files={"file": ("image.png", b"hello", "image/png")},
         )
         self.assertEqual(400, analyze_invalid.status_code)
         ainv = analyze_invalid.json()
-        self.assertEqual("Only CSV and XLSX files are supported.", ainv["detail"])
+        self.assertEqual(
+            "Supported knowledge upload types are CSV, XLSX, TXT, MD, PDF, and DOCX.",
+            ainv["detail"],
+        )
         self.assertEqual(BAD_REQUEST, ainv["code"])
 
         analyze_missing_name = self.client.post(
@@ -532,6 +545,90 @@ class ApiBlackboxContractTests(unittest.TestCase):
         amn = analyze_missing_name.json()
         self.assertEqual(["body", "file"], amn["detail"][0]["loc"])
         self.assertEqual(REQUEST_VALIDATION_ERROR, amn["code"])
+
+    def test_knowledge_endpoints_cover_upload_ingestion_search_and_answer(self) -> None:
+        upload = self.client.post(
+            "/api/knowledge/uploads",
+            files={"file": ("strategy.txt", b"Porter Five Forces explains competitive pressure.", "text/plain")},
+        )
+        self.assertEqual(200, upload.status_code)
+        upload_body = upload.json()
+        self.assertEqual("uploaded", upload_body["status"])
+        document_id = upload_body["document_id"]
+        self.assertEqual("strategy.txt", upload_body["filename"])
+
+        upload_status = self.client.get(f"/api/knowledge/uploads/{document_id}")
+        self.assertEqual(200, upload_status.status_code)
+        self.assertEqual("uploaded", upload_status.json()["status"])
+
+        missing_document = self.client.get("/api/knowledge/uploads/doc-missing")
+        self.assertEqual(404, missing_document.status_code)
+        self.assertEqual(KNOWLEDGE_NOT_FOUND, missing_document.json()["code"])
+
+        ingestion = self.client.post(
+            "/api/knowledge/ingestions",
+            json={"document_id": document_id},
+        )
+        self.assertEqual(200, ingestion.status_code)
+        ingestion_body = ingestion.json()
+        self.assertEqual("completed", ingestion_body["status"])
+        ingestion_id = ingestion_body["ingestion_id"]
+
+        ingestion_status = self.client.get(f"/api/knowledge/ingestions/{ingestion_id}")
+        self.assertEqual(200, ingestion_status.status_code)
+        self.assertEqual("completed", ingestion_status.json()["status"])
+        self.assertGreaterEqual(ingestion_status.json()["chunk_count"], 1)
+
+        search = self.client.post(
+            "/api/knowledge/search",
+            json={"query": "Porter's Five Forces", "top_k": 3},
+        )
+        self.assertEqual(200, search.status_code)
+        search_body = search.json()
+        self.assertEqual("Porter's Five Forces", search_body["query"])
+        self.assertGreaterEqual(len(search_body["hits"]), 1)
+        self.assertEqual(document_id, search_body["hits"][0]["document_id"])
+
+        answer = self.client.post(
+            "/api/knowledge/answers",
+            json={"query": "Porter competitive pressure summary", "top_k": 3},
+        )
+        self.assertEqual(200, answer.status_code)
+        answer_body = answer.json()
+        self.assertTrue(answer_body["answer"])
+        self.assertGreaterEqual(len(answer_body["citations"]), 1)
+
+        no_hit = self.client.post(
+            "/api/knowledge/answers",
+            json={"query": "zxqv non matching token", "top_k": 3},
+        )
+        self.assertEqual(200, no_hit.status_code)
+        self.assertEqual([], no_hit.json()["citations"])
+        self.assertEqual("No relevant context found in the indexed knowledge base.", no_hit.json()["answer"])
+
+        rag_chat = self.client.post(
+            "/api/chat",
+            json={
+                "model": "blackbox-model",
+                "session_id": "rag-chat-1",
+                "knowledge_document_ids": [document_id],
+                "messages": [{"role": "user", "content": "What does the indexed strategy note say?"}],
+            },
+        )
+        self.assertEqual(200, rag_chat.status_code)
+        rag_events = parse_sse_payloads(rag_chat.text)
+        self.assertEqual("done", rag_events[-1]["type"])
+        rag_text = "".join(event["token"] for event in rag_events if event["type"] == "token")
+        self.assertIn("strategy.txt", rag_text)
+        self.assertIn("Porter Five Forces", rag_text)
+
+        rag_history = self.client.get("/api/history/rag-chat-1")
+        self.assertEqual(200, rag_history.status_code)
+        self.assertEqual(3, rag_history.json()["schema_version"])
+        self.assertEqual(
+            [{"document_id": document_id, "filename": "strategy.txt", "mime_type": "text/plain"}],
+            rag_history.json()["knowledge_documents"],
+        )
 
     def test_history_endpoints_cover_empty_missing_delete_and_delete_all(self) -> None:
         empty_list = self.client.get("/api/history")
@@ -557,7 +654,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         listed = self.client.get("/api/history")
         self.assertEqual(2, len(listed.json()["sessions"]))
         for item in listed.json()["sessions"]:
-            self.assertEqual(2, item["schema_version"])
+            self.assertEqual(3, item["schema_version"])
 
         delete_one = self.client.delete("/api/history/hist-a")
         self.assertEqual(204, delete_one.status_code)
@@ -665,6 +762,7 @@ class ApiProtectedBlackboxContractTests(unittest.TestCase):
             app_root=root,
             logo_svg=root / "logo.svg",
             log_db_path=root / "chat_logs.db",
+            data_dir=root / "data",
             api_key="secret-123",
             rate_limit_window_sec=60,
             rate_limit_max_requests=2,
@@ -705,6 +803,19 @@ class ApiProtectedBlackboxContractTests(unittest.TestCase):
                 "/api/upload/analyze",
                 {"files": {"file": ("data.csv", b"col1,col2\n1,2\n", "text/csv")}},
             ),
+            (
+                "POST",
+                "/api/knowledge/uploads",
+                {"files": {"file": ("strategy.pdf", b"%PDF-1.4", "application/pdf")}},
+            ),
+            (
+                "POST",
+                "/api/knowledge/ingestions",
+                {"json": {"document_id": "doc-1", "parser_profile": "default", "chunking_profile": "default", "embedding_profile": "default"}},
+            ),
+            ("GET", "/api/knowledge/ingestions/ing-1", {}),
+            ("POST", "/api/knowledge/search", {"json": {"query": "competitive strategy"}}),
+            ("POST", "/api/knowledge/answers", {"json": {"query": "competitive strategy"}}),
             ("GET", "/api/history", {}),
             ("GET", "/api/history/missing", {}),
             ("DELETE", "/api/history/missing", {}),

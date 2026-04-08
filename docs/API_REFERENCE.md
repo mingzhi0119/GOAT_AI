@@ -29,6 +29,12 @@ Base path: `/api`
 | `POST` | `/api/chat` | Stream chat SSE |
 | `POST` | `/api/upload` | Stream upload analysis SSE |
 | `POST` | `/api/upload/analyze` | Upload analysis as JSON |
+| `POST` | `/api/knowledge/uploads` | Register and persist a knowledge upload |
+| `GET` | `/api/knowledge/uploads/{document_id}` | Read one persisted knowledge upload |
+| `POST` | `/api/knowledge/ingestions` | Start a knowledge ingestion job |
+| `GET` | `/api/knowledge/ingestions/{ingestion_id}` | Read one ingestion job |
+| `POST` | `/api/knowledge/search` | Search indexed knowledge chunks |
+| `POST` | `/api/knowledge/answers` | Retrieval-backed answer with citations |
 | `GET` | `/api/history` | List saved sessions |
 | `GET` | `/api/history/{session_id}` | Read one session |
 | `DELETE` | `/api/history` | Delete all sessions |
@@ -100,9 +106,9 @@ Request body:
 {
   "model": "gemma4:26b",
   "messages": [
-    { "role": "user", "content": "Summarize Porter's Five Forces." },
-    { "role": "user", "content": "[User uploaded tabular data for analysis] ...", "file_context": true }
+    { "role": "user", "content": "Summarize Porter's Five Forces." }
   ],
+  "knowledge_document_ids": ["doc-123"],
   "session_id": "session-123",
   "system_instruction": "Answer in bullet points.",
   "temperature": 0.3,
@@ -111,7 +117,7 @@ Request body:
 }
 ```
 
-Optional `file_context: true` on a user message marks upload-derived tabular context for the session.
+Optional `knowledge_document_ids` binds the turn to already indexed knowledge documents and switches chat to retrieval-backed answering for those documents. Legacy `file_context: true` messages remain readable for old sessions but are no longer the primary upload path.
 
 SSE event types:
 
@@ -158,29 +164,30 @@ Notes:
 
 Purpose:
 
-- Parse CSV/XLSX
-- Return reusable file context for the next chat turn
+- Persist and ingest a supported knowledge file
+- Return readiness metadata for the next retrieval-backed chat turn
 
 Form field:
 
-- `file`: `.csv` or `.xlsx`
+- `file`: `.csv`, `.xlsx`, `.txt`, `.md`, `.pdf`, or `.docx`
 
 SSE event types:
 
-- `file_context`
+- `knowledge_ready`
 - `error`
 - `done`
 
 Success frame:
 
 ```text
-data: {"type":"file_context","filename":"sales.csv","prompt":"[User uploaded tabular data for analysis] ..."}
+data: {"type":"knowledge_ready","filename":"sales.csv","document_id":"doc-123","ingestion_id":"ing-123","status":"completed","retrieval_mode":"knowledge_rag"}
 ```
 
 Notes:
 
+- This endpoint performs synchronous upload + ingestion for the first RAG slice
+- The frontend should store `document_id` and pass it back through `knowledge_document_ids` on `POST /api/chat`
 - This endpoint does not emit `chart_spec`
-- Charts are created later during `/api/chat` tool calls
 
 ## `POST /api/upload/analyze`
 
@@ -189,7 +196,10 @@ Returns:
 ```json
 {
   "filename": "sales.csv",
-  "prompt": "[User uploaded tabular data for analysis] ...",
+  "document_id": "doc-123",
+  "ingestion_id": "ing-123",
+  "status": "completed",
+  "retrieval_mode": "knowledge_rag",
   "chart": null
 }
 ```
@@ -202,6 +212,65 @@ Idempotency:
 - Duplicate key plus the same file bytes returns the same JSON body
 - Reusing a key with different file bytes returns `409` with `code = IDEMPOTENCY_CONFLICT`
 
+## `POST /api/knowledge/uploads`
+
+Persist a supported knowledge file and register document metadata.
+
+Current behavior:
+
+- Supported file types are `csv`, `xlsx`, `txt`, `md`, `pdf`, and `docx`
+- Raw files are stored under `GOAT_DATA_DIR/uploads/knowledge/<document_id>/original/`
+- Returns `upload_id`, `document_id`, filename metadata, and `status = uploaded`
+
+## `GET /api/knowledge/uploads/{document_id}`
+
+Returns metadata for one persisted knowledge upload.
+
+Current behavior:
+
+- Returns `uploaded` before indexing and `indexed` after a successful ingestion
+- Missing documents return `404` with `code = KNOWLEDGE_NOT_FOUND`
+
+## `POST /api/knowledge/ingestions`
+
+Start a knowledge ingestion job for one uploaded document.
+
+Current behavior:
+
+- Normalizes supported source types into text
+- Chunks text into bounded sections
+- Writes SQLite metadata rows plus a local persistent vector index (`simple_local_v1`)
+- Returns an ingestion record with `status = completed` when the synchronous MVP path succeeds
+
+## `GET /api/knowledge/ingestions/{ingestion_id}`
+
+Read the current status of one ingestion attempt.
+
+Current behavior:
+
+- Returns `queued`, `running`, `completed`, or `failed`
+- Includes `chunk_count` and optional `error_code` / `error_detail`
+- Missing ingestions return `404` with `code = KNOWLEDGE_NOT_FOUND`
+
+## `POST /api/knowledge/search`
+
+Pure retrieval endpoint for indexed knowledge chunks.
+
+Current behavior:
+
+- Returns ranked hits with `document_id`, `chunk_id`, `filename`, `snippet`, and `score`
+- Supports `document_ids` filtering and `top_k`
+
+## `POST /api/knowledge/answers`
+
+Retrieval-backed answer endpoint outside the chat session contract.
+
+Current behavior:
+
+- Returns a retrieval-backed answer plus citation payloads
+- Defines explicit no-hit behavior: `No relevant context found in the indexed knowledge base.`
+- When `document_ids` are provided and lexical retrieval misses, the first indexed chunks from those attached documents are used as a bounded fallback scope
+
 ## `GET /api/history`
 
 Returns session metadata list:
@@ -213,7 +282,7 @@ Returns session metadata list:
       "id": "session-123",
       "title": "Porter analysis",
       "model": "gemma4:26b",
-      "schema_version": 2,
+      "schema_version": 3,
       "created_at": "2026-04-07T14:00:00+00:00",
       "updated_at": "2026-04-07T14:01:30+00:00"
     }
@@ -230,11 +299,18 @@ Returns one normalized stored session:
   "id": "session-123",
   "title": "Porter analysis",
   "model": "gemma4:26b",
-  "schema_version": 2,
+  "schema_version": 3,
   "created_at": "2026-04-07T14:00:00+00:00",
   "updated_at": "2026-04-07T14:01:30+00:00",
   "chart_data_source": "uploaded",
   "chart_spec": { "version": "2.0", "engine": "echarts", "kind": "line" },
+  "knowledge_documents": [
+    {
+      "document_id": "doc-123",
+      "filename": "sales.csv",
+      "mime_type": "text/csv"
+    }
+  ],
   "file_context": {
     "prompt": "[User uploaded tabular data for analysis] ..."
   },
@@ -248,7 +324,7 @@ Returns one normalized stored session:
 Notes:
 
 - `messages` contains only normalized chat roles: `user`, `assistant`, `system`
-- `chart_spec` and `file_context` are returned as dedicated fields instead of compatibility pseudo-roles
+- `chart_spec`, `file_context`, and `knowledge_documents` are returned as dedicated fields instead of compatibility pseudo-roles
 - `chart_data_source` indicates where chart data came from: `uploaded`, `demo`, or `none`
 - Legacy stored sessions are still readable; compatibility decode lives in the backend storage codec, not the API contract
 

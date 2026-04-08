@@ -4,7 +4,9 @@ const STORAGE_KEY = 'goat-ai-file-context'
 
 export interface FileContext {
   filename: string
-  prompt: string
+  documentId: string
+  ingestionId: string
+  retrievalMode: string
 }
 
 export interface UseFileContextReturn {
@@ -18,8 +20,20 @@ function loadInitial(): FileContext | null {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<FileContext>
-    if (typeof parsed.filename !== 'string' || typeof parsed.prompt !== 'string') return null
-    return { filename: parsed.filename, prompt: parsed.prompt }
+    if (
+      typeof parsed.filename !== 'string' ||
+      typeof parsed.documentId !== 'string' ||
+      typeof parsed.ingestionId !== 'string' ||
+      typeof parsed.retrievalMode !== 'string'
+    ) {
+      return null
+    }
+    return {
+      filename: parsed.filename,
+      documentId: parsed.documentId,
+      ingestionId: parsed.ingestionId,
+      retrievalMode: parsed.retrievalMode,
+    }
   } catch {
     return null
   }

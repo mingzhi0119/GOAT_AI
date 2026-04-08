@@ -89,6 +89,7 @@ class Settings:
     app_root: Path
     logo_svg: Path
     log_db_path: Path
+    data_dir: Path = APP_ROOT / "data"
     api_key: str = ""
     rate_limit_window_sec: int = 60
     rate_limit_max_requests: int = 60
@@ -120,6 +121,7 @@ def load_settings() -> Settings:
     base = os.environ.get("OLLAMA_BASE_URL", _default_ollama_base_url()).rstrip("/")
     max_mb = int(os.environ.get("GOAT_MAX_UPLOAD_MB", "20"))
     _default_log_db = str(APP_ROOT / "chat_logs.db")
+    _default_data_dir = str(APP_ROOT / "data")
     _rate_limit_window_sec = int(os.environ.get("GOAT_RATE_LIMIT_WINDOW_SEC", "60"))
     _rate_limit_max_requests = int(os.environ.get("GOAT_RATE_LIMIT_MAX_REQUESTS", "60"))
     _deploy_target = os.environ.get("GOAT_DEPLOY_TARGET", "auto").strip().lower()
@@ -187,6 +189,7 @@ def load_settings() -> Settings:
         app_root=APP_ROOT,
         logo_svg=APP_ROOT / "static" / "urochester_simon_business_horizontal.svg",
         log_db_path=Path(os.environ.get("GOAT_LOG_PATH", _default_log_db)),
+        data_dir=Path(os.environ.get("GOAT_DATA_DIR", _default_data_dir)),
         api_key=os.environ.get("GOAT_API_KEY", "").strip(),
         rate_limit_window_sec=_rate_limit_window_sec,
         rate_limit_max_requests=_rate_limit_max_requests,

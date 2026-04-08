@@ -12,6 +12,7 @@ export interface HistorySessionDetail extends HistorySessionItem {
   messages: HistorySessionMessage[]
   chart_spec: ChartSpec | null
   file_context: { prompt: string } | null
+  knowledge_documents: Array<{ document_id: string; filename: string; mime_type: string }>
 }
 
 export async function fetchHistory(): Promise<HistorySessionItem[]> {

@@ -91,6 +91,7 @@ This project is designed for an unprivileged JupyterHub-style server environment
 | `GOAT_SYSTEM_PROMPT` | Override system prompt | built-in default |
 | `GOAT_SYSTEM_PROMPT_FILE` | Path to UTF-8 prompt file | empty |
 | `GOAT_LOG_PATH` | SQLite path | `<project>/chat_logs.db` |
+| `GOAT_DATA_DIR` | Root directory for persisted uploads, normalized knowledge text, and local vector indexes | `<project>/data` |
 | `GOAT_API_KEY` | Protect non-health APIs via `X-GOAT-API-Key` | empty |
 | `GOAT_RATE_LIMIT_WINDOW_SEC` | Rate limit window | `60` |
 | `GOAT_RATE_LIMIT_MAX_REQUESTS` | Max requests per window | `60` |
@@ -178,7 +179,7 @@ SLO starter table:
 | First-token latency p95 | <= 2000 ms | `GET /api/system/inference` (`first_token_p95_ms`) |
 | Full chat latency p95 | <= 12000 ms | `GET /api/system/inference` (`chat_p95_ms`) |
 | Max concurrent SSE streams (single process) | 20 | Runbook load validation (`tools/load_chat_smoke.py`) |
-| Upload analyze JSON budget | <= 5 s for <= 20 MB CSV/XLSX | `POST /api/upload/analyze` smoke run |
+| Upload analyze JSON budget | <= 5 s for <= 20 MB supported knowledge file (`csv/xlsx/txt/md/pdf/docx`) | `POST /api/upload/analyze` smoke run |
 | Session append guardrails | hard-stop at configured maxes | `GOAT_MAX_CHAT_MESSAGES`, `GOAT_MAX_CHAT_PAYLOAD_BYTES` |
 
 Load smoke command:
@@ -257,6 +258,12 @@ Treat the following as operational stop signs during Phase 13 rollout work:
 | POST | `/api/chat` |
 | POST | `/api/upload` |
 | POST | `/api/upload/analyze` |
+| POST | `/api/knowledge/uploads` |
+| GET | `/api/knowledge/uploads/{document_id}` |
+| POST | `/api/knowledge/ingestions` |
+| GET | `/api/knowledge/ingestions/{ingestion_id}` |
+| POST | `/api/knowledge/search` |
+| POST | `/api/knowledge/answers` |
 | GET | `/api/history` |
 | GET | `/api/history/{session_id}` |
 | DELETE | `/api/history` |

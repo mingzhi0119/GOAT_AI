@@ -13,6 +13,18 @@ from backend.models.history import (
     HistorySessionListResponse,
     HistorySessionSummary,
 )
+from backend.models.knowledge import (
+    KnowledgeAnswerRequest,
+    KnowledgeAnswerResponse,
+    KnowledgeCitation,
+    KnowledgeIngestionRequest,
+    KnowledgeIngestionResponse,
+    KnowledgeIngestionStatusResponse,
+    KnowledgeSearchRequest,
+    KnowledgeSearchResponse,
+    KnowledgeUploadResponse,
+    KnowledgeUploadStatusResponse,
+)
 from backend.models.upload import UploadAnalysisResponse
 
 __all__ = [
@@ -26,5 +38,15 @@ __all__ = [
     "HistorySessionFileContext",
     "HistorySessionListResponse",
     "HistorySessionSummary",
+    "KnowledgeAnswerRequest",
+    "KnowledgeAnswerResponse",
+    "KnowledgeCitation",
+    "KnowledgeIngestionRequest",
+    "KnowledgeIngestionResponse",
+    "KnowledgeIngestionStatusResponse",
+    "KnowledgeSearchRequest",
+    "KnowledgeSearchResponse",
+    "KnowledgeUploadResponse",
+    "KnowledgeUploadStatusResponse",
     "UploadAnalysisResponse",
 ]

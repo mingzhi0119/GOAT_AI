@@ -80,7 +80,14 @@ export default function App() {
           void session.deleteHistorySession(sessionId)
         }}
         fileContext={session.fileContext}
-        onFileContext={session.setFileContext}
+        onFileContext={ctx => {
+          session.setFileContext({
+            filename: ctx.filename,
+            documentId: ctx.document_id,
+            ingestionId: ctx.ingestion_id,
+            retrievalMode: ctx.retrieval_mode,
+          })
+        }}
         onClearFileContext={session.clearFileContextSession}
       />
       <div className="flex flex-col flex-1 min-w-0 min-h-0">

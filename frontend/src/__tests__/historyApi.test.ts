@@ -29,6 +29,7 @@ describe('history api', () => {
         updated_at: 'u',
         chart_spec: { version: '2.0', engine: 'echarts' },
         file_context: { prompt: 'prompt' },
+        knowledge_documents: [{ document_id: 'doc-1', filename: 'strategy.pdf', mime_type: 'application/pdf' }],
         messages: [{ role: 'user', content: 'hi' }],
       }),
     })
@@ -38,6 +39,9 @@ describe('history api', () => {
     expect(detail.id).toBe('s1')
     expect(detail.chart_spec).toEqual({ version: '2.0', engine: 'echarts' })
     expect(detail.file_context).toEqual({ prompt: 'prompt' })
+    expect(detail.knowledge_documents).toEqual([
+      { document_id: 'doc-1', filename: 'strategy.pdf', mime_type: 'application/pdf' },
+    ])
     expect(mockedFetch).toHaveBeenCalledWith('./api/history/s1')
   })
 

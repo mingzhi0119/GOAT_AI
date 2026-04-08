@@ -152,42 +152,44 @@ These are **not** "nice-to-have data tasks" — they unblock schema evolution an
 
 ### 14.1 RAG baseline assessment and non-goals
 
-**Current assessment:** the repository is **not yet at a "RAG baseline implementation" stage**. It is closer to **general chat + CSV/XLSX file-context injection + engineering/operations hardening**.
+**Historical baseline:** at the start of Phase 14, the repository was **not yet at a "RAG baseline implementation" stage**. It was closer to **general chat + CSV/XLSX file-context injection + engineering/operations hardening**.
 
-**Why this matters:** the current `POST /api/upload` path parses tabular files and returns `file_context` for prompt injection, but it does **not** constitute a retrieval system. There is currently no persisted ingestion/indexing pipeline, no document chunking strategy, no embeddings lifecycle, no vector index/store, no retriever, no reranker, and no query-rewrite layer.
+**Why this mattered:** the earlier `POST /api/upload` path parsed tabular files and returned `file_context` for prompt injection, which did **not** constitute a retrieval system. The missing pieces were persisted ingestion/indexing, chunking, embeddings, a vector backend, retrieval contracts, and quality layers such as rerank/query rewrite.
 
 **Fit assessment:** the project is still a good candidate for RAG, but this should be planned as a **new subsystem**, not treated as a small extension of the existing upload flow.
 
-- `[ ]` **Explicit non-goal for current upload flow** —Document that `upload -> file_context` is prompt-context assistance, not knowledge-base indexing. Do not market the current CSV/XLSX path as RAG.
-- `[ ]` **Foundation is sufficient** —Leverage the existing API/service layering, SSE streaming path, error model, readiness/metrics work, and the current `upload + chat + history` surface as the platform on which RAG APIs can be introduced.
-- `[ ]` **Separate API family** —When RAG begins, add a contract-first API family such as `knowledge/uploads`, `knowledge/ingestions`, `knowledge/search`, and `knowledge/answers`, rather than overloading the existing upload contract with hidden indexing side effects.
-- `[ ]` **Contract-first boundary** —Before implementation, define black-box contracts for ingestion status, retrieval result shape, citation metadata, and "no relevant context found" behavior, following the same contract discipline used elsewhere in the repo.
-- `[ ]` **Core backend components** —Introduce typed service boundaries for document normalization, chunking, embedding generation, vector-store writes/reads, retrieval orchestration, optional reranking, and optional query rewrite.
-- `[ ]` **Storage decision gate** —Make vector-store choice an explicit design decision with documented single-node/no-root operational constraints; do not couple the first RAG slice to infra that the current deployment model cannot operate reliably.
+- `[x]` **Explicit non-goal retired by implementation** —The legacy `upload -> file_context` prompt-injection path is now superseded for active uploads by synchronous knowledge ingestion plus retrieval-backed chat attachment. Legacy `file_context` remains readable only for backward-compatible session history.
+- `[x]` **Foundation is sufficient** —Leverage the existing API/service layering, SSE streaming path, error model, readiness/metrics work, and the current `upload + chat + history` surface as the platform on which RAG APIs can be introduced.
+- `[x]` **Separate API family** —RAG now uses a dedicated `knowledge/*` API family rather than overloading the existing upload contract with hidden indexing side effects.
+- `[x]` **Contract-first boundary** —Black-box contracts now exist for upload, ingestion status, retrieval result shape, and "no relevant context found" behavior.
+- `[x]` **Core backend components** —Typed service boundaries now exist for document persistence, normalization, chunking, simple embedding/index writes, retrieval, and answer composition.
+- `[x]` **Storage decision gate** —The first RAG slice now uses a documented single-node local persistent backend (`simple_local_v1`) rather than introducing a separate vector service.
 
 ### 14.2 RAG-0 — capability framing and contract design
 
-- `[ ]` **Architecture draft landed** —Keep `docs/RAG_ARCHITECTURE.md` aligned with roadmap, including API family, SQLite metadata tables, local file layout, and vector-store constraints.
-- `[ ]` **OpenAPI-first route design** —Add request/response schemas for `POST /api/knowledge/uploads`, `POST /api/knowledge/ingestions`, `GET /api/knowledge/ingestions/{id}`, and `POST /api/knowledge/search` before feature-complete implementation.
-- `[ ]` **Error semantics** —Reuse the stable `{ "detail", "code", "request_id" }` envelope for ingestion/search failures and unsupported retrieval states.
-- `[ ]` **Chat contract isolation** —`POST /api/chat` remains a chat API and consumes retrieval only through services, not route sharing.
+- `[x]` **Architecture draft landed** —`docs/RAG_ARCHITECTURE.md` now anchors the API family, SQLite metadata tables, local file layout, and vector-store constraints.
+- `[x]` **OpenAPI-first route design** —Schemas now exist for `POST /api/knowledge/uploads`, `GET /api/knowledge/uploads/{document_id}`, `POST /api/knowledge/ingestions`, `GET /api/knowledge/ingestions/{id}`, `POST /api/knowledge/search`, and `POST /api/knowledge/answers`.
+- `[x]` **Error semantics** —The stable `{ "detail", "code", "request_id" }` envelope is now reused for knowledge upload/ingestion failures and not-found states.
+- `[x]` **Chat contract isolation** —`POST /api/chat` remains a chat API; retrieval is enabled only when the caller explicitly supplies `knowledge_document_ids`, rather than overloading hidden upload prompts.
 
 ### 14.3 RAG-1 — ingestion MVP
 
-- `[ ]` **Raw file persistence** —Store uploaded knowledge files under a dedicated local storage root (`GOAT_DATA_DIR`) rather than the current ad hoc upload path.
-- `[ ]` **SQLite metadata and lifecycle** —Add `knowledge_documents`, `knowledge_ingestions`, and `knowledge_chunks` through numbered migrations.
-- `[ ]` **Parser and chunking pipeline** —Implement typed document normalization and chunk generation for a narrow file set first.
-- `[ ]` **Embedding generation** —Generate embeddings through a dedicated service boundary, not in routers or ad hoc upload handlers.
-- `[ ]` **Persistent local vector index** —Write vectors to a local persistent backend that fits the current no-root, single-node deployment model.
-- `[ ]` **Status visibility** —Expose ingestion progress and errors through `GET /api/knowledge/ingestions/{id}`.
+- `[x]` **Raw file persistence** —Knowledge uploads now persist under `GOAT_DATA_DIR/uploads/knowledge/<document_id>/original/`.
+- `[x]` **SQLite metadata and lifecycle** —`knowledge_documents`, `knowledge_ingestions`, and `knowledge_chunks` now exist through numbered migration `007_add_knowledge_tables.sql`.
+- `[x]` **Parser and chunking pipeline** —The normalization and chunking pipeline now supports CSV/XLSX/TXT/MD/PDF/DOCX for the first ingestion slice.
+- `[x]` **Embedding generation** —The first MVP uses a dedicated local simple-embedding path (`simple_local_v1`) rather than embedding logic in routers.
+- `[x]` **Persistent local vector index** —Vectors now persist under `GOAT_DATA_DIR/vector_index/simple_local_v1/`.
+- `[x]` **Status visibility** —Ingestion progress and outcomes are exposed through `GET /api/knowledge/ingestions/{id}`.
+- `[x]` **Legacy tabular upload upgraded** —`POST /api/upload` and `POST /api/upload/analyze` now ingest CSV/XLSX through the knowledge pipeline and return `knowledge_ready` / `document_id` metadata instead of prompt-injection `file_context`.
 
 ### 14.4 RAG-2 — retrieval MVP
 
-- `[ ]` **Pure retrieval API** —Add `POST /api/knowledge/search` that returns ranked chunks, document metadata, and citation payloads without answer generation.
-- `[ ]` **Answer API** —Add `POST /api/knowledge/answers` as a retrieval-backed answer path outside the chat session contract.
-- `[ ]` **Chat integration through services** —Allow `POST /api/chat` to call retrieval orchestration through `RetrieverService` / `AnswerOrchestrator` only after the standalone knowledge APIs are stable.
-- `[ ]` **No-hit behavior** —Define and test explicit "no relevant context found" behavior instead of silent fallback to fabricated citations.
-- `[ ]` **Black-box coverage** —Add API-boundary tests for upload, ingestion, search, answer, and clean failure modes.
+- `[x]` **Pure retrieval API** —`POST /api/knowledge/search` now returns ranked chunks, document metadata, and citation payloads without answer generation.
+- `[x]` **Answer API** —`POST /api/knowledge/answers` now returns a retrieval-backed answer path outside the chat session contract.
+- `[x]` **Chat integration through services** —`POST /api/chat` now accepts `knowledge_document_ids` and routes those turns through retrieval-backed answering without collapsing the standalone knowledge API family into the router layer.
+- `[x]` **No-hit behavior** —The answer API now defines and tests explicit "No relevant context found in the indexed knowledge base." behavior.
+- `[x]` **Black-box coverage** —API-boundary tests now cover upload, ingestion, search, answer, and clean not-found/failure modes.
+- `[x]` **Attached-document fallback** —When lexical retrieval misses but the caller explicitly scopes the turn to indexed documents, the first indexed chunks from those documents are used as a bounded fallback answer scope.
 
 ### 14.5 Vision MVP (after retrieval exists)
 
@@ -287,3 +289,5 @@ These are **not** "nice-to-have data tasks" — they unblock schema evolution an
 | 2026-04-08 | Phase 13.6-13.8 closed | Graceful shutdown is now documented and implemented in deploy scripts; rollback has an explicit ref-aware runbook; Phase 13 risk triggers are documented in OPERATIONS. |
 | 2026-04-08 | RAG classified as a future subsystem, not current baseline capability | Current `/api/upload` remains file-context parsing for prompt injection; roadmap now distinguishes that from true RAG requirements such as chunking, embeddings, vector retrieval, reranking, and retrieval contracts. |
 | 2026-04-08 | RAG elevated ahead of multimodal expansion; original Phase 14 moved to Phase 15 | Priority order is now **Phase 13 closeout -> RAG-0 -> RAG-1 -> RAG-2 -> Vision MVP -> RAG-3**. Video implementation was removed from the roadmap because target model support is too inconsistent for the near-term plan. |
+| 2026-04-08 | RAG-0 completed; first RAG-1/2 slice landed with a local persistent backend | Knowledge APIs now persist uploads, normalize and chunk narrow document types, write to SQLite metadata tables plus a local `simple_local_v1` vector index, and expose search/answer endpoints with black-box coverage. |
+| 2026-04-08 | CSV/XLSX upload path moved fully onto the RAG pipeline; PDF/DOCX joined RAG normalization | `/api/upload` and `/api/upload/analyze` now perform real ingestion and return knowledge identifiers, `/api/chat` can answer with `knowledge_document_ids`, and `pdf/docx` normalize alongside `csv/xlsx/txt/md` in the first RAG ingestion slice. |

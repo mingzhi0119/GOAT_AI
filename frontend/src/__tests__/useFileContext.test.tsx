@@ -26,10 +26,16 @@ describe('useFileContext', () => {
     const { result } = renderHook(() => useFileContext())
 
     act(() => {
-      result.current.setFileContext({ filename: 'data.csv', prompt: 'analyze table' })
+      result.current.setFileContext({
+        filename: 'data.csv',
+        documentId: 'doc-1',
+        ingestionId: 'ing-1',
+        retrievalMode: 'knowledge_rag',
+      })
     })
 
     expect(result.current.fileContext?.filename).toBe('data.csv')
+    expect(result.current.fileContext?.documentId).toBe('doc-1')
     expect(localStorage.getItem('goat-ai-file-context')).toContain('data.csv')
 
     act(() => {

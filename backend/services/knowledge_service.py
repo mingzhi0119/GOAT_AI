@@ -1,0 +1,342 @@
+from __future__ import annotations
+
+import hashlib
+from datetime import datetime, timezone
+from uuid import uuid4
+
+from fastapi import UploadFile
+
+from backend.models.knowledge import (
+    KnowledgeAnswerRequest,
+    KnowledgeAnswerResponse,
+    KnowledgeCitation,
+    KnowledgeIngestionRequest,
+    KnowledgeIngestionResponse,
+    KnowledgeIngestionStatusResponse,
+    KnowledgeSearchRequest,
+    KnowledgeSearchResponse,
+    KnowledgeUploadResponse,
+    KnowledgeUploadStatusResponse,
+)
+from backend.services.exceptions import KnowledgeDocumentNotFound, KnowledgeValidationError
+from backend.services.knowledge_pipeline import (
+    chunk_text,
+    normalize_document,
+    persist_normalized_text,
+    persist_vector_index,
+    search_vector_index,
+)
+from backend.services.knowledge_repository import (
+    KnowledgeChunkRow,
+    KnowledgeDocumentRecord,
+    KnowledgeIngestionRecord,
+    SQLiteKnowledgeRepository,
+)
+from backend.services.knowledge_storage import (
+    KnowledgeValidationError as StorageValidationError,
+    persist_knowledge_bytes,
+)
+from backend.types import Settings
+
+_VECTOR_BACKEND = "simple_local_v1"
+_MAX_READ_BYTES = 25 * 1024 * 1024
+
+
+def create_knowledge_upload(*, file: UploadFile, settings: Settings) -> KnowledgeUploadResponse:
+    """Persist a knowledge upload and register document metadata."""
+    return create_knowledge_upload_from_bytes(
+        content_type=file.content_type,
+        filename=file.filename or "",
+        settings=settings,
+        content=_run_async_read(file=file),
+    )
+
+
+def create_knowledge_upload_from_bytes(
+    *,
+    content: bytes,
+    filename: str,
+    content_type: str | None,
+    settings: Settings,
+) -> KnowledgeUploadResponse:
+    """Persist a knowledge upload from already-read bytes and register document metadata."""
+    document_id = f"doc-{uuid4().hex}"
+    upload_id = f"upload-{uuid4().hex}"
+    try:
+        stored = persist_knowledge_bytes(
+            content=content,
+            filename=filename,
+            content_type=content_type,
+            settings=settings,
+            document_id=document_id,
+        )
+    except StorageValidationError as exc:
+        raise KnowledgeValidationError(str(exc)) from exc
+
+    now = _now_iso()
+    repository = SQLiteKnowledgeRepository(settings.log_db_path)
+    repository.create_document(
+        KnowledgeDocumentRecord(
+            id=document_id,
+            source_type="upload",
+            original_filename=stored.filename,
+            mime_type=stored.mime_type,
+            sha256=stored.sha256,
+            storage_path=str(stored.storage_path),
+            byte_size=stored.byte_size,
+            status="uploaded",
+            created_at=now,
+            updated_at=now,
+            deleted_at=None,
+        )
+    )
+    return KnowledgeUploadResponse(
+        upload_id=upload_id,
+        document_id=document_id,
+        status="uploaded",
+        filename=stored.filename,
+        mime_type=stored.mime_type,
+        byte_size=stored.byte_size,
+    )
+
+
+def get_knowledge_upload(*, document_id: str, settings: Settings) -> KnowledgeUploadStatusResponse:
+    """Lookup one persisted uploaded knowledge document."""
+    repository = SQLiteKnowledgeRepository(settings.log_db_path)
+    document = repository.get_document(document_id)
+    if document is None:
+        raise KnowledgeDocumentNotFound("Knowledge document not found.")
+    status = "indexed" if _document_has_completed_ingestion(document_id=document_id, settings=settings) else "uploaded"
+    return KnowledgeUploadStatusResponse(
+        upload_id=document_id,
+        document_id=document.id,
+        status=status,
+        filename=document.original_filename,
+        mime_type=document.mime_type,
+        byte_size=document.byte_size,
+    )
+
+
+def start_knowledge_ingestion(*, request: KnowledgeIngestionRequest, settings: Settings) -> KnowledgeIngestionResponse:
+    """Normalize, chunk, and index one persisted knowledge document."""
+    repository = SQLiteKnowledgeRepository(settings.log_db_path)
+    document = repository.get_document(request.document_id)
+    if document is None:
+        raise KnowledgeDocumentNotFound("Knowledge document not found.")
+
+    now = _now_iso()
+    ingestion_id = f"ing-{uuid4().hex}"
+    repository.create_ingestion(
+        KnowledgeIngestionRecord(
+            id=ingestion_id,
+            document_id=document.id,
+            status="running",
+            parser_profile=request.parser_profile,
+            chunking_profile=request.chunking_profile,
+            embedding_profile=request.embedding_profile,
+            vector_backend=_VECTOR_BACKEND,
+            started_at=now,
+            completed_at=None,
+            error_code=None,
+            error_detail=None,
+            chunk_count=0,
+            created_at=now,
+            updated_at=now,
+        )
+    )
+
+    try:
+        normalized_text = normalize_document(
+            settings=settings,
+            document_id=document.id,
+            filename=document.original_filename,
+        )
+        persist_normalized_text(settings=settings, document_id=document.id, text=normalized_text)
+        chunks = chunk_text(normalized_text)
+        vector_ref = persist_vector_index(
+            settings=settings,
+            document_id=document.id,
+            filename=document.original_filename,
+            chunks=chunks,
+            backend_name=_VECTOR_BACKEND,
+        )
+        repository.replace_chunks(
+            ingestion_id=ingestion_id,
+            document_id=document.id,
+            chunks=[
+                KnowledgeChunkRow(
+                    id=f"chunk-{uuid4().hex}",
+                    ingestion_id=ingestion_id,
+                    document_id=document.id,
+                    chunk_index=chunk.chunk_index,
+                    text_content=chunk.text,
+                    text_hash=hashlib.sha256(chunk.text.encode("utf-8")).hexdigest(),
+                    token_count=len(chunk.text.split()),
+                    char_start=chunk.char_start,
+                    char_end=chunk.char_end,
+                    vector_ref=f"{vector_ref}#{chunk.chunk_index}",
+                    created_at=now,
+                )
+                for chunk in chunks
+            ],
+        )
+        repository.update_ingestion_status(
+            ingestion_id=ingestion_id,
+            status="completed",
+            updated_at=_now_iso(),
+            chunk_count=len(chunks),
+            completed_at=_now_iso(),
+        )
+    except Exception as exc:
+        repository.update_ingestion_status(
+            ingestion_id=ingestion_id,
+            status="failed",
+            updated_at=_now_iso(),
+            error_code="KNOWLEDGE_INGESTION_FAILED",
+            error_detail=str(exc),
+        )
+        raise
+
+    return KnowledgeIngestionResponse(
+        ingestion_id=ingestion_id,
+        document_id=document.id,
+        status="completed",
+    )
+
+
+def get_knowledge_ingestion_status(*, ingestion_id: str, settings: Settings) -> KnowledgeIngestionStatusResponse:
+    """Lookup one ingestion attempt."""
+    repository = SQLiteKnowledgeRepository(settings.log_db_path)
+    ingestion = repository.get_ingestion(ingestion_id)
+    if ingestion is None:
+        raise KnowledgeDocumentNotFound("Knowledge ingestion not found.")
+    return KnowledgeIngestionStatusResponse(
+        ingestion_id=ingestion.id,
+        document_id=ingestion.document_id,
+        status=ingestion.status,
+        chunk_count=ingestion.chunk_count,
+        error_code=ingestion.error_code,
+        error_detail=ingestion.error_detail,
+    )
+
+
+def search_knowledge(*, request: KnowledgeSearchRequest, settings: Settings) -> KnowledgeSearchResponse:
+    """Search indexed chunks using the local simple vector backend."""
+    hits = search_vector_index(
+        settings=settings,
+        backend_name=_VECTOR_BACKEND,
+        query=request.query,
+        document_filters=request.document_ids,
+    )
+    return KnowledgeSearchResponse(
+        query=request.query,
+        hits=[
+            KnowledgeCitation(
+                document_id=hit.document_id,
+                chunk_id=hit.chunk_id,
+                filename=hit.filename,
+                snippet=hit.snippet,
+                score=hit.score,
+            )
+            for hit in hits[: request.top_k]
+        ],
+    )
+
+
+def answer_with_knowledge(*, request: KnowledgeAnswerRequest, settings: Settings) -> KnowledgeAnswerResponse:
+    """Return a deterministic retrieval-backed answer with citations."""
+    search_response = search_knowledge(
+        request=KnowledgeSearchRequest(
+            query=request.query,
+            document_ids=request.document_ids,
+            top_k=request.top_k,
+            retrieval_profile="default",
+        ),
+        settings=settings,
+    )
+    if not search_response.hits and request.document_ids:
+        search_response = _fallback_answer_scope(
+            document_ids=request.document_ids,
+            query=request.query,
+            top_k=request.top_k,
+            settings=settings,
+        )
+    if not search_response.hits:
+        return KnowledgeAnswerResponse(
+            answer="No relevant context found in the indexed knowledge base.",
+            citations=[],
+        )
+
+    bullets = [
+        f"- {citation.filename}: {citation.snippet[:220].strip()}"
+        for citation in search_response.hits
+    ]
+    answer = "Relevant retrieved context:\n" + "\n".join(bullets)
+    return KnowledgeAnswerResponse(answer=answer, citations=search_response.hits)
+
+
+def resolve_knowledge_documents(
+    *,
+    document_ids: list[str],
+    settings: Settings,
+) -> list[KnowledgeDocumentRecord]:
+    """Return persisted knowledge documents in caller order or raise when any are missing."""
+    if not document_ids:
+        return []
+    repository = SQLiteKnowledgeRepository(settings.log_db_path)
+    deduped_ids = list(dict.fromkeys(document_ids))
+    documents = repository.list_documents(deduped_ids)
+    documents_by_id = {document.id: document for document in documents}
+    missing = [document_id for document_id in deduped_ids if document_id not in documents_by_id]
+    if missing:
+        raise KnowledgeDocumentNotFound("Knowledge document not found.")
+    return [documents_by_id[document_id] for document_id in deduped_ids]
+
+
+def _fallback_answer_scope(
+    *,
+    document_ids: list[str],
+    query: str,
+    top_k: int,
+    settings: Settings,
+) -> KnowledgeSearchResponse:
+    """Fallback to attached-document leading chunks when lexical retrieval finds nothing."""
+    documents = resolve_knowledge_documents(document_ids=document_ids, settings=settings)
+    repository = SQLiteKnowledgeRepository(settings.log_db_path)
+    chunks = repository.get_chunks_for_documents(document_ids)
+    chunks_by_document: dict[str, KnowledgeChunkRow] = {}
+    for chunk in chunks:
+        chunks_by_document.setdefault(chunk.document_id, chunk)
+    hits: list[KnowledgeCitation] = []
+    for rank, document in enumerate(documents):
+        chunk = chunks_by_document.get(document.id)
+        if chunk is None:
+            continue
+        hits.append(
+            KnowledgeCitation(
+                document_id=document.id,
+                chunk_id=chunk.vector_ref,
+                filename=document.original_filename,
+                snippet=chunk.text_content[:400],
+                score=max(0.01, 1.0 - (rank * 0.05)),
+            )
+        )
+        if len(hits) >= top_k:
+            break
+    return KnowledgeSearchResponse(query=query, hits=hits)
+
+
+def _run_async_read(*, file: UploadFile) -> bytes:
+    import asyncio
+
+    return asyncio.run(file.read(_MAX_READ_BYTES))
+
+
+def _document_has_completed_ingestion(*, document_id: str, settings: Settings) -> bool:
+    repository = SQLiteKnowledgeRepository(settings.log_db_path)
+    chunks = repository.get_chunks_for_documents([document_id])
+    return bool(chunks)
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()

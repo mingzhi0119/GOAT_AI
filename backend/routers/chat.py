@@ -100,6 +100,8 @@ def chat_stream(
         system_instruction=(req.system_instruction or "").strip(),
         ollama_options=o_opts,
         tabular_extractor=tabular_extractor,
+        settings=settings,
+        knowledge_document_ids=req.knowledge_document_ids,
     )
 
     if not idempotency_key or not req.session_id:

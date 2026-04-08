@@ -67,6 +67,7 @@ def persist_chat_session(
     chart_spec: dict[str, object] | None,
     session_repository: SessionRepository,
     title_generator: TitleGenerator,
+    knowledge_documents: list[dict[str, str]] | None = None,
     chart_data_source: ChartDataSource = "none",
     title_override: str | None = None,
 ) -> None:
@@ -94,6 +95,7 @@ def persist_chat_session(
         messages=final_messages,
         assistant_text=assistant_text,
         chart_spec=chart_spec,
+        knowledge_documents=knowledge_documents,
         chart_data_source=resolved_chart_data_source,
     )
 

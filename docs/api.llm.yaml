@@ -45,6 +45,7 @@ schemas:
     properties:
       model: string
       messages: ChatMessage[]
+      knowledge_document_ids: string[]
       session_id: string|null
       system_instruction: string|null
       temperature: number|null
@@ -96,6 +97,7 @@ schemas:
       messages: HistorySessionMessage[]
       chart_spec: object|null
       file_context: HistorySessionFileContext|null
+      knowledge_documents: HistorySessionKnowledgeDocument[]
       chart_data_source: string|null
   HistorySessionFileContext:
     type: object
@@ -103,6 +105,16 @@ schemas:
       - prompt
     properties:
       prompt: string
+  HistorySessionKnowledgeDocument:
+    type: object
+    required:
+      - document_id
+      - filename
+      - mime_type
+    properties:
+      document_id: string
+      filename: string
+      mime_type: string
   HistorySessionListResponse:
     type: object
     required:
@@ -155,6 +167,117 @@ schemas:
       first_token_p50_ms: number
       first_token_p95_ms: number
       model_buckets: map[string,map[string,number|integer]]
+  KnowledgeAnswerRequest:
+    type: object
+    required:
+      - query
+    properties:
+      query: string
+      document_ids: string[]
+      top_k: integer
+      session_id: string|null
+  KnowledgeAnswerResponse:
+    type: object
+    required:
+      - answer
+    properties:
+      answer: string
+      citations: KnowledgeCitation[]
+  KnowledgeCitation:
+    type: object
+    required:
+      - document_id
+      - chunk_id
+      - filename
+      - snippet
+      - score
+    properties:
+      document_id: string
+      chunk_id: string
+      filename: string
+      snippet: string
+      score: number
+  KnowledgeIngestionRequest:
+    type: object
+    required:
+      - document_id
+    properties:
+      document_id: string
+      parser_profile: string
+      chunking_profile: string
+      embedding_profile: string
+      force_reindex: boolean
+  KnowledgeIngestionResponse:
+    type: object
+    required:
+      - ingestion_id
+      - document_id
+      - status
+    properties:
+      ingestion_id: string
+      document_id: string
+      status: queued|running|completed|failed
+  KnowledgeIngestionStatusResponse:
+    type: object
+    required:
+      - ingestion_id
+      - document_id
+      - status
+    properties:
+      ingestion_id: string
+      document_id: string
+      status: queued|running|completed|failed
+      chunk_count: integer
+      error_code: string|null
+      error_detail: string|null
+  KnowledgeSearchRequest:
+    type: object
+    required:
+      - query
+    properties:
+      query: string
+      document_ids: string[]
+      top_k: integer
+      retrieval_profile: string
+  KnowledgeSearchResponse:
+    type: object
+    required:
+      - query
+    properties:
+      query: string
+      hits: KnowledgeCitation[]
+  KnowledgeUploadResponse:
+    type: object
+    required:
+      - upload_id
+      - document_id
+      - status
+      - filename
+      - mime_type
+      - byte_size
+    properties:
+      upload_id: string
+      document_id: string
+      status: string
+      filename: string
+      mime_type: string
+      byte_size: integer
+  KnowledgeUploadStatusResponse:
+    type: object
+    required:
+      - upload_id
+      - document_id
+      - status
+      - filename
+      - mime_type
+      - byte_size
+    properties:
+      upload_id: string
+      document_id: string
+      status: uploaded|indexed|failed
+      filename: string
+      mime_type: string
+      byte_size: integer
   ModelCapabilitiesResponse:
     type: object
     required:
@@ -201,10 +324,16 @@ schemas:
     type: object
     required:
       - filename
-      - prompt
+      - document_id
+      - ingestion_id
+      - status
+      - retrieval_mode
     properties:
       filename: string
-      prompt: string
+      document_id: string
+      ingestion_id: string
+      status: string
+      retrieval_mode: string
       chart: "null"
 endpoints:
   - op: list_models
@@ -321,6 +450,74 @@ endpoints:
       session_id: string
     response:
       204: no_content
+      errors:
+        - 401
+        - 429
+  - op: post_knowledge_upload
+    method: POST
+    path: /knowledge/uploads
+    body:
+      content_type: multipart/form-data
+      fields:
+        file: binary
+      schema: Body_post_knowledge_upload_api_knowledge_uploads_post
+    response:
+      200: KnowledgeUploadResponse
+      errors:
+        - 400
+        - 401
+        - 429
+  - op: get_knowledge_upload_status
+    method: GET
+    path: /knowledge/uploads/{document_id}
+    path_params:
+      document_id: string
+    response:
+      200: KnowledgeUploadStatusResponse
+      errors:
+        - 401
+        - 404
+        - 429
+  - op: post_knowledge_ingestion
+    method: POST
+    path: /knowledge/ingestions
+    body: KnowledgeIngestionRequest
+    content_type: application/json
+    response:
+      200: KnowledgeIngestionResponse
+      errors:
+        - 400
+        - 401
+        - 404
+        - 429
+  - op: get_knowledge_ingestion
+    method: GET
+    path: /knowledge/ingestions/{ingestion_id}
+    path_params:
+      ingestion_id: string
+    response:
+      200: KnowledgeIngestionStatusResponse
+      errors:
+        - 401
+        - 404
+        - 429
+  - op: post_knowledge_search
+    method: POST
+    path: /knowledge/search
+    body: KnowledgeSearchRequest
+    content_type: application/json
+    response:
+      200: KnowledgeSearchResponse
+      errors:
+        - 401
+        - 429
+  - op: post_knowledge_answer
+    method: POST
+    path: /knowledge/answers
+    body: KnowledgeAnswerRequest
+    content_type: application/json
+    response:
+      200: KnowledgeAnswerResponse
       errors:
         - 401
         - 429

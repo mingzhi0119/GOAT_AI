@@ -24,6 +24,8 @@ JSON error responses use a **stable envelope** so logs, metrics, and clients sha
 | `IDEMPOTENCY_CONFLICT` | 409 | no | `Idempotency-Key` reused with different payload or while original request is still pending |
 | `REQUEST_VALIDATION_ERROR` | 422 | no | Body / query validation failed |
 | `NOT_FOUND` | 404 | no | Resource does not exist |
+| `KNOWLEDGE_NOT_FOUND` | 404 | no | Knowledge document or ingestion record does not exist |
+| `NOT_IMPLEMENTED` | 501 | no | Contract exists but the feature has not landed yet |
 | `INFERENCE_BACKEND_UNAVAILABLE` | 503 | yes | Ollama (or equivalent) unreachable |
 | `INTERNAL_ERROR` | 500 | no | Unhandled server error (detail sanitized) |
 

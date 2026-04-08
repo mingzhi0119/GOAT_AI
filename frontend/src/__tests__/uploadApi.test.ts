@@ -17,9 +17,9 @@ describe('upload api', () => {
     vi.restoreAllMocks()
   })
 
-  it('parses file_context events', async () => {
+  it('parses knowledge_ready events', async () => {
     const payload = [
-      'data: {"type":"file_context","filename":"data.csv","prompt":"p"}\n',
+      'data: {"type":"knowledge_ready","filename":"data.csv","document_id":"doc-1","ingestion_id":"ing-1","status":"completed","retrieval_mode":"knowledge_rag"}\n',
       'data: {"type":"done"}\n',
     ].join('')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(sseResponse(payload)))
@@ -29,7 +29,7 @@ describe('upload api', () => {
       events.push(event)
     }
     expect(events).toHaveLength(2)
-    expect((events[0] as { type: string }).type).toBe('file_context')
+    expect((events[0] as { type: string }).type).toBe('knowledge_ready')
     expect((events[1] as { type: string }).type).toBe('done')
   })
 })

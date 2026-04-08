@@ -16,7 +16,7 @@ const BASE_PROMPTS = [
 
 /** Prompt injected at slot 3 (0-indexed) when a file has been uploaded. */
 const FILE_PROMPT =
-  'Visualize the uploaded data with a chart and explain the key trends'
+  'Answer questions using the indexed file and cite the key retrieved context'
 
 interface Props {
   messages: Message[]
@@ -61,7 +61,7 @@ const ChatWindow: FC<Props> = ({
 
   /**
    * True when the current session has an active file upload OR carries embedded
-   * file-context hidden messages (restored from history). Used to enable chart
+   * legacy hidden messages (restored from history). Used to enable chart
    * block stripping in MessageBubble.
    */
   const sessionHasFileContext = fileContext !== null || messages.some(m => m.hidden)

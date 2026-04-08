@@ -1,4 +1,4 @@
-"""POST /api/upload — parse CSV/XLSX and return structured metadata via SSE."""
+"""POST /api/upload - ingest supported files into the knowledge RAG pipeline."""
 from __future__ import annotations
 
 import logging
@@ -9,9 +9,10 @@ from fastapi.responses import StreamingResponse
 from backend.config import get_settings
 from backend.models.common import ErrorResponse
 from backend.models.upload import UploadAnalysisResponse
+from backend.services.exceptions import KnowledgeValidationError
 from backend.services.idempotency_service import SQLiteIdempotencyStore, build_request_hash
-from backend.services.upload_request_service import UploadValidationError, read_validated_upload
-from backend.services.upload_service import analyze_upload, stream_upload_analysis_sse
+from backend.services.knowledge_storage import SUPPORTED_KNOWLEDGE_EXTENSIONS
+from backend.services.upload_service import ingest_upload, stream_upload_analysis_sse
 from backend.types import Settings
 
 logger = logging.getLogger(__name__)
@@ -23,12 +24,10 @@ _SSE_HEADERS = {
     "Connection": "keep-alive",
 }
 
-_MAX_READ_BYTES = 25 * 1024 * 1024  # hard cap before hitting service logic
-
 
 @router.post(
     "/upload",
-    summary="Stream upload analysis events over SSE",
+    summary="Stream upload ingestion events over SSE",
     responses={
         200: {"content": {"text/event-stream": {}}},
         400: {"model": ErrorResponse},
@@ -40,22 +39,22 @@ async def upload_and_parse(
     file: UploadFile,
     settings: Settings = Depends(get_settings),
 ) -> StreamingResponse:
-    """Accept a CSV or XLSX upload, parse it, and stream structured metadata.
-
-    Returns SSE events: ``file_context`` (always), then ``{"type":"done"}``. No LLM
-    inference is performed here; the caller uses the file_context prompt as
-    hidden history on the next chat turn. Charts are rendered later only if the
-    LLM explicitly calls the native chart tool during chat.
-    """
-    try:
-        upload = await read_validated_upload(file=file, max_read_bytes=_MAX_READ_BYTES)
-    except UploadValidationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
+    """Accept a supported file, ingest it into knowledge storage, and stream readiness metadata."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided.")
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if ext not in SUPPORTED_KNOWLEDGE_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail="Supported knowledge upload types are CSV, XLSX, TXT, MD, PDF, and DOCX.",
+        )
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
     return StreamingResponse(
         stream_upload_analysis_sse(
-            content=upload.content,
-            filename=upload.filename,
+            content=content,
+            filename=file.filename,
             settings=settings,
         ),
         media_type="text/event-stream",
@@ -66,7 +65,7 @@ async def upload_and_parse(
 @router.post(
     "/upload/analyze",
     response_model=UploadAnalysisResponse,
-    summary="Analyze an uploaded CSV/XLSX and return JSON",
+    summary="Ingest an uploaded file and return JSON readiness metadata",
     responses={
         400: {"model": ErrorResponse},
         401: {"model": ErrorResponse},
@@ -78,14 +77,13 @@ async def analyze_upload_json(
     settings: Settings = Depends(get_settings),
     idempotency_key_header: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> UploadAnalysisResponse:
-    """Accept a CSV or XLSX upload and return reusable analysis metadata as JSON."""
-    try:
-        upload = await read_validated_upload(file=file, max_read_bytes=_MAX_READ_BYTES)
-    except UploadValidationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    """Accept a supported knowledge file and return ingestion metadata as JSON."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided.")
+    content = await file.read()
     idempotency_key = (idempotency_key_header or "").strip()
     idempotency_scope = "upload_analyze_json"
-    request_hash = build_request_hash(upload.filename.encode("utf-8") + b"\x00" + upload.content)
+    request_hash = build_request_hash(file.filename.encode("utf-8") + b"\x00" + content)
     idempotency_store = SQLiteIdempotencyStore(
         db_path=settings.log_db_path,
         ttl_sec=settings.idempotency_ttl_sec,
@@ -112,12 +110,12 @@ async def analyze_upload_json(
             return UploadAnalysisResponse.model_validate_json(claim.completed.body)
 
     try:
-        prompt, chart = analyze_upload(
-            content=upload.content,
-            filename=upload.filename,
+        response_model = ingest_upload(
+            content=content,
+            filename=file.filename,
             settings=settings,
         )
-    except ValueError as exc:
+    except KnowledgeValidationError as exc:
         if idempotency_key:
             idempotency_store.release_pending(
                 key=idempotency_key,
@@ -127,7 +125,6 @@ async def analyze_upload_json(
             )
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    response_model = UploadAnalysisResponse(filename=upload.filename, prompt=prompt, chart=chart)
     if idempotency_key:
         idempotency_store.store_completed(
             key=idempotency_key,

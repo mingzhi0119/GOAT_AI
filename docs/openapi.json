@@ -195,7 +195,7 @@
                 }
               }
             },
-            "description": "Unprocessable Entity"
+            "description": "Unprocessable Content"
           },
           "429": {
             "content": {
@@ -215,8 +215,8 @@
         "tags": [
           "upload"
         ],
-        "summary": "Stream upload analysis events over SSE",
-        "description": "Accept a CSV or XLSX upload, parse it, and stream structured metadata.\n\nReturns SSE events: ``file_context`` (always), then ``{\"type\":\"done\"}``. No LLM\ninference is performed here; the caller uses the file_context prompt as\nhidden history on the next chat turn. Charts are rendered later only if the\nLLM explicitly calls the native chart tool during chat.",
+        "summary": "Stream upload ingestion events over SSE",
+        "description": "Accept a supported file, ingest it into knowledge storage, and stream readiness metadata.",
         "operationId": "upload_and_parse_api_upload_post",
         "requestBody": {
           "content": {
@@ -286,8 +286,8 @@
         "tags": [
           "upload"
         ],
-        "summary": "Analyze an uploaded CSV/XLSX and return JSON",
-        "description": "Accept a CSV or XLSX upload and return reusable analysis metadata as JSON.",
+        "summary": "Ingest an uploaded file and return JSON readiness metadata",
+        "description": "Accept a supported knowledge file and return ingestion metadata as JSON.",
         "operationId": "analyze_upload_json_api_upload_analyze_post",
         "parameters": [
           {
@@ -573,6 +573,430 @@
         }
       }
     },
+    "/api/knowledge/uploads": {
+      "post": {
+        "tags": [
+          "knowledge"
+        ],
+        "summary": "Register a knowledge file upload",
+        "description": "Persist a knowledge upload and register document metadata.",
+        "operationId": "post_knowledge_upload_api_knowledge_uploads_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_post_knowledge_upload_api_knowledge_uploads_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/knowledge/uploads/{document_id}": {
+      "get": {
+        "tags": [
+          "knowledge"
+        ],
+        "summary": "Read one persisted knowledge upload",
+        "description": "Return metadata for one persisted knowledge upload.",
+        "operationId": "get_knowledge_upload_status_api_knowledge_uploads__document_id__get",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeUploadStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/knowledge/ingestions": {
+      "post": {
+        "tags": [
+          "knowledge"
+        ],
+        "summary": "Start a knowledge ingestion job",
+        "description": "Start a knowledge ingestion job for one uploaded document.",
+        "operationId": "post_knowledge_ingestion_api_knowledge_ingestions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeIngestionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeIngestionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/knowledge/ingestions/{ingestion_id}": {
+      "get": {
+        "tags": [
+          "knowledge"
+        ],
+        "summary": "Read one knowledge ingestion job",
+        "description": "Return status for one ingestion attempt.",
+        "operationId": "get_knowledge_ingestion_api_knowledge_ingestions__ingestion_id__get",
+        "parameters": [
+          {
+            "name": "ingestion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ingestion Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeIngestionStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/knowledge/search": {
+      "post": {
+        "tags": [
+          "knowledge"
+        ],
+        "summary": "Search indexed knowledge chunks",
+        "description": "Run pure retrieval against indexed knowledge chunks.",
+        "operationId": "post_knowledge_search_api_knowledge_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeSearchResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/knowledge/answers": {
+      "post": {
+        "tags": [
+          "knowledge"
+        ],
+        "summary": "Generate a retrieval-backed answer",
+        "description": "Return a retrieval-backed answer with citations.",
+        "operationId": "post_knowledge_answer_api_knowledge_answers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeAnswerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeAnswerResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/system/gpu": {
       "get": {
         "tags": [
@@ -806,6 +1230,20 @@
         ],
         "title": "Body_analyze_upload_json_api_upload_analyze_post"
       },
+      "Body_post_knowledge_upload_api_knowledge_uploads_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_post_knowledge_upload_api_knowledge_uploads_post"
+      },
       "Body_upload_and_parse_api_upload_post": {
         "properties": {
           "file": {
@@ -861,6 +1299,14 @@
             "type": "array",
             "minItems": 1,
             "title": "Messages"
+          },
+          "knowledge_document_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Knowledge Document Ids",
+            "description": "Optional indexed knowledge documents to use for retrieval-augmented answering."
           },
           "session_id": {
             "anyOf": [
@@ -1139,6 +1585,13 @@
               }
             ]
           },
+          "knowledge_documents": {
+            "items": {
+              "$ref": "#/components/schemas/HistorySessionKnowledgeDocument"
+            },
+            "type": "array",
+            "title": "Knowledge Documents"
+          },
           "chart_data_source": {
             "anyOf": [
               {
@@ -1178,6 +1631,30 @@
         ],
         "title": "HistorySessionFileContext",
         "description": "Normalized stored file-context metadata for one session."
+      },
+      "HistorySessionKnowledgeDocument": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "filename",
+          "mime_type"
+        ],
+        "title": "HistorySessionKnowledgeDocument",
+        "description": "Indexed knowledge document attached to a chat session."
       },
       "HistorySessionListResponse": {
         "properties": {
@@ -1323,6 +1800,388 @@
         "title": "InferenceLatencyResponse",
         "description": "Rolling average chat completion time (server-side, in-process)."
       },
+      "KnowledgeAnswerRequest": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Query"
+          },
+          "document_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Document Ids"
+          },
+          "top_k": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Top K",
+            "default": 5
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id",
+            "description": "Optional chat session correlation id."
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "KnowledgeAnswerRequest",
+        "description": "Retrieval-backed answer request contract."
+      },
+      "KnowledgeAnswerResponse": {
+        "properties": {
+          "answer": {
+            "type": "string",
+            "title": "Answer"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeCitation"
+            },
+            "type": "array",
+            "title": "Citations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "answer"
+        ],
+        "title": "KnowledgeAnswerResponse",
+        "description": "Retrieval-backed answer contract."
+      },
+      "KnowledgeCitation": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "chunk_id": {
+            "type": "string",
+            "title": "Chunk Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "snippet": {
+            "type": "string",
+            "title": "Snippet"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "chunk_id",
+          "filename",
+          "snippet",
+          "score"
+        ],
+        "title": "KnowledgeCitation",
+        "description": "Citation payload returned from knowledge retrieval."
+      },
+      "KnowledgeIngestionRequest": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Document Id",
+            "description": "Document to ingest into the knowledge index."
+          },
+          "parser_profile": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Parser Profile",
+            "default": "default"
+          },
+          "chunking_profile": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Chunking Profile",
+            "default": "default"
+          },
+          "embedding_profile": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Embedding Profile",
+            "default": "default"
+          },
+          "force_reindex": {
+            "type": "boolean",
+            "title": "Force Reindex",
+            "description": "Rebuild index artifacts even if one already exists.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id"
+        ],
+        "title": "KnowledgeIngestionRequest",
+        "description": "Contract-first request body for knowledge ingestion."
+      },
+      "KnowledgeIngestionResponse": {
+        "properties": {
+          "ingestion_id": {
+            "type": "string",
+            "title": "Ingestion Id",
+            "description": "Opaque ingestion job identifier."
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id",
+            "description": "Document associated with this ingestion."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "description": "Current ingestion lifecycle state."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ingestion_id",
+          "document_id",
+          "status"
+        ],
+        "title": "KnowledgeIngestionResponse",
+        "description": "Queued/running ingestion job response."
+      },
+      "KnowledgeIngestionStatusResponse": {
+        "properties": {
+          "ingestion_id": {
+            "type": "string",
+            "title": "Ingestion Id",
+            "description": "Opaque ingestion job identifier."
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id",
+            "description": "Document associated with this ingestion."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "chunk_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Chunk Count",
+            "default": 0
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code",
+            "description": "Stable machine-readable failure code when status=failed."
+          },
+          "error_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Detail",
+            "description": "Sanitized human-readable failure reason when status=failed."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ingestion_id",
+          "document_id",
+          "status"
+        ],
+        "title": "KnowledgeIngestionStatusResponse",
+        "description": "Lifecycle/status view for one ingestion attempt."
+      },
+      "KnowledgeSearchRequest": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Query",
+            "description": "Natural-language search query."
+          },
+          "document_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Document Ids",
+            "description": "Optional search scope filter."
+          },
+          "top_k": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Top K",
+            "description": "Maximum number of ranked hits to return.",
+            "default": 5
+          },
+          "retrieval_profile": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Retrieval Profile",
+            "default": "default"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "KnowledgeSearchRequest",
+        "description": "Pure retrieval request contract."
+      },
+      "KnowledgeSearchResponse": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "hits": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeCitation"
+            },
+            "type": "array",
+            "title": "Hits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "KnowledgeSearchResponse",
+        "description": "Pure retrieval response contract."
+      },
+      "KnowledgeUploadResponse": {
+        "properties": {
+          "upload_id": {
+            "type": "string",
+            "title": "Upload Id",
+            "description": "Opaque upload identifier."
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id",
+            "description": "Logical knowledge document identifier."
+          },
+          "status": {
+            "type": "string",
+            "const": "uploaded",
+            "title": "Status",
+            "description": "Upload lifecycle state."
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "description": "Original uploaded filename."
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type",
+            "description": "Declared upload MIME type."
+          },
+          "byte_size": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Byte Size",
+            "description": "Raw uploaded file size in bytes."
+          }
+        },
+        "type": "object",
+        "required": [
+          "upload_id",
+          "document_id",
+          "status",
+          "filename",
+          "mime_type",
+          "byte_size"
+        ],
+        "title": "KnowledgeUploadResponse",
+        "description": "Contract skeleton for a persisted knowledge upload."
+      },
+      "KnowledgeUploadStatusResponse": {
+        "properties": {
+          "upload_id": {
+            "type": "string",
+            "title": "Upload Id"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "uploaded",
+              "indexed",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type"
+          },
+          "byte_size": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Byte Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "upload_id",
+          "document_id",
+          "status",
+          "filename",
+          "mime_type",
+          "byte_size"
+        ],
+        "title": "KnowledgeUploadStatusResponse",
+        "description": "Lookup response for one persisted knowledge upload."
+      },
       "ModelCapabilitiesResponse": {
         "properties": {
           "model": {
@@ -1438,10 +2297,25 @@
             "type": "string",
             "title": "Filename"
           },
-          "prompt": {
+          "document_id": {
             "type": "string",
-            "title": "Prompt",
-            "description": "Hidden analysis prompt derived from the uploaded table."
+            "title": "Document Id",
+            "description": "Indexed knowledge document identifier."
+          },
+          "ingestion_id": {
+            "type": "string",
+            "title": "Ingestion Id",
+            "description": "Knowledge ingestion identifier."
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Upload and ingestion lifecycle state."
+          },
+          "retrieval_mode": {
+            "type": "string",
+            "title": "Retrieval Mode",
+            "description": "Stable marker indicating the upload now routes through the RAG knowledge pipeline."
           },
           "chart": {
             "type": "null",
@@ -1452,7 +2326,10 @@
         "type": "object",
         "required": [
           "filename",
-          "prompt"
+          "document_id",
+          "ingestion_id",
+          "status",
+          "retrieval_mode"
         ],
         "title": "UploadAnalysisResponse",
         "description": "JSON response for POST /api/upload/analyze."
@@ -1519,6 +2396,10 @@
     {
       "name": "history",
       "description": "Persisted chat session listing and retrieval."
+    },
+    {
+      "name": "knowledge",
+      "description": "Contract-first knowledge ingestion and retrieval endpoints."
     }
   ]
 }

@@ -12,7 +12,7 @@ STORED_CHART_ROLE = "__chart__"
 STORED_FILE_CONTEXT_ROLE = "__file_context__"
 STORED_FILE_CONTEXT_ACK_ROLE = "__file_context_ack__"
 FILE_CONTEXT_REPLY = "I have loaded the file context."
-SESSION_PAYLOAD_VERSION = 2
+SESSION_PAYLOAD_VERSION = 3
 ChartDataSource = Literal["uploaded", "demo", "none"]
 
 # Alternate upload-analysis header (legacy compatibility / future prompts).
@@ -26,6 +26,7 @@ class DecodedSessionPayload:
     messages: list[dict[str, str]]
     chart_spec: dict[str, object] | None
     file_context_prompt: str | None
+    knowledge_documents: list[dict[str, str]]
     chart_data_source: ChartDataSource = "none"
 
 
@@ -62,6 +63,7 @@ def build_session_payload(
     messages: list[ChatMessage],
     assistant_text: str,
     chart_spec: dict[str, object] | None,
+    knowledge_documents: list[dict[str, str]] | None = None,
     chart_data_source: ChartDataSource = "none",
 ) -> dict[str, object]:
     """Build the versioned storage payload for new session snapshots."""
@@ -85,6 +87,8 @@ def build_session_payload(
         payload["chart_spec"] = chart_spec
     if file_context_prompt is not None:
         payload["file_context_prompt"] = file_context_prompt
+    if knowledge_documents:
+        payload["knowledge_documents"] = knowledge_documents
     return payload
 
 
@@ -121,6 +125,7 @@ def _decode_legacy_session_payload(raw_payload: list[object]) -> DecodedSessionP
         messages=messages,
         chart_spec=chart_spec,
         file_context_prompt=file_context_prompt,
+        knowledge_documents=[],
         chart_data_source="uploaded" if file_context_prompt else "none",
     )
 
@@ -142,6 +147,30 @@ def decode_session_payload(raw_payload: Any) -> DecodedSessionPayload:
         chart_spec = raw_chart if isinstance(raw_chart, dict) else None
         raw_file_context = raw_payload.get("file_context_prompt")
         file_context_prompt = raw_file_context if isinstance(raw_file_context, str) else None
+        raw_knowledge_documents = raw_payload.get("knowledge_documents", [])
+        knowledge_documents: list[dict[str, str]] = []
+        if isinstance(raw_knowledge_documents, list):
+            for item in raw_knowledge_documents:
+                if not isinstance(item, dict):
+                    continue
+                document_id = item.get("document_id")
+                filename = item.get("filename")
+                mime_type = item.get("mime_type")
+                if (
+                    isinstance(document_id, str)
+                    and document_id.strip()
+                    and isinstance(filename, str)
+                    and filename.strip()
+                    and isinstance(mime_type, str)
+                    and mime_type.strip()
+                ):
+                    knowledge_documents.append(
+                        {
+                            "document_id": document_id,
+                            "filename": filename,
+                            "mime_type": mime_type,
+                        }
+                    )
         raw_source = raw_payload.get("chart_data_source")
         chart_data_source: ChartDataSource = (
             raw_source
@@ -152,7 +181,14 @@ def decode_session_payload(raw_payload: Any) -> DecodedSessionPayload:
             messages=messages,
             chart_spec=chart_spec,
             file_context_prompt=file_context_prompt,
+            knowledge_documents=knowledge_documents,
             chart_data_source=chart_data_source,
         )
 
-    return DecodedSessionPayload(messages=[], chart_spec=None, file_context_prompt=None, chart_data_source="none")
+    return DecodedSessionPayload(
+        messages=[],
+        chart_spec=None,
+        file_context_prompt=None,
+        knowledge_documents=[],
+        chart_data_source="none",
+    )

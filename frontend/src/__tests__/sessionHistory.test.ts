@@ -10,6 +10,7 @@ describe('session history utils', () => {
       created_at: 'c',
       updated_at: 'u',
       file_context: { prompt: '[User uploaded tabular data for analysis]\n\nCHART_DATA_CSV:\n```csv```' },
+      knowledge_documents: [],
       chart_spec: null,
       messages: [
         { role: 'user', content: 'Please chart revenue.' },

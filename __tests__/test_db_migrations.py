@@ -31,6 +31,7 @@ class DbMigrationsTests(unittest.TestCase):
                         "004_add_conversations_session_id",
                         "005_add_idempotency_keys",
                         "006_add_sessions_schema_version",
+                        "007_add_knowledge_tables",
                     ],
                 )
                 cols = [r[1] for r in conn.execute("PRAGMA table_info(conversations)").fetchall()]
@@ -38,6 +39,12 @@ class DbMigrationsTests(unittest.TestCase):
                 self.assertIn("session_id", cols)
                 session_cols = [r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()]
                 self.assertIn("schema_version", session_cols)
+                knowledge_cols = [r[1] for r in conn.execute("PRAGMA table_info(knowledge_documents)").fetchall()]
+                self.assertIn("storage_path", knowledge_cols)
+                ingestion_cols = [r[1] for r in conn.execute("PRAGMA table_info(knowledge_ingestions)").fetchall()]
+                self.assertIn("vector_backend", ingestion_cols)
+                chunk_cols = [r[1] for r in conn.execute("PRAGMA table_info(knowledge_chunks)").fetchall()]
+                self.assertIn("vector_ref", chunk_cols)
             finally:
                 conn.close()
 
@@ -77,12 +84,14 @@ class DbMigrationsTests(unittest.TestCase):
             conn = sqlite3.connect(db_path)
             try:
                 n = conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]
-                self.assertEqual(n, 6)
+                self.assertEqual(n, 7)
                 cols = [r[1] for r in conn.execute("PRAGMA table_info(conversations)").fetchall()]
                 self.assertIn("user_name", cols)
                 self.assertIn("session_id", cols)
                 session_cols = [r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()]
                 self.assertIn("schema_version", session_cols)
+                knowledge_cols = [r[1] for r in conn.execute("PRAGMA table_info(knowledge_documents)").fetchall()]
+                self.assertIn("storage_path", knowledge_cols)
             finally:
                 conn.close()
 

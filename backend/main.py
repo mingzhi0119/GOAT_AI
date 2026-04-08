@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from backend.config import CORS_ORIGINS, get_settings
 from backend.exception_handlers import register_exception_handlers
 from backend.http_security import register_http_security
-from backend.routers import chat, history, models, system, upload
+from backend.routers import chat, history, knowledge, models, system, upload
 from backend.services import log_service
 from goat_ai.latency_metrics import init_latency_metrics
 from goat_ai.logging_config import configure_logging
@@ -34,6 +34,7 @@ def create_app() -> FastAPI:
             {"name": "chat", "description": "Streaming conversational analysis endpoints."},
             {"name": "upload", "description": "Tabular file analysis endpoints for CSV/XLSX uploads."},
             {"name": "history", "description": "Persisted chat session listing and retrieval."},
+            {"name": "knowledge", "description": "Contract-first knowledge ingestion and retrieval endpoints."},
         ],
     )
     app.openapi_version = "3.2.0"
@@ -57,6 +58,7 @@ def create_app() -> FastAPI:
     app.include_router(chat.router, prefix="/api", tags=["chat"])
     app.include_router(upload.router, prefix="/api", tags=["upload"])
     app.include_router(history.router, prefix="/api", tags=["history"])
+    app.include_router(knowledge.router, prefix="/api", tags=["knowledge"])
     app.include_router(system.router, prefix="/api", tags=["system"])
 
     @app.get("/api/health", tags=["system"], summary="Read service liveness")

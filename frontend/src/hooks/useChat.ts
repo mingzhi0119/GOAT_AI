@@ -8,7 +8,7 @@ import type {
   Message,
   OllamaOptionsPayload,
 } from '../api/types'
-import { FILE_CONTEXT_REPLY, hydrateHistorySession } from '../utils/sessionHistory'
+import { hydrateHistorySession } from '../utils/sessionHistory'
 
 const MESSAGES_KEY = 'goat-ai-messages'
 const SESSION_KEY = 'goat-ai-session-id'
@@ -33,7 +33,7 @@ export interface UseChatReturn {
     content: string,
     model: string,
     userName?: string,
-    fileContextPrompt?: string,
+    knowledgeDocumentIds?: string[],
     systemInstruction?: string,
     ollamaOptions?: OllamaOptionsPayload,
     onChartSpec?: (spec: ChartSpec) => void,
@@ -146,7 +146,7 @@ export function useChat(): UseChatReturn {
       content: string,
       model: string,
       userName?: string,
-      fileContextPrompt?: string,
+      knowledgeDocumentIds?: string[],
       systemInstruction?: string,
       ollamaOptions?: OllamaOptionsPayload,
       onChartSpec?: (spec: ChartSpec) => void,
@@ -161,16 +161,6 @@ export function useChat(): UseChatReturn {
         content: m.content,
         ...(m.file_context ? { file_context: true as const } : {}),
       }))
-      if (
-        fileContextPrompt &&
-        !baseHistory.some(m => m.role === 'user' && m.content === fileContextPrompt)
-      ) {
-        baseHistory = [
-          { role: 'user', content: fileContextPrompt, file_context: true },
-          { role: 'assistant', content: FILE_CONTEXT_REPLY },
-          ...baseHistory,
-        ]
-      }
       const history: ChatMessage[] = [
         ...baseHistory,
         { role: 'user' as const, content },
@@ -185,6 +175,9 @@ export function useChat(): UseChatReturn {
             {
               model,
               messages: history,
+              ...(knowledgeDocumentIds && knowledgeDocumentIds.length > 0
+                ? { knowledge_document_ids: knowledgeDocumentIds }
+                : {}),
               session_id: activeSessionId,
               ...(systemInstruction?.trim()
                 ? { system_instruction: systemInstruction.trim() }

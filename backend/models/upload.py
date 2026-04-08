@@ -7,7 +7,13 @@ class UploadAnalysisResponse(BaseModel):
     """JSON response for POST /api/upload/analyze."""
 
     filename: str
-    prompt: str = Field(..., description="Hidden analysis prompt derived from the uploaded table.")
+    document_id: str = Field(..., description="Indexed knowledge document identifier.")
+    ingestion_id: str = Field(..., description="Knowledge ingestion identifier.")
+    status: str = Field(..., description="Upload and ingestion lifecycle state.")
+    retrieval_mode: str = Field(
+        ...,
+        description="Stable marker indicating the upload now routes through the RAG knowledge pipeline.",
+    )
     chart: None = Field(
         default=None,
         description="Reserved for backward compatibility; charts are now created only during chat tool calls.",

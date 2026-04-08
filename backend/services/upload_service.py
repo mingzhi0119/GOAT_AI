@@ -1,31 +1,47 @@
-"""Upload service for parsing CSV/XLSX files into reusable file-context SSE events."""
+"""Upload service for routing file uploads into the knowledge ingestion pipeline."""
 from __future__ import annotations
 
-import io
-import logging
-from typing import Generator
+from collections.abc import Generator
 
+from backend.models.knowledge import KnowledgeIngestionRequest
+from backend.models.upload import UploadAnalysisResponse
+from backend.services.exceptions import KnowledgeValidationError
+from backend.services.knowledge_service import (
+    create_knowledge_upload_from_bytes,
+    start_knowledge_ingestion,
+)
 from backend.services.sse import sse_done_event, sse_error_event, sse_event
 from goat_ai.config import Settings
-from goat_ai.tools import build_analysis_user_message
-from goat_ai.uploads import TabularLoadResult, load_tabular_upload
-
-logger = logging.getLogger(__name__)
 
 
-class _UploadAdapter(io.BytesIO):
-    """Wrap raw bytes with the file metadata required by TabularUploadLike."""
-
-    def __init__(self, content: bytes, filename: str) -> None:
-        super().__init__(content)
-        self.name: str = filename
-        self.size: int = len(content)
-
-
-def parse_upload(content: bytes, filename: str, settings: Settings) -> TabularLoadResult:
-    """Validate and parse raw upload bytes into a TabularLoadResult."""
-    adapter = _UploadAdapter(content, filename)
-    return load_tabular_upload(adapter, settings)
+def ingest_upload(
+    *,
+    content: bytes,
+    filename: str,
+    settings: Settings,
+) -> UploadAnalysisResponse:
+    """Persist, ingest, and return RAG knowledge metadata for one uploaded document."""
+    upload = create_knowledge_upload_from_bytes(
+        content=content,
+        filename=filename,
+        content_type=None,
+        settings=settings,
+    )
+    try:
+        ingestion = start_knowledge_ingestion(
+            request=KnowledgeIngestionRequest(document_id=upload.document_id),
+            settings=settings,
+        )
+    except ValueError as exc:
+        raise KnowledgeValidationError(str(exc)) from exc
+    return UploadAnalysisResponse(
+        filename=upload.filename,
+        document_id=upload.document_id,
+        ingestion_id=ingestion.ingestion_id,
+        status=ingestion.status,
+        retrieval_mode="knowledge_rag",
+        chart=None,
+    )
 
 
 def stream_upload_analysis_sse(
@@ -34,35 +50,22 @@ def stream_upload_analysis_sse(
     filename: str,
     settings: Settings,
 ) -> Generator[str, None, None]:
-    """Parse the uploaded file and emit file-context SSE metadata only.
-
-    Uploading a file no longer emits a starter chart. The frontend should wait
-    for a later LLM tool call before rendering any chart.
-    """
-    result = parse_upload(content, filename, settings)
-
-    if result.user_error:
-        yield sse_error_event(result.user_error)
+    """Ingest the uploaded file into the knowledge pipeline and emit readiness metadata."""
+    try:
+        result = ingest_upload(content=content, filename=filename, settings=settings)
+    except KnowledgeValidationError as exc:
+        yield sse_error_event(str(exc))
         yield sse_done_event()
         return
 
-    assert result.dataframe is not None  # parse_upload guarantees this when no user_error
-    analysis_prompt = build_analysis_user_message(result.dataframe)
-    yield sse_event({"type": "file_context", "filename": filename, "prompt": analysis_prompt})
+    yield sse_event(
+        {
+            "type": "knowledge_ready",
+            "filename": result.filename,
+            "document_id": result.document_id,
+            "ingestion_id": result.ingestion_id,
+            "status": result.status,
+            "retrieval_mode": result.retrieval_mode,
+        }
+    )
     yield sse_done_event()
-
-
-def analyze_upload(
-    *,
-    content: bytes,
-    filename: str,
-    settings: Settings,
-) -> tuple[str, None]:
-    """Parse the uploaded file and return reusable prompt metadata only."""
-    result = parse_upload(content, filename, settings)
-    if result.user_error:
-        raise ValueError(result.user_error)
-
-    assert result.dataframe is not None
-    analysis_prompt = build_analysis_user_message(result.dataframe)
-    return analysis_prompt, None

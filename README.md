@@ -14,7 +14,7 @@ Strategic Intelligence assistant for Simon Business School, University of Roches
 | Backend | FastAPI, Uvicorn, Python 3.12 |
 | Frontend | React 19, TypeScript, Vite 8 |
 | LLM runtime | Ollama |
-| Data parsing | pandas, openpyxl |
+| Data parsing | pandas, openpyxl, python-docx, pypdf |
 | Persistence | SQLite |
 | Charts | Apache ECharts |
 
@@ -35,6 +35,12 @@ Core API surface:
 - `POST /api/chat`
 - `POST /api/upload`
 - `POST /api/upload/analyze`
+- `POST /api/knowledge/uploads`
+- `GET /api/knowledge/uploads/{document_id}`
+- `POST /api/knowledge/ingestions`
+- `GET /api/knowledge/ingestions/{ingestion_id}`
+- `POST /api/knowledge/search`
+- `POST /api/knowledge/answers`
 - `GET /api/history`
 - `GET /api/history/{session_id}`
 - `DELETE /api/history`
@@ -46,15 +52,16 @@ Core API surface:
 ## Current behavior
 
 - Chat streams typed SSE event objects: `token`, `chart_spec`, `error`, `done`
-- Upload SSE emits `file_context` and `done`
+- Upload SSE ingests supported files into the knowledge pipeline and emits `knowledge_ready`, `error`, `done`
 - Charts are created only from native Ollama tool calls during chat
-- Session history is persisted in SQLite and can restore chart/file-context state
+- Session history is persisted in SQLite and can restore chart state plus attached knowledge documents
 - Chat now includes a lightweight safeguard layer for clearly unsafe sexual or violent misuse requests
 - Request/error correlation uses `X-Request-ID`, with a stable JSON error envelope documented in [`docs/API_ERRORS.md`](docs/API_ERRORS.md)
 - Liveness and readiness are split into `GET /api/health` and `GET /api/ready`
 - Prometheus-style metrics are exposed at `GET /api/system/metrics`
 - Idempotent retries are supported for `POST /api/upload/analyze` and chat session append requests (`POST /api/chat` with `session_id`)
 - Shared-host operations now include documented graceful shutdown, rollback, backup/restore, and post-deploy checks
+- RAG-0 is complete, and the first RAG-1/2 slice is live: `csv/xlsx` uploads now route through real ingestion/search/answer, `pdf/docx/md/txt` normalize into the same knowledge pipeline, and chat can use `knowledge_document_ids` for retrieval-backed replies
 
 ## Quick Start
 

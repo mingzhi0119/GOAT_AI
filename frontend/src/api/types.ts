@@ -15,6 +15,7 @@ export interface HistorySessionMessage {
 export interface ChatRequest {
   model: string
   messages: ChatMessage[]
+  knowledge_document_ids?: string[]
   session_id?: string
   /** Optional user-defined instructions merged into the server system prompt. */
   system_instruction?: string

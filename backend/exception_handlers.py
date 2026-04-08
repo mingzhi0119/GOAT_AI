@@ -12,10 +12,13 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.api_errors import (
     INFERENCE_BACKEND_UNAVAILABLE,
+    KNOWLEDGE_NOT_FOUND,
     build_error_body,
     default_code_for_http_status,
 )
 from backend.services.exceptions import InferenceBackendUnavailable
+from backend.services.exceptions import KnowledgeDocumentNotFound
+from backend.services.exceptions import KnowledgeFeatureNotImplemented
 from goat_ai.request_context import get_request_id
 
 logger = logging.getLogger(__name__)
@@ -42,6 +45,31 @@ def register_exception_handlers(app: FastAPI) -> None:
                     detail="AI backend unavailable",
                     code=INFERENCE_BACKEND_UNAVAILABLE,
                     status_code=503,
+                ),
+            ),
+        )
+
+    @app.exception_handler(KnowledgeFeatureNotImplemented)
+    def _knowledge_not_implemented(_request: Request, exc: KnowledgeFeatureNotImplemented) -> JSONResponse:
+        return _attach_request_id(
+            JSONResponse(
+                status_code=501,
+                content=build_error_body(
+                    detail=str(exc),
+                    status_code=501,
+                ),
+            ),
+        )
+
+    @app.exception_handler(KnowledgeDocumentNotFound)
+    def _knowledge_not_found(_request: Request, exc: KnowledgeDocumentNotFound) -> JSONResponse:
+        return _attach_request_id(
+            JSONResponse(
+                status_code=404,
+                content=build_error_body(
+                    detail=str(exc),
+                    code=KNOWLEDGE_NOT_FOUND,
+                    status_code=404,
                 ),
             ),
         )

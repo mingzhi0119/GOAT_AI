@@ -1,19 +1,19 @@
 import { useCallback, useRef, useState, type DragEvent, type FC } from 'react'
 import {
   streamUpload,
-  type UploadFileContextEvent,
+  type UploadKnowledgeReadyEvent,
 } from '../api/upload'
 
 interface Props {
-  onFileContext: (ctx: UploadFileContextEvent) => void
+  onFileContext: (ctx: UploadKnowledgeReadyEvent) => void
 }
 
 /**
- * Drag-and-drop / click-to-browse upload area for CSV and XLSX files.
+ * Drag-and-drop / click-to-browse upload area for supported knowledge files.
  *
- * On upload the backend parses the file and returns a file_context event only.
- * No LLM inference is triggered here; the user types a follow-up question in
- * the chat input and the model answers using the file context.
+ * On upload the backend ingests the file into the knowledge index and returns a
+ * readiness event. The next chat turn then uses retrieval against that indexed
+ * document.
  */
 const FileUpload: FC<Props> = ({ onFileContext }) => {
   const [isDragging, setIsDragging] = useState(false)
@@ -29,7 +29,7 @@ const FileUpload: FC<Props> = ({ onFileContext }) => {
       setStatus('uploading')
       try {
         for await (const event of streamUpload(file)) {
-          if (event.type === 'file_context') onFileContext(event)
+          if (event.type === 'knowledge_ready') onFileContext(event)
           else if (event.type === 'error') throw new Error(event.message)
         }
         setStatus('done')
@@ -67,14 +67,14 @@ const FileUpload: FC<Props> = ({ onFileContext }) => {
         ? `${fileName ?? 'File'} ready ✓\nAsk your question below`
         : status === 'error'
           ? 'Upload failed — retry'
-          : 'Drop CSV / XLSX\nor click to browse'
+      : 'Drop CSV / XLSX / PDF / DOCX / MD\nor click to browse'
 
   return (
     <div>
       <div
         role="button"
         tabIndex={0}
-        aria-label="Upload CSV or XLSX file"
+        aria-label="Upload knowledge file"
         onClick={() => inputRef.current?.click()}
         onKeyDown={e => {
           if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click()
@@ -105,7 +105,7 @@ const FileUpload: FC<Props> = ({ onFileContext }) => {
       <input
         ref={inputRef}
         type="file"
-        accept=".csv,.xlsx"
+        accept=".csv,.xlsx,.pdf,.docx,.md,.txt"
         className="hidden"
         onChange={handleChange}
       />

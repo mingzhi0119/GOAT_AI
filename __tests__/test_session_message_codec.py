@@ -43,6 +43,31 @@ class SessionMessageCodecTests(unittest.TestCase):
         self.assertEqual(raw_msgs[0], {"role": "user", "content": "visible ask"})
         self.assertEqual(raw_msgs[1], {"role": "assistant", "content": "ok"})
 
+    def test_build_payload_keeps_knowledge_document_metadata(self) -> None:
+        payload = build_session_payload(
+            messages=[ChatMessage(role="user", content="visible ask")],
+            assistant_text="ok",
+            chart_spec=None,
+            knowledge_documents=[
+                {
+                    "document_id": "doc-1",
+                    "filename": "strategy.pdf",
+                    "mime_type": "application/pdf",
+                }
+            ],
+            chart_data_source="none",
+        )
+        self.assertEqual(
+            [
+                {
+                    "document_id": "doc-1",
+                    "filename": "strategy.pdf",
+                    "mime_type": "application/pdf",
+                }
+            ],
+            payload.get("knowledge_documents"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

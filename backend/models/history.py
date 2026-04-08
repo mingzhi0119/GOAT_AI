@@ -17,6 +17,14 @@ class HistorySessionFileContext(BaseModel):
     prompt: str
 
 
+class HistorySessionKnowledgeDocument(BaseModel):
+    """Indexed knowledge document attached to a chat session."""
+
+    document_id: str
+    filename: str
+    mime_type: str
+
+
 class HistorySessionSummary(BaseModel):
     """Lightweight session metadata for sidebar/history list views."""
 
@@ -40,4 +48,5 @@ class HistorySessionDetailResponse(HistorySessionSummary):
     messages: list[HistorySessionMessage]
     chart_spec: dict[str, object] | None = None
     file_context: HistorySessionFileContext | None = None
+    knowledge_documents: list[HistorySessionKnowledgeDocument] = Field(default_factory=list)
     chart_data_source: str | None = Field(default=None, pattern="^(uploaded|demo|none)$")
