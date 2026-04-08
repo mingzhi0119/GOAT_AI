@@ -83,6 +83,7 @@ This project is designed for an unprivileged JupyterHub-style server environment
 |----------|---------|---------|
 | `OLLAMA_BASE_URL` | Ollama HTTP base URL | `http://127.0.0.1:11434` |
 | `OLLAMA_GENERATE_TIMEOUT` | LLM request timeout seconds | `120` |
+| `OLLAMA_CHAT_FIRST_EVENT_TIMEOUT` | `/api/chat` first SSE event timeout seconds | `90` |
 | `GOAT_MAX_UPLOAD_MB` | Max upload size | `20` |
 | `GOAT_MAX_DATAFRAME_ROWS` | Max parsed rows | `50000` |
 | `GOAT_SYSTEM_PROMPT` | Override system prompt | built-in default |
@@ -134,7 +135,7 @@ This project is designed for an unprivileged JupyterHub-style server environment
 - Scope: only idempotent metadata reads (`GET /api/tags`, `POST /api/show`).
 - Retries: exponential backoff + jitter using `GOAT_OLLAMA_READ_RETRY_*`.
 - Circuit breaker: `closed -> open -> half_open` using `GOAT_OLLAMA_CIRCUIT_BREAKER_*`.
-- Timeouts remain unchanged (`timeout=5` for tags/show probes).
+- Timeouts remain unchanged (`timeout=5` for tags/show probes). Streamed chat uses `OLLAMA_CHAT_FIRST_EVENT_TIMEOUT` for the first response chunk, while non-stream generation keeps `OLLAMA_GENERATE_TIMEOUT`.
 - Retryability registry source remains `backend/api_errors.py` (documented stable codes); this policy does not change API error envelope semantics.
 
 ### Idempotency keys (Phase 13 Wave B)

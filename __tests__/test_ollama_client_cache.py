@@ -26,6 +26,49 @@ def _settings(*, ttl: int) -> Settings:
     )
 
 
+def test_stream_tokens_uses_chat_first_event_timeout() -> None:
+    base = _settings(ttl=60)
+    settings = Settings(
+        **{
+            **base.__dict__,
+            "chat_first_event_timeout_sec": 77,
+        }
+    )
+    service = OllamaService(settings)
+
+    fake_response = Mock()
+    fake_response.raise_for_status.return_value = None
+    fake_response.iter_lines.return_value = []
+
+    with patch("goat_ai.ollama_client.requests.post", return_value=fake_response) as post_mock:
+        list(service.stream_tokens("gemma4:26b", [], "system"))
+
+    assert post_mock.call_args is not None
+    assert post_mock.call_args.kwargs["timeout"] == (5.0, 77.0)
+
+
+def test_generate_completion_uses_generate_timeout() -> None:
+    base = _settings(ttl=60)
+    settings = Settings(
+        **{
+            **base.__dict__,
+            "generate_timeout": 123,
+        }
+    )
+    service = OllamaService(settings)
+
+    fake_response = Mock()
+    fake_response.raise_for_status.return_value = None
+    fake_response.json.return_value = {"response": "ok"}
+
+    with patch("goat_ai.ollama_client.requests.post", return_value=fake_response) as post_mock:
+        text = service.generate_completion("gemma4:26b", "hello")
+
+    assert text == "ok"
+    assert post_mock.call_args is not None
+    assert post_mock.call_args.kwargs["timeout"] == 123.0
+
+
 def test_get_model_capabilities_uses_ttl_cache() -> None:
     service = OllamaService(_settings(ttl=60))
 

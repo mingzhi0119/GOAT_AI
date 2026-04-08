@@ -110,6 +110,7 @@ class Settings:
     idempotency_ttl_sec: int = 300
     max_chat_messages: int = 120
     max_chat_payload_bytes: int = 512000
+    chat_first_event_timeout_sec: int = 90
 
     @property
     def user_facing_error(self) -> str:
@@ -136,6 +137,7 @@ def load_settings() -> Settings:
     _idempotency_ttl_sec = int(os.environ.get("GOAT_IDEMPOTENCY_TTL_SEC", "300"))
     _max_chat_messages = int(os.environ.get("GOAT_MAX_CHAT_MESSAGES", "120"))
     _max_chat_payload_bytes = int(os.environ.get("GOAT_MAX_CHAT_PAYLOAD_BYTES", "512000"))
+    _chat_first_event_timeout_sec = int(os.environ.get("OLLAMA_CHAT_FIRST_EVENT_TIMEOUT", "90"))
     if _deploy_target not in {"auto", "server", "local"}:
         raise ValueError("GOAT_DEPLOY_TARGET must be one of: auto, server, local")
     if _rate_limit_window_sec < 1:
@@ -166,6 +168,8 @@ def load_settings() -> Settings:
         raise ValueError("GOAT_MAX_CHAT_MESSAGES must be >= 1")
     if _max_chat_payload_bytes < 1024:
         raise ValueError("GOAT_MAX_CHAT_PAYLOAD_BYTES must be >= 1024")
+    if _chat_first_event_timeout_sec < 1:
+        raise ValueError("OLLAMA_CHAT_FIRST_EVENT_TIMEOUT must be >= 1")
     return Settings(
         ollama_base_url=base,
         generate_timeout=int(os.environ.get("OLLAMA_GENERATE_TIMEOUT", "120")),
@@ -196,4 +200,5 @@ def load_settings() -> Settings:
         idempotency_ttl_sec=_idempotency_ttl_sec,
         max_chat_messages=_max_chat_messages,
         max_chat_payload_bytes=_max_chat_payload_bytes,
+        chat_first_event_timeout_sec=_chat_first_event_timeout_sec,
     )

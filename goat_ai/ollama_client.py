@@ -155,13 +155,22 @@ class OllamaService:
         payload: dict[str, Any],
         *,
         stream: bool,
+        stream_timeout_sec: int | None = None,
     ) -> requests.Response:
+        timeout: float | tuple[float, float]
+        if stream:
+            read_timeout = float(
+                stream_timeout_sec if stream_timeout_sec is not None else self._s.generate_timeout
+            )
+            timeout = (5.0, read_timeout)
+        else:
+            timeout = float(self._s.generate_timeout)
         try:
             res = requests.post(
                 f"{self._s.ollama_base_url}/api/chat",
                 json=payload,
                 stream=stream,
-                timeout=self._s.generate_timeout,
+                timeout=timeout,
             )
             res.raise_for_status()
             return res
@@ -292,7 +301,11 @@ class OllamaService:
         }
         if ollama_options:
             payload["options"] = ollama_options
-        res = self._post_chat(payload, stream=True)
+        res = self._post_chat(
+            payload,
+            stream=True,
+            stream_timeout_sec=self._s.chat_first_event_timeout_sec,
+        )
         for line in res.iter_lines():
             if line:
                 chunk = json.loads(line.decode("utf-8"))
@@ -395,7 +408,11 @@ class OllamaService:
             payload["options"] = ollama_options
 
         try:
-            res = self._post_chat(payload, stream=True)
+            res = self._post_chat(
+                payload,
+                stream=True,
+                stream_timeout_sec=self._s.chat_first_event_timeout_sec,
+            )
         except ValueError:
             return
 
@@ -499,7 +516,11 @@ class OllamaService:
             payload["options"] = ollama_options
 
         try:
-            res = self._post_chat(payload, stream=True)
+            res = self._post_chat(
+                payload,
+                stream=True,
+                stream_timeout_sec=self._s.chat_first_event_timeout_sec,
+            )
         except ValueError:
             return
 

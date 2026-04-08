@@ -22,6 +22,9 @@ def test_expect_runtime_target_accepts_server_port() -> None:
 def test_expect_chat_stream_contract_accepts_token_then_done() -> None:
     response = Mock()
     response.raise_for_status.return_value = None
-    response.text = 'data: {"type":"token","token":"hello"}\n\ndata: {"type":"done"}\n\n'
+    response.iter_lines.return_value = [
+        'data: {"type":"token","token":"hello"}',
+        'data: {"type":"done"}',
+    ]
     with patch("scripts.post_deploy_check.requests.post", return_value=response):
         assert _expect_chat_stream_contract("http://127.0.0.1:62606") == 0

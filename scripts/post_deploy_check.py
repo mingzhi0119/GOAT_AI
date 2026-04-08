@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from typing import Any
 
@@ -24,6 +25,17 @@ def _parse_sse_events(body: str) -> list[dict[str, Any]]:
     return events
 
 
+def _first_event_timeout_sec() -> int:
+    raw = os.environ.get("OLLAMA_CHAT_FIRST_EVENT_TIMEOUT", "90").strip()
+    try:
+        timeout = int(raw)
+    except ValueError as exc:  # pragma: no cover - defensive config guard
+        raise ValueError("OLLAMA_CHAT_FIRST_EVENT_TIMEOUT must be an integer") from exc
+    if timeout < 1:
+        raise ValueError("OLLAMA_CHAT_FIRST_EVENT_TIMEOUT must be >= 1")
+    return timeout
+
+
 def _expect_runtime_target(base_url: str) -> int:
     response = requests.get(f"{base_url}/api/system/runtime-target", timeout=10)
     response.raise_for_status()
@@ -38,24 +50,38 @@ def _expect_runtime_target(base_url: str) -> int:
 
 
 def _expect_chat_stream_contract(base_url: str) -> int:
-    response = requests.post(
-        f"{base_url}/api/chat",
-        json={
-            "model": "gemma4:26b",
-            "messages": [{"role": "user", "content": "Say hello in three short tokens."}],
-        },
-        timeout=30,
-    )
-    response.raise_for_status()
-    events = _parse_sse_events(response.text)
-    if not events:
-        return _fail("chat stream produced no SSE events")
-    types = [str(item.get("type")) for item in events]
-    if types[-1] != "done":
-        return _fail("chat stream did not end with done event")
-    if not any(t == "token" for t in types) and not any(t == "error" for t in types):
-        return _fail("chat stream produced neither token nor error events")
-    return 0
+    timeout_sec = _first_event_timeout_sec()
+    response: requests.Response | None = None
+    try:
+        response = requests.post(
+            f"{base_url}/api/chat",
+            json={
+                "model": "gemma4:26b",
+                "messages": [{"role": "user", "content": "Say hello in three short tokens."}],
+            },
+            stream=True,
+            timeout=(5, timeout_sec),
+        )
+        response.raise_for_status()
+        for line in response.iter_lines(decode_unicode=True):
+            if not line or not line.startswith("data: "):
+                continue
+            event = json.loads(line[6:])
+            if not isinstance(event, dict):
+                return _fail("chat stream returned a non-object SSE payload")
+            event_type = str(event.get("type"))
+            if event_type == "error":
+                return _fail(f"chat stream first event was error: {event.get('message', '')}")
+            if event_type != "token":
+                return _fail(f"chat stream first event was {event_type!r} instead of token")
+            return 0
+    except requests.Timeout as exc:
+        return _fail(f"chat stream produced no SSE events before first-token timeout: {exc}")
+    finally:
+        close = getattr(response, "close", None) if response is not None else None
+        if callable(close):
+            close()
+    return _fail("chat stream produced no SSE events")
 
 
 def main() -> int:
