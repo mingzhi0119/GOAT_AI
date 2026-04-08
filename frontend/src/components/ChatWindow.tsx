@@ -1,9 +1,14 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type FC, type KeyboardEvent } from 'react'
 import { uploadMediaImage } from '../api/media'
-import type { ChartSpec, Message } from '../api/types'
+import { streamUpload, type UploadStreamEvent } from '../api/upload'
 import type { GPUStatus, InferenceLatency } from '../api/system'
+import type { ChartSpec, Message } from '../api/types'
 import type { FileContext } from '../hooks/useFileContext'
-import { getSuffixPrompt, getTemplateFallbackPrompt } from '../utils/uploadPrompts'
+import {
+  getFileExtension,
+  getSuffixPrompt,
+  getTemplateFallbackPrompt,
+} from '../utils/uploadPrompts'
 import GpuStatusDot from './GpuStatusDot'
 import MessageBubble from './MessageBubble'
 
@@ -16,6 +21,10 @@ const BASE_PROMPTS = [
   'Draft an executive summary template',
 ]
 
+const KNOWLEDGE_FILE_EXTENSIONS = new Set(['csv', 'xlsx', 'pdf', 'docx', 'md', 'txt'])
+const IMAGE_FILE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp'])
+const TEXTAREA_MAX_HEIGHT_PX = 144
+
 type PromptItem =
   | { text: string; kind: 'base' }
   | { text: string; kind: 'suffix' }
@@ -26,17 +35,46 @@ interface Props {
   chartSpec: ChartSpec | null
   isStreaming: boolean
   selectedModel: string
-  /** When true, show image attach control (model reports Ollama ``vision`` capability). */
   supportsVision?: boolean
   fileContext: FileContext | null
+  onUploadEvent: (event: UploadStreamEvent) => void
   onSendMessage: (content: string, imageAttachmentIds?: string[]) => void
   onStop: () => void
+  onClearFileContext: () => void
   gpuStatus: GPUStatus | null
   gpuError: string | null
   inferenceLatency: InferenceLatency | null
 }
 
-/** Main chat panel: message list + auto-scroll + input area. */
+const PlusIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <path
+      d="M8 3.25v9.5M3.25 8h9.5"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
+const CloseIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+    <path
+      d="M3 3l6 6M9 3 3 9"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
+function getAttachmentKind(file: File, supportsVision: boolean): 'image' | 'knowledge' | 'unsupported' {
+  const ext = getFileExtension(file.name)
+  if (KNOWLEDGE_FILE_EXTENSIONS.has(ext)) return 'knowledge'
+  if (supportsVision && IMAGE_FILE_EXTENSIONS.has(ext)) return 'image'
+  return 'unsupported'
+}
+
 const ChatWindow: FC<Props> = ({
   messages,
   chartSpec,
@@ -44,16 +82,19 @@ const ChatWindow: FC<Props> = ({
   selectedModel,
   supportsVision = false,
   fileContext,
+  onUploadEvent,
   onSendMessage,
   onStop,
+  onClearFileContext,
   gpuStatus,
   gpuError,
   inferenceLatency,
 }) => {
   const [input, setInput] = useState('')
   const [pendingImageIds, setPendingImageIds] = useState<string[]>([])
-  const [imageUploadError, setImageUploadError] = useState<string | null>(null)
-  const [imageUploading, setImageUploading] = useState(false)
+  const [attachmentUploadError, setAttachmentUploadError] = useState<string | null>(null)
+  const [attachmentUploading, setAttachmentUploading] = useState(false)
+  const [attachmentStatus, setAttachmentStatus] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -66,62 +107,95 @@ const ChatWindow: FC<Props> = ({
     return [
       { text: BASE_PROMPTS[0]!, kind: 'base' },
       { text: BASE_PROMPTS[1]!, kind: 'base' },
-      {
-        text: fileContext.suffixPrompt ?? getSuffixPrompt(filename),
-        kind: 'suffix',
-      },
-      {
-        text: fileContext.templatePrompt ?? getTemplateFallbackPrompt(filename),
-        kind: 'template',
-      },
+      { text: fileContext.suffixPrompt ?? getSuffixPrompt(filename), kind: 'suffix' },
+      { text: fileContext.templatePrompt ?? getTemplateFallbackPrompt(filename), kind: 'template' },
     ]
   }, [fileContext])
 
-  /** Visible (non-hidden) messages to render in the chat list. */
-  const visibleMessages = useMemo(() => messages.filter(m => !m.hidden), [messages])
-
-  /**
-   * True when the current session has an active file upload OR carries embedded
-   * legacy hidden messages (restored from history). Used to enable chart
-   * block stripping in MessageBubble.
-   */
-  const sessionHasFileContext = fileContext !== null || messages.some(m => m.hidden)
+  const visibleMessages = useMemo(() => messages.filter(message => !message.hidden), [messages])
+  const sessionHasFileContext = fileContext !== null || messages.some(message => message.hidden)
+  const attachmentAccept = supportsVision
+    ? 'image/png,image/jpeg,image/jpg,image/webp,.csv,.xlsx,.pdf,.docx,.md,.txt'
+    : '.csv,.xlsx,.pdf,.docx,.md,.txt'
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    textarea.style.height = 'auto'
+    const nextHeight = Math.min(textarea.scrollHeight, TEXTAREA_MAX_HEIGHT_PX)
+    textarea.style.height = `${Math.max(48, nextHeight)}px`
+    textarea.style.overflowY = textarea.scrollHeight > TEXTAREA_MAX_HEIGHT_PX ? 'auto' : 'hidden'
+  }, [input])
+
   const handleSubmit = () => {
     const trimmed = input.trim()
-    if ((!trimmed && !pendingImageIds.length) || isStreaming) return
-    const text =
-      trimmed || (pendingImageIds.length > 0 ? 'What do you see in this image?' : '')
+    if ((!trimmed && !pendingImageIds.length) || isStreaming || attachmentUploading) return
+    const text = trimmed || (pendingImageIds.length > 0 ? 'What do you see in this image?' : '')
     onSendMessage(text, pendingImageIds.length > 0 ? pendingImageIds : undefined)
     setInput('')
     setPendingImageIds([])
-    setImageUploadError(null)
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
-    }
+    setAttachmentUploadError(null)
+    setAttachmentStatus(null)
   }
 
-  const handleImagePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files?.length) return
-    setImageUploadError(null)
-    setImageUploading(true)
-    try {
-      const next: string[] = [...pendingImageIds]
-      for (const f of Array.from(files)) {
-        const res = await uploadMediaImage(f)
-        next.push(res.attachment_id)
+  const uploadKnowledgeFile = async (file: File) => {
+    setAttachmentStatus(`Analyzing ${file.name}...`)
+    for await (const event of streamUpload(file)) {
+      if (event.type === 'file_prompt' || event.type === 'knowledge_ready') {
+        onUploadEvent(event)
+      } else if (event.type === 'error') {
+        throw new Error(event.message)
       }
-      setPendingImageIds(next)
+    }
+    setAttachmentStatus(`${file.name} is ready for RAG`)
+  }
+
+  const handleAttachmentPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : []
+    e.target.value = ''
+    if (files.length === 0) return
+
+    setAttachmentUploadError(null)
+    setAttachmentUploading(true)
+    try {
+      const knowledgeFiles = files.filter(
+        file => getAttachmentKind(file, supportsVision) === 'knowledge',
+      )
+      const imageFiles = files.filter(file => getAttachmentKind(file, supportsVision) === 'image')
+      const unsupportedFiles = files.filter(
+        file => getAttachmentKind(file, supportsVision) === 'unsupported',
+      )
+
+      if (unsupportedFiles.length > 0) {
+        throw new Error(`Unsupported file type: ${unsupportedFiles[0]!.name}`)
+      }
+      if (knowledgeFiles.length > 1) {
+        throw new Error('Please upload one knowledge file at a time.')
+      }
+
+      for (const imageFile of imageFiles) {
+        setAttachmentStatus(`Uploading ${imageFile.name}...`)
+        const result = await uploadMediaImage(imageFile)
+        setPendingImageIds(prev => [...prev, result.attachment_id])
+      }
+
+      const knowledgeFile = knowledgeFiles[0]
+      if (knowledgeFile) {
+        await uploadKnowledgeFile(knowledgeFile)
+      } else if (imageFiles.length > 0) {
+        setAttachmentStatus(`${imageFiles.length} image attachment${imageFiles.length > 1 ? 's' : ''} ready`)
+      } else {
+        setAttachmentStatus(null)
+      }
     } catch (err) {
-      setImageUploadError(err instanceof Error ? err.message : 'Image upload failed')
+      setAttachmentStatus(null)
+      setAttachmentUploadError(err instanceof Error ? err.message : 'Attachment upload failed')
     } finally {
-      setImageUploading(false)
-      e.target.value = ''
+      setAttachmentUploading(false)
     }
   }
 
@@ -132,25 +206,20 @@ const ChatWindow: FC<Props> = ({
     }
   }
 
-  const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(e.target.value)
-    e.target.style.height = 'auto'
-    e.target.style.height = `${Math.min(e.target.scrollHeight, 180)}px`
-  }
-
-  const canSend = (input.trim().length > 0 || pendingImageIds.length > 0) && !isStreaming
+  const canSend =
+    (input.trim().length > 0 || pendingImageIds.length > 0) && !isStreaming && !attachmentUploading
 
   return (
     <div
-      className="flex flex-col flex-1 min-w-0 min-h-0 h-full"
+      className="flex h-full min-h-0 min-w-0 flex-1 flex-col"
       style={{ background: 'var(--bg-chat)' }}
     >
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+      <div className="flex-1 space-y-4 overflow-y-auto px-4 py-6">
         {chartSpec && visibleMessages.length > 0 && (
           <Suspense
             fallback={
               <div
-                className="rounded-2xl p-4 border text-sm"
+                className="rounded-2xl border p-4 text-sm"
                 style={{
                   borderColor: 'var(--border-color)',
                   background: 'var(--bg-asst-bubble)',
@@ -165,9 +234,9 @@ const ChatWindow: FC<Props> = ({
           </Suspense>
         )}
         {visibleMessages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-5 text-center px-4">
+          <div className="flex h-full flex-col items-center justify-center gap-5 px-4 text-center">
             <div
-              className="w-20 h-20 rounded-2xl overflow-hidden"
+              className="h-20 w-20 overflow-hidden rounded-2xl"
               style={{
                 border: '1.5px solid #FFCD00',
                 background: '#2b2b2b',
@@ -180,44 +249,42 @@ const ChatWindow: FC<Props> = ({
               />
             </div>
             <div>
-              <h2 className="text-xl font-bold mb-1" style={{ color: 'var(--text-main)' }}>
+              <h2 className="mb-1 text-xl font-bold" style={{ color: 'var(--text-main)' }}>
                 Welcome to GOAT AI
               </h2>
               <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
                 Strategic Intelligence - Simon Business School
               </p>
               {selectedModel && (
-                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
                   Model: <span style={{ color: 'var(--gold)' }}>{selectedModel}</span>
                   {supportsVision && (
                     <span className="ml-2" title="This model reports vision support in Ollama">
-                      · vision
+                      vision
                     </span>
                   )}
                 </p>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-2 w-full max-w-md mt-2">
-              {starterPrompts.map((item, i) => {
+            <div className="mt-2 grid w-full max-w-md grid-cols-2 gap-2">
+              {starterPrompts.map((item, index) => {
                 const isFilePrompt = item.kind !== 'base'
                 return (
                   <button
-                    key={`${item.kind}-${i}-${item.text}`}
+                    key={`${item.kind}-${index}-${item.text}`}
                     onClick={() => onSendMessage(item.text, undefined)}
-                    className="text-xs px-3 py-2 rounded-xl text-left transition-colors hover:opacity-80"
+                    className="rounded-xl px-3 py-2 text-left text-xs transition-colors hover:opacity-80"
                     style={{
                       border: isFilePrompt
                         ? '1px solid var(--gold)'
                         : '1px solid var(--border-color)',
                       color: 'var(--text-main)',
-                      background: isFilePrompt
-                        ? 'rgba(255,205,0,0.08)'
-                        : 'var(--bg-asst-bubble)',
+                      background: isFilePrompt ? 'rgba(255,205,0,0.08)' : 'var(--bg-asst-bubble)',
                     }}
                   >
                     {isFilePrompt && (
                       <span
-                        className="block text-[10px] font-semibold mb-0.5 leading-none"
+                        className="mb-0.5 block text-[10px] font-semibold leading-none"
                         style={{ color: 'var(--gold)' }}
                       >
                         {item.kind === 'suffix' ? 'From your file' : 'Template suggestion'}
@@ -230,103 +297,174 @@ const ChatWindow: FC<Props> = ({
             </div>
           </div>
         ) : (
-          visibleMessages.map(msg => (
-            <MessageBubble key={msg.id} message={msg} hasFileContext={sessionHasFileContext} />
+          visibleMessages.map(message => (
+            <MessageBubble
+              key={message.id}
+              message={message}
+              hasFileContext={sessionHasFileContext}
+            />
           ))
         )}
         <div ref={bottomRef} />
       </div>
 
       <div
-        className="flex-shrink-0 px-4 py-3 border-t"
+        className="flex-shrink-0 border-t px-4 py-3"
         style={{ borderColor: 'var(--border-color)', background: 'var(--bg-chat)' }}
       >
-        <div className="flex items-center gap-2 max-w-4xl mx-auto">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/jpg,image/webp"
-            multiple
-            className="hidden"
-            onChange={handleImagePick}
-          />
-          {supportsVision && (
-            <button
-              type="button"
-              disabled={isStreaming || imageUploading}
-              onClick={() => fileInputRef.current?.click()}
-              className="flex-shrink-0 px-2 py-2 rounded-xl text-lg leading-none disabled:opacity-40"
-              style={{
-                border: '1px solid var(--border-color)',
-                color: 'var(--text-muted)',
-                background: 'var(--bg-asst-bubble)',
-              }}
-              title="Attach images (PNG, JPEG, WebP)"
-            >
-              {imageUploading ? '...' : '📸'}
-            </button>
+        <div className="mx-auto max-w-4xl space-y-2">
+          {(fileContext || pendingImageIds.length > 0 || attachmentStatus) && (
+            <div className="flex flex-wrap items-center gap-2 px-1">
+              {fileContext && (
+                <div
+                  className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs"
+                  style={{
+                    borderColor: 'rgba(255,205,0,0.4)',
+                    background: 'rgba(255,205,0,0.08)',
+                    color: 'var(--text-main)',
+                  }}
+                >
+                  <span className="font-medium">RAG</span>
+                  <span className="max-w-[220px] truncate">{fileContext.filename}</span>
+                  <button
+                    type="button"
+                    onClick={onClearFileContext}
+                    className="flex h-4 w-4 items-center justify-center rounded-full"
+                    style={{ color: 'var(--text-muted)' }}
+                    title="Clear file context"
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
+              )}
+              {pendingImageIds.map((id, index) => (
+                <button
+                  key={`${id}-${index}`}
+                  type="button"
+                  onClick={() => setPendingImageIds(prev => prev.filter((_, i) => i !== index))}
+                  className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs"
+                  style={{
+                    borderColor: 'var(--border-color)',
+                    background: 'var(--bg-asst-bubble)',
+                    color: 'var(--text-muted)',
+                  }}
+                  title="Remove image attachment"
+                >
+                  <span>Image {index + 1}</span>
+                  <CloseIcon />
+                </button>
+              ))}
+              {attachmentStatus && (
+                <div
+                  className="rounded-full border px-3 py-1 text-xs"
+                  style={{
+                    borderColor: 'rgba(255,255,255,0.14)',
+                    background: 'rgba(255,255,255,0.05)',
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  {attachmentStatus}
+                </div>
+              )}
+            </div>
           )}
-          <GpuStatusDot
-            gpuStatus={gpuStatus}
-            gpuError={gpuError}
-            inferenceLatency={inferenceLatency}
-          />
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={handleInput}
-            onKeyDown={handleKeyDown}
-            placeholder="Message GOAT AI (Enter to send, Shift+Enter for newline)"
-            rows={1}
-            disabled={isStreaming}
-            className="flex-1 resize-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 transition-all"
+
+          <div
+            className="rounded-[26px] border px-3 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.18)]"
             style={{
-              background: 'var(--input-bg)',
-              border: '1px solid var(--input-border)',
-              color: 'var(--text-main)',
-              lineHeight: '1.5',
-              maxHeight: '180px',
-            }}
-          />
-          <button
-            type="button"
-            onClick={isStreaming ? onStop : handleSubmit}
-            disabled={!isStreaming && !canSend}
-            className="flex-shrink-0 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
-            style={{
-              background: isStreaming ? '#dc2626' : canSend ? 'var(--navy)' : 'var(--border-color)',
-              color: isStreaming || canSend ? '#fff' : 'var(--text-muted)',
+              borderColor: 'rgba(255,255,255,0.09)',
+              background:
+                'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%)',
             }}
           >
-            {isStreaming ? 'Stop' : 'Send'}
-          </button>
-        </div>
-        {pendingImageIds.length > 0 && (
-          <div className="max-w-4xl mx-auto flex flex-wrap gap-1.5 mt-2 justify-center">
-            {pendingImageIds.map((id, i) => (
+            <div className="flex items-end gap-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={attachmentAccept}
+                multiple
+                className="hidden"
+                onChange={handleAttachmentPick}
+              />
+
               <button
-                key={`${id}-${i}`}
                 type="button"
-                onClick={() => setPendingImageIds(prev => prev.filter((_, j) => j !== i))}
-                className="text-[10px] px-2 py-0.5 rounded-lg"
+                disabled={isStreaming || attachmentUploading}
+                onClick={() => fileInputRef.current?.click()}
+                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl transition-all disabled:opacity-40"
                 style={{
-                  border: '1px solid var(--border-color)',
-                  color: 'var(--text-muted)',
-                  background: 'var(--bg-asst-bubble)',
+                  border: '1px solid rgba(255,255,255,0.14)',
+                  color: 'var(--text-main)',
+                  background:
+                    'linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.04) 100%)',
                 }}
-                title="Remove"
+                title={supportsVision ? 'Attach images or knowledge files' : 'Attach a knowledge file'}
               >
-                Image {i + 1} ×
+                <PlusIcon />
               </button>
-            ))}
+
+              <div className="min-w-0 flex-1">
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Message GOAT AI"
+                  rows={1}
+                  disabled={isStreaming}
+                  className="w-full resize-none bg-transparent px-1 py-1 text-sm focus:outline-none"
+                  style={{
+                    color: 'var(--text-main)',
+                    lineHeight: '24px',
+                    minHeight: '48px',
+                    maxHeight: `${TEXTAREA_MAX_HEIGHT_PX}px`,
+                  }}
+                />
+                <div className="flex items-center justify-between gap-3 px-1 pt-1 text-[11px]">
+                  <span style={{ color: 'var(--text-muted)' }}>
+                    {supportsVision
+                      ? 'Attach PNG, JPG, WEBP, CSV, XLSX, PDF, DOCX, MD, or TXT'
+                      : 'Attach CSV, XLSX, PDF, DOCX, MD, or TXT'}
+                  </span>
+                  <span style={{ color: 'var(--text-muted)' }}>
+                    Enter to send, Shift+Enter for a new line
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-shrink-0 items-center gap-2 pb-1">
+                <GpuStatusDot
+                  gpuStatus={gpuStatus}
+                  gpuError={gpuError}
+                  inferenceLatency={inferenceLatency}
+                />
+                <button
+                  type="button"
+                  onClick={isStreaming ? onStop : handleSubmit}
+                  disabled={!isStreaming && !canSend}
+                  className="rounded-2xl px-5 py-3 text-sm font-semibold transition-all disabled:opacity-40"
+                  style={{
+                    background: isStreaming
+                      ? '#dc2626'
+                      : canSend
+                        ? 'linear-gradient(135deg, #0f2b56 0%, #1c4b8c 100%)'
+                        : 'rgba(255,255,255,0.08)',
+                    color: isStreaming || canSend ? '#fff' : 'var(--text-muted)',
+                  }}
+                >
+                  {isStreaming ? 'Stop' : 'Send'}
+                </button>
+              </div>
+            </div>
           </div>
-        )}
-        {imageUploadError && (
-          <p className="text-center text-xs mt-1 text-red-600">{imageUploadError}</p>
-        )}
-        <p className="text-center text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
-          AI may make mistakes. Verify important information.
-        </p>
+
+          {attachmentUploadError && (
+            <p className="mt-1 text-center text-xs text-red-600">{attachmentUploadError}</p>
+          )}
+          <p className="mt-1.5 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+            AI may make mistakes. Verify important information.
+          </p>
+        </div>
       </div>
     </div>
   )

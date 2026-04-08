@@ -54,6 +54,26 @@ export default function App() {
     })
   }
 
+  const handleUploadEvent = (event: UploadStreamEvent) => {
+    if (event.type === 'file_prompt') {
+      session.setFileContext({
+        filename: event.filename,
+        suffixPrompt: event.suffix_prompt,
+      })
+      return
+    }
+    if (event.type === 'knowledge_ready') {
+      session.setFileContext({
+        filename: event.filename,
+        documentId: event.document_id,
+        ingestionId: event.ingestion_id,
+        retrievalMode: event.retrieval_mode,
+        suffixPrompt: event.suffix_prompt,
+        templatePrompt: event.template_prompt,
+      })
+    }
+  }
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar
@@ -80,27 +100,6 @@ export default function App() {
         onDeleteHistorySession={sessionId => {
           void session.deleteHistorySession(sessionId)
         }}
-        fileContext={session.fileContext}
-        onUploadEvent={(event: UploadStreamEvent) => {
-          if (event.type === 'file_prompt') {
-            session.setFileContext({
-              filename: event.filename,
-              suffixPrompt: event.suffix_prompt,
-            })
-            return
-          }
-          if (event.type === 'knowledge_ready') {
-            session.setFileContext({
-              filename: event.filename,
-              documentId: event.document_id,
-              ingestionId: event.ingestion_id,
-              retrievalMode: event.retrieval_mode,
-              suffixPrompt: event.suffix_prompt,
-              templatePrompt: event.template_prompt,
-            })
-          }
-        }}
-        onClearFileContext={session.clearFileContextSession}
       />
       <div className="flex flex-col flex-1 min-w-0 min-h-0">
         <TopBar
@@ -133,10 +132,12 @@ export default function App() {
             selectedModel={models.selectedModel}
             supportsVision={models.capabilities?.supports_vision ?? false}
             fileContext={session.fileContext}
+            onUploadEvent={handleUploadEvent}
             onSendMessage={(content, imageIds) => {
               void session.sendMessage(content, imageIds)
             }}
             onStop={session.stopStreaming}
+            onClearFileContext={session.clearFileContextSession}
             gpuStatus={gpu.status}
             gpuError={gpu.error}
             inferenceLatency={gpu.inference}
