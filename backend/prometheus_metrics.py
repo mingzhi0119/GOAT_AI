@@ -5,7 +5,12 @@ import math
 import threading
 from collections import defaultdict
 
-from goat_ai.telemetry_counters import snapshot_feature_gate_denials, snapshot_ollama_errors
+from goat_ai.telemetry_counters import (
+    snapshot_feature_gate_denials,
+    snapshot_knowledge_query_rewrite_applied,
+    snapshot_knowledge_retrieval,
+    snapshot_ollama_errors,
+)
 
 _lock = threading.Lock()
 
@@ -79,6 +84,8 @@ def render_prometheus_text() -> str:
         sqlite_copy = dict(_sqlite_write_failures)
 
     fg_copy = snapshot_feature_gate_denials()
+    retr_copy = snapshot_knowledge_retrieval()
+    rew_copy = snapshot_knowledge_query_rewrite_applied()
 
     lines.append("# HELP http_requests_total Total HTTP requests processed.")
     lines.append("# TYPE http_requests_total counter")
@@ -121,5 +128,24 @@ def render_prometheus_text() -> str:
         ff = _escape_label_value(feature)
         rr = _escape_label_value(reason)
         lines.append(f'feature_gate_denials_total{{feature="{ff}",reason="{rr}"}} {count}')
+
+    lines.append(
+        "# HELP knowledge_retrieval_requests_total "
+        "Knowledge search requests by retrieval_profile and outcome (hit=at least one chunk returned)."
+    )
+    lines.append("# TYPE knowledge_retrieval_requests_total counter")
+    for (profile, outcome), count in sorted(retr_copy.items()):
+        pp = _escape_label_value(profile)
+        oo = _escape_label_value(outcome)
+        lines.append(f'knowledge_retrieval_requests_total{{retrieval_profile="{pp}",outcome="{oo}"}} {count}')
+
+    lines.append(
+        "# HELP knowledge_query_rewrite_applied_total "
+        "Conservative query rewrite applied (retrieval_profile=rag3_quality) before vector search."
+    )
+    lines.append("# TYPE knowledge_query_rewrite_applied_total counter")
+    for profile, count in sorted(rew_copy.items()):
+        pp = _escape_label_value(profile)
+        lines.append(f'knowledge_query_rewrite_applied_total{{retrieval_profile="{pp}"}} {count}')
 
     return "\n".join(lines) + "\n"

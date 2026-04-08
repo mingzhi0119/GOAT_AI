@@ -526,6 +526,7 @@ Before every commit ask:
 ## 12. Documentation update rules
 
 - **Language** — All prose in **`docs/`** and **`README.md`** must be **English**. Do not commit Chinese or other non-English text in those paths.
+- **RAG quality (§14.7)** — Changes to retrieval/rerank/rewrite logic or `evaldata/rag_eval_cases.jsonl` must keep `python tools/run_rag_eval.py` green; document golden-set updates in `evaldata/README.md` / `evaldata/VERSION`. Operational knobs: [OPERATIONS.md](OPERATIONS.md) **RAG retrieval quality**.
 
 When behavior changes, update:
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -63,11 +64,27 @@ def _run_case(case: dict[str, object]) -> None:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="RAG golden-set regression (Phase 14.7).")
+    parser.add_argument(
+        "--min-cases",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Minimum number of JSONL rows required (default: 1).",
+    )
+    args = parser.parse_args()
+
     cases_path = _REPO_ROOT / "evaldata" / "rag_eval_cases.jsonl"
     if not cases_path.is_file():
         print(f"missing eval cases: {cases_path}", file=sys.stderr)
         return 2
     cases = _load_cases(cases_path)
+    if len(cases) < args.min_cases:
+        print(
+            f"rag_eval: expected at least {args.min_cases} cases, got {len(cases)}",
+            file=sys.stderr,
+        )
+        return 2
     for case in cases:
         _run_case(case)
     print(f"rag_eval: OK ({len(cases)} cases)")

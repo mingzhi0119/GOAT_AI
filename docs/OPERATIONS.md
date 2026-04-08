@@ -169,6 +169,27 @@ curl -sS -H "X-GOAT-API-Key: $GOAT_API_KEY" http://127.0.0.1:62606/api/system/me
 - Same key + different payload returns `409` (`code = IDEMPOTENCY_CONFLICT`)
 - Storage: SQLite `idempotency_keys` table with TTL cleanup on claim
 
+### RAG retrieval quality (Phase 14.7)
+
+**Regression:** run `python tools/run_rag_eval.py` before merge when changing `backend/services/retrieval_quality/`, `tools/run_rag_eval.py`, or `evaldata/`. CI enforces this on every backend job.
+
+**Knobs (environment + request):**
+
+| Control | Where | Behavior |
+|---------|--------|----------|
+| `GOAT_RAG_RERANK_MODE` | `passthrough` or `lexical` | For `retrieval_profile=default` only, selects vector order vs lexical overlap rerank after the vector stage (`goat_ai/config.py`). |
+| `retrieval_profile` | `POST /api/knowledge/search` body | `default` — uses `GOAT_RAG_RERANK_MODE`; `rag3_lexical` / `rag3_quality` — always lexical rerank; `rag3_quality` also enables conservative whitespace query rewrite before search. |
+| Vector similarity | Implementation | Scores are backend-specific; there is **no** global numeric score threshold in config—triage uses **hit vs miss** (see metrics) and eval cases. |
+
+**No-hit behavior:** search returns zero citations when nothing ranks above the empty list; `POST /api/knowledge/answers` returns the documented fixed sentence when no hits (after optional attached-document fallback).
+
+**Observability (`GET /api/system/metrics`):**
+
+- `knowledge_retrieval_requests_total{retrieval_profile="...",outcome="hit|miss"}` — one increment per `search_knowledge` execution.
+- `knowledge_query_rewrite_applied_total{retrieval_profile="..."}` — increments when conservative rewrite changed the query (`rag3_quality`).
+
+**Golden set:** see [evaldata/README.md](../evaldata/README.md) and `evaldata/VERSION`.
+
 ### Multi-instance stance (honest limits)
 
 - Rate limiting in `backend/http_security.py` is in-memory and per-process

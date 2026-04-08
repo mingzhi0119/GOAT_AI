@@ -1,6 +1,6 @@
 ﻿# GOAT AI Roadmap
 
-> Last updated: 2026-04-08 — **v1.3.0** tags Phase **11–12**; **main** additionally ships **Phase 13** (full closeout) and **Phase 14** through **14.6 RAG-3**. **Next:** Phase **15** (semantics then structure — sections below).
+> Last updated: 2026-04-08 — **v1.3.0** tags Phase **11–12**; **main** additionally ships **Phase 13** (full closeout) and **Phase 14** through **14.6 RAG-3**. **Next:** close **RAG quality loop** (§14.7), then **Phase 15** (semantics then structure — sections below). **Constraints vs roadmap:** see [Current reality and improvement map](#current-reality-and-improvement-map).
 > Current release tag: **v1.3.0**
 > Compact snapshot: [PROJECT_STATUS.md](PROJECT_STATUS.md) · Engineering standards: [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md)
 
@@ -73,6 +73,7 @@ Program order for remaining roadmap:
 
 | Order | Focus | Notes |
 |-------|--------|--------|
+| **0** | **§14.7 RAG quality closure** | CI/regression eval, thresholds, golden-set process, light observability — see [§14.7](#147-rag-quality-closure-post-146--in-progress--next). |
 | **1** | **Phase 15** | `DOMAIN.md`, policy objects, then one-time `application` / `domain` / `infrastructure` split; pytest-first, integration tier; optional `session_messages`, minimal AuthZ, optional OpenTelemetry. |
 
 ### Near-term execution order (project-calibrated)
@@ -83,8 +84,79 @@ Aligned with [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) and **referenc
 |---------|--------|
 | **v1.3.x** | Ops hardening from Phase 12 backlog: systemd vs nohup playbook, SQLite backup/migration thresholds, security/audit as exposure grows. |
 | **v1.4.x** | Phase 13 is **done on main**; any follow-up is maintenance. Postgres / multi-instance only after ops gates stable. |
-| **v1.5.x** | Phase **14** (through **14.6 RAG-3**) and **Vision MVP** are **ship-complete on main**; follow-up is maintenance until **Phase 15**. |
-| **v1.6+** | **Phase 15** — semantics and structural overhaul, optional normalization & tracing (**consumes** Phase 13 §13.0 error model; **does not redefine** it). |
+| **v1.5.x** | Phase **14** (through **14.6**) and **Vision MVP** are **ship-complete on main**; active follow-up is **§14.7** (RAG quality closure), then **Phase 15**. |
+| **v1.6+** | **Phase 15** — semantics and structural overhaul, optional normalization & tracing (**consumes** Phase 13 §13.0 error model; **does not redefine** it). May overlap late **v1.5.x** once **§14.7** exit criteria are clear. |
+
+---
+
+## Current reality and improvement map
+
+This section records **constraints that match today’s shipped architecture** and **where planned improvements sit** in this roadmap (phases, docs, or decision log). It does not replace exit criteria in individual phases.
+
+### 1. Access control — shared API key (no per-user AuthN/AuthZ)
+
+| Reality (main) | Improvement path | Roadmap / docs home |
+|----------------|------------------|---------------------|
+| Protection is **`GOAT_API_KEY` + `X-GOAT-API-Key`** when set; same key ⇒ single trust domain (no tenant or user identity in requests). | **Document** threat model, rotation, and blast radius; keep rate limits and health exceptions as today. | [SECURITY.md](SECURITY.md), [OPERATIONS.md](OPERATIONS.md); Phase **13** non-goals already allow a one-page shared-key model. |
+| Feature gates expose **`policy_allowed: null`** until AuthZ exists; runtime gating (503) is separate from policy (403). | **Optional:** scoped keys (read/write) or multiple keys via env — service-layer checks; **not** full IAM until product requires it. | Phase **15.5** (AuthZ roadmap + minimal enforcement); [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) §15. |
+| Per-user sessions in SQLite are **not** authenticated identities; history is a convenience store, not proof of principal. | **Future:** session ownership + denial tests only after AuthZ decision. | Phase **15.5**; Decision Log when/if product commits. |
+
+**Priority:** Docs + operational discipline **first**; code changes for multi-key **only** when exposure grows (see horizon **v1.3.x** in [Near-term execution order](#near-term-execution-order-project-calibrated)).
+
+### 2. Data plane — SQLite + local vector index (`simple_local_v1`)
+
+| Reality (main) | Improvement path | Roadmap / docs home |
+|----------------|------------------|---------------------|
+| **Single primary SQLite** for app metadata; **files + JSON vector artifacts** under `GOAT_DATA_DIR`; not a multi-writer cluster store. | Treat **one active writer** as the supported deployment; document backup/restore and migration discipline. | [OPERATIONS.md](OPERATIONS.md), [BACKUP_RESTORE.md](BACKUP_RESTORE.md); Phase **13** Wave B “multi-instance limitations”; Appendix [RAG subsystem](#appendix-rag-subsystem-architecture-snapshot). |
+| Horizontal scale-out **not** a current goal; multiple Uvicorn workers or multiple hosts require a **Decision Log** + storage change. | **If** capacity forces it: Postgres (or equivalent) + optional external vector store — **after** ops stability gates (Phase **13** risk triggers). | Phase **13** non-goals; new Decision Log entry before any migration; not Phase 15’s default outcome. |
+
+**Priority:** Correct **single-instance** ops and backups **before** distributed data stores.
+
+### 3. RAG quality — protocols shipped; §14.7 closure landed
+
+| Reality (main) | Improvement path | Roadmap / docs home |
+|----------------|------------------|---------------------|
+| **14.6** delivered rerank/rewrite **Protocols**, `retrieval_profile`, `tools/run_rag_eval.py`, `evaldata/`. | **§14.7:** CI runs `run_rag_eval.py` every backend build; OPERATIONS documents knobs; `evaldata/README.md` + `VERSION`; metrics on profile/outcome and rewrite. | **§14.7** below; [README.md](../README.md) / [PROJECT_STATUS.md](PROJECT_STATUS.md) “RAG-ready” wording. |
+| Further tuning (score cutoffs, dashboards) | Optional; not blocking §14.7. | Phase **15.6** optional. |
+
+**Priority:** **§14.7** is complete; iterate eval cases as retrieval behavior evolves.
+
+### 4. Testing — black-box strong; integration tier immature
+
+| Reality (main) | Improvement path | Roadmap / docs home |
+|----------------|------------------|---------------------|
+| Contract tests and architecture guards exist; many flows use mocks. | **Integration tier:** temp `GOAT_DATA_DIR`, real migrations, `TestClient`, **no** live Ollama; shared fixtures; optional CI job with time budget. | Phase **15.3**; [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) testing rules. |
+| Clock / RNG not fully injected everywhere. | **Clock** + optional seeded RNG for TTL and idempotency tests. | Phase **15.3**. |
+
+**Priority:** **High** leverage — lowers cost of §14.7 and Phase **15.1** invariant tests.
+
+### 5. Domain semantics, policy, invariants — partially in code, not fully documented
+
+| Reality (main) | Improvement path | Roadmap / docs home |
+|----------------|------------------|---------------------|
+| Rules spread across services, prompts, and env; chart/safeguard behavior partially implicit. | **`docs/DOMAIN.md`** + small **policy** types + **invariant** helpers with unit tests **before** large package moves. | Phase **15.1**–**15.2**; PR template link in **15.1** exit criteria. |
+
+**Priority:** **Before** `application`/`domain`/`infra` reshuffle (Phase **15.2**).
+
+### 6. Deployment — shared host, not a platform runtime
+
+| Reality (main) | Improvement path | Roadmap / docs home |
+|----------------|------------------|---------------------|
+| No root; **`nohup` + PID** is the permanent fallback; `systemd --user` when it works. Process lifecycle is **ops scripts**, not Kubernetes-style orchestration. | Harden **deploy**, **readiness**, **graceful shutdown**, log rotation; document failure modes; avoid assuming `systemctl` in SSH sessions. | [OPERATIONS.md](OPERATIONS.md) **Deployment profiles**; [Infrastructure Notes](#infrastructure-notes); Phase **13.6** done; Decision Log **2026-04-07**. |
+| “Platform-grade” self-healing is **out of scope** unless hosting changes. | Revisit only if deployment environment changes (e.g. managed VM with guaranteed systemd). | Decision Log; not Phase 15 default. |
+
+**Priority:** **Reliability of the current path** over new orchestration layers.
+
+### Summary — where work lands
+
+| Theme | Primary roadmap anchor |
+|-------|-------------------------|
+| Shared key + future minimal AuthZ | §15.5, §15.1, SECURITY / OPERATIONS |
+| Single-instance SQLite + local vector | Appendix, OPERATIONS, Phase 13 risk triggers; future datastore = Decision Log |
+| RAG eval + thresholds + CI | **§14.7** (complete — CI + OPERATIONS + evaldata + metrics) |
+| Integration tests + injectable clock | §15.3 |
+| DOMAIN.md + policy + invariants | §15.1–15.2 |
+| Deploy / process lifecycle | Infrastructure Notes, OPERATIONS, Phase 13 closed slices |
 
 ---
 
@@ -115,7 +187,7 @@ Aligned with [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) and **referenc
 
 **Status:** **RAG-0 → RAG-3 complete** on main (tables above). **Next:** Phase 15.
 
-**Priority order (remaining):** **Phase 15**.
+**Priority order (remaining):** **§14.7** (RAG quality closure), then **Phase 15**.
 
 ### 14.5 Vision MVP (after retrieval exists) — **complete**
 
@@ -137,6 +209,23 @@ Aligned with [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) and **referenc
 - `[x]` **Retrieval evaluation** —Create a small evaluation set and regression process for retrieval precision, citation correctness, and no-hit behavior.
 - `[x]` **Quality gate before claims** —Do not describe the system as "RAG-ready" in README or PROJECT_STATUS until retrieval quality thresholds are documented and regression-tested.
 
+### 14.7 RAG quality closure (post-14.6) — **complete**
+
+**Goal:** Turn RAG-3 **building blocks** into a **closed operational loop**: regression signal, tunable thresholds, and documented ownership — without requiring Postgres or per-user AuthZ.
+
+Aligned with the RAG subsection in [Current reality and improvement map](#current-reality-and-improvement-map).
+
+| Track | Status | Exit |
+|-------|--------|------|
+| **Regression gate** | `[x]` | `tools/run_rag_eval.py` runs in **CI** (`.github/workflows/ci.yml` backend job); failure blocks merge. |
+| **Thresholds** | `[x]` | RAG knobs and no-hit behavior documented in [OPERATIONS.md](OPERATIONS.md) **RAG retrieval quality**; [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) §12 points to OPERATIONS + evaldata. |
+| **Golden set** | `[x]` | [evaldata/README.md](../evaldata/README.md) + `evaldata/VERSION`; linked from [README.md](../README.md) and this roadmap. |
+| **Observability** | `[x]` | `knowledge_retrieval_requests_total{retrieval_profile,outcome}` and `knowledge_query_rewrite_applied_total{retrieval_profile}` on `GET /api/system/metrics`. |
+
+**Dependencies:** §15.3 integration fixtures (optional but recommended) to avoid brittle pure-mock tests when tightening retrieval.
+
+**Explicit non-goals for 14.7:** Replace SQLite or `simple_local_v1` with Postgres/pgvector (that remains a **Decision Log** + capacity trigger, not part of 14.7).
+
 ---
 
 ## Phase 15: Industrial 9/10 —Priority 2 (Semantics, Then Structure)
@@ -144,7 +233,9 @@ Aligned with [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) and **referenc
 **Target release band:** **v1.6+** (may overlap **late v1.5.x** for low-risk doc-only items)  
 **Goal:** **Semantic convergence first, directory migration second**—policies and invariants stabilize meaning before `application/` vs `domain/` vs `infra/` reshaping. Phase 15 **consumes** the Phase 13 §13.0 **error model** (stable `code`, `request_id`, handlers); it **does not redefine** that contract—only uses it for policies, tests, and optional tracing.
 
-**Ordering principle (industrial default):** policy objects + invariants = **narrow, testable moves**; package reshuffle = **wide blast radius**. Do the former first.
+**Context:** [Current reality and improvement map](#current-reality-and-improvement-map) ties shared-key trust, single-instance storage, RAG loop, tests, deploy constraints, and Phase 15 slices.
+
+**Ordering principle (industrial default):** policy objects + invariants = **narrow, testable moves**; package reshuffle = **wide blast radius**. Do the former first. **§14.7** is complete; proceed with Phase **15** when ready—large AuthZ or datastore changes remain **Decision Log** items.
 
 ### 15.1 Domain semantics and policy objects (before big split)
 
@@ -203,7 +294,7 @@ This replaces the retired long-form `docs/RAG_ARCHITECTURE.md` (historical draft
 | Server OS | Linux typical (example: Ubuntu 24.04 + A100) | per operator |
 | Public URL | Example: `https://ai.simonbb.com/mingzhi/` | per deployment |
 | Port | 62606 (nginx proxy) | 62606 |
-| Process mgmt | `nohup` + PID file default on no-root hosts (required fallback) | Try `systemd --user` when D-Bus/session is available; **always** retain nohup/watchdog path for SSH/JupyterHub hosts where user systemd fails |
+| Process mgmt | `nohup` + PID file default on no-root hosts (required fallback); **not** platform-orchestrated (K8s-style) | Try `systemd --user` when D-Bus/session is available; **always** retain nohup/watchdog path for SSH/JupyterHub hosts where user systemd fails; see [§6](#6-deployment--shared-host-not-a-platform-runtime) in [Current reality and improvement map](#current-reality-and-improvement-map) |
 | Log files | `logs/fastapi.log` + user-space rotation script | same |
 | Node version | 24.14.1 (`.nvmrc`) | 24.x |
 | Python | 3.12.6 | 3.12.x |
@@ -233,3 +324,5 @@ This replaces the retired long-form `docs/RAG_ARCHITECTURE.md` (historical draft
 | 2026-04-08 | Phase 14.5 Vision MVP and 14.6 RAG-3 closed on main | Vision path shipped; RAG-3 adds rerank/rewrite protocols, `rag3_*` retrieval profiles, `tools/run_rag_eval.py` + `evaldata/` gate documented in README/PROJECT_STATUS. |
 | 2026-04-08 | Engineering standards: single canonical doc | Full rules live in `docs/ENGINEERING_STANDARDS.md`; `AGENTS.md` is a short index. `docs/PLAN.md` retired; content folded into this roadmap. `docs/RAG_ARCHITECTURE.md` retired; RAG snapshot lives in ROADMAP appendix. |
 | 2026-04-08 | Docs: multi-environment portability | README/OPERATIONS/ENGINEERING_STANDARDS clarify the repo is not limited to one school host; optional high-risk features (e.g. code sandbox) are policy-gated per **ENGINEERING_STANDARDS §15**. |
+| 2026-04-08 | ROADMAP: current reality map + §14.7 | Added **Current reality and improvement map** (shared API key, SQLite/local vector, RAG loop, tests, domain semantics, shared-host process model) with **Summary** table; added **§14.7 RAG quality closure** (CI eval, thresholds, golden-set process, observability); **Next** program order is **0 = §14.7**, **1 = Phase 15**. |
+| 2026-04-08 | Phase 14.7 implemented | CI runs `python tools/run_rag_eval.py`; `evaldata/README.md` + `VERSION`; OPERATIONS **RAG retrieval quality**; Prometheus `knowledge_retrieval_requests_total` / `knowledge_query_rewrite_applied_total`; ENGINEERING_STANDARDS §12 RAG bullet. |

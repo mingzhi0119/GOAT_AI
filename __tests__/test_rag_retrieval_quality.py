@@ -8,7 +8,15 @@ from goat_ai.config import load_settings
 from backend.services.knowledge_pipeline import KnowledgeSearchHit
 from backend.services.retrieval_quality.policy import resolve_query_rewrite_enabled, resolve_rerank_mode
 from backend.services.retrieval_quality.query_rewrite import conservative_rewrite_query
+from backend import prometheus_metrics
 from backend.services.retrieval_quality.rerank import lexical_rerank_hits
+from goat_ai.telemetry_counters import (
+    inc_knowledge_query_rewrite_applied,
+    inc_knowledge_retrieval,
+    reset_knowledge_retrieval_metrics_for_tests,
+    snapshot_knowledge_query_rewrite_applied,
+    snapshot_knowledge_retrieval,
+)
 
 
 class TestRagRetrievalQuality(unittest.TestCase):
@@ -51,6 +59,22 @@ class TestRagRetrievalQuality(unittest.TestCase):
         self.assertTrue(resolve_query_rewrite_enabled(retrieval_profile="rag3_quality"))
         self.assertFalse(resolve_query_rewrite_enabled(retrieval_profile="rag3_lexical"))
         self.assertFalse(resolve_query_rewrite_enabled(retrieval_profile="default"))
+
+    def test_knowledge_retrieval_metrics_exported(self) -> None:
+        reset_knowledge_retrieval_metrics_for_tests()
+        try:
+            inc_knowledge_retrieval(retrieval_profile="default", outcome="hit")
+            inc_knowledge_retrieval(retrieval_profile="rag3_quality", outcome="miss")
+            inc_knowledge_query_rewrite_applied(retrieval_profile="rag3_quality")
+            self.assertEqual(snapshot_knowledge_retrieval()[("default", "hit")], 1)
+            self.assertEqual(snapshot_knowledge_retrieval()[("rag3_quality", "miss")], 1)
+            self.assertEqual(snapshot_knowledge_query_rewrite_applied()["rag3_quality"], 1)
+            text = prometheus_metrics.render_prometheus_text()
+            self.assertIn("knowledge_retrieval_requests_total", text)
+            self.assertIn('retrieval_profile="default",outcome="hit"', text)
+            self.assertIn("knowledge_query_rewrite_applied_total", text)
+        finally:
+            reset_knowledge_retrieval_metrics_for_tests()
 
 
 if __name__ == "__main__":

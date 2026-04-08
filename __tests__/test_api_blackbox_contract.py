@@ -979,6 +979,8 @@ class ApiProtectedBlackboxContractTests(unittest.TestCase):
         self.assertIn("chat_stream_completed_total", text)
         self.assertIn("ollama_errors_total", text)
         self.assertIn("sqlite_log_write_failures_total", text)
+        self.assertIn("knowledge_retrieval_requests_total", text)
+        self.assertIn("knowledge_query_rewrite_applied_total", text)
 
     def test_rate_limit_contract_applies_after_threshold(self) -> None:
         headers = {"X-GOAT-API-Key": "secret-123"}

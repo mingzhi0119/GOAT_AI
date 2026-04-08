@@ -32,6 +32,8 @@ from backend.services.knowledge_pipeline import (
     persist_vector_index,
     search_vector_index,
 )
+from goat_ai.telemetry_counters import inc_knowledge_query_rewrite_applied, inc_knowledge_retrieval
+
 from backend.services.knowledge_repository import (
     KnowledgeChunkRow,
     KnowledgeDocumentRecord,
@@ -239,6 +241,13 @@ def search_knowledge(*, request: KnowledgeSearchRequest, settings: Settings) -> 
     )
     ranked = apply_rerank_hits(query=effective_query, mode=mode, hits=hits)
     effective_out: str | None = effective_query if effective_query != request.query else None
+    top = ranked[: request.top_k]
+    inc_knowledge_retrieval(
+        retrieval_profile=request.retrieval_profile,
+        outcome="hit" if top else "miss",
+    )
+    if rewrite_enabled and effective_out is not None:
+        inc_knowledge_query_rewrite_applied(retrieval_profile=request.retrieval_profile)
     return KnowledgeSearchResponse(
         query=request.query,
         effective_query=effective_out,
@@ -250,7 +259,7 @@ def search_knowledge(*, request: KnowledgeSearchRequest, settings: Settings) -> 
                 snippet=hit.snippet,
                 score=hit.score,
             )
-            for hit in ranked[: request.top_k]
+            for hit in top
         ],
     )
 
