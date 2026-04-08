@@ -39,6 +39,7 @@ interface Props {
   fileContext: FileContext | null
   onUploadEvent: (event: UploadStreamEvent) => void
   onSendMessage: (content: string, imageAttachmentIds?: string[]) => void
+  onSetFileContextMode: (mode: 'idle' | 'single' | 'persistent') => void
   onStop: () => void
   onClearFileContext: () => void
   gpuStatus: GPUStatus | null
@@ -84,6 +85,7 @@ const ChatWindow: FC<Props> = ({
   fileContext,
   onUploadEvent,
   onSendMessage,
+  onSetFileContextMode,
   onStop,
   onClearFileContext,
   gpuStatus,
@@ -326,6 +328,52 @@ const ChatWindow: FC<Props> = ({
                 >
                   <span className="font-medium">RAG</span>
                   <span className="max-w-[220px] truncate">{fileContext.filename}</span>
+                  <div className="inline-flex items-center rounded-full border overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => onSetFileContextMode('single')}
+                      className="px-2 py-0.5"
+                      style={{
+                        background:
+                          fileContext.bindingMode === 'single'
+                            ? 'rgba(255,205,0,0.24)'
+                            : 'transparent',
+                      }}
+                      title="Use this document for the next message only"
+                    >
+                      Next Turn
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onSetFileContextMode('persistent')}
+                      className="border-l px-2 py-0.5"
+                      style={{
+                        borderColor: 'rgba(255,205,0,0.24)',
+                        background:
+                          fileContext.bindingMode === 'persistent'
+                            ? 'rgba(255,205,0,0.24)'
+                            : 'transparent',
+                      }}
+                      title="Keep using this document until cleared"
+                    >
+                      Sticky
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onSetFileContextMode('idle')}
+                      className="border-l px-2 py-0.5"
+                      style={{
+                        borderColor: 'rgba(255,205,0,0.24)',
+                        background:
+                          fileContext.bindingMode === 'idle'
+                            ? 'rgba(255,205,0,0.18)'
+                            : 'transparent',
+                      }}
+                      title="Keep the document available but do not attach it automatically"
+                    >
+                      Inactive
+                    </button>
+                  </div>
                   <button
                     type="button"
                     onClick={onClearFileContext}

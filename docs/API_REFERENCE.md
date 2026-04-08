@@ -36,6 +36,7 @@ Base path: `/api`
 | `POST` | `/api/knowledge/search` | Search indexed knowledge chunks |
 | `POST` | `/api/knowledge/answers` | Retrieval-backed answer with citations |
 | `POST` | `/api/media/uploads` | Register a vision image attachment (PNG/JPEG/WebP) for `image_attachment_ids` on chat |
+| `GET` | `/api/artifacts/{artifact_id}` | Download one generated chat artifact |
 | `GET` | `/api/history` | List saved sessions |
 | `GET` | `/api/history/{session_id}` | Read one session |
 | `DELETE` | `/api/history` | Delete all sessions |
@@ -120,12 +121,13 @@ Request body:
 }
 ```
 
-Optional `knowledge_document_ids` binds the turn to already indexed knowledge documents and switches chat to retrieval-backed answering for those documents. Legacy `file_context: true` messages remain readable for old sessions but are no longer the primary upload path.
+Optional `knowledge_document_ids` binds the turn to already indexed knowledge documents and switches chat to retrieval-backed generation for those documents. Legacy `file_context: true` messages remain readable for old sessions but are no longer the primary upload path.
 
 SSE event types:
 
 - `token`
 - `chart_spec`
+- `artifact`
 - `error`
 - `done`
 
@@ -139,6 +141,12 @@ Chart frame:
 
 ```text
 data: {"type":"chart_spec","chart":{"version":"2.0","engine":"echarts","kind":"line"}}
+```
+
+Artifact frame:
+
+```text
+data: {"type":"artifact","artifact_id":"art-123","filename":"brief.md","mime_type":"text/markdown","byte_size":128,"download_url":"/api/artifacts/art-123","source_message_id":"session-123:assistant:0"}
 ```
 
 Error frame:
@@ -156,8 +164,10 @@ data: {"type":"done"}
 Notes:
 
 - If the selected model does not support native tools, chat remains text-only
+- Retrieval-backed chat reuses the normal chat streaming path; knowledge search builds bounded context for the model instead of streaming raw snippet dumps
 - Unsafe prompts are converted into a safe refusal instead of passing through the raw request
 - Unsafe model output is replaced server-side before streaming
+- Downloadable generated files are emitted as `artifact` events and must be fetched from the server-provided `download_url`
 - Optional `Idempotency-Key` is supported when `session_id` is present
 - Duplicate `Idempotency-Key` plus the same payload replays the same SSE body and avoids duplicate session/conversation writes
 - Reusing a key with a different payload returns `409` with `code = IDEMPOTENCY_CONFLICT`
@@ -285,6 +295,17 @@ Current behavior:
 - Returns `attachment_id`, `filename`, `mime_type`, `byte_size`, and optional `width_px` / `height_px`
 - Use the `attachment_id` values in `image_attachment_ids` on `POST /api/chat` when the model reports Ollama **vision** capability; otherwise the chat request may fail validation (`422`, `VISION_NOT_SUPPORTED`)
 
+## `GET /api/artifacts/{artifact_id}`
+
+Download one persisted generated file from chat.
+
+Current behavior:
+
+- Returns the exact stored file with `Content-Disposition: attachment`
+- Requires the same API key protection as the rest of `/api`
+- When session-owner scoping is enabled, download access is limited to the matching owner scope
+- Missing artifacts return `404`
+
 ## `GET /api/history`
 
 Returns session metadata list:
@@ -296,7 +317,7 @@ Returns session metadata list:
       "id": "session-123",
       "title": "Porter analysis",
       "model": "gemma4:26b",
-      "schema_version": 3,
+      "schema_version": 4,
       "created_at": "2026-04-07T14:00:00+00:00",
       "updated_at": "2026-04-07T14:01:30+00:00"
     }
@@ -313,7 +334,7 @@ Returns one normalized stored session:
   "id": "session-123",
   "title": "Porter analysis",
   "model": "gemma4:26b",
-  "schema_version": 3,
+  "schema_version": 4,
   "created_at": "2026-04-07T14:00:00+00:00",
   "updated_at": "2026-04-07T14:01:30+00:00",
   "chart_data_source": "uploaded",
@@ -329,8 +350,21 @@ Returns one normalized stored session:
     "prompt": "[User uploaded tabular data for analysis] ..."
   },
   "messages": [
-    { "role": "user", "content": "Explain Porter." },
-    { "role": "assistant", "content": "..." }
+    { "role": "user", "content": "Explain Porter.", "artifacts": [] },
+    {
+      "role": "assistant",
+      "content": "...",
+      "artifacts": [
+        {
+          "artifact_id": "art-123",
+          "filename": "brief.md",
+          "mime_type": "text/markdown",
+          "byte_size": 128,
+          "download_url": "/api/artifacts/art-123",
+          "source_message_id": "session-123:assistant:0"
+        }
+      ]
+    }
   ]
 }
 ```

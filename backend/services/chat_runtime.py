@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+from backend.services.artifact_service import PersistedArtifactRecord
 from backend.services import log_service
 from backend.services.session_message_codec import decode_session_payload
 from goat_ai.ollama_client import LLMClient
@@ -74,6 +75,10 @@ class SessionRepository(Protocol):
     def delete_session(self, session_id: str) -> None: ...
 
     def delete_all_sessions(self, owner_filter: str | None = None) -> None: ...
+
+    def create_chat_artifact(self, record: PersistedArtifactRecord) -> None: ...
+
+    def get_chat_artifact(self, artifact_id: str) -> PersistedArtifactRecord | None: ...
 
 
 class ConversationLogger(Protocol):
@@ -153,6 +158,36 @@ class SQLiteSessionRepository:
 
     def delete_all_sessions(self, owner_filter: str | None = None) -> None:
         log_service.delete_all_sessions(db_path=self._db_path, owner_filter=owner_filter)
+
+    def create_chat_artifact(self, record: PersistedArtifactRecord) -> None:
+        log_service.create_chat_artifact(
+            db_path=self._db_path,
+            artifact_id=record.id,
+            session_id=record.session_id,
+            owner_id=record.owner_id,
+            filename=record.filename,
+            mime_type=record.mime_type,
+            byte_size=record.byte_size,
+            storage_path=record.storage_path,
+            source_message_index=record.source_message_index,
+            created_at=record.created_at,
+        )
+
+    def get_chat_artifact(self, artifact_id: str) -> PersistedArtifactRecord | None:
+        row = log_service.get_chat_artifact(db_path=self._db_path, artifact_id=artifact_id)
+        if row is None:
+            return None
+        return PersistedArtifactRecord(
+            id=str(row["id"]),
+            session_id=str(row["session_id"]),
+            owner_id=str(row.get("owner_id", "")),
+            filename=str(row["filename"]),
+            mime_type=str(row["mime_type"]),
+            byte_size=int(row["byte_size"]),
+            storage_path=str(row["storage_path"]),
+            source_message_index=int(row.get("source_message_index", 0)),
+            created_at=str(row["created_at"]),
+        )
 
 
 class SQLiteConversationLogger:

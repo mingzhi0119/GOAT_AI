@@ -7,9 +7,28 @@ export interface StreamChatOptions {
 
 function isChatStreamEvent(payload: unknown): payload is ChatStreamEvent {
   if (typeof payload !== 'object' || payload === null) return false
-  const event = payload as { type?: string; token?: unknown; chart?: unknown; message?: unknown }
+  const event = payload as {
+    type?: string
+    token?: unknown
+    chart?: unknown
+    message?: unknown
+    artifact_id?: unknown
+    filename?: unknown
+    mime_type?: unknown
+    byte_size?: unknown
+    download_url?: unknown
+  }
   if (event.type === 'token') return typeof event.token === 'string'
   if (event.type === 'chart_spec') return !!event.chart && typeof event.chart === 'object'
+  if (event.type === 'artifact') {
+    return (
+      typeof event.artifact_id === 'string' &&
+      typeof event.filename === 'string' &&
+      typeof event.mime_type === 'string' &&
+      typeof event.byte_size === 'number' &&
+      typeof event.download_url === 'string'
+    )
+  }
   if (event.type === 'done') return true
   if (event.type === 'error') return typeof event.message === 'string'
   return false
@@ -37,7 +56,7 @@ function* parseSSELines(lines: string[]): Generator<ChatStreamEvent> {
   }
 }
 
-/** Stream a chat completion as typed token/chart/error/done events. */
+/** Stream a chat completion as typed token/chart/artifact/error/done events. */
 export async function* streamChat(
   req: ChatRequest,
   options?: StreamChatOptions,

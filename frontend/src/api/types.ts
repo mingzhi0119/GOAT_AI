@@ -11,6 +11,7 @@ export interface HistorySessionMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
   image_attachment_ids?: string[]
+  artifacts?: ChatArtifact[]
 }
 
 export interface ChatRequest {
@@ -90,6 +91,20 @@ export interface ChatChartStreamEvent {
   chart: ChartSpec
 }
 
+export interface ChatArtifact {
+  artifact_id: string
+  filename: string
+  mime_type: string
+  byte_size: number
+  download_url: string
+  label?: string
+  source_message_id?: string
+}
+
+export interface ChatArtifactStreamEvent extends ChatArtifact {
+  type: 'artifact'
+}
+
 export interface ChatDoneStreamEvent {
   type: 'done'
 }
@@ -103,6 +118,7 @@ export interface ChatErrorStreamEvent {
 export type ChatStreamEvent =
   | ChatTokenStreamEvent
   | ChatChartStreamEvent
+  | ChatArtifactStreamEvent
   | ChatDoneStreamEvent
   | ChatErrorStreamEvent
 
@@ -111,6 +127,7 @@ export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+  artifacts?: ChatArtifact[]
   /** Set when this user turn included vision image attachments (for UI hints). */
   image_attachment_ids?: string[]
   /** Mirrors API `file_context` when sending hidden upload context to the backend. */

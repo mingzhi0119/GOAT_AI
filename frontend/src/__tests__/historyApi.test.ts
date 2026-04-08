@@ -30,7 +30,21 @@ describe('history api', () => {
         chart_spec: { version: '2.0', engine: 'echarts' },
         file_context: { prompt: 'prompt' },
         knowledge_documents: [{ document_id: 'doc-1', filename: 'strategy.pdf', mime_type: 'application/pdf' }],
-        messages: [{ role: 'user', content: 'hi' }],
+        messages: [
+          {
+            role: 'assistant',
+            content: 'hi',
+            artifacts: [
+              {
+                artifact_id: 'art-1',
+                filename: 'brief.md',
+                mime_type: 'text/markdown',
+                byte_size: 128,
+                download_url: '/api/artifacts/art-1',
+              },
+            ],
+          },
+        ],
       }),
     })
     vi.stubGlobal('fetch', mockedFetch)
@@ -41,6 +55,15 @@ describe('history api', () => {
     expect(detail.file_context).toEqual({ prompt: 'prompt' })
     expect(detail.knowledge_documents).toEqual([
       { document_id: 'doc-1', filename: 'strategy.pdf', mime_type: 'application/pdf' },
+    ])
+    expect(detail.messages[0]?.artifacts).toEqual([
+      {
+        artifact_id: 'art-1',
+        filename: 'brief.md',
+        mime_type: 'text/markdown',
+        byte_size: 128,
+        download_url: '/api/artifacts/art-1',
+      },
     ])
     expect(mockedFetch).toHaveBeenCalledWith('./api/history/s1')
   })

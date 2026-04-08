@@ -15,6 +15,7 @@ except ImportError:  # pragma: no cover - environment without backend deps
 
 from backend.api_errors import (
     AUTH_INVALID_API_KEY,
+    ARTIFACT_NOT_FOUND,
     BAD_REQUEST,
     FEATURE_UNAVAILABLE,
     INFERENCE_BACKEND_UNAVAILABLE,
@@ -36,6 +37,7 @@ if TestClient is not None:
     from backend.main import create_app
     from backend.models.system import GPUStatusResponse
     from backend.services import log_service
+    from backend.services.session_message_codec import SESSION_PAYLOAD_VERSION
     from backend.services.safeguard_service import (
         SAFEGUARD_BLOCKED_TITLE,
         SAFEGUARD_REFUSAL_MESSAGE,
@@ -91,6 +93,23 @@ class ContractFakeLLM:
         if last_user_images_base64:
             yield "Vision"
             yield "OK"
+            return
+        last_user = ""
+        for message in reversed(messages):
+            if message.get("role") == "user":
+                last_user = str(message.get("content", ""))
+                break
+        if "Retrieved knowledge context:" in system_prompt:
+            if "competitive pressure" in system_prompt:
+                yield "The strategy note says "
+                yield "Porter Five Forces explains competitive pressure."
+                return
+            yield "I could not find evidence "
+            yield "in the attached document for that question."
+            return
+        if "downloadable file" in last_user.lower():
+            yield "I prepared [brief.md](brief.md) "
+            yield "for download."
             return
         yield "Hello"
         yield " from"
@@ -370,14 +389,20 @@ class ApiBlackboxContractTests(unittest.TestCase):
         history_detail = self.client.get("/api/history/chat-1")
         self.assertEqual(200, history_detail.status_code)
         self.assertEqual("Generated session title", history_detail.json()["title"])
-        self.assertEqual(3, history_detail.json()["schema_version"])
+        self.assertEqual(SESSION_PAYLOAD_VERSION, history_detail.json()["schema_version"])
         self.assertEqual(
             [
-                {"role": "user", "content": "Hello there", "image_attachment_ids": []},
+                {
+                    "role": "user",
+                    "content": "Hello there",
+                    "image_attachment_ids": [],
+                    "artifacts": [],
+                },
                 {
                     "role": "assistant",
                     "content": "Hello from GOAT",
                     "image_attachment_ids": [],
+                    "artifacts": [],
                 },
             ],
             history_detail.json()["messages"],
@@ -722,12 +747,12 @@ class ApiBlackboxContractTests(unittest.TestCase):
         rag_text = "".join(
             event["token"] for event in rag_events if event["type"] == "token"
         )
-        self.assertIn("strategy.txt", rag_text)
-        self.assertIn("Porter Five Forces", rag_text)
+        self.assertNotIn("Relevant retrieved context:", rag_text)
+        self.assertIn("competitive pressure", rag_text)
 
         rag_history = self.client.get("/api/history/rag-chat-1")
         self.assertEqual(200, rag_history.status_code)
-        self.assertEqual(3, rag_history.json()["schema_version"])
+        self.assertEqual(SESSION_PAYLOAD_VERSION, rag_history.json()["schema_version"])
         self.assertEqual(
             [
                 {
@@ -738,6 +763,52 @@ class ApiBlackboxContractTests(unittest.TestCase):
             ],
             rag_history.json()["knowledge_documents"],
         )
+
+    def test_chat_artifact_event_and_download_route(self) -> None:
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "model": "blackbox-model",
+                "session_id": "artifact-1",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Create a downloadable file with a short brief.",
+                    }
+                ],
+            },
+        )
+
+        self.assertEqual(200, response.status_code)
+        events = parse_sse_payloads(response.text)
+        artifact_event = next(
+            event for event in events if event.get("type") == "artifact"
+        )
+        self.assertEqual("brief.md", artifact_event["filename"])
+        download = self.client.get(artifact_event["download_url"])
+        self.assertEqual(200, download.status_code)
+        self.assertEqual(
+            'attachment; filename="brief.md"',
+            download.headers["content-disposition"],
+        )
+        self.assertIn("prepared", download.text)
+
+        history_detail = self.client.get("/api/history/artifact-1")
+        self.assertEqual(200, history_detail.status_code)
+        assistant_messages = [
+            message
+            for message in history_detail.json()["messages"]
+            if message["role"] == "assistant"
+        ]
+        self.assertEqual(1, len(assistant_messages))
+        self.assertEqual(
+            "brief.md",
+            assistant_messages[0]["artifacts"][0]["filename"],
+        )
+
+        missing = self.client.get("/api/artifacts/art-missing")
+        self.assertEqual(404, missing.status_code)
+        self.assertEqual(ARTIFACT_NOT_FOUND, missing.json()["code"])
 
     def test_history_endpoints_cover_empty_missing_delete_and_delete_all(self) -> None:
         empty_list = self.client.get("/api/history")
@@ -763,7 +834,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         listed = self.client.get("/api/history")
         self.assertEqual(2, len(listed.json()["sessions"]))
         for item in listed.json()["sessions"]:
-            self.assertEqual(3, item["schema_version"])
+            self.assertEqual(SESSION_PAYLOAD_VERSION, item["schema_version"])
 
         delete_one = self.client.delete("/api/history/hist-a")
         self.assertEqual(204, delete_one.status_code)
@@ -797,11 +868,13 @@ class ApiBlackboxContractTests(unittest.TestCase):
                     "role": "user",
                     "content": "Hello idempotent chat",
                     "image_attachment_ids": [],
+                    "artifacts": [],
                 },
                 {
                     "role": "assistant",
                     "content": "Hello from GOAT",
                     "image_attachment_ids": [],
+                    "artifacts": [],
                 },
             ],
             detail.json()["messages"],

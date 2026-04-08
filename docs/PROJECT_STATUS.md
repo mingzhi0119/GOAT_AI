@@ -91,7 +91,8 @@ Last updated: 2026-04-09
 - `/api/chat` streams typed JSON SSE objects, not legacy string sentinels
 - `/api/upload` now emits `knowledge_ready` then `done`; it ingests the file into the knowledge subsystem instead of returning prompt-injection `file_context`
 - `/api/upload/analyze` now returns `document_id`, `ingestion_id`, `status`, and `retrieval_mode`; `chart: null` remains only for backward compatibility
-- `/api/chat` accepts `knowledge_document_ids` and uses retrieval-backed answering when indexed documents are attached
+- `/api/chat` accepts `knowledge_document_ids` and uses retrieval-backed generation when indexed documents are attached
+- Chat can emit persisted downloadable artifacts over SSE and serve them from `GET /api/artifacts/{artifact_id}`
 - `/api/knowledge/*` routes now support persisted upload, synchronous ingestion, retrieval, retrieval-backed answers, and attached-document fallback when lexical retrieval misses
 - `/api/health` is liveness only; `/api/ready` is the deploy/readiness probe and returns `503` when SQLite or the optional Ollama probe is not ready
 - History reads are normalized at the backend boundary: `/api/history/{id}` returns standard chat roles plus structured `chart_spec`, legacy `file_context`, and `knowledge_documents`, while legacy stored payloads remain readable through a dedicated compatibility codec

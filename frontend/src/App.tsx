@@ -136,6 +136,7 @@ export default function App() {
             onSendMessage={(content, imageIds) => {
               void session.sendMessage(content, imageIds)
             }}
+            onSetFileContextMode={session.setFileContextBindingMode}
             onStop={session.stopStreaming}
             onClearFileContext={session.clearFileContextSession}
             gpuStatus={gpu.status}

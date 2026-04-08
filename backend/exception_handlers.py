@@ -15,6 +15,7 @@ from backend.api_errors import (
     FEATURE_UNAVAILABLE,
     INFERENCE_BACKEND_UNAVAILABLE,
     KNOWLEDGE_NOT_FOUND,
+    ARTIFACT_NOT_FOUND,
     MEDIA_NOT_FOUND,
     VISION_NOT_SUPPORTED,
     build_error_body,
@@ -22,6 +23,7 @@ from backend.api_errors import (
 )
 from backend.application.ports import (
     FeatureNotAvailable,
+    ArtifactNotFound,
     InferenceBackendUnavailable,
     KnowledgeDocumentNotFound,
     MediaNotFound,
@@ -92,6 +94,19 @@ def register_exception_handlers(app: FastAPI) -> None:
                 content=build_error_body(
                     detail=str(exc),
                     code=MEDIA_NOT_FOUND,
+                    status_code=404,
+                ),
+            ),
+        )
+
+    @app.exception_handler(ArtifactNotFound)
+    def _artifact_not_found(_request: Request, exc: ArtifactNotFound) -> JSONResponse:
+        return _attach_request_id(
+            JSONResponse(
+                status_code=404,
+                content=build_error_body(
+                    detail=str(exc),
+                    code=ARTIFACT_NOT_FOUND,
                     status_code=404,
                 ),
             ),

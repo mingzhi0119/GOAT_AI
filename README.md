@@ -64,6 +64,7 @@ Core API surface:
 - `GET /api/knowledge/ingestions/{ingestion_id}`
 - `POST /api/knowledge/search`
 - `POST /api/knowledge/answers`
+- `GET /api/artifacts/{artifact_id}`
 - `GET /api/history`
 - `GET /api/history/{session_id}`
 - `DELETE /api/history`
@@ -76,7 +77,7 @@ Core API surface:
 
 ## Current behavior
 
-- Chat streams typed SSE event objects: `token`, `chart_spec`, `error`, `done`
+- Chat streams typed SSE event objects: `token`, `chart_spec`, `artifact`, `error`, `done`
 - Upload SSE ingests supported files into the knowledge pipeline and emits `knowledge_ready`, `error`, `done`
 - Charts are created only from native Ollama tool calls during chat
 - Session history is persisted in SQLite and can restore chart state plus attached knowledge documents
@@ -86,7 +87,8 @@ Core API surface:
 - Prometheus-style metrics are exposed at `GET /api/system/metrics`
 - Idempotent retries are supported for `POST /api/upload/analyze` and chat session append requests (`POST /api/chat` with `session_id`)
 - Shared-host operations now include documented graceful shutdown, rollback, backup/restore, and post-deploy checks
-- RAG-0 is complete, and the first RAG-1/2 slice is live: `csv/xlsx` uploads now route through real ingestion/search/answer, `pdf/docx/md/txt` normalize into the same knowledge pipeline, and chat can use `knowledge_document_ids` for retrieval-backed replies
+- RAG-0 is complete, and the first RAG-1/2 slice is live: `csv/xlsx` uploads now route through real ingestion/search/answer, `pdf/docx/md/txt` normalize into the same knowledge pipeline, and chat can use `knowledge_document_ids` for retrieval-backed generation instead of raw snippet dumps
+- Generated non-executed chat files now download through persisted artifact ids under `/api/artifacts/{artifact_id}`
 - **RAG-ready gate:** the product may be described as **RAG-ready** only when `python -m tools.run_rag_eval` exits 0 (checked-in `evaldata/rag_eval_cases.jsonl`; see [evaldata/README.md](evaldata/README.md)) and retrieval quality notes in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) stay aligned with that runner. CI runs the same command on every backend build.
 
 ## Quick Start

@@ -31,6 +31,7 @@ export function hydrateHistorySession(session: HistorySessionDetail): Message[] 
       id: crypto.randomUUID(),
       role: message.role,
       content: message.content,
+      ...(message.artifacts && message.artifacts.length > 0 ? { artifacts: message.artifacts } : {}),
       ...(ids && ids.length > 0 ? { image_attachment_ids: ids } : {}),
     })
   }
@@ -47,5 +48,6 @@ export function historyKnowledgeAttachment(session: HistorySessionDetail): FileC
     filename: firstKnowledgeDocument.filename,
     documentId: firstKnowledgeDocument.document_id,
     retrievalMode: 'knowledge_rag',
+    bindingMode: 'idle',
   }
 }

@@ -176,6 +176,17 @@ def _response_schema(operation: dict[str, Any], status_code: str) -> Any:
                 "stream": [
                     {"token": {"type": "token", "token": "string"}},
                     {"chart_spec": "ChartSpec"},
+                    {
+                        "artifact": {
+                            "type": "artifact",
+                            "artifact_id": "string",
+                            "filename": "string",
+                            "mime_type": "string",
+                            "byte_size": "integer",
+                            "download_url": "string",
+                            "source_message_id": "string|null",
+                        }
+                    },
                     {"done": {"type": "done"}},
                     {"error_frame": {"type": "error", "message": "string"}},
                 ],

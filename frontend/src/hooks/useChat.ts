@@ -62,6 +62,15 @@ function useStreamIntoMessage() {
             setMsgs(prev =>
               prev.map(m => (m.id === msgId ? { ...m, content: m.content + event.token } : m)),
             )
+          } else if (event.type === 'artifact') {
+            const { type: _type, ...artifact } = event
+            setMsgs(prev =>
+              prev.map(m =>
+                m.id === msgId
+                  ? { ...m, artifacts: [...(m.artifacts ?? []), artifact] }
+                  : m,
+              ),
+            )
           } else if (event.type === 'chart_spec') {
             onChartSpec?.(event.chart)
           } else if (event.type === 'error') {
@@ -134,7 +143,7 @@ export function useChat(): UseChatReturn {
       const asstId = crypto.randomUUID()
       setMessages(prev => [
         ...(prependMessages ?? prev),
-        { id: asstId, role: 'assistant', content: '', isStreaming: true },
+        { id: asstId, role: 'assistant', content: '', isStreaming: true, artifacts: [] },
       ])
       setIsStreaming(true)
       await _runStream(gen, asstId, setMessages, setIsStreaming, onChartSpec)

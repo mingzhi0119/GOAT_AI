@@ -45,6 +45,9 @@ def _payload_visible_messages(payload: dict[str, Any]) -> list[dict[str, Any]]:
                     ids.append(x.strip())
             if ids:
                 row["image_attachment_ids"] = ids
+        raw_artifacts = item.get("artifacts")
+        if isinstance(raw_artifacts, list) and raw_artifacts:
+            row["artifacts"] = raw_artifacts
         out.append(row)
     return out
 
@@ -78,12 +81,17 @@ def _replace_session_messages(
             if msg.get("image_attachment_ids")
             else None
         )
+        artifacts_json = (
+            json.dumps(msg["artifacts"], ensure_ascii=False)
+            if msg.get("artifacts")
+            else None
+        )
         conn.execute(
             """
-            INSERT INTO session_messages (session_id, seq, role, content, image_attachment_ids, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO session_messages (session_id, seq, role, content, image_attachment_ids, artifacts_json, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (session_id, seq, msg["role"], msg["content"], ids_json, now),
+            (session_id, seq, msg["role"], msg["content"], ids_json, artifacts_json, now),
         )
 
 
@@ -93,7 +101,7 @@ def _fetch_session_messages_list(conn: sqlite3.Connection, session_id: str) -> l
         return None
     rows = conn.execute(
         """
-        SELECT role, content, image_attachment_ids
+        SELECT role, content, image_attachment_ids, artifacts_json
         FROM session_messages
         WHERE session_id = ?
         ORDER BY seq ASC
@@ -103,7 +111,7 @@ def _fetch_session_messages_list(conn: sqlite3.Connection, session_id: str) -> l
     if not rows:
         return None
     out: list[dict[str, Any]] = []
-    for role, content, ids_raw in rows:
+    for role, content, ids_raw, artifacts_raw in rows:
         item: dict[str, Any] = {"role": str(role), "content": str(content)}
         if isinstance(ids_raw, str) and ids_raw.strip():
             try:
@@ -112,8 +120,22 @@ def _fetch_session_messages_list(conn: sqlite3.Connection, session_id: str) -> l
                 parsed = None
             if isinstance(parsed, list) and parsed:
                 item["image_attachment_ids"] = parsed
+        if isinstance(artifacts_raw, str) and artifacts_raw.strip():
+            try:
+                parsed_artifacts = json.loads(artifacts_raw)
+            except json.JSONDecodeError:
+                parsed_artifacts = None
+            if isinstance(parsed_artifacts, list) and parsed_artifacts:
+                item["artifacts"] = parsed_artifacts
         out.append(item)
     return out
+
+
+def _chat_artifacts_table_exists(conn: sqlite3.Connection) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='chat_artifacts'",
+    ).fetchone()
+    return row is not None
 
 
 def _merge_session_messages_into_item(
@@ -350,6 +372,8 @@ def delete_session(*, db_path: Path, session_id: str) -> None:
         with sqlite3.connect(db_path) as conn:
             if _session_messages_table_exists(conn):
                 conn.execute("DELETE FROM session_messages WHERE session_id = ?", (session_id,))
+            if _chat_artifacts_table_exists(conn):
+                conn.execute("DELETE FROM chat_artifacts WHERE session_id = ?", (session_id,))
             conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
     except Exception:
         inc_sqlite_log_write_failure(operation="session_delete", code=_SQLITE_WRITE_METRIC_CODE)
@@ -382,10 +406,14 @@ def delete_all_sessions(*, db_path: Path, owner_filter: str | None = None) -> No
                 if _session_messages_table_exists(conn):
                     for sid in ids:
                         conn.execute("DELETE FROM session_messages WHERE session_id = ?", (sid,))
+                if _chat_artifacts_table_exists(conn):
+                    conn.execute("DELETE FROM chat_artifacts WHERE owner_id = ?", (owner_filter,))
                 conn.execute("DELETE FROM sessions WHERE owner_id = ?", (owner_filter,))
             else:
                 if _session_messages_table_exists(conn):
                     conn.execute("DELETE FROM session_messages")
+                if _chat_artifacts_table_exists(conn):
+                    conn.execute("DELETE FROM chat_artifacts")
                 conn.execute("DELETE FROM sessions")
     except Exception:
         inc_sqlite_log_write_failure(operation="session_delete_all", code=_SQLITE_WRITE_METRIC_CODE)
@@ -400,3 +428,72 @@ def delete_all_sessions(*, db_path: Path, owner_filter: str | None = None) -> No
             },
             exc_info=True,
         )
+
+
+def create_chat_artifact(
+    *,
+    db_path: Path,
+    artifact_id: str,
+    session_id: str,
+    owner_id: str,
+    filename: str,
+    mime_type: str,
+    byte_size: int,
+    storage_path: str,
+    source_message_index: int,
+    created_at: str,
+) -> None:
+    """Persist one generated chat artifact."""
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO chat_artifacts
+                    (id, session_id, owner_id, filename, mime_type, byte_size, storage_path, source_message_index, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    artifact_id,
+                    session_id,
+                    owner_id,
+                    filename,
+                    mime_type,
+                    int(byte_size),
+                    storage_path,
+                    int(source_message_index),
+                    created_at,
+                ),
+            )
+    except Exception:
+        inc_sqlite_log_write_failure(operation="chat_artifact_create", code=_SQLITE_WRITE_METRIC_CODE)
+        logger.error(
+            "Failed to persist chat artifact in SQLite",
+            extra={
+                "event": "sqlite_log_write_failure",
+                "component": "log_service.create_chat_artifact",
+                "operation": "chat_artifact_create",
+                "code": _SQLITE_WRITE_METRIC_CODE,
+                "db_path": str(db_path),
+                "artifact_id": artifact_id,
+            },
+            exc_info=True,
+        )
+
+
+def get_chat_artifact(*, db_path: Path, artifact_id: str) -> dict[str, Any] | None:
+    """Return one persisted chat artifact metadata row."""
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                """
+                SELECT id, session_id, owner_id, filename, mime_type, byte_size, storage_path, source_message_index, created_at
+                FROM chat_artifacts
+                WHERE id = ?
+                """,
+                (artifact_id,),
+            ).fetchone()
+        return dict(row) if row is not None else None
+    except Exception:
+        logger.exception("Failed to fetch chat artifact %s from %s", artifact_id, db_path)
+        return None

@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from backend.models.artifact import ChatArtifact
+
 
 class HistorySessionMessage(BaseModel):
     """Stored message row for persisted session history."""
@@ -12,6 +14,10 @@ class HistorySessionMessage(BaseModel):
     image_attachment_ids: list[str] = Field(
         default_factory=list,
         description="Vision image attachment ids stored for this user turn.",
+    )
+    artifacts: list[ChatArtifact] = Field(
+        default_factory=list,
+        description="Downloadable generated files associated with this assistant turn.",
     )
 
 

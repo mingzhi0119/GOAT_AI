@@ -31,6 +31,10 @@ class MediaValidationError(Exception):
     """Raised when an uploaded image fails format, size, or normalization checks."""
 
 
+class ArtifactNotFound(Exception):
+    """Raised when a requested generated chat artifact does not exist."""
+
+
 class VisionNotSupported(Exception):
     """Raised when the selected model lacks Ollama-reported vision capability."""
 

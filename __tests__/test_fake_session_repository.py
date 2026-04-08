@@ -5,6 +5,7 @@ import unittest
 from datetime import datetime, timezone
 
 from backend.models.chat import ChatMessage
+from backend.services.artifact_service import PersistedArtifactRecord
 from backend.services.chat_runtime import (
     SessionDetailRecord,
     SessionRepository,
@@ -23,6 +24,7 @@ class InMemorySessionRepository:
 
     def __init__(self) -> None:
         self._rows: dict[str, dict[str, object]] = {}
+        self._artifacts: dict[str, PersistedArtifactRecord] = {}
 
     def list_sessions(self, owner_filter: str | None = None) -> list[SessionSummaryRecord]:
         out: list[SessionSummaryRecord] = []
@@ -85,6 +87,12 @@ class InMemorySessionRepository:
             return
         for sid in [k for k, row in self._rows.items() if str(row.get("owner_id", "")) == owner_filter]:
             del self._rows[sid]
+
+    def create_chat_artifact(self, record: PersistedArtifactRecord) -> None:
+        self._artifacts[record.id] = record
+
+    def get_chat_artifact(self, artifact_id: str) -> PersistedArtifactRecord | None:
+        return self._artifacts.get(artifact_id)
 
 
 class TestFakeSessionRepository(unittest.TestCase):

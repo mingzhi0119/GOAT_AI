@@ -6,6 +6,7 @@ from backend.services.chat_runtime import ConversationLogger, SessionRepository,
 from backend.services.exceptions import (  # noqa: F401
     FeatureNotAvailable,
     InferenceBackendUnavailable,
+    ArtifactNotFound,
     KnowledgeDocumentNotFound,
     KnowledgeValidationError,
     MediaNotFound,
@@ -19,6 +20,7 @@ from backend.types import LLMClient, OllamaUnavailable, Settings  # noqa: F401
 __all__ = [
     "ChatCapacityError",
     "ConversationLogger",
+    "ArtifactNotFound",
     "FeatureNotAvailable",
     "InferenceBackendUnavailable",
     "KnowledgeDocumentNotFound",

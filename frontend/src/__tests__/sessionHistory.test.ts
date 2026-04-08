@@ -14,7 +14,19 @@ describe('session history utils', () => {
       chart_spec: null,
       messages: [
         { role: 'user', content: 'Please chart revenue.' },
-        { role: 'assistant', content: 'Done.' },
+        {
+          role: 'assistant',
+          content: 'Done.',
+          artifacts: [
+            {
+              artifact_id: 'art-1',
+              filename: 'brief.md',
+              mime_type: 'text/markdown',
+              byte_size: 128,
+              download_url: '/api/artifacts/art-1',
+            },
+          ],
+        },
       ],
     })
 
@@ -26,6 +38,10 @@ describe('session history utils', () => {
       hidden: true,
     })
     expect(messages[2]).toMatchObject({ role: 'user', content: 'Please chart revenue.' })
-    expect(messages[3]).toMatchObject({ role: 'assistant', content: 'Done.' })
+    expect(messages[3]).toMatchObject({
+      role: 'assistant',
+      content: 'Done.',
+      artifacts: [{ artifact_id: 'art-1', filename: 'brief.md' }],
+    })
   })
 })

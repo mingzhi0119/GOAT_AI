@@ -9,4 +9,28 @@ describe('MessageBubble', () => {
     )
     expect(screen.getByText('Hello from user')).toBeInTheDocument()
   })
+
+  it('renders artifact download card and resolves matching markdown links', () => {
+    render(
+      <MessageBubble
+        message={{
+          id: 'm2',
+          role: 'assistant',
+          content: '[brief.md](brief.md)',
+          artifacts: [
+            {
+              artifact_id: 'art-1',
+              filename: 'brief.md',
+              mime_type: 'text/markdown',
+              byte_size: 128,
+              download_url: '/api/artifacts/art-1',
+            },
+          ],
+        }}
+      />,
+    )
+    const link = screen.getAllByRole('link', { name: /brief\.md/i })[0]
+    expect(link).toHaveAttribute('href', '/api/artifacts/art-1')
+    expect(screen.getByText('128 B')).toBeInTheDocument()
+  })
 })

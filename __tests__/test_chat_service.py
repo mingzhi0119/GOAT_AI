@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from backend.models.chat import ChatMessage
 from backend.services.chat_runtime import SessionDetailRecord, SessionUpsertPayload
 from backend.services.session_message_codec import decode_session_payload
+from backend.services.session_message_codec import SESSION_PAYLOAD_VERSION
 from backend.services.session_message_codec import (
     FILE_CONTEXT_REPLY,
     STORED_CHART_ROLE,
@@ -53,6 +54,12 @@ class FakeSessionRepository:
     def delete_all_sessions(self, owner_filter: str | None = None) -> None:
         self.sessions.clear()
 
+    def create_chat_artifact(self, record) -> None:
+        return None
+
+    def get_chat_artifact(self, artifact_id: str):
+        return None
+
 
 class FakeTitleGenerator:
     def __init__(self, title: str | None) -> None:
@@ -95,7 +102,7 @@ class ChatServiceTitleTests(unittest.TestCase):
                     id="sid-2",
                     title="Kept title",
                     model="m",
-                    schema_version=3,
+                    schema_version=SESSION_PAYLOAD_VERSION,
                     created_at="2026-01-01T00:00:00+00:00",
                     updated_at="2026-01-01T00:00:01+00:00",
                     owner_id="",
@@ -163,7 +170,7 @@ class ChatServiceTitleTests(unittest.TestCase):
         self.assertEqual("Done.", stored.messages[1]["content"])
         self.assertIsNotNone(stored.file_context_prompt)
         self.assertEqual("uploaded", stored.chart_data_source)
-        self.assertEqual(3, stored.schema_version)
+        self.assertEqual(SESSION_PAYLOAD_VERSION, stored.schema_version)
 
     def test_decode_session_payload_keeps_legacy_storage_compatible(self) -> None:
         decoded = decode_session_payload(

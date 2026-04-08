@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -46,6 +47,16 @@ from backend.types import AsyncUploadReader, Settings
 
 _VECTOR_BACKEND = "simple_local_v1"
 _MAX_READ_BYTES = 25 * 1024 * 1024
+_CHAT_CONTEXT_SNIPPET_CHARS = 900
+_CHAT_CONTEXT_TOTAL_CHARS = 5000
+
+
+@dataclass(frozen=True)
+class KnowledgeChatContext:
+    """Bounded retrieval context for LLM-backed chat turns."""
+
+    context_block: str
+    citations: list[KnowledgeCitation]
 
 
 def create_knowledge_upload(*, file: AsyncUploadReader, settings: Settings) -> KnowledgeUploadResponse:
@@ -292,6 +303,58 @@ def answer_with_knowledge(*, request: KnowledgeAnswerRequest, settings: Settings
     ]
     answer = "Relevant retrieved context:\n" + "\n".join(bullets)
     return KnowledgeAnswerResponse(answer=answer, citations=search_response.hits)
+
+
+def build_chat_knowledge_context(
+    *,
+    query: str,
+    document_ids: list[str],
+    top_k: int,
+    settings: Settings,
+) -> KnowledgeChatContext:
+    """Build a bounded retrieval context block for RAG chat."""
+    search_response = search_knowledge(
+        request=KnowledgeSearchRequest(
+            query=query,
+            document_ids=document_ids,
+            top_k=top_k,
+            retrieval_profile="default",
+        ),
+        settings=settings,
+    )
+    if not search_response.hits and document_ids:
+        search_response = _fallback_answer_scope(
+            document_ids=document_ids,
+            query=query,
+            top_k=top_k,
+            settings=settings,
+        )
+    if not search_response.hits:
+        return KnowledgeChatContext(context_block="", citations=[])
+
+    context_sections: list[str] = []
+    used_chars = 0
+    citations: list[KnowledgeCitation] = []
+    for index, citation in enumerate(search_response.hits, start=1):
+        snippet = citation.snippet.strip()
+        if not snippet:
+            continue
+        bounded = snippet[:_CHAT_CONTEXT_SNIPPET_CHARS].strip()
+        block = (
+            f"[Source {index}] filename={citation.filename} score={citation.score:.3f}\n"
+            f"{bounded}"
+        )
+        projected = used_chars + len(block) + 2
+        if context_sections and projected > _CHAT_CONTEXT_TOTAL_CHARS:
+            break
+        context_sections.append(block)
+        citations.append(citation)
+        used_chars = projected
+
+    return KnowledgeChatContext(
+        context_block="\n\n".join(context_sections),
+        citations=citations,
+    )
 
 
 def resolve_knowledge_documents(

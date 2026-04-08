@@ -70,6 +70,7 @@ def persist_chat_session(
     session_repository: SessionRepository,
     title_generator: TitleGenerator,
     knowledge_documents: list[dict[str, str]] | None = None,
+    assistant_artifacts: list[dict[str, object]] | None = None,
     chart_data_source: ChartDataSource = "none",
     title_override: str | None = None,
     owner_id: str = "",
@@ -100,6 +101,7 @@ def persist_chat_session(
         assistant_text=assistant_text,
         chart_spec=chart_spec,
         knowledge_documents=knowledge_documents,
+        assistant_artifacts=assistant_artifacts,
         chart_data_source=resolved_chart_data_source,
     )
 

@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from backend.config import CORS_ORIGINS, get_settings
 from backend.exception_handlers import register_exception_handlers
 from backend.http_security import register_http_security
-from backend.routers import chat, code_sandbox, history, knowledge, media, models, system, upload
+from backend.routers import artifacts, chat, code_sandbox, history, knowledge, media, models, system, upload
 from backend.services import log_service
 from goat_ai.latency_metrics import init_latency_metrics
 from goat_ai.logging_config import configure_logging
@@ -37,6 +37,7 @@ def create_app() -> FastAPI:
             {"name": "history", "description": "Persisted chat session listing and retrieval."},
             {"name": "knowledge", "description": "Contract-first knowledge ingestion and retrieval endpoints."},
             {"name": "media", "description": "Image uploads for vision-capable chat."},
+            {"name": "artifacts", "description": "Download generated chat files."},
             {"name": "code_sandbox", "description": "Capability-gated code execution (scaffold)."},
         ],
     )
@@ -69,6 +70,7 @@ def create_app() -> FastAPI:
     app.include_router(history.router, prefix="/api", tags=["history"])
     app.include_router(knowledge.router, prefix="/api", tags=["knowledge"])
     app.include_router(media.router, prefix="/api", tags=["media"])
+    app.include_router(artifacts.router, prefix="/api", tags=["artifacts"])
     app.include_router(system.router, prefix="/api", tags=["system"])
     app.include_router(code_sandbox.router, prefix="/api", tags=["code_sandbox"])
 

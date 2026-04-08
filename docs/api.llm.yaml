@@ -29,6 +29,22 @@ api:
     503:
       detail: ai backend unavailable
 schemas:
+  ChatArtifact:
+    type: object
+    required:
+      - artifact_id
+      - filename
+      - mime_type
+      - byte_size
+      - download_url
+    properties:
+      artifact_id: string
+      filename: string
+      mime_type: string
+      byte_size: integer
+      download_url: string
+      label: string|null
+      source_message_id: string|null
   ChatMessage:
     type: object
     required:
@@ -145,6 +161,7 @@ schemas:
       role: string
       content: string
       image_attachment_ids: string[]
+      artifacts: ChatArtifact[]
   HistorySessionSummary:
     type: object
     required:
@@ -364,19 +381,23 @@ schemas:
     type: object
     required:
       - filename
+      - suffix_prompt
       - document_id
       - ingestion_id
       - status
       - retrieval_mode
+      - template_prompt
     properties:
       filename: string
+      suffix_prompt: string
       document_id: string
       ingestion_id: string
       status: string
       retrieval_mode: string
+      template_prompt: string
       chart: "null"
 endpoints:
-  - op: list_models
+  - op: list_models_route
     method: GET
     path: /models
     response:
@@ -385,7 +406,7 @@ endpoints:
         - 401
         - 429
         - 503
-  - op: get_model_capabilities
+  - op: get_model_capabilities_route
     method: GET
     path: /models/capabilities
     response:
@@ -407,6 +428,14 @@ endpoints:
               type: token
               token: string
           - chart_spec: ChartSpec
+          - artifact:
+              type: artifact
+              artifact_id: string
+              filename: string
+              mime_type: string
+              byte_size: integer
+              download_url: string
+              source_message_id: string|null
           - done:
               type: done
           - error_frame:
@@ -442,14 +471,14 @@ endpoints:
         - 400
         - 401
         - 429
-  - op: analyze_upload_json
+  - op: analyze_upload_json_route
     method: POST
     path: /upload/analyze
     body:
       content_type: multipart/form-data
       fields:
         file: binary
-      schema: Body_analyze_upload_json_api_upload_analyze_post
+      schema: Body_analyze_upload_json_route_api_upload_analyze_post
     response:
       200: UploadAnalysisResponse
       errors:
@@ -581,6 +610,17 @@ endpoints:
         - 401
         - 404
         - 429
+  - op: get_artifact_download
+    method: GET
+    path: /artifacts/{artifact_id}
+    path_params:
+      artifact_id: string
+    response:
+      200: object
+      errors:
+        - 401
+        - 404
+        - 429
   - op: get_gpu_status
     method: GET
     path: /system/gpu
@@ -589,7 +629,7 @@ endpoints:
       errors:
         - 401
         - 429
-  - op: get_inference_latency
+  - op: get_inference_latency_route
     method: GET
     path: /system/inference
     response:
@@ -597,7 +637,7 @@ endpoints:
       errors:
         - 401
         - 429
-  - op: get_system_features
+  - op: get_system_features_route
     method: GET
     path: /system/features
     response:
@@ -605,7 +645,7 @@ endpoints:
       errors:
         - 401
         - 429
-  - op: get_runtime_target
+  - op: get_runtime_target_route
     method: GET
     path: /system/runtime-target
     response:
@@ -613,14 +653,14 @@ endpoints:
       errors:
         - 401
         - 429
-  - op: get_ready
+  - op: get_ready_route
     method: GET
     path: /ready
     response:
       200: object
       errors:
         - 503
-  - op: get_system_metrics
+  - op: get_system_metrics_route
     method: GET
     path: /system/metrics
     response:

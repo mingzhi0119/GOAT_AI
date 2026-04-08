@@ -7,6 +7,7 @@ from typing import Any
 
 from backend.domain.chart_types import ChartDataSource
 from backend.domain.invariants import chart_spec_requires_version_field
+from backend.models.artifact import ChatArtifact
 from backend.models.chat import ChatMessage
 from goat_ai.tools import FILE_CONTEXT_UPLOAD_PREFIX, LEGACY_CSV_FENCE_SUBSTRING
 
@@ -14,7 +15,7 @@ STORED_CHART_ROLE = "__chart__"
 STORED_FILE_CONTEXT_ROLE = "__file_context__"
 STORED_FILE_CONTEXT_ACK_ROLE = "__file_context_ack__"
 FILE_CONTEXT_REPLY = "I have loaded the file context."
-SESSION_PAYLOAD_VERSION = 3
+SESSION_PAYLOAD_VERSION = 4
 
 # Alternate upload-analysis header (legacy compatibility / future prompts).
 FILE_CONTEXT_REQUESTED_PREFIX = "[User requested analysis of uploaded tabular data]"
@@ -65,6 +66,18 @@ def _normalize_message_dict(message: object) -> dict[str, Any] | None:
                 ids.append(item.strip())
         if ids:
             out["image_attachment_ids"] = ids
+    raw_artifacts = message.get("artifacts")
+    if isinstance(raw_artifacts, list) and raw_artifacts:
+        artifacts: list[dict[str, object]] = []
+        for item in raw_artifacts:
+            if not isinstance(item, dict):
+                continue
+            try:
+                artifacts.append(ChatArtifact.model_validate(item).model_dump(mode="json"))
+            except Exception:
+                continue
+        if artifacts:
+            out["artifacts"] = artifacts
     return out
 
 
@@ -74,6 +87,7 @@ def build_session_payload(
     assistant_text: str,
     chart_spec: dict[str, object] | None,
     knowledge_documents: list[dict[str, str]] | None = None,
+    assistant_artifacts: list[dict[str, object]] | None = None,
     chart_data_source: ChartDataSource = "none",
 ) -> dict[str, object]:
     """Build the versioned storage payload for new session snapshots."""
@@ -89,6 +103,8 @@ def build_session_payload(
         row: dict[str, object] = {"role": message.role, "content": message.content}
         if message.image_attachment_ids:
             row["image_attachment_ids"] = list(message.image_attachment_ids)
+        if message.role == "assistant" and message.content == assistant_text and assistant_artifacts:
+            row["artifacts"] = assistant_artifacts
         visible_messages.append(row)
 
     payload: dict[str, object] = {

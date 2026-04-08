@@ -34,6 +34,7 @@ class DbMigrationsTests(unittest.TestCase):
                         "007_add_knowledge_tables",
                         "008_session_messages",
                         "009_sessions_owner_id",
+                        "010_chat_artifacts",
                     ],
                 )
                 cols = [r[1] for r in conn.execute("PRAGMA table_info(conversations)").fetchall()]
@@ -48,6 +49,10 @@ class DbMigrationsTests(unittest.TestCase):
                 self.assertIn("vector_backend", ingestion_cols)
                 chunk_cols = [r[1] for r in conn.execute("PRAGMA table_info(knowledge_chunks)").fetchall()]
                 self.assertIn("vector_ref", chunk_cols)
+                session_message_cols = [r[1] for r in conn.execute("PRAGMA table_info(session_messages)").fetchall()]
+                self.assertIn("artifacts_json", session_message_cols)
+                artifact_cols = [r[1] for r in conn.execute("PRAGMA table_info(chat_artifacts)").fetchall()]
+                self.assertIn("storage_path", artifact_cols)
             finally:
                 conn.close()
 
@@ -87,7 +92,7 @@ class DbMigrationsTests(unittest.TestCase):
             conn = sqlite3.connect(db_path)
             try:
                 n = conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]
-                self.assertEqual(n, 9)
+                self.assertEqual(n, 10)
                 cols = [r[1] for r in conn.execute("PRAGMA table_info(conversations)").fetchall()]
                 self.assertIn("user_name", cols)
                 self.assertIn("session_id", cols)
@@ -96,6 +101,8 @@ class DbMigrationsTests(unittest.TestCase):
                 self.assertIn("owner_id", session_cols)
                 knowledge_cols = [r[1] for r in conn.execute("PRAGMA table_info(knowledge_documents)").fetchall()]
                 self.assertIn("storage_path", knowledge_cols)
+                artifact_cols = [r[1] for r in conn.execute("PRAGMA table_info(chat_artifacts)").fetchall()]
+                self.assertIn("storage_path", artifact_cols)
             finally:
                 conn.close()
 

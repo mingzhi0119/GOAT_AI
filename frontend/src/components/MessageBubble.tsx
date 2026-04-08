@@ -1,7 +1,7 @@
 import { useState, type FC } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import type { Message } from '../api/types'
+import type { ChatArtifact, Message } from '../api/types'
 import GoatIcon from './GoatIcon'
 
 interface Props {
@@ -42,11 +42,36 @@ function stripChartBlock(text: string, isStreaming: boolean): string {
   return clean.trimEnd()
 }
 
+function resolveArtifactLink(
+  href: string,
+  artifactByFilename: Map<string, ChatArtifact>,
+): ChatArtifact | null {
+  if (!href) return null
+  if (
+    /^[a-z]+:/i.test(href) ||
+    href.startsWith('/') ||
+    href.startsWith('./') ||
+    href.startsWith('../')
+  ) {
+    return null
+  }
+  return artifactByFilename.get(href) ?? null
+}
+
+function formatArtifactSize(byteSize: number): string {
+  if (byteSize < 1024) return `${byteSize} B`
+  if (byteSize < 1024 * 1024) return `${(byteSize / 1024).toFixed(1)} KB`
+  return `${(byteSize / (1024 * 1024)).toFixed(1)} MB`
+}
+
 /** Renders a single chat turn with role-based styling, Markdown, and copy button. */
 const MessageBubble: FC<Props> = ({ message, hasFileContext = false }) => {
   const isUser = message.role === 'user'
   const isError = message.isError === true
   const [copied, setCopied] = useState(false)
+  const artifactByFilename = new Map(
+    (message.artifacts ?? []).map(artifact => [artifact.filename, artifact]),
+  )
 
   // Only strip :::chart blocks when a file is loaded — avoids accidentally
   // truncating responses that legitimately contain ":::chart" as text.
@@ -109,12 +134,53 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false }) => {
             </>
           ) : (
             <div className="prose-msg">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  a: ({ href, children }) => {
+                    const artifact = resolveArtifactLink(
+                      typeof href === 'string' ? href : '',
+                      artifactByFilename,
+                    )
+                    if (artifact) {
+                      return (
+                        <a href={artifact.download_url} download={artifact.filename}>
+                          {children}
+                        </a>
+                      )
+                    }
+                    return <a href={href}>{children}</a>
+                  },
+                }}
+              >
                 {displayContent || ' '}
               </ReactMarkdown>
             </div>
           )}
         </div>
+
+        {!message.isStreaming && message.artifacts && message.artifacts.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {message.artifacts.map(artifact => (
+              <a
+                key={artifact.artifact_id}
+                href={artifact.download_url}
+                download={artifact.filename}
+                className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs transition-opacity hover:opacity-85"
+                style={{
+                  borderColor: 'var(--border-color)',
+                  background: 'var(--bg-asst-bubble)',
+                  color: 'var(--text-main)',
+                }}
+              >
+                <span className="font-medium">{artifact.label ?? artifact.filename}</span>
+                <span style={{ color: 'var(--text-muted)' }}>
+                  {formatArtifactSize(artifact.byte_size)}
+                </span>
+              </a>
+            ))}
+          </div>
+        )}
 
         {/* Copy button — visible on group hover, hidden while streaming */}
         {!message.isStreaming && displayContent && (

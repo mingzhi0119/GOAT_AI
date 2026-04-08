@@ -1,25 +1,21 @@
 """Public entry for chat streaming, including knowledge-backed RAG answers."""
 from __future__ import annotations
 
-import re
 import time
 from collections.abc import Generator
 
 from backend.models.chat import ChatMessage
-from backend.models.knowledge import KnowledgeAnswerRequest
 from backend.services.chat_orchestration import SessionPersistenceService
 from backend.services.chat_runtime import ConversationLogger, SessionRepository, TitleGenerator
 from backend.services.chat_stream_service import ChatStreamService
 from backend.services.exceptions import KnowledgeDocumentNotFound
-from backend.services.knowledge_service import answer_with_knowledge, resolve_knowledge_documents
+from backend.services.knowledge_service import build_chat_knowledge_context, resolve_knowledge_documents
 from backend.services.safeguard_service import SafeguardService
 from backend.services.session_service import last_user_message
-from backend.services.sse import sse_done_event, sse_error_event, sse_token_event
+from backend.services.sse import sse_done_event, sse_error_event
 from backend.services.tabular_context import TabularContextExtractor
 from backend.types import Settings
 from goat_ai.ollama_client import LLMClient
-
-_TOKEN_SPLIT_RE = re.compile(r"\S+\s*|\n")
 
 
 def stream_chat_sse(
@@ -58,8 +54,12 @@ def stream_chat_sse(
             session_repository=session_repository,
             title_generator=title_generator,
             safeguard_service=safeguard_service,
+            system_instruction=system_instruction,
+            ollama_options=ollama_options,
+            tabular_extractor=tabular_extractor,
             settings=settings,
             knowledge_document_ids=knowledge_document_ids,
+            llm=llm,
             session_owner_id=session_owner_id,
         )
         return
@@ -81,12 +81,14 @@ def stream_chat_sse(
         ollama_options=ollama_options,
         tabular_extractor=tabular_extractor,
         vision_last_user_images_base64=vision_last_user_images_base64,
+        settings=settings,
         session_owner_id=session_owner_id,
     )
 
 
 def _stream_knowledge_chat_sse(
     *,
+    llm: LLMClient,
     model: str,
     messages: list[ChatMessage],
     system_prompt: str,
@@ -98,11 +100,14 @@ def _stream_knowledge_chat_sse(
     session_repository: SessionRepository | None,
     title_generator: TitleGenerator | None,
     safeguard_service: SafeguardService | None,
+    system_instruction: str,
+    ollama_options: dict[str, float | int] | None,
+    tabular_extractor: TabularContextExtractor | None,
     settings: Settings,
     knowledge_document_ids: list[str],
     session_owner_id: str = "",
 ) -> Generator[str, None, None]:
-    """Serve a deterministic retrieval-backed answer for sessions bound to indexed documents."""
+    """Serve a retrieval-backed chat answer using the main chat streaming stack."""
     persistence = SessionPersistenceService()
     started_at = time.monotonic()
 
@@ -134,13 +139,10 @@ def _stream_knowledge_chat_sse(
             document_ids=knowledge_document_ids,
             settings=settings,
         )
-        answer = answer_with_knowledge(
-            request=KnowledgeAnswerRequest(
-                query=last_user_message(messages),
-                document_ids=knowledge_document_ids,
-                top_k=5,
-                session_id=session_id,
-            ),
+        context = build_chat_knowledge_context(
+            query=last_user_message(messages),
+            document_ids=knowledge_document_ids,
+            top_k=5,
             settings=settings,
         )
     except KnowledgeDocumentNotFound:
@@ -152,38 +154,13 @@ def _stream_knowledge_chat_sse(
         yield sse_done_event()
         return
 
-    if safeguard_service is not None:
-        output_assessment = safeguard_service.review_output(
-            user_text=last_user_message(messages),
-            assistant_text=answer.answer,
-        )
-        if not output_assessment.allowed:
-            yield from persistence.yield_blocked_response(
-                assessment=output_assessment,
-                model=model,
-                messages=messages,
-                system_prompt=system_prompt,
-                ip=ip,
-                conversation_logger=conversation_logger,
-                user_name=user_name,
-                session_id=session_id,
-                all_messages=all_messages,
-                session_repository=session_repository,
-                title_generator=title_generator,
-                started_at=started_at,
-                session_owner_id=session_owner_id,
-            )
-            return
-
-    first_token_started = False
-    first_token_ms: float | None = None
-    for token in _TOKEN_SPLIT_RE.findall(answer.answer):
-        if not first_token_started:
-            first_token_ms = round((time.monotonic() - started_at) * 1000, 1)
-            first_token_started = True
-        yield sse_token_event(token)
-    yield sse_done_event()
-    persistence.persist_and_log_chat_result(
+    knowledge_instruction = _compose_knowledge_instruction(
+        base_instruction=system_instruction,
+        context_block=context.context_block,
+        has_hits=bool(context.citations),
+    )
+    yield from ChatStreamService().stream(
+        llm=llm,
         model=model,
         messages=messages,
         system_prompt=system_prompt,
@@ -194,8 +171,11 @@ def _stream_knowledge_chat_sse(
         all_messages=all_messages,
         session_repository=session_repository,
         title_generator=title_generator,
-        assistant_text=answer.answer,
-        chart_spec=None,
+        safeguard_service=safeguard_service,
+        system_instruction=knowledge_instruction,
+        ollama_options=ollama_options,
+        tabular_extractor=tabular_extractor,
+        settings=settings,
         knowledge_documents=[
             {
                 "document_id": document.id,
@@ -204,11 +184,32 @@ def _stream_knowledge_chat_sse(
             }
             for document in documents
         ],
-        chart_data_source="none",
-        started_at=started_at,
-        first_token_ms=first_token_ms,
         session_owner_id=session_owner_id,
     )
+
+
+def _compose_knowledge_instruction(
+    *,
+    base_instruction: str,
+    context_block: str,
+    has_hits: bool,
+) -> str:
+    parts: list[str] = []
+    if base_instruction.strip():
+        parts.append(base_instruction.strip())
+    if has_hits:
+        parts.append(
+            "Use the retrieved knowledge context below as your primary evidence. "
+            "Answer naturally, synthesize rather than dumping snippets, and say when the context is insufficient.\n\n"
+            "Retrieved knowledge context:\n"
+            f"{context_block}"
+        )
+    else:
+        parts.append(
+            "No relevant retrieved context was found in the attached knowledge documents. "
+            "Explain that briefly and suggest how the user can refine the question."
+        )
+    return "\n\n".join(parts)
 
 
 __all__ = ["stream_chat_sse"]

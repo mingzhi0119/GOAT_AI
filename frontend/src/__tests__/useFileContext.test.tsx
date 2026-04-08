@@ -34,6 +34,7 @@ describe('useFileContext', () => {
 
     expect(result.current.fileContext?.filename).toBe('data.csv')
     expect(result.current.fileContext?.suffixPrompt).toContain('CSV')
+    expect(result.current.fileContext?.bindingMode).toBe('single')
     expect(localStorage.getItem('goat-ai-file-context')).toContain('data.csv')
 
     act(() => {
@@ -50,6 +51,7 @@ describe('useFileContext', () => {
     expect(result.current.fileContext?.documentId).toBe('doc-1')
     expect(result.current.fileContext?.templatePrompt).toContain('Analyze this CSV')
     expect(result.current.fileContext?.suffixPrompt).toContain('CSV')
+    expect(result.current.fileContext?.bindingMode).toBe('single')
 
     act(() => {
       result.current.clearFileContext()

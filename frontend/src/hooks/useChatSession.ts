@@ -36,7 +36,9 @@ export interface UseChatSessionReturn {
     retrievalMode?: string
     suffixPrompt?: string
     templatePrompt?: string
+    bindingMode?: 'idle' | 'single' | 'persistent'
   }) => void
+  setFileContextBindingMode: (mode: 'idle' | 'single' | 'persistent') => void
   clearFileContextSession: () => void
 }
 
@@ -80,6 +82,14 @@ export function useChatSession({
     setChartSpec(null)
   }, [chat, clearFileContext])
 
+  const setFileContextBindingMode = useCallback(
+    (mode: 'idle' | 'single' | 'persistent') => {
+      if (!fileContext) return
+      setFileContext({ ...fileContext, bindingMode: mode })
+    },
+    [fileContext, setFileContext],
+  )
+
   const loadHistorySession = useCallback(
     async (sessionId: string) => {
       const session = await history.loadSession(sessionId)
@@ -94,16 +104,23 @@ export function useChatSession({
 
   const sendMessage = useCallback(
     async (content: string, imageAttachmentIds?: string[]) => {
+      const shouldAttachKnowledge =
+        !!fileContext?.documentId &&
+        !imageAttachmentIds?.length &&
+        fileContext.bindingMode !== 'idle'
       await chat.sendMessage(
         content,
         selectedModel,
         userName,
-        fileContext?.documentId && !imageAttachmentIds?.length ? [fileContext.documentId] : undefined,
+        shouldAttachKnowledge && fileContext?.documentId ? [fileContext.documentId] : undefined,
         systemInstruction,
         ollamaOptions,
         setChartSpec,
         imageAttachmentIds,
       )
+      if (fileContext?.bindingMode === 'single') {
+        setFileContext({ ...fileContext, bindingMode: 'idle' })
+      }
       await history.refresh()
     },
     [
@@ -112,6 +129,7 @@ export function useChatSession({
       history,
       ollamaOptions,
       selectedModel,
+      setFileContext,
       systemInstruction,
       userName,
     ],
@@ -135,6 +153,7 @@ export function useChatSession({
     deleteAllHistory: history.deleteAll,
     refreshHistory: history.refresh,
     setFileContext,
+    setFileContextBindingMode,
     clearFileContextSession,
   }
 }

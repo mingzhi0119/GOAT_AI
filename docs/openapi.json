@@ -13,7 +13,7 @@
         ],
         "summary": "List available Ollama models",
         "description": "Return the list of locally available Ollama model names.",
-        "operationId": "list_models_api_models_get",
+        "operationId": "list_models_route_api_models_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -65,7 +65,7 @@
         ],
         "summary": "Read capabilities for one Ollama model",
         "description": "Return Ollama-reported capabilities for the selected model.",
-        "operationId": "get_model_capabilities_api_models_capabilities_get",
+        "operationId": "get_model_capabilities_route_api_models_capabilities_get",
         "parameters": [
           {
             "name": "model",
@@ -137,7 +137,7 @@
           "chat"
         ],
         "summary": "Stream a chat completion over SSE",
-        "description": "Stream an LLM response as Server-Sent Events.\n\nEach SSE event carries a typed JSON object.\nThe final event is ``{\"type\":\"done\"}``.\nThe client reads events with the native ``EventSource`` API or a fetch+ReadableStream.",
+        "description": "Stream an LLM response as Server-Sent Events.",
         "operationId": "chat_stream_api_chat_post",
         "parameters": [
           {
@@ -195,7 +195,7 @@
                 }
               }
             },
-            "description": "Unprocessable Content"
+            "description": "Unprocessable Entity"
           },
           "429": {
             "content": {
@@ -288,7 +288,7 @@
         ],
         "summary": "Ingest an uploaded file and return JSON readiness metadata",
         "description": "Accept a supported knowledge file and return ingestion metadata as JSON.",
-        "operationId": "analyze_upload_json_api_upload_analyze_post",
+        "operationId": "analyze_upload_json_route_api_upload_analyze_post",
         "parameters": [
           {
             "name": "Idempotency-Key",
@@ -312,7 +312,7 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_analyze_upload_json_api_upload_analyze_post"
+                "$ref": "#/components/schemas/Body_analyze_upload_json_route_api_upload_analyze_post"
               }
             }
           }
@@ -1129,6 +1129,77 @@
         }
       }
     },
+    "/api/artifacts/{artifact_id}": {
+      "get": {
+        "tags": [
+          "artifacts"
+        ],
+        "summary": "Download one generated chat artifact",
+        "description": "Serve one persisted artifact file.",
+        "operationId": "get_artifact_download_api_artifacts__artifact_id__get",
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/system/gpu": {
       "get": {
         "tags": [
@@ -1178,7 +1249,7 @@
         ],
         "summary": "Read rolling chat latency telemetry",
         "description": "Rolling average duration of completed chat streams (milliseconds).",
-        "operationId": "get_inference_latency_api_system_inference_get",
+        "operationId": "get_inference_latency_route_api_system_inference_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1220,7 +1291,7 @@
         ],
         "summary": "Read capability-gated feature flags",
         "description": "Return config + host probes for optional high-risk features (see docs/ENGINEERING_STANDARDS.md §15).",
-        "operationId": "get_system_features_api_system_features_get",
+        "operationId": "get_system_features_route_api_system_features_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1262,7 +1333,7 @@
         ],
         "summary": "Read resolved deployment target order",
         "description": "Return the current runtime target and the ordered deployment fallback list.",
-        "operationId": "get_runtime_target_api_system_runtime_target_get",
+        "operationId": "get_runtime_target_route_api_system_runtime_target_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1304,7 +1375,7 @@
         ],
         "summary": "Readiness probe (SQLite + optional Ollama)",
         "description": "Return 200 when SQLite and (unless skipped) Ollama are reachable; 503 otherwise.",
-        "operationId": "get_ready_api_ready_get",
+        "operationId": "get_ready_route_api_ready_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1327,7 +1398,7 @@
         ],
         "summary": "Prometheus text metrics",
         "description": "Expose in-process counters and histograms for Prometheus scraping.",
-        "operationId": "get_system_metrics_api_system_metrics_get",
+        "operationId": "get_system_metrics_route_api_system_metrics_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1459,7 +1530,7 @@
   },
   "components": {
     "schemas": {
-      "Body_analyze_upload_json_api_upload_analyze_post": {
+      "Body_analyze_upload_json_route_api_upload_analyze_post": {
         "properties": {
           "file": {
             "type": "string",
@@ -1471,7 +1542,7 @@
         "required": [
           "file"
         ],
-        "title": "Body_analyze_upload_json_api_upload_analyze_post"
+        "title": "Body_analyze_upload_json_route_api_upload_analyze_post"
       },
       "Body_post_knowledge_upload_api_knowledge_uploads_post": {
         "properties": {
@@ -1514,6 +1585,67 @@
           "file"
         ],
         "title": "Body_upload_and_parse_api_upload_post"
+      },
+      "ChatArtifact": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Artifact Id"
+          },
+          "filename": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Filename"
+          },
+          "mime_type": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Mime Type"
+          },
+          "byte_size": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Byte Size"
+          },
+          "download_url": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Download Url"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "source_message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Message Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "filename",
+          "mime_type",
+          "byte_size",
+          "download_url"
+        ],
+        "title": "ChatArtifact",
+        "description": "One downloadable file generated during chat."
       },
       "ChatMessage": {
         "properties": {
@@ -2020,6 +2152,14 @@
             "type": "array",
             "title": "Image Attachment Ids",
             "description": "Vision image attachment ids stored for this user turn."
+          },
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/ChatArtifact"
+            },
+            "type": "array",
+            "title": "Artifacts",
+            "description": "Downloadable generated files associated with this assistant turn."
           }
         },
         "type": "object",
@@ -2721,6 +2861,11 @@
             "type": "string",
             "title": "Filename"
           },
+          "suffix_prompt": {
+            "type": "string",
+            "title": "Suffix Prompt",
+            "description": "Immediate prompt suggestion derived from the uploaded file suffix."
+          },
           "document_id": {
             "type": "string",
             "title": "Document Id",
@@ -2741,6 +2886,11 @@
             "title": "Retrieval Mode",
             "description": "Stable marker indicating the upload now routes through the RAG knowledge pipeline."
           },
+          "template_prompt": {
+            "type": "string",
+            "title": "Template Prompt",
+            "description": "Content-aware template prompt recommended after RAG analysis of the uploaded file."
+          },
           "chart": {
             "type": "null",
             "title": "Chart",
@@ -2750,10 +2900,12 @@
         "type": "object",
         "required": [
           "filename",
+          "suffix_prompt",
           "document_id",
           "ingestion_id",
           "status",
-          "retrieval_mode"
+          "retrieval_mode",
+          "template_prompt"
         ],
         "title": "UploadAnalysisResponse",
         "description": "JSON response for POST /api/upload/analyze."
@@ -2828,6 +2980,10 @@
     {
       "name": "media",
       "description": "Image uploads for vision-capable chat."
+    },
+    {
+      "name": "artifacts",
+      "description": "Download generated chat files."
     },
     {
       "name": "code_sandbox",

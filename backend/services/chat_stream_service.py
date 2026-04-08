@@ -10,6 +10,7 @@ from types import SimpleNamespace
 import pandas as pd
 
 from backend.models.chat import ChatMessage
+from backend.models.artifact import ChatArtifact
 from backend.prometheus_metrics import inc_chat_stream_completed
 from backend.services.chat_orchestration import (
     ChartToolOrchestrator,
@@ -17,11 +18,13 @@ from backend.services.chat_orchestration import (
     SessionPersistenceService,
 )
 from backend.services.chat_runtime import ConversationLogger, SessionRepository, TitleGenerator
+from backend.services.artifact_service import create_chat_artifacts_from_text
 from backend.services.safeguard_service import SafeguardAssessment, SafeguardService
 from backend.domain.chart_types import ChartDataSource
 from backend.services.session_service import last_user_message
 from backend.services.sse import sse_done_event, sse_error_event, sse_event, sse_token_event
 from backend.services.tabular_context import EmbeddedCsvTabularExtractor, TabularContextExtractor
+from backend.types import Settings
 from goat_ai.echarts_tool import GENERATE_CHART_V2_SCHEMA
 from goat_ai.exceptions import OllamaUnavailable
 from goat_ai.ollama_client import LLMClient
@@ -127,6 +130,8 @@ class ChatStreamService:
         ollama_options: dict[str, float | int] | None = None,
         tabular_extractor: TabularContextExtractor | None = None,
         vision_last_user_images_base64: list[str] | None = None,
+        settings: Settings | None = None,
+        knowledge_documents: list[dict[str, str]] | None = None,
         session_owner_id: str = "",
     ) -> Generator[str, None, None]:
         """Yield SSE-formatted events for a chat completion."""
@@ -147,6 +152,8 @@ class ChatStreamService:
             ollama_options=ollama_options,
             tabular_extractor=tabular_extractor,
             vision_last_user_images_base64=vision_last_user_images_base64,
+            settings=settings,
+            knowledge_documents=knowledge_documents,
             session_owner_id=session_owner_id,
         )
         yield from self._phase_input_guard(run)
@@ -183,6 +190,8 @@ class ChatStreamService:
         ollama_options: dict[str, float | int] | None,
         tabular_extractor: TabularContextExtractor | None,
         vision_last_user_images_base64: list[str] | None,
+        settings: Settings | None,
+        knowledge_documents: list[dict[str, str]] | None,
         session_owner_id: str,
     ) -> SimpleNamespace:
         """Assemble collaborators, derived turns, and mutable stream state."""
@@ -248,6 +257,9 @@ class ChatStreamService:
             emitted_chart_spec=None,
             buffer=[],
             vision_last_user_images_base64=vision_last_user_images_base64,
+            settings=settings,
+            knowledge_documents=knowledge_documents,
+            emitted_artifacts=[],
             session_owner_id=session_owner_id,
         )
 
@@ -391,6 +403,14 @@ class ChatStreamService:
                 if run.first_token_emitted_at is None:
                     run.first_token_emitted_at = time.monotonic()
                 yield token_event
+            artifact_events = self._emit_artifacts(run, assistant_text=clean_text)
+            for artifact in artifact_events:
+                yield sse_event(
+                    {
+                        "type": "artifact",
+                        **artifact.model_dump(mode="json"),
+                    }
+                )
             if chart_spec is not None:
                 yield sse_event({"type": "chart_spec", "chart": chart_spec})
             yield sse_done_event()
@@ -413,6 +433,10 @@ class ChatStreamService:
                 title_generator=run.title_generator,
                 assistant_text=clean_text,
                 chart_spec=chart_spec,
+                knowledge_documents=run.knowledge_documents,
+                assistant_artifacts=[
+                    artifact.model_dump(mode="json") for artifact in run.emitted_artifacts
+                ],
                 chart_data_source=(
                     run.chart_data_source if chart_spec is not None else "none"
                 ),
@@ -436,3 +460,31 @@ class ChatStreamService:
                 started_at=run.started_at,
                 session_owner_id=run.session_owner_id,
             )
+
+    def _emit_artifacts(
+        self,
+        run: SimpleNamespace,
+        *,
+        assistant_text: str,
+    ) -> list[ChatArtifact]:
+        """Create and return any downloadable artifact events for this assistant turn."""
+        if run.settings is None or run.session_repository is None:
+            run.emitted_artifacts = []
+            return []
+        assistant_index = sum(1 for msg in run.messages if msg.role == "assistant")
+        artifacts = create_chat_artifacts_from_text(
+            assistant_text=assistant_text,
+            settings=run.settings,
+            session_id=run.session_id,
+            owner_id=run.session_owner_id,
+            source_message_index=assistant_index,
+            register_artifact=run.session_repository.create_chat_artifact,
+        )
+        source_message_id = (
+            f"{run.session_id or 'ephemeral'}:assistant:{assistant_index}"
+        )
+        run.emitted_artifacts = [
+            artifact.model_copy(update={"source_message_id": source_message_id})
+            for artifact in artifacts
+        ]
+        return run.emitted_artifacts

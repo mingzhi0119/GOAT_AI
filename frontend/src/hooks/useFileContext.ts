@@ -9,6 +9,7 @@ export interface FileContext {
   retrievalMode?: string
   suffixPrompt?: string
   templatePrompt?: string
+  bindingMode: 'idle' | 'single' | 'persistent'
 }
 
 export interface FileContextUpdate {
@@ -18,6 +19,7 @@ export interface FileContextUpdate {
   retrievalMode?: string
   suffixPrompt?: string
   templatePrompt?: string
+  bindingMode?: 'idle' | 'single' | 'persistent'
 }
 
 export interface UseFileContextReturn {
@@ -37,7 +39,11 @@ function loadInitial(): FileContext | null {
       (parsed.ingestionId !== undefined && typeof parsed.ingestionId !== 'string') ||
       (parsed.retrievalMode !== undefined && typeof parsed.retrievalMode !== 'string') ||
       (parsed.suffixPrompt !== undefined && typeof parsed.suffixPrompt !== 'string') ||
-      (parsed.templatePrompt !== undefined && typeof parsed.templatePrompt !== 'string')
+      (parsed.templatePrompt !== undefined && typeof parsed.templatePrompt !== 'string') ||
+      (parsed.bindingMode !== undefined &&
+        parsed.bindingMode !== 'idle' &&
+        parsed.bindingMode !== 'single' &&
+        parsed.bindingMode !== 'persistent')
     ) {
       return null
     }
@@ -48,6 +54,10 @@ function loadInitial(): FileContext | null {
       ...(parsed.retrievalMode ? { retrievalMode: parsed.retrievalMode } : {}),
       ...(parsed.suffixPrompt ? { suffixPrompt: parsed.suffixPrompt } : {}),
       ...(parsed.templatePrompt ? { templatePrompt: parsed.templatePrompt } : {}),
+      bindingMode:
+        parsed.bindingMode === 'persistent' || parsed.bindingMode === 'idle'
+          ? parsed.bindingMode
+          : 'single',
     }
   } catch {
     return null
@@ -58,8 +68,12 @@ export function useFileContext(): UseFileContextReturn {
   const [fileContext, setFileContextState] = useState<FileContext | null>(loadInitial)
 
   const setFileContext = useCallback((ctx: FileContextUpdate) => {
-    setFileContextState(ctx)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(ctx))
+    const next: FileContext = {
+      ...ctx,
+      bindingMode: ctx.bindingMode ?? 'single',
+    }
+    setFileContextState(next)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
   }, [])
 
   const clearFileContext = useCallback(() => {
