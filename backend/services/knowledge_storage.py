@@ -4,9 +4,9 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
-from fastapi import UploadFile
-
 from goat_ai.config import Settings
+
+from backend.types import AsyncUploadReader
 
 
 SUPPORTED_KNOWLEDGE_EXTENSIONS: frozenset[str] = frozenset(
@@ -42,7 +42,7 @@ def knowledge_vector_dir(settings: Settings, backend_name: str) -> Path:
 
 async def persist_knowledge_upload(
     *,
-    file: UploadFile,
+    file: AsyncUploadReader,
     settings: Settings,
     document_id: str,
     max_read_bytes: int,

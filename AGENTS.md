@@ -6,6 +6,8 @@ Short durable index for coding agents and contributors. **Canonical engineering 
 
 **[`docs/ENGINEERING_STANDARDS.md`](docs/ENGINEERING_STANDARDS.md)** — full rules (Python/TS, testing, API design, cross-env, production host, documentation workflow, API artifacts, recovery). **§15** describes **capability-based feature gates** for optional high-risk features (e.g. future code sandbox).
 
+**[`docs/DOMAIN.md`](docs/DOMAIN.md)** — ubiquitous domain language (Phase 15.1); update when user-visible chat/chart/safeguard semantics change.
+
 Editor rules under `.cursor/rules/` mirror the same principles; keep them aligned when either file changes.
 
 ## Documentation language

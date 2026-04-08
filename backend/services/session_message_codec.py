@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any
 
+from backend.domain.chart_types import ChartDataSource
+from backend.domain.invariants import chart_spec_requires_version_field
 from backend.models.chat import ChatMessage
 from goat_ai.tools import FILE_CONTEXT_UPLOAD_PREFIX, LEGACY_CSV_FENCE_SUBSTRING
 
@@ -13,7 +15,6 @@ STORED_FILE_CONTEXT_ROLE = "__file_context__"
 STORED_FILE_CONTEXT_ACK_ROLE = "__file_context_ack__"
 FILE_CONTEXT_REPLY = "I have loaded the file context."
 SESSION_PAYLOAD_VERSION = 3
-ChartDataSource = Literal["uploaded", "demo", "none"]
 
 # Alternate upload-analysis header (legacy compatibility / future prompts).
 FILE_CONTEXT_REQUESTED_PREFIX = "[User requested analysis of uploaded tabular data]"
@@ -96,6 +97,7 @@ def build_session_payload(
         "chart_data_source": chart_data_source,
     }
     if chart_spec is not None:
+        chart_spec_requires_version_field(chart_spec)
         payload["chart_spec"] = chart_spec
     if file_context_prompt is not None:
         payload["file_context_prompt"] = file_context_prompt

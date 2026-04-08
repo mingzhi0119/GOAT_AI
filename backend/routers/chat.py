@@ -29,8 +29,7 @@ from backend.services.media_service import load_images_base64_for_chat
 from backend.services.exceptions import VisionNotSupported
 from backend.services.tabular_context import TabularContextExtractor
 from backend.services.safeguard_service import SafeguardService
-from backend.types import LLMClient, Settings
-from goat_ai.exceptions import OllamaUnavailable
+from backend.types import LLMClient, OllamaUnavailable, Settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

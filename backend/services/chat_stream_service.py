@@ -18,7 +18,7 @@ from backend.services.chat_orchestration import (
 )
 from backend.services.chat_runtime import ConversationLogger, SessionRepository, TitleGenerator
 from backend.services.safeguard_service import SafeguardAssessment, SafeguardService
-from backend.services.session_message_codec import ChartDataSource
+from backend.domain.chart_types import ChartDataSource
 from backend.services.session_service import last_user_message
 from backend.services.sse import sse_done_event, sse_error_event, sse_event, sse_token_event
 from backend.services.tabular_context import EmbeddedCsvTabularExtractor, TabularContextExtractor

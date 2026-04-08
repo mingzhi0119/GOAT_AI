@@ -1,6 +1,6 @@
 ﻿# GOAT AI Roadmap
 
-> Last updated: 2026-04-08 — **v1.3.0** tags Phase **11–12**; **main** additionally ships **Phase 13** (full closeout) and **Phase 14** through **14.6 RAG-3**. **Next:** close **RAG quality loop** (§14.7), then **Phase 15** (semantics then structure — sections below). **Constraints vs roadmap:** see [Current reality and improvement map](#current-reality-and-improvement-map).
+> Last updated: 2026-04-09 — **v1.3.0** tags Phase **11–12**; **main** additionally ships **Phase 13** (full closeout) and **Phase 14** through **14.6 RAG-3**. **Phase 15.2–15.3** initial slices are complete on main (see §15.2–15.3). **Next:** **Phase 15.4+** (session store, AuthZ, optional tracing); keep the **§14.7** RAG eval gate green as retrieval evolves. **Constraints vs roadmap:** see [Current reality and improvement map](#current-reality-and-improvement-map).
 > Current release tag: **v1.3.0**
 > Compact snapshot: [PROJECT_STATUS.md](PROJECT_STATUS.md) · Engineering standards: [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md)
 
@@ -121,12 +121,12 @@ This section records **constraints that match today’s shipped architecture** a
 
 **Priority:** **§14.7** is complete; iterate eval cases as retrieval behavior evolves.
 
-### 4. Testing — black-box strong; integration tier immature
+### 4. Testing — black-box strong; integration + clock partially landed
 
 | Reality (main) | Improvement path | Roadmap / docs home |
 |----------------|------------------|---------------------|
-| Contract tests and architecture guards exist; many flows use mocks. | **Integration tier:** temp `GOAT_DATA_DIR`, real migrations, `TestClient`, **no** live Ollama; shared fixtures; optional CI job with time budget. | Phase **15.3**; [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) testing rules. |
-| Clock / RNG not fully injected everywhere. | **Clock** + optional seeded RNG for TTL and idempotency tests. | Phase **15.3**. |
+| Contract tests and architecture guards exist; many flows use mocks. | **Integration tier (initial):** `__tests__/integration/` with temp `GOAT_LOG_PATH` / `GOAT_DATA_DIR`, `TestClient`, `GOAT_READY_SKIP_OLLAMA_PROBE`; pytest marker `integration`; ~30s budget in [SESSION_SCHEMA.md](SESSION_SCHEMA.md) / [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md). Expand coverage as needed. | Phase **15.3** (first exit met); [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) testing rules. |
+| Clock / RNG not fully injected everywhere. | **`Clock`** (`goat_ai/clocks.py`) injected for **idempotency** TTL; thread through chat/rate-limit/title paths in follow-ups. Optional seeded RNG remains future work. | Phase **15.3** (narrow scope done). |
 
 **Priority:** **High** leverage — lowers cost of §14.7 and Phase **15.1** invariant tests.
 
@@ -154,7 +154,7 @@ This section records **constraints that match today’s shipped architecture** a
 | Shared key + future minimal AuthZ | §15.5, §15.1, SECURITY / OPERATIONS |
 | Single-instance SQLite + local vector | Appendix, OPERATIONS, Phase 13 risk triggers; future datastore = Decision Log |
 | RAG eval + thresholds + CI | **§14.7** (complete — CI + OPERATIONS + evaldata + metrics) |
-| Integration tests + injectable clock | §15.3 |
+| Integration smoke + clock (idempotency) | §15.3 (initial); broader injection follow-up |
 | DOMAIN.md + policy + invariants | §15.1–15.2 |
 | Deploy / process lifecycle | Infrastructure Notes, OPERATIONS, Phase 13 closed slices |
 
@@ -222,7 +222,7 @@ Aligned with the RAG subsection in [Current reality and improvement map](#curren
 | **Golden set** | `[x]` | [evaldata/README.md](../evaldata/README.md) + `evaldata/VERSION`; linked from [README.md](../README.md) and this roadmap. |
 | **Observability** | `[x]` | `knowledge_retrieval_requests_total{retrieval_profile,outcome}` and `knowledge_query_rewrite_applied_total{retrieval_profile}` on `GET /api/system/metrics`. |
 
-**Dependencies:** §15.3 integration fixtures (optional but recommended) to avoid brittle pure-mock tests when tightening retrieval.
+**Dependencies:** §15.3 integration fixtures are available; use them when tightening retrieval beyond pure mocks.
 
 **Explicit non-goals for 14.7:** Replace SQLite or `simple_local_v1` with Postgres/pgvector (that remains a **Decision Log** + capacity trigger, not part of 14.7).
 
@@ -237,24 +237,24 @@ Aligned with the RAG subsection in [Current reality and improvement map](#curren
 
 **Ordering principle (industrial default):** policy objects + invariants = **narrow, testable moves**; package reshuffle = **wide blast radius**. Do the former first. **§14.7** is complete; proceed with Phase **15** when ready—large AuthZ or datastore changes remain **Decision Log** items.
 
-### 15.1 Domain semantics and policy objects (before big split)
+### 15.1 Domain semantics and policy objects (before big split) — **complete**
 
-- `[ ]` **`docs/DOMAIN.md`** —Ubiquitous language: Session, Turn, FileContext, ChartIntent, ChartSpec, ToolCall, SafeguardDecision. **Exit:** PR template links for user-visible behavior changes.
-- `[ ]` **`SafeguardPolicy`** (or equivalent) —Typed inputs →decision; unit tests **without** HTTP. **Exit:** orchestration calls policy object, not ad hoc string rules.
-- `[ ]` **`ChartDataProvenancePolicy`** —Same: explicit provenance decisions vs implicit marker logic. **Exit:** tests without HTTP.
-- `[ ]` **Invariants** —Small pure helpers: e.g. chart spec persisted only with version; at most one file-context row semantics; failures are test-visible. **Exit:** tests fail when invariant broken.
+- `[x]` **`docs/DOMAIN.md`** —Ubiquitous language for sessions, file context, charts, safeguards; PR checklist in [`.github/pull_request_template.md`](../.github/pull_request_template.md).
+- `[x]` **`SafeguardPolicy`** —`backend.domain.safeguard_policy` (`RuleBasedSafeguardPolicy`); `RuleBasedSafeguardService` adapts `ChatMessage` lists; unit tests in `__tests__/test_domain_phase15.py` + existing safeguard tests.
+- `[x]` **Chart provenance** —`backend.domain.chart_types`, `chart_provenance_policy` (native tool dataframe + persist `none`→`uploaded` upgrade); `import-linter` layer **`backend.domain`** under **`backend.services`**.
+- `[x]` **Invariants** —`chart_spec_requires_version_field` in `build_session_payload`; tests in `__tests__/test_domain_phase15.py`.
 
-### 15.2 Large structural migration (after §15.1)
+### 15.2 Large structural migration (after §15.1) — **initial slice complete**
 
-- `[ ]` **Application / domain / infrastructure layout** —`backend/application/`, `backend/domain/`, adapters under clear names; `services/` as facades during migration; **update `import-linter` layers**. **Exit:** dependency graph doc; no new business rules in `routers/`.
-- `[ ]` **Session schema contract** —`docs/SESSION_SCHEMA.md`: message JSON version, read N- / write N, codec upgrade tests. **Exit:** round-trip old →new row tests (builds on Phase 13 migrations).
-- `[ ]` **Ports list** —Document stable `Protocol`s (`SessionRepository`, `LLMClient`, telemetry sink) in engineering standards; one **fake repository** test without SQLite file.
+- `[x]` **Application / domain / infrastructure layout** —`backend/application/` introduced (`history.list_session_summaries` for `GET /api/history` only); **`import-linter`** layer updated; **reuse** `backend/domain/` (15.1 policies). **Exit met:** [DEPENDENCY_GRAPH.md](DEPENDENCY_GRAPH.md) (current vs target); no new business rules in `routers/`. *Follow-up:* migrate additional routes behind `application/` iteratively.
+- `[x]` **Session schema contract** —[SESSION_SCHEMA.md](SESSION_SCHEMA.md) documents `SESSION_PAYLOAD_VERSION`, versioned dict vs legacy list, bump rules. **Exit met:** [test_fake_session_repository.py](../__tests__/test_fake_session_repository.py) in-memory `SessionRepository` round-trip (no SQLite file).
+- `[x]` **Ports list** —[PORTS.md](PORTS.md) + link from [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) §1.9; lists `SessionRepository`, `ConversationLogger`, `TitleGenerator`, `LLMClient`, telemetry.
 
-### 15.3 Testability
+### 15.3 Testability — **complete** (narrow scope per plan)
 
-- `[ ]` **Clock / random injection** —`Clock` (wall + monotonic) for TTL, rate limit, title paths; optional seeded RNG. **Exit:** no `time.sleep` for those behaviors.
-- `[ ]` **Single primary test entry** —**pytest** as primary for `__tests__/`; unittest shimmed where needed. **Exit:** one CI command documented.
-- `[ ]` **Integration tier** —`__tests__/integration/`: temp SQLite + `TestClient` for session + migrations (no Ollama). **Exit:** CI or optional job; under 30s runtime budget documented.
+- `[x]` **Clock / random injection** —`goat_ai/clocks.py`: `Clock` protocol, `SystemClock`, `FakeClock`; **`SQLiteIdempotencyStore`** accepts injectable clock; tests avoid `time.sleep` for TTL/expiry. *Deferred:* chat, rate limit, title paths.
+- `[x]` **Single primary test entry** —README + [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) §3.1: **`pytest`** canonical; `unittest discover` legacy/optional. CI unchanged (`python -m pytest __tests__/`).
+- `[x]` **Integration tier** —`__tests__/integration/conftest.py` + `test_app_smoke.py` (`/api/health`, `/api/ready` with Ollama skipped); pytest marker `integration`; ~30s budget documented.
 
 ### 15.4 Data (deep)
 

@@ -5,8 +5,10 @@ import hashlib
 import logging
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from pathlib import Path
+
+from goat_ai.clocks import Clock, SystemClock
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +37,10 @@ class ClaimResult:
 class SQLiteIdempotencyStore:
     """Persist and replay idempotent responses for selected API boundaries."""
 
-    def __init__(self, *, db_path: Path, ttl_sec: int) -> None:
+    def __init__(self, *, db_path: Path, ttl_sec: int, clock: Clock | None = None) -> None:
         self._db_path = db_path
         self._ttl_sec = max(1, ttl_sec)
+        self._clock: Clock = clock if clock is not None else SystemClock()
 
     def claim(
         self,
@@ -47,7 +50,7 @@ class SQLiteIdempotencyStore:
         scope: str,
         request_hash: str,
     ) -> ClaimResult:
-        now = datetime.now(timezone.utc)
+        now = self._clock.utc_now()
         now_iso = now.isoformat()
         expires_iso = (now + timedelta(seconds=self._ttl_sec)).isoformat()
 
@@ -134,7 +137,7 @@ class SQLiteIdempotencyStore:
         content_type: str,
         body: str,
     ) -> None:
-        expires_iso = (datetime.now(timezone.utc) + timedelta(seconds=self._ttl_sec)).isoformat()
+        expires_iso = (self._clock.utc_now() + timedelta(seconds=self._ttl_sec)).isoformat()
         with sqlite3.connect(self._db_path) as conn:
             conn.execute(
                 """

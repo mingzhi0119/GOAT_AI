@@ -10,6 +10,8 @@ from typing import Generator
 
 import pandas as pd
 
+from backend.domain.chart_provenance_policy import resolve_dataframe_for_native_chart_tool
+from backend.domain.chart_types import ChartDataSource
 from backend.models.chat import ChatMessage
 from backend.services.chart_compiler_v2 import compile_chart_spec_v2
 from backend.services.chat_runtime import (
@@ -22,7 +24,6 @@ from backend.services.safeguard_service import (
     SAFEGUARD_BLOCKED_TITLE,
     SafeguardAssessment,
 )
-from backend.services.session_message_codec import ChartDataSource
 from backend.services.session_service import last_user_message, persist_chat_session
 from backend.services.sse import sse_done_event, sse_token_event
 from backend.services.tabular_context import TabularContextExtractor
@@ -55,18 +56,6 @@ def _compose_system_prompt(
             "Additional instructions from the user (apply consistently):\n" + extra
         )
     return "\n\n".join(parts)
-
-
-def _default_chart_dataframe() -> pd.DataFrame:
-    """Provide a small fallback dataset for chart tool calls without uploads."""
-    return pd.DataFrame(
-        [
-            {"category": "A", "value": 42, "revenue": 120, "cost": 70, "month": "Jan"},
-            {"category": "B", "value": 28, "revenue": 95, "cost": 60, "month": "Feb"},
-            {"category": "C", "value": 18, "revenue": 80, "cost": 55, "month": "Mar"},
-            {"category": "D", "value": 12, "revenue": 72, "cost": 48, "month": "Apr"},
-        ]
-    )
 
 
 def _should_attempt_native_chart_tool(messages: list[ChatMessage]) -> bool:
@@ -124,9 +113,7 @@ class ChartToolOrchestrator:
         self, messages: list[ChatMessage]
     ) -> tuple[pd.DataFrame, ChartDataSource]:
         uploaded = self._tabular.extract_dataframe(messages)
-        if uploaded is not None:
-            return uploaded, "uploaded"
-        return _default_chart_dataframe(), "demo"
+        return resolve_dataframe_for_native_chart_tool(uploaded)
 
     def compile_tool_call(
         self,

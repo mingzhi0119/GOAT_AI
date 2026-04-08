@@ -5,6 +5,7 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 
+from backend.application.history import list_session_summaries
 from backend.dependencies import get_session_repository
 from backend.models.common import ErrorResponse
 from backend.models.history import (
@@ -28,7 +29,7 @@ def list_history(
     session_repository: SessionRepository = Depends(get_session_repository),
 ) -> HistorySessionListResponse:
     """Return session metadata rows for the history sidebar."""
-    sessions = [asdict(session) for session in session_repository.list_sessions()]
+    sessions = [asdict(session) for session in list_session_summaries(session_repository)]
     return HistorySessionListResponse.model_validate({"sessions": sessions})
 
 

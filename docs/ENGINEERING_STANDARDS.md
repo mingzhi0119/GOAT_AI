@@ -151,7 +151,7 @@ backend/
 ### 1.8 Import layers (enforced)
 
 - **Mechanical check:** from the repo root, run `lint-imports` (config: `pyproject.toml`). CI runs this before pytest.
-- **Intent:** outer layers must not import inward-only modules (e.g. `goat_ai` never imports `backend`; `backend.services` never imports `backend.routers`). Order is approximately: `main` → `routers` → `dependencies` → `services` → `models` → `http_security` → `config`/`types` → `goat_ai`.
+- **Intent:** outer layers must not import inward-only modules (e.g. `goat_ai` never imports `backend`; `backend.services` must not import `backend.application` or `backend.routers`). Order is enforced in `pyproject.toml`: `main` → `routers` → `dependencies` → `exception_handlers` → **`application`** → `services` → `domain` → `models` → … → `goat_ai`. See [DEPENDENCY_GRAPH.md](DEPENDENCY_GRAPH.md) for the diagram and “current vs target” wiring.
 - **Routers:** do not add direct `import goat_ai` / `from goat_ai` (use `backend.types` for shared type hints). `__tests__/test_router_direct_imports.py` also rejects direct `httpx` / `requests` / `pandas` / `openpyxl` in `backend/routers/`.
 - **Domain → HTTP:** `InferenceBackendUnavailable` (in `backend/services/exceptions.py`) is registered in `main` and maps to HTTP 503 for model listing endpoints; keep other routes using explicit `HTTPException` or the same pattern when you add more cross-cutting failures.
 
@@ -164,6 +164,11 @@ backend/
 - `models/` only: data shapes, no methods beyond validators.
 - `goat_ai/` (shared): LLM client, upload parsing, tools, **`chart_intent_v2`** (native tool intent models). No FastAPI imports and **no imports from `backend`** in the shared layer.
 - **Chat wire:** optional `file_context: bool` on `ChatMessage` marks upload-derived tabular context; persistence uses versioned `file_context_prompt` + `chart_spec` fields (legacy content sniff remains as fallback for old clients).
+
+### 1.9 Ports and persisted session JSON
+
+- **Ports (injectable boundaries):** [PORTS.md](PORTS.md) — `SessionRepository`, `ConversationLogger`, `TitleGenerator`, `LLMClient`, telemetry hooks.
+- **Session blob format:** [SESSION_SCHEMA.md](SESSION_SCHEMA.md) — `SESSION_PAYLOAD_VERSION`, `build_session_payload` / `decode_session_payload`, legacy list vs dict.
 
 ---
 
@@ -271,6 +276,8 @@ frontend/src/
 
 ### 3.1 Python (pytest)
 
+**Canonical runner:** `python -m pytest __tests__/ -v` (matches CI). Prefer **pytest** for new tests (`pytest` markers, fixtures, plain functions). `python -m unittest discover -s __tests__ -p "test_*.py" -v` remains **legacy / optional** for older files not yet migrated.
+
 **Minimum coverage targets**:
 
 | Module | Target |
@@ -286,7 +293,8 @@ frontend/src/
 __tests__/
 ├── test_chat_service.py
 ├── test_upload_service.py
-└── …                    # unittest discover — mock Ollama at Protocol boundary
+├── integration/         # pytest marker `integration` — app + SQLite paths (keep total CI time in budget)
+└── …                    # mock Ollama at Protocol boundary
 ```
 
 **Rules**:
@@ -530,6 +538,9 @@ Before every commit ask:
 
 When behavior changes, update:
 
+- `docs/DOMAIN.md` — ubiquitous terms and user-visible semantics (Phase 15.1); required when chat/chart/safeguard meaning changes
+- `docs/SESSION_SCHEMA.md` — when `SESSION_PAYLOAD_VERSION` or persisted session JSON shape changes
+- `docs/PORTS.md` / `docs/DEPENDENCY_GRAPH.md` — when injectable ports or layer import rules change
 - `README.md` — architecture, structure, or developer workflow
 - `docs/openapi.json` — committed OpenAPI from FastAPI (`backend.main:app`)
 - `docs/api.llm.yaml` — regenerate via `python -m tools.generate_llm_api_yaml` (from repository root)

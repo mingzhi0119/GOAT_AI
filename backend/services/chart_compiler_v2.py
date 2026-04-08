@@ -213,7 +213,8 @@ def _prepare_dataset(
 
     working = working.copy()
     if intent.time_grain != "none":
-        working[x_key] = _coerce_time_grain(working, x_key, intent.time_grain)
+        # Single-step column assign (avoids pandas 3.x chained-assignment FutureWarning).
+        working.loc[:, x_key] = _coerce_time_grain(working, x_key, intent.time_grain)
 
     truncated = False
     aggregate = any(

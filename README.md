@@ -123,7 +123,13 @@ Windows PowerShell:
 
 ## Testing
 
-Backend:
+Backend (canonical — matches CI):
+
+```bash
+python -m pytest __tests__/ -v --tb=short
+```
+
+Legacy optional runner for files still on `unittest` style:
 
 ```bash
 python -m unittest discover -s __tests__ -p "test_*.py" -v

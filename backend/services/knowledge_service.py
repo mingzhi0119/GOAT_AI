@@ -4,8 +4,6 @@ import hashlib
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from fastapi import UploadFile
-
 from backend.models.knowledge import (
     KnowledgeAnswerRequest,
     KnowledgeAnswerResponse,
@@ -44,13 +42,13 @@ from backend.services.knowledge_storage import (
     KnowledgeValidationError as StorageValidationError,
     persist_knowledge_bytes,
 )
-from backend.types import Settings
+from backend.types import AsyncUploadReader, Settings
 
 _VECTOR_BACKEND = "simple_local_v1"
 _MAX_READ_BYTES = 25 * 1024 * 1024
 
 
-def create_knowledge_upload(*, file: UploadFile, settings: Settings) -> KnowledgeUploadResponse:
+def create_knowledge_upload(*, file: AsyncUploadReader, settings: Settings) -> KnowledgeUploadResponse:
     """Persist a knowledge upload and register document metadata."""
     return create_knowledge_upload_from_bytes(
         content_type=file.content_type,
@@ -347,7 +345,7 @@ def _fallback_answer_scope(
     return KnowledgeSearchResponse(query=query, hits=hits)
 
 
-def _run_async_read(*, file: UploadFile) -> bytes:
+def _run_async_read(*, file: AsyncUploadReader) -> bytes:
     import asyncio
 
     return asyncio.run(file.read(_MAX_READ_BYTES))

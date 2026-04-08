@@ -12,6 +12,7 @@ except ImportError:  # pragma: no cover - environment without backend deps
     FastAPI = None  # type: ignore[assignment]
     TestClient = None  # type: ignore[assignment]
 
+from backend.models.upload import UploadAnalysisResponse
 from backend.services import log_service
 from goat_ai.config import Settings
 
@@ -49,7 +50,7 @@ class UploadRouterIntegrationTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmpdir.cleanup()
 
-    def test_upload_analyze_returns_prompt_without_chart(self) -> None:
+    def test_upload_analyze_returns_knowledge_rag_metadata_without_chart(self) -> None:
         response = self.client.post(
             "/api/upload/analyze",
             files={"file": ("data.csv", b"month,revenue\nJan,10\nFeb,12\n", "text/csv")},
@@ -58,26 +59,36 @@ class UploadRouterIntegrationTests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         payload = response.json()
         self.assertEqual("data.csv", payload["filename"])
-        self.assertIn("month", payload["prompt"])
+        self.assertIn("document_id", payload)
+        self.assertIn("ingestion_id", payload)
+        self.assertEqual("knowledge_rag", payload["retrieval_mode"])
         self.assertIsNone(payload["chart"])
 
     def test_upload_analyze_rejects_invalid_extension(self) -> None:
         response = self.client.post(
             "/api/upload/analyze",
-            files={"file": ("notes.txt", b"hello", "text/plain")},
+            files={"file": ("data.bin", b"hello", "application/octet-stream")},
         )
 
         self.assertEqual(400, response.status_code)
         body = response.json()
-        self.assertEqual("Only CSV and XLSX files are supported.", body["detail"])
+        self.assertIn("Supported knowledge upload types", body["detail"])
         self.assertEqual("BAD_REQUEST", body["code"])
 
     def test_upload_analyze_idempotency_replays_same_body(self) -> None:
         headers = {"Idempotency-Key": "upload-key-1"}
+        canned = UploadAnalysisResponse(
+            filename="data.csv",
+            document_id="doc-cached",
+            ingestion_id="ing-cached",
+            status="completed",
+            retrieval_mode="knowledge_rag",
+            chart=None,
+        )
         with patch(
-            "backend.routers.upload.analyze_upload",
-            return_value=("cached prompt", None),
-        ) as analyze_mock:
+            "backend.routers.upload.ingest_upload",
+            return_value=canned,
+        ) as ingest_mock:
             first = self.client.post(
                 "/api/upload/analyze",
                 files={"file": ("data.csv", b"month,revenue\nJan,10\n", "text/csv")},
@@ -92,7 +103,7 @@ class UploadRouterIntegrationTests(unittest.TestCase):
         self.assertEqual(200, first.status_code)
         self.assertEqual(200, second.status_code)
         self.assertEqual(first.json(), second.json())
-        self.assertEqual(1, analyze_mock.call_count)
+        self.assertEqual(1, ingest_mock.call_count)
 
     def test_upload_analyze_idempotency_rejects_payload_mismatch(self) -> None:
         headers = {"Idempotency-Key": "upload-key-mismatch"}
