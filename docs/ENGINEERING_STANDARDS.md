@@ -343,7 +343,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
+        with: { python-version: "3.14" }
       - run: pip install -r requirements.txt
       - run: python -m pytest __tests__/ -v --tb=short
 
@@ -367,7 +367,7 @@ jobs:
 | **Ports** | Env var with safe dev/prod defaults | `GOAT_SERVER_PORT=62606` for dev/prod parity behind the current single-port runtime-target policy |
 | **Base URLs** | Env var, never `localhost` hardcoded | `OLLAMA_BASE_URL=http://127.0.0.1:11434` |
 | **Node version** | Pin in `.nvmrc` and CI matrix | `24.14.1` |
-| **Python version** | Keep runtime/docs/CI aligned | `3.12` |
+| **Python version** | Keep runtime/docs/CI aligned | Production target `3.12.x`; CI uses `3.14` so `docs/openapi.json` matches `app.openapi()` from dev machines |
 | **Dependencies** | Exact pins in `requirements.txt` | `fastapi==0.135.2` |
 | **npm packages** | `package-lock.json` committed | `npm ci` in CI/deploy, never `npm install` |
 | **File encoding** | Always `encoding="utf-8"` on `open()` | `open(path, encoding="utf-8")` |

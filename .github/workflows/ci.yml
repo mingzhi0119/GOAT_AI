@@ -15,7 +15,8 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          # Match developer machines that regenerate docs/openapi.json; FastAPI schema can differ across minor Python versions.
+          python-version: "3.14"
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Ruff check

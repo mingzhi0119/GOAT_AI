@@ -34,7 +34,7 @@ Until such a feature ships, this table documents the **intended** model: **high-
 
 | Layer | Technology |
 |-------|------------|
-| Backend | FastAPI, Uvicorn, Python 3.12 |
+| Backend | FastAPI, Uvicorn, Python 3.12+ (CI uses 3.14 for contract tests) |
 | Frontend | React 19, TypeScript, Vite 8 |
 | LLM runtime | Ollama |
 | Data parsing | pandas, openpyxl, python-docx, pypdf |
