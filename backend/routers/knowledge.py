@@ -2,6 +2,15 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, UploadFile
 
+from backend.application.knowledge import (
+    answer,
+    create_upload,
+    get_ingestion_status,
+    get_upload_status,
+    search,
+    start_ingestion,
+)
+from backend.application.ports import KnowledgeDocumentNotFound, KnowledgeValidationError, Settings
 from backend.config import get_settings
 from backend.models.common import ErrorResponse
 from backend.models.knowledge import (
@@ -15,16 +24,6 @@ from backend.models.knowledge import (
     KnowledgeUploadResponse,
     KnowledgeUploadStatusResponse,
 )
-from backend.services.knowledge_service import (
-    answer_with_knowledge,
-    create_knowledge_upload,
-    get_knowledge_upload,
-    get_knowledge_ingestion_status,
-    search_knowledge,
-    start_knowledge_ingestion,
-)
-from backend.services.exceptions import KnowledgeDocumentNotFound, KnowledgeValidationError
-from backend.types import Settings
 
 router = APIRouter()
 
@@ -51,7 +50,7 @@ def post_knowledge_upload(
 ) -> KnowledgeUploadResponse:
     """Persist a knowledge upload and register document metadata."""
     try:
-        return create_knowledge_upload(file=file, settings=settings)
+        return create_upload(file=file, settings=settings)
     except KnowledgeValidationError as exc:
         _raise_bad_request(exc)
 
@@ -68,7 +67,7 @@ def get_knowledge_upload_status(
 ) -> KnowledgeUploadStatusResponse:
     """Return metadata for one persisted knowledge upload."""
     try:
-        return get_knowledge_upload(document_id=document_id, settings=settings)
+        return get_upload_status(document_id=document_id, settings=settings)
     except KnowledgeDocumentNotFound as exc:
         _raise_not_found(exc)
 
@@ -85,7 +84,7 @@ def post_knowledge_ingestion(
 ) -> KnowledgeIngestionResponse:
     """Start a knowledge ingestion job for one uploaded document."""
     try:
-        return start_knowledge_ingestion(request=request, settings=settings)
+        return start_ingestion(request=request, settings=settings)
     except KnowledgeDocumentNotFound as exc:
         _raise_not_found(exc)
     except KnowledgeValidationError as exc:
@@ -104,7 +103,7 @@ def get_knowledge_ingestion(
 ) -> KnowledgeIngestionStatusResponse:
     """Return status for one ingestion attempt."""
     try:
-        return get_knowledge_ingestion_status(ingestion_id=ingestion_id, settings=settings)
+        return get_ingestion_status(ingestion_id=ingestion_id, settings=settings)
     except KnowledgeDocumentNotFound as exc:
         _raise_not_found(exc)
 
@@ -121,7 +120,7 @@ def post_knowledge_search(
 ) -> KnowledgeSearchResponse:
     """Run pure retrieval against indexed knowledge chunks."""
     try:
-        return search_knowledge(request=request, settings=settings)
+        return search(request=request, settings=settings)
     except KnowledgeValidationError as exc:
         _raise_bad_request(exc)
 
@@ -138,6 +137,6 @@ def post_knowledge_answer(
 ) -> KnowledgeAnswerResponse:
     """Return a retrieval-backed answer with citations."""
     try:
-        return answer_with_knowledge(request=request, settings=settings)
+        return answer(request=request, settings=settings)
     except KnowledgeValidationError as exc:
         _raise_bad_request(exc)

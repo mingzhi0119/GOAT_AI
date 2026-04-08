@@ -246,9 +246,9 @@ Aligned with the RAG subsection in [Current reality and improvement map](#curren
 
 ### 15.2 Large structural migration (after §15.1) — **initial slice complete**
 
-- `[x]` **Application / domain / infrastructure layout** —`backend/application/` introduced (`history.list_session_summaries` for `GET /api/history` only); **`import-linter`** layer updated; **reuse** `backend/domain/` (15.1 policies). **Exit met:** [DEPENDENCY_GRAPH.md](DEPENDENCY_GRAPH.md) (current vs target); no new business rules in `routers/`. *Follow-up:* migrate additional routes behind `application/` iteratively.
+- `[x]` **Application / domain / infrastructure layout** —`backend/application/` now owns history, knowledge, media, models, system, upload/analyze, chat preflight, and code-sandbox gating; **`import-linter`** layer updated; **reuse** `backend/domain/` (15.1 policies). **Exit met:** [DEPENDENCY_GRAPH.md](DEPENDENCY_GRAPH.md) (current vs target); no new business rules in `routers/`. *Follow-up:* keep migrating any remaining helper logic behind `application/` iteratively.
 - `[x]` **Session schema contract** —[SESSION_SCHEMA.md](SESSION_SCHEMA.md) documents `SESSION_PAYLOAD_VERSION`, versioned dict vs legacy list, bump rules. **Exit met:** [test_fake_session_repository.py](../__tests__/test_fake_session_repository.py) in-memory `SessionRepository` round-trip (no SQLite file).
-- `[x]` **Ports list** —[PORTS.md](PORTS.md) + link from [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) §1.9; lists `SessionRepository`, `ConversationLogger`, `TitleGenerator`, `LLMClient`, telemetry.
+- `[x]` **Ports list** —[PORTS.md](PORTS.md) + link from [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) §1.9; lists `SessionRepository`, `ConversationLogger`, `TitleGenerator`, `LLMClient`, `Settings`, `SafeguardService`, `TabularContextExtractor`, and stable shared exceptions so routers/application import from one contract face.
 
 ### 15.3 Testability — **complete** (narrow scope per plan)
 

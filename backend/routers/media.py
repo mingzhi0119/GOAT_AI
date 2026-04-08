@@ -1,14 +1,13 @@
-"""POST /api/media/uploads — register a vision image attachment."""
+"""POST /api/media/uploads - register a vision image attachment."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 
+from backend.application.media import create_media_upload
+from backend.application.ports import MediaValidationError, Settings
 from backend.config import get_settings
 from backend.models.common import ErrorResponse
 from backend.models.media import MediaUploadResponse
-from backend.services.exceptions import MediaValidationError
-from backend.services.media_service import create_media_upload_from_bytes
-from backend.types import Settings
 
 router = APIRouter()
 
@@ -31,7 +30,7 @@ async def post_media_upload(
     """Persist and normalize a PNG/JPEG/WebP image for use with POST /api/chat."""
     try:
         raw = await file.read()
-        return create_media_upload_from_bytes(
+        return create_media_upload(
             content=raw,
             filename=file.filename or "",
             settings=settings,

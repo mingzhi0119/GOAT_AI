@@ -20,12 +20,14 @@ from backend.api_errors import (
     build_error_body,
     default_code_for_http_status,
 )
-from backend.services.exceptions import FeatureNotAvailable
-from backend.services.exceptions import InferenceBackendUnavailable
-from backend.services.exceptions import KnowledgeDocumentNotFound
+from backend.application.ports import (
+    FeatureNotAvailable,
+    InferenceBackendUnavailable,
+    KnowledgeDocumentNotFound,
+    MediaNotFound,
+    VisionNotSupported,
+)
 from backend.services.exceptions import KnowledgeFeatureNotImplemented
-from backend.services.exceptions import MediaNotFound
-from backend.services.exceptions import VisionNotSupported
 from goat_ai.feature_gates import feature_gate_public_detail
 from goat_ai.request_context import get_request_id
 
