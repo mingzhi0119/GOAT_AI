@@ -27,7 +27,17 @@ jobs:
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
             base_ref="origin/${GITHUB_BASE_REF}"
           else
-            base_ref="${GITHUB_EVENT_BEFORE}"
+            # push: GITHUB_EVENT_BEFORE may be unset (set -u) or all-zero for new branches
+            before="${GITHUB_EVENT_BEFORE:-}"
+            if [[ -n "${before}" && "${before}" != "0000000000000000000000000000000000000000" ]]; then
+              base_ref="${before}"
+            else
+              base_ref="$(git rev-parse HEAD^ 2>/dev/null || true)"
+            fi
+          fi
+          if [[ -z "${base_ref}" ]]; then
+            echo "No base ref for diff; skipping ruff format check on changed files."
+            exit 0
           fi
           mapfile -t changed_files < <(git diff --name-only --diff-filter=ACMRT "${base_ref}" "${GITHUB_SHA}" | grep -E '\.py$' || true)
           if (( ${#changed_files[@]} )); then
