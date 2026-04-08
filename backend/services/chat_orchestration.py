@@ -1,4 +1,5 @@
 """Collaborators for chat: prompt composition, chart tools, session finalize."""
+
 from __future__ import annotations
 
 import json
@@ -11,11 +12,15 @@ import pandas as pd
 
 from backend.models.chat import ChatMessage
 from backend.services.chart_compiler_v2 import compile_chart_spec_v2
-from backend.services.chat_runtime import ConversationLogEntry, ConversationLogger, SessionRepository, TitleGenerator
+from backend.services.chat_runtime import (
+    ConversationLogEntry,
+    ConversationLogger,
+    SessionRepository,
+    TitleGenerator,
+)
 from backend.services.safeguard_service import (
     SAFEGUARD_BLOCKED_TITLE,
     SafeguardAssessment,
-    SafeguardService,
 )
 from backend.services.session_message_codec import ChartDataSource
 from backend.services.session_service import last_user_message, persist_chat_session
@@ -35,7 +40,9 @@ _CHART_INTENT_RE = re.compile(
 )
 
 
-def _compose_system_prompt(base_prompt: str, user_name: str, system_instruction: str) -> str:
+def _compose_system_prompt(
+    base_prompt: str, user_name: str, system_instruction: str
+) -> str:
     """Merge base GOAT prompt, optional name, and optional user instructions."""
     parts: list[str] = [base_prompt]
     if user_name.strip():
@@ -82,13 +89,17 @@ def _compile_native_chart_tool_call(
         return None
 
     compiled_chart = compile_chart_spec_v2(dataframe, intent)
-    return compiled_chart.model_dump(mode="json") if compiled_chart is not None else None
+    return (
+        compiled_chart.model_dump(mode="json") if compiled_chart is not None else None
+    )
 
 
 class PromptComposer:
     """Compose the effective system prompt for chat orchestration."""
 
-    def compose(self, *, base_prompt: str, user_name: str, system_instruction: str) -> str:
+    def compose(
+        self, *, base_prompt: str, user_name: str, system_instruction: str
+    ) -> str:
         return _compose_system_prompt(base_prompt, user_name, system_instruction)
 
 
@@ -105,9 +116,13 @@ class ChartToolOrchestrator:
         llm: LLMClient,
         model: str,
     ) -> bool:
-        return _should_attempt_native_chart_tool(messages) and llm.supports_tool_calling(model)
+        return _should_attempt_native_chart_tool(
+            messages
+        ) and llm.supports_tool_calling(model)
 
-    def resolve_dataframe(self, messages: list[ChatMessage]) -> tuple[pd.DataFrame, ChartDataSource]:
+    def resolve_dataframe(
+        self, messages: list[ChatMessage]
+    ) -> tuple[pd.DataFrame, ChartDataSource]:
         uploaded = self._tabular.extract_dataframe(messages)
         if uploaded is not None:
             return uploaded, "uploaded"

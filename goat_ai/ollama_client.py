@@ -1,4 +1,5 @@
 """Ollama HTTP client — streaming APIs for SSE (FastAPI)."""
+
 from __future__ import annotations
 
 import json
@@ -131,8 +132,8 @@ class OllamaService:
         with self._breaker_lock:
             if self._breaker_state == "half_open":
                 self._breaker_state = "open"
-                self._breaker_open_until_monotonic = (
-                    time.monotonic() + float(self._s.ollama_circuit_breaker_open_sec)
+                self._breaker_open_until_monotonic = time.monotonic() + float(
+                    self._s.ollama_circuit_breaker_open_sec
                 )
                 self._read_failure_count = self._s.ollama_circuit_breaker_failures
                 return
@@ -140,13 +141,15 @@ class OllamaService:
             self._read_failure_count += 1
             if self._read_failure_count >= self._s.ollama_circuit_breaker_failures:
                 self._breaker_state = "open"
-                self._breaker_open_until_monotonic = (
-                    time.monotonic() + float(self._s.ollama_circuit_breaker_open_sec)
+                self._breaker_open_until_monotonic = time.monotonic() + float(
+                    self._s.ollama_circuit_breaker_open_sec
                 )
 
     def _sleep_before_retry(self, attempt_index: int) -> None:
         base_sec = float(self._s.ollama_read_retry_base_ms) / 1000.0
-        jitter_sec = random.uniform(0.0, float(self._s.ollama_read_retry_jitter_ms) / 1000.0)
+        jitter_sec = random.uniform(
+            0.0, float(self._s.ollama_read_retry_jitter_ms) / 1000.0
+        )
         backoff_sec = base_sec * (2 ** max(0, attempt_index - 1))
         time.sleep(max(0.0, backoff_sec + jitter_sec))
 
@@ -160,7 +163,9 @@ class OllamaService:
         timeout: float | tuple[float, float]
         if stream:
             read_timeout = float(
-                stream_timeout_sec if stream_timeout_sec is not None else self._s.generate_timeout
+                stream_timeout_sec
+                if stream_timeout_sec is not None
+                else self._s.generate_timeout
             )
             timeout = (5.0, read_timeout)
         else:
@@ -180,10 +185,14 @@ class OllamaService:
                 logger.info("Ollama tool calling unavailable or rejected: %s", exc)
                 raise ValueError("tool calling unavailable") from exc
             st = str(status_code) if status_code is not None else "none"
-            inc_ollama_error(code=OLLAMA_ERROR_API_CODE, endpoint="chat", http_status=st)
+            inc_ollama_error(
+                code=OLLAMA_ERROR_API_CODE, endpoint="chat", http_status=st
+            )
             raise OllamaUnavailable("Cannot reach Ollama /api/chat") from exc
         except requests.RequestException as exc:
-            inc_ollama_error(code=OLLAMA_ERROR_API_CODE, endpoint="chat", http_status="none")
+            inc_ollama_error(
+                code=OLLAMA_ERROR_API_CODE, endpoint="chat", http_status="none"
+            )
             raise OllamaUnavailable("Cannot reach Ollama /api/chat") from exc
 
     # ── Model list ────────────────────────────────────────────────────────────
@@ -207,10 +216,16 @@ class OllamaService:
                         self._cap_cache.pop(removed, None)
                 return names
             except requests.HTTPError as exc:
-                status_code = exc.response.status_code if exc.response is not None else None
-                last_http_status = str(status_code) if status_code is not None else "none"
+                status_code = (
+                    exc.response.status_code if exc.response is not None else None
+                )
+                last_http_status = (
+                    str(status_code) if status_code is not None else "none"
+                )
                 last_exc = exc
-                retryable = status_code is not None and self._is_retryable_http_status(status_code)
+                retryable = status_code is not None and self._is_retryable_http_status(
+                    status_code
+                )
                 if retryable and attempt < attempts:
                     self._sleep_before_retry(attempt)
                     continue
@@ -223,7 +238,9 @@ class OllamaService:
                 break
 
         self._mark_read_failure()
-        inc_ollama_error(code=OLLAMA_ERROR_API_CODE, endpoint="tags", http_status=last_http_status)
+        inc_ollama_error(
+            code=OLLAMA_ERROR_API_CODE, endpoint="tags", http_status=last_http_status
+        )
         raise OllamaUnavailable("Cannot reach Ollama /api/tags") from last_exc
 
     def get_model_capabilities(self, model: str) -> list[str]:
@@ -262,10 +279,16 @@ class OllamaService:
                         self._cap_cache[model] = (now + ttl_sec, list(normalized))
                 return normalized
             except requests.HTTPError as exc:
-                status_code = exc.response.status_code if exc.response is not None else None
-                last_http_status = str(status_code) if status_code is not None else "none"
+                status_code = (
+                    exc.response.status_code if exc.response is not None else None
+                )
+                last_http_status = (
+                    str(status_code) if status_code is not None else "none"
+                )
                 last_exc = exc
-                retryable = status_code is not None and self._is_retryable_http_status(status_code)
+                retryable = status_code is not None and self._is_retryable_http_status(
+                    status_code
+                )
                 if retryable and attempt < attempts:
                     self._sleep_before_retry(attempt)
                     continue
@@ -278,7 +301,9 @@ class OllamaService:
                 break
 
         self._mark_read_failure()
-        inc_ollama_error(code=OLLAMA_ERROR_API_CODE, endpoint="show", http_status=last_http_status)
+        inc_ollama_error(
+            code=OLLAMA_ERROR_API_CODE, endpoint="show", http_status=last_http_status
+        )
         raise OllamaUnavailable("Cannot reach Ollama /api/show") from last_exc
 
     def supports_tool_calling(self, model: str) -> bool:
@@ -333,7 +358,9 @@ class OllamaService:
             )
             res.raise_for_status()
         except requests.RequestException as exc:
-            inc_ollama_error(code=OLLAMA_ERROR_API_CODE, endpoint="generate", http_status="none")
+            inc_ollama_error(
+                code=OLLAMA_ERROR_API_CODE, endpoint="generate", http_status="none"
+            )
             raise OllamaUnavailable("Cannot reach Ollama /api/generate") from exc
         for line in res.iter_lines():
             if line:
@@ -362,7 +389,9 @@ class OllamaService:
             )
             res.raise_for_status()
         except requests.RequestException as exc:
-            inc_ollama_error(code=OLLAMA_ERROR_API_CODE, endpoint="generate", http_status="none")
+            inc_ollama_error(
+                code=OLLAMA_ERROR_API_CODE, endpoint="generate", http_status="none"
+            )
             raise OllamaUnavailable("Cannot reach Ollama /api/generate") from exc
         data = res.json()
         return str(data.get("response") or "").strip()

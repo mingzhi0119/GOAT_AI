@@ -2,6 +2,7 @@ param(
     [string]$ProjectDir = (Get-Location).Path,
     [string]$RepoUrl = "https://github.com/mingzhi0119/GOAT_AI.git",
     [string]$GitBranch = "main",
+    [string]$GitRef = $GitBranch,
     [string]$PythonBin = "python",
     [switch]$Quick,
     [switch]$SkipBuild,
@@ -31,7 +32,22 @@ function Stop-PidFileProcess {
     $rawPid = Get-Content -LiteralPath $PidFile -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($rawPid -and ($rawPid.ToString().Trim() -match '^\d+$')) {
         $pidValue = [int]$rawPid
-        Stop-ProcessTree -ProcessId $pidValue
+        $proc = Get-Process -Id $pidValue -ErrorAction SilentlyContinue
+        if ($null -ne $proc) {
+            Stop-Process -Id $pidValue -ErrorAction SilentlyContinue
+            for ($attempt = 0; $attempt -lt 30; $attempt++) {
+                if (-not (Get-Process -Id $pidValue -ErrorAction SilentlyContinue)) {
+                    break
+                }
+                Start-Sleep -Seconds 1
+            }
+
+            if (Get-Process -Id $pidValue -ErrorAction SilentlyContinue) {
+                Write-Step "Graceful shutdown timed out for PID $pidValue; forcing cleanup."
+                Stop-ProcessTree -ProcessId $pidValue
+                Stop-ProcessTreeTaskkill -ProcessId $pidValue
+            }
+        }
     }
 
     Remove-Item -LiteralPath $PidFile -Force -ErrorAction SilentlyContinue
@@ -257,7 +273,7 @@ $ServerPort = 62606
 $QuickLabel = if ($Quick.IsPresent) { " [QUICK mode]" } else { "" }
 $ResolvedOllamaBaseUrl = $null
 
-Write-Host "GOAT AI Windows deploy starting (branch: $GitBranch)$QuickLabel"
+Write-Host "GOAT AI Windows deploy starting (branch: $GitBranch, ref: $GitRef)$QuickLabel"
 
 Assert-CommandAvailable -Name git
 Assert-CommandAvailable -Name $PythonBin
@@ -270,7 +286,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $ProjectDir ".git"))) {
 
 Set-Location -LiteralPath $ProjectDir
 New-Item -ItemType Directory -Path $LogsDir -Force | Out-Null
-git checkout $GitBranch
+git checkout $GitRef
 
 if ($SyncGit.IsPresent) {
     Write-Step "Syncing to origin/$GitBranch"

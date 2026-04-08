@@ -3,11 +3,12 @@
 Phase 13 §13.0 — single module to satisfy import-layer rules (no sibling cross-imports).
 See ``docs/API_ERRORS.md`` for the registry.
 """
+
 from __future__ import annotations
 
 from typing import Any, Final
 
-from goat_ai.request_context import get_request_id, reset_request_id, set_request_id
+from goat_ai.request_context import get_request_id
 
 # ── Stable error codes (do not rename once shipped) ──────────────────────────
 INTERNAL_ERROR: Final = "INTERNAL_ERROR"
@@ -31,7 +32,9 @@ _DEFAULT_CODE_BY_STATUS: dict[int, str] = {
 }
 
 # Documented for Wave B client retry policy (not enforced here).
-RETRYABLE_CODES: frozenset[str] = frozenset({INFERENCE_BACKEND_UNAVAILABLE, RATE_LIMITED})
+RETRYABLE_CODES: frozenset[str] = frozenset(
+    {INFERENCE_BACKEND_UNAVAILABLE, RATE_LIMITED}
+)
 
 
 def default_code_for_http_status(status_code: int) -> str:
@@ -46,8 +49,14 @@ def build_error_body(
     status_code: int | None = None,
 ) -> dict[str, Any]:
     """Build ``{"detail", "code", "request_id"?}`` for JSON responses."""
-    resolved = code if code is not None else (
-        default_code_for_http_status(status_code) if status_code is not None else default_code_for_http_status(500)
+    resolved = (
+        code
+        if code is not None
+        else (
+            default_code_for_http_status(status_code)
+            if status_code is not None
+            else default_code_for_http_status(500)
+        )
     )
     body: dict[str, Any] = {"detail": detail, "code": resolved}
     rid = get_request_id()

@@ -33,6 +33,8 @@ Last updated: 2026-04-08
 - Load smoke utility `tools/load_chat_smoke.py` provides one-command p50/p95 validation against chat SSE + optional `/api/system/inference` snapshot
 - Session history contract now includes `schema_version` audit field; `updated_at` remains part of list/detail APIs
 - SQLite backup/restore runbook published at `docs/BACKUP_RESTORE.md` and linked from OPERATIONS
+- Security/tooling baseline now includes `docs/SECURITY.md`, `ruff check` in CI, `pip-audit` in CI, and changed-file `ruff format` gating for Python edits
+- Operations baseline now includes graceful shutdown, ref-aware rollback via `deploy.sh` / `deploy.ps1`, and Phase 13 risk trigger response notes in OPERATIONS
 
 ## Current API surface
 

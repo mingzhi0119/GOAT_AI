@@ -1,8 +1,8 @@
 """Pure Python compiler from ChartIntentV2 to validated Apache ECharts options."""
+
 from __future__ import annotations
 
 import re
-from typing import Any
 
 import pandas as pd
 
@@ -103,7 +103,9 @@ def _apply_filters(
     return filtered
 
 
-def _infer_x_key(df: pd.DataFrame, requested_x_key: str, series_keys: list[str]) -> str | None:
+def _infer_x_key(
+    df: pd.DataFrame, requested_x_key: str, series_keys: list[str]
+) -> str | None:
     resolved = resolve_column_name(df, requested_x_key)
     if resolved:
         return resolved
@@ -112,7 +114,9 @@ def _infer_x_key(df: pd.DataFrame, requested_x_key: str, series_keys: list[str])
     if temporal:
         return temporal[0]
 
-    non_numeric = [str(col) for col in df.columns if str(col) not in _numeric_columns(df)]
+    non_numeric = [
+        str(col) for col in df.columns if str(col) not in _numeric_columns(df)
+    ]
     for candidate in non_numeric:
         if candidate not in series_keys:
             return candidate
@@ -178,7 +182,9 @@ def _agg_name(series: ChartIntentSeriesV2) -> str:
     return f"{series.key}__{op}"
 
 
-def _build_aggregation_spec(series_list: list[ChartIntentSeriesV2]) -> dict[str, tuple[str, str]]:
+def _build_aggregation_spec(
+    series_list: list[ChartIntentSeriesV2],
+) -> dict[str, tuple[str, str]]:
     spec: dict[str, tuple[str, str]] = {}
     for item in series_list:
         op: AggregateOp = "sum" if item.aggregate == "none" else item.aggregate
@@ -187,7 +193,9 @@ def _build_aggregation_spec(series_list: list[ChartIntentSeriesV2]) -> dict[str,
     return spec
 
 
-def _prepare_dataset(df: pd.DataFrame, intent: ChartIntentV2, warnings: list[str]) -> tuple[list[dict[str, object]], str, list[ChartIntentSeriesV2], bool]:
+def _prepare_dataset(
+    df: pd.DataFrame, intent: ChartIntentV2, warnings: list[str]
+) -> tuple[list[dict[str, object]], str, list[ChartIntentSeriesV2], bool]:
     working = _apply_filters(df, intent.filters, warnings)
     if working.empty:
         warnings.append("Filters produced no rows; chart skipped.")
@@ -208,7 +216,9 @@ def _prepare_dataset(df: pd.DataFrame, intent: ChartIntentV2, warnings: list[str
         working[x_key] = _coerce_time_grain(working, x_key, intent.time_grain)
 
     truncated = False
-    aggregate = any(item.aggregate != "none" for item in series_list) or intent.chart_type in {
+    aggregate = any(
+        item.aggregate != "none" for item in series_list
+    ) or intent.chart_type in {
         "bar",
         "stacked_bar",
         "pie",
@@ -228,11 +238,17 @@ def _prepare_dataset(df: pd.DataFrame, intent: ChartIntentV2, warnings: list[str
         resolved_sort = resolve_column_name(grouped, intent.sort_by)
         sort_column = resolved_sort or intent.sort_by
         if sort_column in grouped.columns and intent.sort_direction != "none":
-            grouped = grouped.sort_values(sort_column, ascending=intent.sort_direction == "asc")
+            grouped = grouped.sort_values(
+                sort_column, ascending=intent.sort_direction == "asc"
+            )
         elif sort_column not in grouped.columns:
             warnings.append(f"Skipped unknown sort field: {intent.sort_by}")
 
-    row_limit = _MAX_ROWS if intent.chart_type in {"line", "area", "scatter"} else _MAX_CATEGORY_ROWS
+    row_limit = (
+        _MAX_ROWS
+        if intent.chart_type in {"line", "area", "scatter"}
+        else _MAX_CATEGORY_ROWS
+    )
     effective_top_n = intent.top_n or row_limit
     if len(grouped) > effective_top_n:
         grouped = grouped.head(effective_top_n)
@@ -270,11 +286,17 @@ def _build_option(
     series_list: list[ChartIntentSeriesV2],
     dataset: list[dict[str, object]],
 ) -> dict[str, object]:
-    title = intent.title.strip() or ", ".join(_series_label(item) for item in series_list)
+    title = intent.title.strip() or ", ".join(
+        _series_label(item) for item in series_list
+    )
 
     if intent.chart_type == "pie":
         item = series_list[0]
-        value_key = _agg_name(item) if any(key.startswith(f"{item.key}__") for key in dataset[0].keys()) else item.key
+        value_key = (
+            _agg_name(item)
+            if any(key.startswith(f"{item.key}__") for key in dataset[0].keys())
+            else item.key
+        )
         return {
             "title": {"text": title},
             "tooltip": {"trigger": "item"},
@@ -289,7 +311,9 @@ def _build_option(
             ],
         }
 
-    option = _build_common_option(title=title, x_key=x_key, series_list=series_list, dataset=dataset)
+    option = _build_common_option(
+        title=title, x_key=x_key, series_list=series_list, dataset=dataset
+    )
 
     chart_type = "bar" if intent.chart_type == "stacked_bar" else intent.chart_type
     if chart_type == "area":
@@ -313,7 +337,9 @@ def _build_option(
     return option
 
 
-def compile_chart_spec_v2(df: pd.DataFrame, intent: ChartIntentV2) -> ChartSpecV2 | None:
+def compile_chart_spec_v2(
+    df: pd.DataFrame, intent: ChartIntentV2
+) -> ChartSpecV2 | None:
     """Compile a high-level chart intent into a safe Apache ECharts payload."""
     warnings: list[str] = []
     dataset, x_key, series_list, truncated = _prepare_dataset(df, intent, warnings)

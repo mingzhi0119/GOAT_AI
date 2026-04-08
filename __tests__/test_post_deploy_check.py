@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from unittest.mock import Mock, patch
 
-from scripts.post_deploy_check import _expect_chat_stream_contract, _expect_runtime_target, _parse_sse_events
+from scripts.post_deploy_check import (
+    _expect_chat_stream_contract,
+    _expect_runtime_target,
+    _parse_sse_events,
+)
 
 
 def test_parse_sse_events_extracts_json_frames() -> None:

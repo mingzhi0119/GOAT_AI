@@ -57,7 +57,9 @@ def _expect_chat_stream_contract(base_url: str) -> int:
             f"{base_url}/api/chat",
             json={
                 "model": "gemma4:26b",
-                "messages": [{"role": "user", "content": "Say hello in three short tokens."}],
+                "messages": [
+                    {"role": "user", "content": "Say hello in three short tokens."}
+                ],
             },
             stream=True,
             timeout=(5, timeout_sec),
@@ -71,12 +73,18 @@ def _expect_chat_stream_contract(base_url: str) -> int:
                 return _fail("chat stream returned a non-object SSE payload")
             event_type = str(event.get("type"))
             if event_type == "error":
-                return _fail(f"chat stream first event was error: {event.get('message', '')}")
+                return _fail(
+                    f"chat stream first event was error: {event.get('message', '')}"
+                )
             if event_type != "token":
-                return _fail(f"chat stream first event was {event_type!r} instead of token")
+                return _fail(
+                    f"chat stream first event was {event_type!r} instead of token"
+                )
             return 0
     except requests.Timeout as exc:
-        return _fail(f"chat stream produced no SSE events before first-token timeout: {exc}")
+        return _fail(
+            f"chat stream produced no SSE events before first-token timeout: {exc}"
+        )
     finally:
         close = getattr(response, "close", None) if response is not None else None
         if callable(close):
@@ -85,7 +93,9 @@ def _expect_chat_stream_contract(base_url: str) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Verify GOAT AI post-deploy API contract checks.")
+    parser = argparse.ArgumentParser(
+        description="Verify GOAT AI post-deploy API contract checks."
+    )
     parser.add_argument("--base-url", default="http://127.0.0.1:62606")
     args = parser.parse_args()
     base_url = str(args.base_url).rstrip("/")
@@ -96,7 +106,9 @@ def main() -> int:
 
     ready = requests.get(f"{base_url}/api/ready", timeout=15)
     if ready.status_code != 200:
-        return _fail(f"ready check returned HTTP {ready.status_code}: {ready.text[:500]}")
+        return _fail(
+            f"ready check returned HTTP {ready.status_code}: {ready.text[:500]}"
+        )
     try:
         ready_body = ready.json()
     except json.JSONDecodeError:

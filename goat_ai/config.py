@@ -17,9 +17,7 @@ You give clear, professional business-oriented analysis. Be precise and cite spe
 Stay neutral, educational, and policy-safe: no harmful, discriminatory, or non-academic misuse of content.
 If you are unsure, say so briefly."""
 
-USER_FACING_ERROR = (
-    "Sorry, the AI service is temporarily unavailable. Please try again or check that Ollama is running."
-)
+USER_FACING_ERROR = "Sorry, the AI service is temporarily unavailable. Please try again or check that Ollama is running."
 _DOTENV_QUOTES: Final[tuple[str, str]] = ("'", '"')
 
 
@@ -131,13 +129,21 @@ def load_settings() -> Settings:
     _cap_ttl = int(os.environ.get("GOAT_MODEL_CAP_CACHE_TTL_SEC", "60"))
     _read_retry_attempts = int(os.environ.get("GOAT_OLLAMA_READ_RETRY_ATTEMPTS", "3"))
     _read_retry_base_ms = int(os.environ.get("GOAT_OLLAMA_READ_RETRY_BASE_MS", "120"))
-    _read_retry_jitter_ms = int(os.environ.get("GOAT_OLLAMA_READ_RETRY_JITTER_MS", "80"))
+    _read_retry_jitter_ms = int(
+        os.environ.get("GOAT_OLLAMA_READ_RETRY_JITTER_MS", "80")
+    )
     _breaker_failures = int(os.environ.get("GOAT_OLLAMA_CIRCUIT_BREAKER_FAILURES", "3"))
-    _breaker_open_sec = int(os.environ.get("GOAT_OLLAMA_CIRCUIT_BREAKER_OPEN_SEC", "20"))
+    _breaker_open_sec = int(
+        os.environ.get("GOAT_OLLAMA_CIRCUIT_BREAKER_OPEN_SEC", "20")
+    )
     _idempotency_ttl_sec = int(os.environ.get("GOAT_IDEMPOTENCY_TTL_SEC", "300"))
     _max_chat_messages = int(os.environ.get("GOAT_MAX_CHAT_MESSAGES", "120"))
-    _max_chat_payload_bytes = int(os.environ.get("GOAT_MAX_CHAT_PAYLOAD_BYTES", "512000"))
-    _chat_first_event_timeout_sec = int(os.environ.get("OLLAMA_CHAT_FIRST_EVENT_TIMEOUT", "90"))
+    _max_chat_payload_bytes = int(
+        os.environ.get("GOAT_MAX_CHAT_PAYLOAD_BYTES", "512000")
+    )
+    _chat_first_event_timeout_sec = int(
+        os.environ.get("OLLAMA_CHAT_FIRST_EVENT_TIMEOUT", "90")
+    )
     if _deploy_target not in {"auto", "server", "local"}:
         raise ValueError("GOAT_DEPLOY_TARGET must be one of: auto, server, local")
     if _rate_limit_window_sec < 1:

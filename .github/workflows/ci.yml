@@ -11,11 +11,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Ruff check
+        run: ruff check backend goat_ai scripts tools __tests__
+      - name: Ruff format check on changed Python files
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            base_ref="origin/${GITHUB_BASE_REF}"
+          else
+            base_ref="${GITHUB_EVENT_BEFORE}"
+          fi
+          mapfile -t changed_files < <(git diff --name-only --diff-filter=ACMRT "${base_ref}" "${GITHUB_SHA}" | grep -E '\.py$' || true)
+          if (( ${#changed_files[@]} )); then
+            ruff format --check "${changed_files[@]}"
+          fi
+      - name: Dependency audit
+        run: pip-audit -r requirements.txt
       - name: Import layer lint
         run: lint-imports
       - name: API Contract Gate

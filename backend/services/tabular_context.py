@@ -1,4 +1,5 @@
 """Injectable boundary for resolving tabular data embedded in chat messages."""
+
 from __future__ import annotations
 
 import io
@@ -9,7 +10,7 @@ from typing import Protocol
 import pandas as pd
 
 from backend.models.chat import ChatMessage
-from goat_ai.tools import CHART_DATA_CSV_MARKER, LEGACY_CSV_FENCE_SUBSTRING
+from goat_ai.tools import CHART_DATA_CSV_MARKER
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,9 @@ class EmbeddedCsvTabularExtractor:
                 try:
                     return pd.read_csv(io.StringIO(match.group(1)))
                 except Exception:
-                    logger.warning("Failed to parse embedded CSV from file-context message")
+                    logger.warning(
+                        "Failed to parse embedded CSV from file-context message"
+                    )
             return None
 
         for message in messages:

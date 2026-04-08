@@ -63,6 +63,8 @@ Important behavior:
 - Deploy defaults to the current checkout
 - `SYNC_GIT=1` is explicit opt-in
 - `deploy.sh` keeps the `nohup` + `logs/fastapi.pid` fallback path
+- `deploy.sh` and `deploy.ps1` now stop the current FastAPI process gracefully first, then force cleanup only if the drain window expires
+- Rollback uses an explicit ref: see [ROLLBACK.md](ROLLBACK.md)
 - Windows deploy reuses Ollama on `127.0.0.1:11434` when available unless `OLLAMA_BASE_URL` is explicitly set
 - Deploy now includes a post-deploy contract check (`scripts/post_deploy_check.py`) before success is reported
 
@@ -95,6 +97,7 @@ This project is designed for an unprivileged JupyterHub-style server environment
 | `GOAT_DEPLOY_TARGET` | `auto`, `server`, or `local` | `auto` |
 | `GOAT_SERVER_PORT` | Preferred server port | `62606` |
 | `GOAT_LOCAL_PORT` | Deprecated alias (single-port policy uses `GOAT_SERVER_PORT`) | `62606` |
+| `GIT_REF` | Explicit branch/tag/commit checkout target for rollback deploys | `main` |
 | `GOAT_GPU_UUID` | Preferred GPU UUID | empty |
 | `GOAT_GPU_INDEX` | GPU index fallback | `0` |
 | `GOAT_LATENCY_ROLLING_MAX_SAMPLES` | Inference average sample window | `20` |
@@ -194,6 +197,17 @@ kill "$(cat logs/fastapi.pid)"
 Stop-Process -Id (Get-Content .\logs\fastapi.pid)
 ```
 
+Graceful shutdown note:
+
+- The deploy scripts send a normal terminate signal first
+- They wait up to 30 seconds for the FastAPI worker to exit cleanly
+- Forced cleanup is a fallback, not the default path
+
+## Rollback
+
+- Use [ROLLBACK.md](ROLLBACK.md) for the end-to-end ref rollback procedure
+- If the rollback is caused by a schema or data regression, pair it with [BACKUP_RESTORE.md](BACKUP_RESTORE.md)
+
 ## Backup and restore
 
 - Runbook: [BACKUP_RESTORE.md](BACKUP_RESTORE.md)
@@ -211,6 +225,16 @@ Telemetry endpoints:
 - `GET /api/system/inference`
 
 If `nvidia-smi` is unavailable or unreadable, GPU telemetry should degrade gracefully instead of showing fake values.
+
+## Phase 13 risk triggers
+
+Treat the following as operational stop signs during Phase 13 rollout work:
+
+| Trigger | Response |
+|---------|----------|
+| Repeated SSE failure or timeout in post-deploy contract checks | Pause Wave B work, inspect `logs/fastapi.log` and Ollama logs, and do not advance the rollout until `/api/chat` emits SSE again. |
+| `/api/ready` flapping or sustained non-200 responses | Block Phase 14 structural refactors until readiness and deploy checks are stable across a full deploy cycle. |
+| `sqlite_log_write_failures_total` rising over a sustained window | Prioritize backup/restore drill and recovery work before any new persistence feature lands. |
 
 ## API ops summary
 
@@ -233,3 +257,4 @@ If `nvidia-smi` is unavailable or unreadable, GPU telemetry should degrade grace
 | GET | `/api/system/runtime-target` |
 
 For exact request and response details, use [API_REFERENCE.md](API_REFERENCE.md).
+For current upload/API threat notes, use [SECURITY.md](SECURITY.md).

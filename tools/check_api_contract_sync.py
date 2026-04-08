@@ -9,6 +9,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+# ruff: noqa: E402
 from backend.main import app
 from tools import generate_llm_api_yaml
 
@@ -25,7 +26,9 @@ def main() -> int:
     committed_openapi = OPENAPI_PATH.read_text(encoding="utf-8")
     if generated_openapi != committed_openapi:
         print("Contract check failed: docs/openapi.json is out of sync.")
-        print("Run: python -c \"import json; from backend.main import app; from pathlib import Path; Path('docs/openapi.json').write_text(json.dumps(app.openapi(), ensure_ascii=False, indent=2)+'\\n', encoding='utf-8')\"")
+        print(
+            "Run: python -c \"import json; from backend.main import app; from pathlib import Path; Path('docs/openapi.json').write_text(json.dumps(app.openapi(), ensure_ascii=False, indent=2)+'\\n', encoding='utf-8')\""
+        )
         return 1
 
     openapi_obj = json.loads(committed_openapi)

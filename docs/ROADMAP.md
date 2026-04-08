@@ -118,14 +118,14 @@ These are **not** "nice-to-have data tasks" — they unblock schema evolution an
 
 ### 13.5 Security and tooling
 
-- `[ ]` **Dependency audit in CI** —`pip-audit` on `requirements.txt`; fail vs warn policy documented. **Exit:** CI green on main.
-- `[ ]` **Upload / API threat notes** —`docs/SECURITY.md`: extensions vs sniff, zip bombs, CSV formula injection, shared API key model. **Exit:** OPERATIONS links it.
-- `[ ]` **Python lint/format in CI** —`ruff check` + `ruff format` (or equivalent). **Exit:** CI job.
+- `[x]` **Dependency audit in CI** —`pip-audit` on `requirements.txt`; fail vs warn policy documented. **Landed:** CI workflow step, pinned vulnerable dependencies updated, audit passes clean on the current lock set.
+- `[x]` **Upload / API threat notes** —`docs/SECURITY.md`: extensions vs sniff, zip bombs, CSV formula injection, shared API key model. **Landed:** OPERATIONS links it and documents the shared-key trust model.
+- `[x]` **Python lint/format in CI** —`ruff check` + `ruff format` on changed Python files (equivalent to a full-repo rewrite-free formatting gate). **Landed:** CI workflow step plus `ruff` config-compatible checks.
 
 ### 13.6 Release and operations (beyond Wave A)
 
-- `[ ]` **Graceful shutdown** —Uvicorn/SSE drain expectations and max wait. **Exit:** OPERATIONS.
-- `[ ]` **Rollback runbook** —Previous tag + venv + DB backup + post-deploy check. **Exit:** OPERATIONS link.
+- `[x]` **Graceful shutdown** —Uvicorn/SSE drain expectations and max wait. **Exit:** OPERATIONS.
+- `[x]` **Rollback runbook** —Previous tag + venv + DB backup + post-deploy check. **Exit:** OPERATIONS link.
 
 ### 13.7 Phase 13 non-goals
 
@@ -139,6 +139,47 @@ These are **not** "nice-to-have data tasks" — they unblock schema evolution an
 | **SSE** error rate or timeout above agreed threshold | Pause **Wave B** (client retry / **idempotency**) until root cause triaged. |
 | **`/api/ready`** flapping or sustained non-200 in prod | Block **Phase 14** structural refactors until **readiness** and deploy checks are stable. |
 | **`sqlite_log_write_failures_total`** (or equivalent) abnormal for a sustained window | Prioritize recovery + backup/restore drill before new persistence features. |
+
+---
+
+## Phase 13.9: Native Multimodal Capability Expansion
+
+**Target release band:** **late v1.4.x**, after Phase 13 exit criteria are stable and before Phase 14 structural refactors begin.
+**Goal:** Add **native image and video understanding** for Ollama models that explicitly support multimodal inputs, without weakening the existing text/chat contract or introducing silent fallback behavior.
+
+**Ordering principle:** **vision first, video second**. Treat image support as the MVP and video as a follow-on that can reuse the same capability contract, media-context pipeline, and SSE response model.
+
+### 13.9.1 Capability contract and model gating
+
+- `[ ]` **Explicit multimodal capabilities** —Extend model capability probing so the backend can distinguish `text`, `vision`, `video`, and `multimodal` support.
+- `[ ]` **Contract-first gating** —Expose multimodal support through the same black-box style contract used for chat/model capabilities; the UI must disable unsupported media flows instead of silently degrading them.
+- `[ ]` **Capability-aware model selection** —Surface a clear capability badge or equivalent UI signal so users can tell whether the currently selected model can read images or video.
+
+### 13.9.2 Image understanding MVP
+
+- `[ ]` **Image upload path** —Add a typed upload flow for images (`png`, `jpg/jpeg`, `webp` initially) with size limits, preview, and explicit attachment state.
+- `[ ]` **Media context service** —Create a backend service that normalizes image inputs, applies safe resizing/encoding, and converts them into the Ollama message format expected by native multimodal models.
+- `[ ]` **Chat integration** —Extend `POST /api/chat` so image attachments become first-class chat context instead of ad hoc prompt text.
+- `[ ]` **Failure behavior** —If the selected model does not support vision, return a clear, sanitized error and keep the text-only chat path intact.
+
+### 13.9.3 Video understanding follow-on
+
+- `[ ]` **Video upload path** —Add a typed upload flow for video files with clear size/duration guardrails.
+- `[ ]` **Frame extraction pipeline** —Implement a backend media pipeline that extracts representative frames and timestamps, then packages them as ordered multimodal context.
+- `[ ]` **Optional audio companion context** —If supported by the chosen implementation, add transcript or scene-summary context as a separate structured input rather than mixing it into the chat prompt.
+- `[ ]` **Native video gating** —Only enable direct video understanding when the selected model and backend pipeline both explicitly support it; otherwise, keep the feature disabled.
+
+### 13.9.4 Frontend experience
+
+- `[ ]` **Attachment UX** —Add image/video attachments to the chat composer with preview, removal, and clear status labels.
+- `[ ]` **User-facing model hints** —Show whether the current model can inspect uploaded media, and explain when an attachment is not usable by the selected model.
+- `[ ]` **No silent fallback** —Do not auto-convert media into hidden OCR/ASR text unless that behavior is intentionally exposed as a separate, explicit feature.
+
+### 13.9.5 Tests and release criteria
+
+- `[ ]` **Black-box contract tests** —Cover supported and unsupported multimodal requests at the API boundary, including image input success, video input success, and clean rejection for unsupported models.
+- `[ ]` **Service tests** —Unit test media normalization, capability gating, frame selection, and error handling without live Ollama dependencies.
+- `[ ]` **Operational readiness** —Document multimodal timeout, size, and format limits in OPERATIONS before enabling the UI entry points.
 
 ---
 
@@ -214,4 +255,5 @@ These are **not** "nice-to-have data tasks" — they unblock schema evolution an
 | 2026-04-07 | Phase 11 closed in v1.3.0 | `ChatStreamService` + orchestration split; tabular/title injection; log_service adapter-only guard; wire constants centralized; 79 unittest + 13 black-box OK |
 | 2026-04-07 | Phases 13-14 split from prior monolithic Phase 13 | **13** = priority 1; **14** = priority 2 (semantics before package reshuffle). |
 | 2026-04-07 | Phase 13 sequencing tightened | **§13.0** = migrations-as-artifacts + error model/registry **before** Wave A. **Wave A** = only four ops items (structured logs+`request_id`, metrics, **liveness**/**readiness**, persistence signals). **Ollama retry/circuit breaker** deferred to **Wave B** after Wave A. **Phase 14** = policy objects + invariants **before** `application/`/`domain/` split; **consumes** §13.0 error model, **does not redefine** it. |
-
+| 2026-04-08 | Phase 13.5 closed | `pip-audit` added to CI, `ruff check` added to CI, changed-file `ruff format` gate added, `docs/SECURITY.md` published, and known vulnerable dependency pins updated (`requests`, `python-multipart`). |
+| 2026-04-08 | Phase 13.6-13.8 closed | Graceful shutdown is now documented and implemented in deploy scripts; rollback has an explicit ref-aware runbook; Phase 13 risk triggers are documented in OPERATIONS. |
