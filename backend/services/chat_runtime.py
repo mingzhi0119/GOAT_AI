@@ -17,6 +17,7 @@ class SessionSummaryRecord:
     id: str
     title: str
     model: str
+    schema_version: int
     created_at: str
     updated_at: str
 
@@ -38,6 +39,7 @@ class SessionUpsertPayload:
     session_id: str
     title: str
     model: str
+    schema_version: int
     payload: dict[str, object]
     created_at: str
     updated_at: str
@@ -102,6 +104,7 @@ class SQLiteSessionRepository:
                 id=str(row["id"]),
                 title=str(row["title"]),
                 model=str(row["model"]),
+                schema_version=int(row.get("schema_version", 1)),
                 created_at=str(row["created_at"]),
                 updated_at=str(row["updated_at"]),
             )
@@ -117,6 +120,7 @@ class SQLiteSessionRepository:
             id=str(row["id"]),
             title=str(row["title"]),
             model=str(row["model"]),
+            schema_version=int(row.get("schema_version", 1)),
             created_at=str(row["created_at"]),
             updated_at=str(row["updated_at"]),
             messages=decoded.messages,
@@ -131,6 +135,7 @@ class SQLiteSessionRepository:
             session_id=payload.session_id,
             title=payload.title,
             model=payload.model,
+            schema_version=payload.schema_version,
             payload=payload.payload,
             created_at=payload.created_at,
             updated_at=payload.updated_at,

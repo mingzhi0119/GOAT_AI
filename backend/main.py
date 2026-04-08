@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from backend.config import CORS_ORIGINS, get_settings
+from backend.exception_handlers import register_exception_handlers
 from backend.http_security import register_http_security
 from backend.routers import chat, history, models, system, upload
 from backend.services import log_service
@@ -40,6 +41,8 @@ def create_app() -> FastAPI:
     settings = get_settings()
     log_service.init_db(settings.log_db_path)
     init_latency_metrics(settings.latency_rolling_max_samples)
+
+    register_exception_handlers(app)
 
     app.add_middleware(
         CORSMiddleware,

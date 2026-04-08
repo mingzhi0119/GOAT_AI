@@ -129,8 +129,9 @@ STATIC_DIR = "C:\\Users\\simon\\GOAT_AI\\frontend\\dist"
 backend/
 ├── main.py              # App factory: create_app() → FastAPI; mounts static, registers routers
 ├── config.py            # Settings wrapper; validated at startup/import boundary
+├── types.py             # Re-exports `Settings` / `LLMClient` for router signatures (no direct `goat_ai` in routers)
 ├── dependencies.py      # FastAPI Depends() factories (get_llm_client, get_tabular_context_extractor, …)
-├── exceptions.py        # Domain exception hierarchy
+├── http_security.py       # API key + rate limit middleware
 ├── routers/
 │   ├── chat.py          # POST /api/chat  (SSE streaming)
 │   ├── models.py        # GET  /api/models
@@ -147,13 +148,21 @@ backend/
     └── upload.py
 ```
 
+### 1.8 Import layers (enforced)
+
+- **Mechanical check:** from the repo root, run `lint-imports` (config: `pyproject.toml`). CI runs this before pytest.
+- **Intent:** outer layers must not import inward-only modules (e.g. `goat_ai` never imports `backend`; `backend.services` never imports `backend.routers`). Order is approximately: `main` → `routers` → `dependencies` → `services` → `models` → `http_security` → `config`/`types` → `goat_ai`.
+- **Routers:** do not add direct `import goat_ai` / `from goat_ai` (use `backend.types` for shared type hints). `__tests__/test_router_direct_imports.py` also rejects direct `httpx` / `requests` / `pandas` / `openpyxl` in `backend/routers/`.
+- **Domain → HTTP:** `InferenceBackendUnavailable` (in `backend/services/exceptions.py`) is registered in `main` and maps to HTTP 503 for model listing endpoints; keep other routes using explicit `HTTPException` or the same pattern when you add more cross-cutting failures.
+
 **Rules**:
 - `routers/` only: validate input, call service, return response.
 - `services/` only: orchestrate, no HTTP primitives.
 - **Tabular context for charts**: resolve upload-embedded tables through injectable `TabularContextExtractor` (`tabular_context.py`), not ad hoc regex scattered in orchestration.
 - **`log_service` imports:** under `backend/services/`, only `log_service.py` and `chat_runtime.py` may import `log_service` (enforced by `__tests__/test_architecture_boundaries.py`).
 - `models/` only: data shapes, no methods beyond validators.
-- `goat_ai/` (shared): LLM client, upload parsing, tools. No FastAPI imports in the shared layer.
+- `goat_ai/` (shared): LLM client, upload parsing, tools, **`chart_intent_v2`** (native tool intent models). No FastAPI imports and **no imports from `backend`** in the shared layer.
+- **Chat wire:** optional `file_context: bool` on `ChatMessage` marks upload-derived tabular context; persistence uses versioned `file_context_prompt` + `chart_spec` fields (legacy content sniff remains as fallback for old clients).
 
 ---
 

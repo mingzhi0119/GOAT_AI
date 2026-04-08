@@ -53,6 +53,7 @@ class HistoryRouterIntegrationTests(unittest.TestCase):
             session_id=session_id,
             title="Case discussion",
             model="llama3:latest",
+            schema_version=2,
             payload={
                 "version": 2,
                 "messages": [
@@ -71,11 +72,13 @@ class HistoryRouterIntegrationTests(unittest.TestCase):
         self.assertIn("sessions", list_data)
         self.assertEqual(1, len(list_data["sessions"]))
         self.assertEqual(session_id, list_data["sessions"][0]["id"])
+        self.assertEqual(2, list_data["sessions"][0]["schema_version"])
 
         detail_resp = self.client.get(f"/api/history/{session_id}")
         self.assertEqual(200, detail_resp.status_code)
         detail_data = detail_resp.json()
         self.assertEqual("Case discussion", detail_data["title"])
+        self.assertEqual(2, detail_data["schema_version"])
         self.assertEqual(2, len(detail_data["messages"]))
 
         missing_resp = self.client.get("/api/history/not-found")
@@ -94,6 +97,7 @@ class HistoryRouterIntegrationTests(unittest.TestCase):
                 session_id=sid,
                 title=title,
                 model="m",
+                schema_version=2,
                 payload={
                     "version": 2,
                     "messages": [{"role": "user", "content": "x"}],

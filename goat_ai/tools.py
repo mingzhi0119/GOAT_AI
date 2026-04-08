@@ -12,6 +12,8 @@ CHART_DATA_CSV_MARKER = "CHART_DATA_CSV"
 _CSV_EMBED_MARKER = CHART_DATA_CSV_MARKER
 
 FILE_CONTEXT_UPLOAD_PREFIX = "[User uploaded tabular data for analysis]"
+# Substring used to locate embedded CSV in user content (legacy wire + sniff fallback).
+LEGACY_CSV_FENCE_SUBSTRING = f"{CHART_DATA_CSV_MARKER}:\n```\n"
 
 # Instructions appended to every file-context prompt that explain the :::chart
 # structured-output protocol to the LLM.

@@ -159,13 +159,14 @@ export function useChat(): UseChatReturn {
       let baseHistory: ChatMessage[] = messagesRef.current.map(m => ({
         role: m.role,
         content: m.content,
+        ...(m.file_context ? { file_context: true as const } : {}),
       }))
       if (
         fileContextPrompt &&
         !baseHistory.some(m => m.role === 'user' && m.content === fileContextPrompt)
       ) {
         baseHistory = [
-          { role: 'user', content: fileContextPrompt },
+          { role: 'user', content: fileContextPrompt, file_context: true },
           { role: 'assistant', content: FILE_CONTEXT_REPLY },
           ...baseHistory,
         ]

@@ -37,6 +37,7 @@ schemas:
     properties:
       role: string
       content: string
+      file_context: boolean
   ChatRequest:
     type: object
     required:
@@ -53,8 +54,11 @@ schemas:
     type: object
     required:
       - detail
+      - code
     properties:
-      detail: string
+      detail: string|any[]|object
+      code: string
+      request_id: string|null
   GPUStatusResponse:
     type: object
     required:
@@ -78,6 +82,7 @@ schemas:
       - id
       - title
       - model
+      - schema_version
       - created_at
       - updated_at
       - messages
@@ -85,6 +90,7 @@ schemas:
       id: string
       title: string
       model: string
+      schema_version: integer
       created_at: string
       updated_at: string
       messages: HistorySessionMessage[]
@@ -117,12 +123,14 @@ schemas:
       - id
       - title
       - model
+      - schema_version
       - created_at
       - updated_at
     properties:
       id: string
       title: string
       model: string
+      schema_version: integer
       created_at: string
       updated_at: string
   InferenceLatencyResponse:
@@ -337,6 +345,20 @@ endpoints:
     path: /system/runtime-target
     response:
       200: RuntimeTargetResponse
+      errors:
+        - 401
+        - 429
+  - op: get_ready
+    method: GET
+    path: /ready
+    response:
+      200: object
+      errors:
+        - 503
+  - op: get_system_metrics
+    method: GET
+    path: /system/metrics
+    response:
       errors:
         - 401
         - 429

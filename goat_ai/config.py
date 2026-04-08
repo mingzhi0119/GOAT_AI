@@ -29,6 +29,11 @@ def _strip_wrapped_quotes(value: str) -> str:
     return value
 
 
+def load_dotenv_if_present() -> None:
+    """Load ``APP_ROOT/.env`` when present (idempotent for keys already in the environment)."""
+    _load_dotenv_file(APP_ROOT / ".env")
+
+
 def _load_dotenv_file(dotenv_path: Path) -> None:
     if not dotenv_path.is_file():
         return
@@ -96,6 +101,15 @@ class Settings:
     gpu_target_index: int = 0
     latency_rolling_max_samples: int = 20
     model_cap_cache_ttl_sec: int = 60
+    ready_skip_ollama_probe: bool = False
+    ollama_read_retry_attempts: int = 3
+    ollama_read_retry_base_ms: int = 120
+    ollama_read_retry_jitter_ms: int = 80
+    ollama_circuit_breaker_failures: int = 3
+    ollama_circuit_breaker_open_sec: int = 20
+    idempotency_ttl_sec: int = 300
+    max_chat_messages: int = 120
+    max_chat_payload_bytes: int = 512000
 
     @property
     def user_facing_error(self) -> str:
@@ -114,6 +128,14 @@ def load_settings() -> Settings:
     _local_port = int(os.environ.get("GOAT_LOCAL_PORT", str(_server_port)))
     _lat_n = int(os.environ.get("GOAT_LATENCY_ROLLING_MAX_SAMPLES", "20"))
     _cap_ttl = int(os.environ.get("GOAT_MODEL_CAP_CACHE_TTL_SEC", "60"))
+    _read_retry_attempts = int(os.environ.get("GOAT_OLLAMA_READ_RETRY_ATTEMPTS", "3"))
+    _read_retry_base_ms = int(os.environ.get("GOAT_OLLAMA_READ_RETRY_BASE_MS", "120"))
+    _read_retry_jitter_ms = int(os.environ.get("GOAT_OLLAMA_READ_RETRY_JITTER_MS", "80"))
+    _breaker_failures = int(os.environ.get("GOAT_OLLAMA_CIRCUIT_BREAKER_FAILURES", "3"))
+    _breaker_open_sec = int(os.environ.get("GOAT_OLLAMA_CIRCUIT_BREAKER_OPEN_SEC", "20"))
+    _idempotency_ttl_sec = int(os.environ.get("GOAT_IDEMPOTENCY_TTL_SEC", "300"))
+    _max_chat_messages = int(os.environ.get("GOAT_MAX_CHAT_MESSAGES", "120"))
+    _max_chat_payload_bytes = int(os.environ.get("GOAT_MAX_CHAT_PAYLOAD_BYTES", "512000"))
     if _deploy_target not in {"auto", "server", "local"}:
         raise ValueError("GOAT_DEPLOY_TARGET must be one of: auto, server, local")
     if _rate_limit_window_sec < 1:
@@ -128,6 +150,22 @@ def load_settings() -> Settings:
         raise ValueError("GOAT_LATENCY_ROLLING_MAX_SAMPLES must be >= 1")
     if _cap_ttl < 0:
         raise ValueError("GOAT_MODEL_CAP_CACHE_TTL_SEC must be >= 0")
+    if _read_retry_attempts < 1:
+        raise ValueError("GOAT_OLLAMA_READ_RETRY_ATTEMPTS must be >= 1")
+    if _read_retry_base_ms < 0:
+        raise ValueError("GOAT_OLLAMA_READ_RETRY_BASE_MS must be >= 0")
+    if _read_retry_jitter_ms < 0:
+        raise ValueError("GOAT_OLLAMA_READ_RETRY_JITTER_MS must be >= 0")
+    if _breaker_failures < 1:
+        raise ValueError("GOAT_OLLAMA_CIRCUIT_BREAKER_FAILURES must be >= 1")
+    if _breaker_open_sec < 1:
+        raise ValueError("GOAT_OLLAMA_CIRCUIT_BREAKER_OPEN_SEC must be >= 1")
+    if _idempotency_ttl_sec < 1:
+        raise ValueError("GOAT_IDEMPOTENCY_TTL_SEC must be >= 1")
+    if _max_chat_messages < 1:
+        raise ValueError("GOAT_MAX_CHAT_MESSAGES must be >= 1")
+    if _max_chat_payload_bytes < 1024:
+        raise ValueError("GOAT_MAX_CHAT_PAYLOAD_BYTES must be >= 1024")
     return Settings(
         ollama_base_url=base,
         generate_timeout=int(os.environ.get("OLLAMA_GENERATE_TIMEOUT", "120")),
@@ -149,4 +187,13 @@ def load_settings() -> Settings:
         gpu_target_index=int(os.environ.get("GOAT_GPU_INDEX", "0")),
         latency_rolling_max_samples=_lat_n,
         model_cap_cache_ttl_sec=_cap_ttl,
+        ready_skip_ollama_probe=_env_bool("GOAT_READY_SKIP_OLLAMA_PROBE", "false"),
+        ollama_read_retry_attempts=_read_retry_attempts,
+        ollama_read_retry_base_ms=_read_retry_base_ms,
+        ollama_read_retry_jitter_ms=_read_retry_jitter_ms,
+        ollama_circuit_breaker_failures=_breaker_failures,
+        ollama_circuit_breaker_open_sec=_breaker_open_sec,
+        idempotency_ttl_sec=_idempotency_ttl_sec,
+        max_chat_messages=_max_chat_messages,
+        max_chat_payload_bytes=_max_chat_payload_bytes,
     )

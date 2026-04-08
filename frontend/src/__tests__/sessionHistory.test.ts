@@ -18,7 +18,7 @@ describe('session history utils', () => {
     })
 
     expect(messages).toHaveLength(4)
-    expect(messages[0]).toMatchObject({ role: 'user', hidden: true })
+    expect(messages[0]).toMatchObject({ role: 'user', hidden: true, file_context: true })
     expect(messages[1]).toMatchObject({
       role: 'assistant',
       content: FILE_CONTEXT_REPLY,

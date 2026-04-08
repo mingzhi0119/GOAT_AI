@@ -4,8 +4,8 @@ Each successful (or partial) chat completion is appended as one row in the
 ``conversations`` table.  Errors inside this module are logged and swallowed
 so they never interrupt a live SSE stream.
 
-WAL journal mode is enabled at init time, making concurrent writes from
-multiple uvicorn workers safe without extra locking.
+Schema changes are applied via ``backend/migrations`` (see ``db_migrations``).
+WAL journal mode is enabled by the migration runner.
 """
 from __future__ import annotations
 
@@ -16,58 +16,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from backend.prometheus_metrics import inc_sqlite_log_write_failure
+
 logger = logging.getLogger(__name__)
 
-_DDL = """
-CREATE TABLE IF NOT EXISTS conversations (
-    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
-    created_at         TEXT    NOT NULL,
-    ip                 TEXT    NOT NULL,
-    model              TEXT    NOT NULL,
-    turn_count         INTEGER NOT NULL,
-    user_message       TEXT    NOT NULL,
-    assistant_response TEXT    NOT NULL,
-    response_ms        INTEGER,
-    user_name          TEXT    NOT NULL DEFAULT ''
-);
-
-CREATE TABLE IF NOT EXISTS sessions (
-    id         TEXT PRIMARY KEY,
-    title      TEXT NOT NULL DEFAULT '',
-    model      TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    messages   TEXT NOT NULL DEFAULT '[]'
-);
-"""
+_SQLITE_WRITE_METRIC_CODE = "SQLITE_WRITE_FAILED"
 
 
 def init_db(db_path: Path) -> None:
-    """Create the conversations table if it does not already exist.
+    """Apply SQL migrations under ``backend/migrations`` (WAL enabled by runner).
 
-    Also applies incremental schema migrations (idempotent).
-    Called once at application startup; safe to call multiple times.
+    Raises on migration failure so startup fails loud.
     """
-    try:
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(db_path) as conn:
-            conn.execute("PRAGMA journal_mode=WAL;")
-            conn.executescript(_DDL)
-            # Migration: add user_name column to existing databases
-            try:
-                conn.execute(
-                    "ALTER TABLE conversations ADD COLUMN user_name TEXT NOT NULL DEFAULT ''"
-                )
-            except sqlite3.OperationalError:
-                pass  # column already exists
-            # Migration: add session_id column to existing databases
-            try:
-                conn.execute("ALTER TABLE conversations ADD COLUMN session_id TEXT")
-            except sqlite3.OperationalError:
-                pass  # column already exists
-        logger.info("Chat log DB ready: %s", db_path)
-    except Exception:
-        logger.exception("Failed to initialise chat log DB at %s", db_path)
+    from backend.services.db_migrations import apply_migrations
+
+    apply_migrations(db_path)
+    logger.info("Chat log DB ready: %s", db_path)
 
 
 def log_conversation(
@@ -109,7 +73,18 @@ def log_conversation(
                 ),
             )
     except Exception:
-        logger.exception("Failed to log conversation to %s", db_path)
+        inc_sqlite_log_write_failure(operation="conversation", code=_SQLITE_WRITE_METRIC_CODE)
+        logger.error(
+            "Failed to log conversation to SQLite",
+            extra={
+                "event": "sqlite_log_write_failure",
+                "component": "log_service.log_conversation",
+                "operation": "conversation",
+                "code": _SQLITE_WRITE_METRIC_CODE,
+                "db_path": str(db_path),
+            },
+            exc_info=True,
+        )
 
 
 def upsert_session(
@@ -118,6 +93,7 @@ def upsert_session(
     session_id: str,
     title: str,
     model: str,
+    schema_version: int = 1,
     payload: dict[str, Any],
     created_at: str,
     updated_at: str,
@@ -128,18 +104,31 @@ def upsert_session(
         with sqlite3.connect(db_path) as conn:
             conn.execute(
                 """
-                INSERT INTO sessions (id, title, model, created_at, updated_at, messages)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO sessions (id, title, model, schema_version, created_at, updated_at, messages)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     title=excluded.title,
                     model=excluded.model,
+                    schema_version=excluded.schema_version,
                     updated_at=excluded.updated_at,
                     messages=excluded.messages
                 """,
-                (session_id, title, model, created_at, updated_at, encoded_payload),
+                (session_id, title, model, int(schema_version), created_at, updated_at, encoded_payload),
             )
     except Exception:
-        logger.exception("Failed to upsert session %s in %s", session_id, db_path)
+        inc_sqlite_log_write_failure(operation="session_upsert", code=_SQLITE_WRITE_METRIC_CODE)
+        logger.error(
+            "Failed to upsert session in SQLite",
+            extra={
+                "event": "sqlite_log_write_failure",
+                "component": "log_service.upsert_session",
+                "operation": "session_upsert",
+                "code": _SQLITE_WRITE_METRIC_CODE,
+                "db_path": str(db_path),
+                "session_id": session_id,
+            },
+            exc_info=True,
+        )
 
 
 def list_sessions(*, db_path: Path) -> list[dict[str, Any]]:
@@ -149,7 +138,7 @@ def list_sessions(*, db_path: Path) -> list[dict[str, Any]]:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 """
-                SELECT id, title, model, created_at, updated_at
+                SELECT id, title, model, schema_version, created_at, updated_at
                 FROM sessions
                 ORDER BY updated_at DESC
                 """
@@ -167,7 +156,7 @@ def get_session(*, db_path: Path, session_id: str) -> dict[str, Any] | None:
             conn.row_factory = sqlite3.Row
             row = conn.execute(
                 """
-                SELECT id, title, model, created_at, updated_at, messages
+                SELECT id, title, model, schema_version, created_at, updated_at, messages
                 FROM sessions
                 WHERE id = ?
                 """,
@@ -195,7 +184,19 @@ def delete_session(*, db_path: Path, session_id: str) -> None:
         with sqlite3.connect(db_path) as conn:
             conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
     except Exception:
-        logger.exception("Failed to delete session %s from %s", session_id, db_path)
+        inc_sqlite_log_write_failure(operation="session_delete", code=_SQLITE_WRITE_METRIC_CODE)
+        logger.error(
+            "Failed to delete session from SQLite",
+            extra={
+                "event": "sqlite_log_write_failure",
+                "component": "log_service.delete_session",
+                "operation": "session_delete",
+                "code": _SQLITE_WRITE_METRIC_CODE,
+                "db_path": str(db_path),
+                "session_id": session_id,
+            },
+            exc_info=True,
+        )
 
 
 def delete_all_sessions(*, db_path: Path) -> None:
@@ -204,4 +205,15 @@ def delete_all_sessions(*, db_path: Path) -> None:
         with sqlite3.connect(db_path) as conn:
             conn.execute("DELETE FROM sessions")
     except Exception:
-        logger.exception("Failed to delete all sessions from %s", db_path)
+        inc_sqlite_log_write_failure(operation="session_delete_all", code=_SQLITE_WRITE_METRIC_CODE)
+        logger.error(
+            "Failed to delete all sessions from SQLite",
+            extra={
+                "event": "sqlite_log_write_failure",
+                "component": "log_service.delete_all_sessions",
+                "operation": "session_delete_all",
+                "code": _SQLITE_WRITE_METRIC_CODE,
+                "db_path": str(db_path),
+            },
+            exc_info=True,
+        )

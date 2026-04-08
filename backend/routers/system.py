@@ -2,14 +2,19 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse, PlainTextResponse
 
-from backend.config import BACKEND_HOST, BACKEND_PORT, get_settings
+from backend.config import get_settings
 from backend.models.common import ErrorResponse
 from backend.models.system import GPUStatusResponse, InferenceLatencyResponse, RuntimeTargetResponse
+from backend.prometheus_metrics import render_prometheus_text
+from backend.readiness_service import evaluate_readiness
 from backend.services.gpu_service import read_gpu_status
-from goat_ai.config import Settings
-from goat_ai.latency_metrics import get_inference_snapshot
-from goat_ai.runtime_target import current_runtime_target, ordered_runtime_targets
+from backend.services.system_telemetry_service import (
+    build_inference_latency_response,
+    build_runtime_target_response,
+)
+from backend.types import Settings
 
 router = APIRouter()
 
@@ -33,18 +38,7 @@ def get_gpu_status(settings: Settings = Depends(get_settings)) -> GPUStatusRespo
 )
 def get_inference_latency() -> InferenceLatencyResponse:
     """Rolling average duration of completed chat streams (milliseconds)."""
-    snap = get_inference_snapshot()
-    return InferenceLatencyResponse(
-        chat_avg_ms=float(snap["chat_avg_ms"]),
-        chat_sample_count=int(snap["chat_sample_count"]),
-        chat_p50_ms=float(snap["chat_p50_ms"]),
-        chat_p95_ms=float(snap["chat_p95_ms"]),
-        first_token_avg_ms=float(snap["first_token_avg_ms"]),
-        first_token_sample_count=int(snap["first_token_sample_count"]),
-        first_token_p50_ms=float(snap["first_token_p50_ms"]),
-        first_token_p95_ms=float(snap["first_token_p95_ms"]),
-        model_buckets=dict(snap["model_buckets"]),
-    )
+    return build_inference_latency_response()
 
 
 @router.get(
@@ -55,14 +49,29 @@ def get_inference_latency() -> InferenceLatencyResponse:
 )
 def get_runtime_target(settings: Settings = Depends(get_settings)) -> RuntimeTargetResponse:
     """Return the current runtime target and the ordered deployment fallback list."""
-    current = current_runtime_target(
-        settings,
-        current_port=BACKEND_PORT,
-        host="127.0.0.1" if BACKEND_HOST == "0.0.0.0" else BACKEND_HOST,
-    )
-    ordered = ordered_runtime_targets(settings)
-    return RuntimeTargetResponse(
-        deploy_target=settings.deploy_target,
-        current=current.__dict__,
-        ordered_targets=[item.__dict__ for item in ordered],
+    return build_runtime_target_response(settings)
+
+
+@router.get(
+    "/ready",
+    summary="Readiness probe (SQLite + optional Ollama)",
+    responses={503: {"description": "Not ready; see JSON ``checks`` for failing dependency."}},
+)
+def get_ready(settings: Settings = Depends(get_settings)) -> JSONResponse:
+    """Return 200 when SQLite and (unless skipped) Ollama are reachable; 503 otherwise."""
+    body, status = evaluate_readiness(settings)
+    return JSONResponse(status_code=status, content=body)
+
+
+@router.get(
+    "/system/metrics",
+    response_class=PlainTextResponse,
+    summary="Prometheus text metrics",
+    responses={401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
+)
+def get_system_metrics() -> PlainTextResponse:
+    """Expose in-process counters and histograms for Prometheus scraping."""
+    return PlainTextResponse(
+        render_prometheus_text(),
+        media_type="text/plain; charset=utf-8",
     )

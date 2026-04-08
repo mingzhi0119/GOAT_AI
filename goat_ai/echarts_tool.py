@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.models.chart_v2 import ChartIntentV2
+from goat_ai.chart_intent_v2 import ChartIntentV2
 
 
 GENERATE_CHART_V2_SCHEMA: dict[str, Any] = {

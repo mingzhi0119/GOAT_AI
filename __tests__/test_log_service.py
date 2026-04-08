@@ -24,6 +24,7 @@ class LogServiceTests(unittest.TestCase):
             session_id=session_id,
             title="First chat",
             model="llama3:latest",
+            schema_version=2,
             payload={
                 "version": 2,
                 "messages": [{"role": "user", "content": "hello"}],
@@ -41,6 +42,7 @@ class LogServiceTests(unittest.TestCase):
         self.assertIsNotNone(detail)
         assert detail is not None
         self.assertEqual("First chat", detail["title"])
+        self.assertEqual(2, detail["schema_version"])
         self.assertIsInstance(detail["messages"], dict)
         self.assertEqual([{"role": "user", "content": "hello"}], detail["messages"]["messages"])
 

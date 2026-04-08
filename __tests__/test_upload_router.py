@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 try:
     from fastapi import FastAPI
@@ -16,6 +17,7 @@ from goat_ai.config import Settings
 
 if FastAPI is not None:
     from backend.config import get_settings
+    from backend.exception_handlers import register_exception_handlers
     from backend.routers import upload
 
 
@@ -39,6 +41,7 @@ class UploadRouterIntegrationTests(unittest.TestCase):
         log_service.init_db(self.settings.log_db_path)
 
         app = FastAPI()
+        register_exception_handlers(app)
         app.include_router(upload.router, prefix="/api")
         app.dependency_overrides[get_settings] = lambda: self.settings
         self.client = TestClient(app)
@@ -65,7 +68,48 @@ class UploadRouterIntegrationTests(unittest.TestCase):
         )
 
         self.assertEqual(400, response.status_code)
-        self.assertEqual("Only CSV and XLSX files are supported.", response.json()["detail"])
+        body = response.json()
+        self.assertEqual("Only CSV and XLSX files are supported.", body["detail"])
+        self.assertEqual("BAD_REQUEST", body["code"])
+
+    def test_upload_analyze_idempotency_replays_same_body(self) -> None:
+        headers = {"Idempotency-Key": "upload-key-1"}
+        with patch(
+            "backend.routers.upload.analyze_upload",
+            return_value=("cached prompt", None),
+        ) as analyze_mock:
+            first = self.client.post(
+                "/api/upload/analyze",
+                files={"file": ("data.csv", b"month,revenue\nJan,10\n", "text/csv")},
+                headers=headers,
+            )
+            second = self.client.post(
+                "/api/upload/analyze",
+                files={"file": ("data.csv", b"month,revenue\nJan,10\n", "text/csv")},
+                headers=headers,
+            )
+
+        self.assertEqual(200, first.status_code)
+        self.assertEqual(200, second.status_code)
+        self.assertEqual(first.json(), second.json())
+        self.assertEqual(1, analyze_mock.call_count)
+
+    def test_upload_analyze_idempotency_rejects_payload_mismatch(self) -> None:
+        headers = {"Idempotency-Key": "upload-key-mismatch"}
+        first = self.client.post(
+            "/api/upload/analyze",
+            files={"file": ("data.csv", b"month,revenue\nJan,10\n", "text/csv")},
+            headers=headers,
+        )
+        second = self.client.post(
+            "/api/upload/analyze",
+            files={"file": ("data.csv", b"month,revenue\nJan,11\n", "text/csv")},
+            headers=headers,
+        )
+        self.assertEqual(200, first.status_code)
+        self.assertEqual(409, second.status_code)
+        body = second.json()
+        self.assertEqual("IDEMPOTENCY_CONFLICT", body["code"])
 
 
 if __name__ == "__main__":

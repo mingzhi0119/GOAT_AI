@@ -1,0 +1,19 @@
+[tool.importlinter]
+root_packages = ["backend", "goat_ai"]
+include_external_packages = true
+
+# First row = outermost. Sibling layers (same | group) may not import each other.
+[[tool.importlinter.contracts]]
+name = "Backend layers: HTTP over wiring over app over shared"
+type = "layers"
+layers = [
+    "backend.main",
+    "backend.routers",
+    "backend.dependencies",
+    "backend.exception_handlers",
+    "backend.services",
+    "backend.models",
+    "backend.http_security",
+    "backend.api_errors | backend.config | backend.types",
+    "goat_ai",
+]

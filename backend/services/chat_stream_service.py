@@ -5,10 +5,12 @@ import logging
 import re
 import time
 from collections.abc import Generator
+from types import SimpleNamespace
 
 import pandas as pd
 
 from backend.models.chat import ChatMessage
+from backend.prometheus_metrics import inc_chat_stream_completed
 from backend.services.chat_orchestration import (
     ChartToolOrchestrator,
     PromptComposer,
@@ -126,6 +128,58 @@ class ChatStreamService:
         tabular_extractor: TabularContextExtractor | None = None,
     ) -> Generator[str, None, None]:
         """Yield SSE-formatted events for a chat completion."""
+        run = self._phase_prepare_runtime(
+            llm=llm,
+            model=model,
+            messages=messages,
+            system_prompt=system_prompt,
+            ip=ip,
+            conversation_logger=conversation_logger,
+            user_name=user_name,
+            session_id=session_id,
+            all_messages=all_messages,
+            session_repository=session_repository,
+            title_generator=title_generator,
+            safeguard_service=safeguard_service,
+            system_instruction=system_instruction,
+            ollama_options=ollama_options,
+            tabular_extractor=tabular_extractor,
+        )
+        yield from self._phase_input_guard(run)
+        error_message: str | None = None
+        try:
+            yield from self._phase_llm_token_stream(run)
+        except OllamaUnavailable as exc:
+            logger.warning("Ollama unavailable during chat stream: %s", exc)
+            error_message = "AI service temporarily unavailable."
+            yield sse_error_event(error_message)
+        except Exception:
+            logger.exception("Unexpected error during chat stream")
+            error_message = "An unexpected error occurred."
+            yield sse_error_event(error_message)
+        finally:
+            yield from self._phase_emit_completion(run, error_message)
+
+    def _phase_prepare_runtime(
+        self,
+        *,
+        llm: LLMClient,
+        model: str,
+        messages: list[ChatMessage],
+        system_prompt: str,
+        ip: str,
+        conversation_logger: ConversationLogger,
+        user_name: str,
+        session_id: str | None,
+        all_messages: list[ChatMessage] | None,
+        session_repository: SessionRepository | None,
+        title_generator: TitleGenerator | None,
+        safeguard_service: SafeguardService | None,
+        system_instruction: str,
+        ollama_options: dict[str, float | int] | None,
+        tabular_extractor: TabularContextExtractor | None,
+    ) -> SimpleNamespace:
+        """Assemble collaborators, derived turns, and mutable stream state."""
         prompt_composer = PromptComposer()
         chart_orchestrator = ChartToolOrchestrator(
             tabular_extractor or EmbeddedCsvTabularExtractor(),
@@ -138,198 +192,231 @@ class ChatStreamService:
             user_name=user_name,
             system_instruction=system_instruction,
         )
-        emitted_chart_spec: dict[str, object] | None = None
-        chart_data_source: ChartDataSource = "none"
-        buffer: list[str] = []
         holdback_tokens = _STREAM_OUTPUT_HOLDBACK_TOKENS if safeguard_service is not None else 0
         output_buffer = _StreamingOutputBuffer(
             safeguard_service,
             latest_user_text,
             holdback_tokens=holdback_tokens,
         )
-        started_at = time.monotonic()
-        first_token_emitted_at: float | None = None
-        safeguard = safeguard_service
-        error_message: str | None = None
         should_use_native_chart_tools = chart_orchestrator.should_use_tools(
             messages=messages,
             llm=llm,
             model=model,
         )
         chart_dataframe: pd.DataFrame | None = None
+        chart_data_source: ChartDataSource = "none"
         if should_use_native_chart_tools:
             chart_dataframe, chart_data_source = chart_orchestrator.resolve_dataframe(messages)
 
-        if safeguard is not None:
-            input_assessment = safeguard.review_input(
-                messages=messages,
-                system_instruction=system_instruction,
-            )
-            if not input_assessment.allowed:
-                yield from persistence.yield_blocked_response(
-                    assessment=input_assessment,
-                    model=model,
-                    messages=messages,
-                    system_prompt=system_prompt,
-                    ip=ip,
-                    conversation_logger=conversation_logger,
-                    user_name=user_name,
-                    session_id=session_id,
-                    all_messages=all_messages,
-                    session_repository=session_repository,
-                    title_generator=title_generator,
-                    started_at=started_at,
-                )
-                return
+        return SimpleNamespace(
+            llm=llm,
+            model=model,
+            messages=messages,
+            system_prompt=system_prompt,
+            ip=ip,
+            conversation_logger=conversation_logger,
+            user_name=user_name,
+            session_id=session_id,
+            all_messages=all_messages,
+            session_repository=session_repository,
+            title_generator=title_generator,
+            safeguard=safeguard_service,
+            system_instruction=system_instruction,
+            ollama_options=ollama_options,
+            prompt_composer=prompt_composer,
+            chart_orchestrator=chart_orchestrator,
+            persistence=persistence,
+            turns=turns,
+            latest_user_text=latest_user_text,
+            effective_prompt=effective_prompt,
+            output_buffer=output_buffer,
+            should_use_native_chart_tools=should_use_native_chart_tools,
+            chart_dataframe=chart_dataframe,
+            chart_data_source=chart_data_source,
+            started_at=time.monotonic(),
+            first_token_emitted_at=None,
+            emitted_chart_spec=None,
+            buffer=[],
+        )
 
-        try:
-            if should_use_native_chart_tools and chart_dataframe is not None:
-                followup_messages: list[dict[str, object]] | None = None
-                for event in llm.stream_tokens_with_tools(
-                    model,
-                    turns,
-                    effective_prompt,
-                    tools=[GENERATE_CHART_V2_SCHEMA],
-                    ollama_options=ollama_options,
-                ):
-                    if isinstance(event, str):
-                        buffer.append(event)
-                        for token_event in output_buffer.push(event):
-                            if first_token_emitted_at is None:
-                                first_token_emitted_at = time.monotonic()
-                            yield token_event
-                        if output_buffer.blocked:
-                            break
-                        continue
+    def _phase_input_guard(self, run: SimpleNamespace) -> Generator[str, None, None]:
+        """Block unsafe input before any LLM call."""
+        if run.safeguard is None:
+            return
+        input_assessment = run.safeguard.review_input(
+            messages=run.messages,
+            system_instruction=run.system_instruction,
+        )
+        if input_assessment.allowed:
+            return
+        run.input_blocked = True  # type: ignore[attr-defined]
+        yield from run.persistence.yield_blocked_response(
+            assessment=input_assessment,
+            model=run.model,
+            messages=run.messages,
+            system_prompt=run.system_prompt,
+            ip=run.ip,
+            conversation_logger=run.conversation_logger,
+            user_name=run.user_name,
+            session_id=run.session_id,
+            all_messages=run.all_messages,
+            session_repository=run.session_repository,
+            title_generator=run.title_generator,
+            started_at=run.started_at,
+        )
 
-                    chart_spec = chart_orchestrator.compile_tool_call(
-                        tool_plan=event,
-                        dataframe=chart_dataframe,
-                    )
-                    if chart_spec is None:
-                        continue
+    def _phase_llm_token_stream(self, run: SimpleNamespace) -> Generator[str, None, None]:
+        """Stream model tokens (native chart tool path or plain completion)."""
+        if getattr(run, "input_blocked", False):
+            return
 
-                    emitted_chart_spec = chart_spec
-                    followup_messages = chart_orchestrator.build_followup_messages(
-                        turns=turns,
-                        effective_prompt=effective_prompt,
-                        tool_event=event,
-                        chart_spec=chart_spec,
-                    )
+        if run.should_use_native_chart_tools and run.chart_dataframe is not None:
+            yield from self._stream_native_chart_tool_path(run)
+        else:
+            yield from self._stream_plain_completion(run)
+
+    def _stream_native_chart_tool_path(self, run: SimpleNamespace) -> Generator[str, None, None]:
+        followup_messages: list[dict[str, object]] | None = None
+        for event in run.llm.stream_tokens_with_tools(
+            run.model,
+            run.turns,
+            run.effective_prompt,
+            tools=[GENERATE_CHART_V2_SCHEMA],
+            ollama_options=run.ollama_options,
+        ):
+            if isinstance(event, str):
+                run.buffer.append(event)
+                for token_event in run.output_buffer.push(event):
+                    if run.first_token_emitted_at is None:
+                        run.first_token_emitted_at = time.monotonic()
+                    yield token_event
+                if run.output_buffer.blocked:
                     break
+                continue
 
-                if followup_messages is not None:
-                    for token in llm.stream_tool_followup(
-                        model,
-                        followup_messages,
-                        tools=[GENERATE_CHART_V2_SCHEMA],
-                        ollama_options=ollama_options,
-                    ):
-                        buffer.append(token)
-                        for token_event in output_buffer.push(token):
-                            if first_token_emitted_at is None:
-                                first_token_emitted_at = time.monotonic()
-                            yield token_event
-                        if output_buffer.blocked:
-                            break
-                elif not buffer:
-                    for token in llm.stream_tokens(
-                        model,
-                        turns,
-                        effective_prompt,
-                        ollama_options=ollama_options,
-                    ):
-                        buffer.append(token)
-                        for token_event in output_buffer.push(token):
-                            if first_token_emitted_at is None:
-                                first_token_emitted_at = time.monotonic()
-                            yield token_event
-                        if output_buffer.blocked:
-                            break
-            else:
-                for token in llm.stream_tokens(
-                    model,
-                    turns,
-                    effective_prompt,
-                    ollama_options=ollama_options,
-                ):
-                    buffer.append(token)
-                    for token_event in output_buffer.push(token):
-                        if first_token_emitted_at is None:
-                            first_token_emitted_at = time.monotonic()
-                        yield token_event
-                    if output_buffer.blocked:
-                        break
-        except OllamaUnavailable as exc:
-            logger.warning("Ollama unavailable during chat stream: %s", exc)
-            error_message = "AI service temporarily unavailable."
-            yield sse_error_event(error_message)
-        except Exception:
-            logger.exception("Unexpected error during chat stream")
-            error_message = "An unexpected error occurred."
-            yield sse_error_event(error_message)
-        finally:
-            if error_message is not None:
-                yield sse_done_event()
-                return
-            full_text = "".join(buffer)
-            clean_text = _strip_chart_block(full_text)
-            chart_spec = emitted_chart_spec
-            if buffer:
-                output_assessment = (
-                    SafeguardAssessment(allowed=False, stage="output")
-                    if output_buffer.blocked
-                    else (
-                        safeguard.review_output(
-                            user_text=latest_user_text,
-                            assistant_text=clean_text,
-                        )
-                        if safeguard is not None
-                        else SafeguardAssessment(allowed=True, stage="output")
-                    )
+            chart_spec = run.chart_orchestrator.compile_tool_call(
+                tool_plan=event,
+                dataframe=run.chart_dataframe,
+            )
+            if chart_spec is None:
+                continue
+
+            run.emitted_chart_spec = chart_spec
+            followup_messages = run.chart_orchestrator.build_followup_messages(
+                turns=run.turns,
+                effective_prompt=run.effective_prompt,
+                tool_event=event,
+                chart_spec=chart_spec,
+            )
+            break
+
+        if followup_messages is not None:
+            for token in run.llm.stream_tool_followup(
+                run.model,
+                followup_messages,
+                tools=[GENERATE_CHART_V2_SCHEMA],
+                ollama_options=run.ollama_options,
+            ):
+                run.buffer.append(token)
+                for token_event in run.output_buffer.push(token):
+                    if run.first_token_emitted_at is None:
+                        run.first_token_emitted_at = time.monotonic()
+                    yield token_event
+                if run.output_buffer.blocked:
+                    break
+        elif not run.buffer:
+            yield from self._stream_plain_completion(run)
+
+    def _stream_plain_completion(self, run: SimpleNamespace) -> Generator[str, None, None]:
+        for token in run.llm.stream_tokens(
+            run.model,
+            run.turns,
+            run.effective_prompt,
+            ollama_options=run.ollama_options,
+        ):
+            run.buffer.append(token)
+            for token_event in run.output_buffer.push(token):
+                if run.first_token_emitted_at is None:
+                    run.first_token_emitted_at = time.monotonic()
+                yield token_event
+            if run.output_buffer.blocked:
+                break
+
+    def _phase_emit_completion(
+        self,
+        run: SimpleNamespace,
+        error_message: str | None,
+    ) -> Generator[str, None, None]:
+        """After LLM phase: error tail, or safeguard output check + persist + done."""
+        if getattr(run, "input_blocked", False):
+            return
+        if error_message is not None:
+            yield sse_done_event()
+            return
+
+        full_text = "".join(run.buffer)
+        clean_text = _strip_chart_block(full_text)
+        chart_spec = run.emitted_chart_spec
+        if not run.buffer:
+            return
+
+        output_assessment = (
+            SafeguardAssessment(allowed=False, stage="output")
+            if run.output_buffer.blocked
+            else (
+                run.safeguard.review_output(
+                    user_text=run.latest_user_text,
+                    assistant_text=clean_text,
                 )
-                if output_assessment.allowed:
-                    for token_event in output_buffer.flush():
-                        if first_token_emitted_at is None:
-                            first_token_emitted_at = time.monotonic()
-                        yield token_event
-                    if chart_spec is not None:
-                        yield sse_event({"type": "chart_spec", "chart": chart_spec})
-                    yield sse_done_event()
-                    first_token_ms = (
-                        round((first_token_emitted_at - started_at) * 1000, 1)
-                        if first_token_emitted_at is not None
-                        else None
-                    )
-                    persistence.persist_and_log_chat_result(
-                        model=model,
-                        messages=messages,
-                        system_prompt=system_prompt,
-                        ip=ip,
-                        conversation_logger=conversation_logger,
-                        user_name=user_name,
-                        session_id=session_id,
-                        all_messages=all_messages,
-                        session_repository=session_repository,
-                        title_generator=title_generator,
-                        assistant_text=clean_text,
-                        chart_spec=chart_spec,
-                        chart_data_source=(chart_data_source if chart_spec is not None else "none"),
-                        started_at=started_at,
-                        first_token_ms=first_token_ms,
-                    )
-                else:
-                    yield from persistence.yield_blocked_response(
-                        assessment=output_assessment,
-                        model=model,
-                        messages=messages,
-                        system_prompt=system_prompt,
-                        ip=ip,
-                        conversation_logger=conversation_logger,
-                        user_name=user_name,
-                        session_id=session_id,
-                        all_messages=all_messages,
-                        session_repository=session_repository,
-                        title_generator=title_generator,
-                        started_at=started_at,
-                    )
+                if run.safeguard is not None
+                else SafeguardAssessment(allowed=True, stage="output")
+            )
+        )
+        if output_assessment.allowed:
+            for token_event in run.output_buffer.flush():
+                if run.first_token_emitted_at is None:
+                    run.first_token_emitted_at = time.monotonic()
+                yield token_event
+            if chart_spec is not None:
+                yield sse_event({"type": "chart_spec", "chart": chart_spec})
+            yield sse_done_event()
+            inc_chat_stream_completed()
+            first_token_ms = (
+                round((run.first_token_emitted_at - run.started_at) * 1000, 1)
+                if run.first_token_emitted_at is not None
+                else None
+            )
+            run.persistence.persist_and_log_chat_result(
+                model=run.model,
+                messages=run.messages,
+                system_prompt=run.system_prompt,
+                ip=run.ip,
+                conversation_logger=run.conversation_logger,
+                user_name=run.user_name,
+                session_id=run.session_id,
+                all_messages=run.all_messages,
+                session_repository=run.session_repository,
+                title_generator=run.title_generator,
+                assistant_text=clean_text,
+                chart_spec=chart_spec,
+                chart_data_source=(
+                    run.chart_data_source if chart_spec is not None else "none"
+                ),
+                started_at=run.started_at,
+                first_token_ms=first_token_ms,
+            )
+        else:
+            yield from run.persistence.yield_blocked_response(
+                assessment=output_assessment,
+                model=run.model,
+                messages=run.messages,
+                system_prompt=run.system_prompt,
+                ip=run.ip,
+                conversation_logger=run.conversation_logger,
+                user_name=run.user_name,
+                session_id=run.session_id,
+                all_messages=run.all_messages,
+                session_repository=run.session_repository,
+                title_generator=run.title_generator,
+                started_at=run.started_at,
+            )

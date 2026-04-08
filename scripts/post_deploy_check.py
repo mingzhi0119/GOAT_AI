@@ -68,6 +68,16 @@ def main() -> int:
     if health.status_code != 200:
         return _fail(f"health check returned HTTP {health.status_code}")
 
+    ready = requests.get(f"{base_url}/api/ready", timeout=15)
+    if ready.status_code != 200:
+        return _fail(f"ready check returned HTTP {ready.status_code}: {ready.text[:500]}")
+    try:
+        ready_body = ready.json()
+    except json.JSONDecodeError:
+        return _fail("ready check returned non-JSON body")
+    if not ready_body.get("ready"):
+        return _fail(f"ready check reports not ready: {ready_body!r}")
+
     for check in (_expect_runtime_target, _expect_chat_stream_contract):
         try:
             result = check(base_url)

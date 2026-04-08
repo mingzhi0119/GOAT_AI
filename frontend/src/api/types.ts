@@ -3,6 +3,8 @@
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
+  /** When true, this user turn is upload-derived tabular file context (preferred over content sniffing). */
+  file_context?: boolean
 }
 
 export interface HistorySessionMessage {
@@ -104,6 +106,8 @@ export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+  /** Mirrors API `file_context` when sending hidden upload context to the backend. */
+  file_context?: boolean
   isStreaming?: boolean
   isError?: boolean
   /**

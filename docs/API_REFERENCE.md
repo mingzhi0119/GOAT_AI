@@ -4,14 +4,16 @@ Base path: `/api`
 
 ## Global behavior
 
-- If `GOAT_API_KEY` is configured, every endpoint except `GET /api/health` requires `X-GOAT-API-Key`
+- If `GOAT_API_KEY` is configured, every endpoint except `GET /api/health` and `GET /api/ready` requires `X-GOAT-API-Key`
 - Responses include `X-Request-ID`
 - Rate-limited requests return `429` with `Retry-After`
 - Standard error shape:
 
 ```json
 {
-  "detail": "Human-readable error message"
+  "detail": "Human-readable error message",
+  "code": "STABLE_ERROR_CODE",
+  "request_id": "uuid"
 }
 ```
 
@@ -20,6 +22,8 @@ Base path: `/api`
 | Method | Path | Purpose |
 |--------|------|---------|
 | `GET` | `/api/health` | Liveness probe |
+| `GET` | `/api/ready` | Readiness (SQLite + optional Ollama) |
+| `GET` | `/api/system/metrics` | Prometheus text metrics |
 | `GET` | `/api/models` | List Ollama models |
 | `GET` | `/api/models/capabilities` | Read capabilities for one model |
 | `POST` | `/api/chat` | Stream chat SSE |
@@ -43,6 +47,14 @@ Returns:
   "version": "1.0.0"
 }
 ```
+
+## `GET /api/ready`
+
+Returns JSON `{ "ready": boolean, "checks": { ... } }`. HTTP **503** when any required check fails (e.g. SQLite unreachable or Ollama probe failed). Set `GOAT_READY_SKIP_OLLAMA_PROBE=1` to omit the Ollama HTTP check.
+
+## `GET /api/system/metrics`
+
+Returns **Prometheus** exposition text (`text/plain`). Requires `X-GOAT-API-Key` when `GOAT_API_KEY` is set. Includes `http_requests_total`, `http_request_duration_seconds`, `chat_stream_completed_total`, `ollama_errors_total`, and `sqlite_log_write_failures_total`.
 
 ## `GET /api/models`
 
@@ -88,7 +100,8 @@ Request body:
 {
   "model": "gemma4:26b",
   "messages": [
-    { "role": "user", "content": "Summarize Porter's Five Forces." }
+    { "role": "user", "content": "Summarize Porter's Five Forces." },
+    { "role": "user", "content": "…", "file_context": true }
   ],
   "session_id": "session-123",
   "system_instruction": "Answer in bullet points.",
@@ -97,6 +110,8 @@ Request body:
   "top_p": 0.9
 }
 ```
+
+Optional `file_context: true` on a user message marks upload-derived tabular context for the session (preferred over inferring from message text alone).
 
 SSE event types:
 
@@ -134,6 +149,10 @@ Notes:
 - If the selected model does not support native tools, chat remains text-only
 - Unsafe prompts are converted into a safe refusal instead of passing through the raw request
 - Unsafe model output is replaced server-side before streaming
+- Optional `Idempotency-Key` is supported when `session_id` is present.
+- Duplicate `Idempotency-Key` + same payload replays the same SSE body and avoids duplicate session/conversation writes.
+- Reusing a key with a different payload returns `409` with `code = IDEMPOTENCY_CONFLICT`.
+- Capacity guardrails reject oversized requests with `422` when message count or total payload bytes exceed configured limits (`GOAT_MAX_CHAT_MESSAGES`, `GOAT_MAX_CHAT_PAYLOAD_BYTES`).
 
 ## `POST /api/upload`
 
@@ -177,6 +196,12 @@ Returns:
 
 `chart` is retained only for backward compatibility.
 
+Idempotency:
+
+- Optional `Idempotency-Key` deduplicates retries.
+- Duplicate key + same file bytes returns the same JSON body.
+- Reusing a key with different file bytes returns `409` with `code = IDEMPOTENCY_CONFLICT`.
+
 ## `GET /api/history`
 
 Returns session metadata list:
@@ -188,6 +213,7 @@ Returns session metadata list:
       "id": "session-123",
       "title": "Porter analysis",
       "model": "gemma4:26b",
+      "schema_version": 2,
       "created_at": "2026-04-07T14:00:00+00:00",
       "updated_at": "2026-04-07T14:01:30+00:00"
     }
@@ -204,6 +230,7 @@ Returns one normalized stored session:
   "id": "session-123",
   "title": "Porter analysis",
   "model": "gemma4:26b",
+  "schema_version": 2,
   "created_at": "2026-04-07T14:00:00+00:00",
   "updated_at": "2026-04-07T14:01:30+00:00",
   "chart_data_source": "uploaded",

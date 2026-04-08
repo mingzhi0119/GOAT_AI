@@ -6,13 +6,12 @@ from typing import Any
 
 import pandas as pd
 
-from backend.models.chart_v2 import (
+from backend.models.chart_v2 import ChartMetaV2, ChartSpecV2
+from goat_ai.chart_intent_v2 import (
     AggregateOp,
     ChartIntentFilterV2,
     ChartIntentSeriesV2,
     ChartIntentV2,
-    ChartMetaV2,
-    ChartSpecV2,
 )
 
 _MAX_ROWS = 50

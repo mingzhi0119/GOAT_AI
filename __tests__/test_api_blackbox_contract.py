@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,6 +13,14 @@ try:
 except ImportError:  # pragma: no cover - environment without backend deps
     TestClient = None  # type: ignore[assignment]
 
+from backend.api_errors import (
+    AUTH_INVALID_API_KEY,
+    BAD_REQUEST,
+    INFERENCE_BACKEND_UNAVAILABLE,
+    NOT_FOUND,
+    RATE_LIMITED,
+    REQUEST_VALIDATION_ERROR,
+)
 from goat_ai.config import Settings
 from goat_ai.exceptions import OllamaUnavailable
 from goat_ai.ollama_client import ToolCallPlan
@@ -231,6 +240,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
             app_root=root,
             logo_svg=root / "logo.svg",
             log_db_path=root / "chat_logs.db",
+            ready_skip_ollama_probe=True,
         )
         log_service.init_db(self.settings.log_db_path)
 
@@ -250,6 +260,15 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual("ok", response.json()["status"])
         self.assertIn("version", response.json())
         self.assertIn("X-Request-ID", response.headers)
+
+    def test_ready_endpoint_contract(self) -> None:
+        response = self.client.get("/api/ready")
+        self.assertEqual(200, response.status_code)
+        self.assertIn("X-Request-ID", response.headers)
+        body = response.json()
+        self.assertTrue(body.get("ready"))
+        self.assertIn("checks", body)
+        self.assertTrue(body["checks"].get("sqlite", {}).get("ok"))
 
     def test_models_endpoints_contract_and_backend_unavailable_boundary(self) -> None:
         list_response = self.client.get("/api/models")
@@ -275,9 +294,15 @@ class ApiBlackboxContractTests(unittest.TestCase):
             self.client.app.dependency_overrides[get_llm_client] = lambda: ContractFakeLLM()
 
         self.assertEqual(503, unavailable_list.status_code)
-        self.assertEqual("AI backend unavailable", unavailable_list.json()["detail"])
+        ul = unavailable_list.json()
+        self.assertEqual("AI backend unavailable", ul["detail"])
+        self.assertEqual(INFERENCE_BACKEND_UNAVAILABLE, ul["code"])
+        self.assertIn("request_id", ul)
         self.assertEqual(503, unavailable_caps.status_code)
-        self.assertEqual("AI backend unavailable", unavailable_caps.json()["detail"])
+        uc = unavailable_caps.json()
+        self.assertEqual("AI backend unavailable", uc["detail"])
+        self.assertEqual(INFERENCE_BACKEND_UNAVAILABLE, uc["code"])
+        self.assertIn("request_id", uc)
 
         self.client.app.dependency_overrides[get_llm_client] = lambda: EmptyModelsLLM()
         try:
@@ -313,6 +338,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         history_detail = self.client.get("/api/history/chat-1")
         self.assertEqual(200, history_detail.status_code)
         self.assertEqual("Generated session title", history_detail.json()["title"])
+        self.assertEqual(2, history_detail.json()["schema_version"])
         self.assertEqual(
             [{"role": "user", "content": "Hello there"}, {"role": "assistant", "content": "Hello from GOAT"}],
             history_detail.json()["messages"],
@@ -466,14 +492,18 @@ class ApiBlackboxContractTests(unittest.TestCase):
             files={"file": ("notes.txt", b"hello", "text/plain")},
         )
         self.assertEqual(400, upload_invalid.status_code)
-        self.assertEqual("Only CSV and XLSX files are supported.", upload_invalid.json()["detail"])
+        uinv = upload_invalid.json()
+        self.assertEqual("Only CSV and XLSX files are supported.", uinv["detail"])
+        self.assertEqual(BAD_REQUEST, uinv["code"])
 
         upload_missing_name = self.client.post(
             "/api/upload",
             files={"file": ("", b"col1,col2\n1,2\n", "text/csv")},
         )
         self.assertEqual(422, upload_missing_name.status_code)
-        self.assertEqual(["body", "file"], upload_missing_name.json()["detail"][0]["loc"])
+        umn = upload_missing_name.json()
+        self.assertEqual(["body", "file"], umn["detail"][0]["loc"])
+        self.assertEqual(REQUEST_VALIDATION_ERROR, umn["code"])
 
         analyze_response = self.client.post(
             "/api/upload/analyze",
@@ -490,14 +520,18 @@ class ApiBlackboxContractTests(unittest.TestCase):
             files={"file": ("notes.txt", b"hello", "text/plain")},
         )
         self.assertEqual(400, analyze_invalid.status_code)
-        self.assertEqual("Only CSV and XLSX files are supported.", analyze_invalid.json()["detail"])
+        ainv = analyze_invalid.json()
+        self.assertEqual("Only CSV and XLSX files are supported.", ainv["detail"])
+        self.assertEqual(BAD_REQUEST, ainv["code"])
 
         analyze_missing_name = self.client.post(
             "/api/upload/analyze",
             files={"file": ("", b"month,revenue\nJan,10\n", "text/csv")},
         )
         self.assertEqual(422, analyze_missing_name.status_code)
-        self.assertEqual(["body", "file"], analyze_missing_name.json()["detail"][0]["loc"])
+        amn = analyze_missing_name.json()
+        self.assertEqual(["body", "file"], amn["detail"][0]["loc"])
+        self.assertEqual(REQUEST_VALIDATION_ERROR, amn["code"])
 
     def test_history_endpoints_cover_empty_missing_delete_and_delete_all(self) -> None:
         empty_list = self.client.get("/api/history")
@@ -506,7 +540,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
 
         missing = self.client.get("/api/history/not-found")
         self.assertEqual(404, missing.status_code)
-        self.assertEqual("Session not found", missing.json()["detail"])
+        mj = missing.json()
+        self.assertEqual("Session not found", mj["detail"])
+        self.assertEqual(NOT_FOUND, mj["code"])
 
         for session_id in ("hist-a", "hist-b"):
             self.client.post(
@@ -520,6 +556,8 @@ class ApiBlackboxContractTests(unittest.TestCase):
 
         listed = self.client.get("/api/history")
         self.assertEqual(2, len(listed.json()["sessions"]))
+        for item in listed.json()["sessions"]:
+            self.assertEqual(2, item["schema_version"])
 
         delete_one = self.client.delete("/api/history/hist-a")
         self.assertEqual(204, delete_one.status_code)
@@ -528,6 +566,36 @@ class ApiBlackboxContractTests(unittest.TestCase):
         delete_all = self.client.delete("/api/history")
         self.assertEqual(204, delete_all.status_code)
         self.assertEqual({"sessions": []}, self.client.get("/api/history").json())
+
+    def test_chat_session_append_idempotency_replays_same_sse_and_avoids_double_write(self) -> None:
+        headers = {"Idempotency-Key": "chat-key-1"}
+        payload = {
+            "model": "blackbox-model",
+            "session_id": "idem-chat-1",
+            "messages": [{"role": "user", "content": "Hello idempotent chat"}],
+        }
+        first = self.client.post("/api/chat", json=payload, headers=headers)
+        second = self.client.post("/api/chat", json=payload, headers=headers)
+
+        self.assertEqual(200, first.status_code)
+        self.assertEqual(200, second.status_code)
+        self.assertEqual(first.text, second.text)
+
+        detail = self.client.get("/api/history/idem-chat-1")
+        self.assertEqual(200, detail.status_code)
+        self.assertEqual(
+            [
+                {"role": "user", "content": "Hello idempotent chat"},
+                {"role": "assistant", "content": "Hello from GOAT"},
+            ],
+            detail.json()["messages"],
+        )
+        with sqlite3.connect(self.settings.log_db_path) as conn:
+            total = conn.execute(
+                "SELECT COUNT(*) FROM conversations WHERE session_id = ?",
+                ("idem-chat-1",),
+            ).fetchone()[0]
+        self.assertEqual(1, total)
 
     def test_system_endpoints_cover_gpu_inference_and_runtime_target_contracts(self) -> None:
         self.client.post(
@@ -600,6 +668,7 @@ class ApiProtectedBlackboxContractTests(unittest.TestCase):
             api_key="secret-123",
             rate_limit_window_sec=60,
             rate_limit_max_requests=2,
+            ready_skip_ollama_probe=True,
         )
         log_service.init_db(self.settings.log_db_path)
 
@@ -616,6 +685,11 @@ class ApiProtectedBlackboxContractTests(unittest.TestCase):
         health = self.client.get("/api/health")
         self.assertEqual(200, health.status_code)
         self.assertIn("X-Request-ID", health.headers)
+
+        ready = self.client.get("/api/ready")
+        self.assertEqual(200, ready.status_code)
+        self.assertTrue(ready.json().get("ready"))
+        self.assertIn("X-Request-ID", ready.headers)
 
         protected_requests: list[tuple[str, str, dict[str, object]]] = [
             ("GET", "/api/models", {}),
@@ -638,17 +712,32 @@ class ApiProtectedBlackboxContractTests(unittest.TestCase):
             ("GET", "/api/system/gpu", {}),
             ("GET", "/api/system/inference", {}),
             ("GET", "/api/system/runtime-target", {}),
+            ("GET", "/api/system/metrics", {}),
         ]
 
         for method, path, kwargs in protected_requests:
             response = self.client.request(method, path, **kwargs)
             self.assertEqual(401, response.status_code, f"{method} {path} should require API key")
-            self.assertEqual("Invalid or missing API key.", response.json()["detail"])
+            rj = response.json()
+            self.assertEqual("Invalid or missing API key.", rj["detail"])
+            self.assertEqual(AUTH_INVALID_API_KEY, rj["code"])
+            self.assertIn("request_id", rj)
             self.assertIn("X-Request-ID", response.headers)
 
         ok = self.client.get("/api/history", headers={"X-GOAT-API-Key": "secret-123"})
         self.assertEqual(200, ok.status_code)
         self.assertEqual({"sessions": []}, ok.json())
+
+    def test_metrics_endpoint_prometheus_text(self) -> None:
+        headers = {"X-GOAT-API-Key": "secret-123"}
+        response = self.client.get("/api/system/metrics", headers=headers)
+        self.assertEqual(200, response.status_code)
+        text = response.text
+        self.assertIn("http_requests_total", text)
+        self.assertIn("http_request_duration_seconds_bucket", text)
+        self.assertIn("chat_stream_completed_total", text)
+        self.assertIn("ollama_errors_total", text)
+        self.assertIn("sqlite_log_write_failures_total", text)
 
     def test_rate_limit_contract_applies_after_threshold(self) -> None:
         headers = {"X-GOAT-API-Key": "secret-123"}
@@ -660,7 +749,10 @@ class ApiProtectedBlackboxContractTests(unittest.TestCase):
         self.assertEqual(200, first.status_code)
         self.assertEqual(200, second.status_code)
         self.assertEqual(429, limited.status_code)
-        self.assertEqual("Too many requests. Please try again shortly.", limited.json()["detail"])
+        lj = limited.json()
+        self.assertEqual("Too many requests. Please try again shortly.", lj["detail"])
+        self.assertEqual(RATE_LIMITED, lj["code"])
+        self.assertIn("request_id", lj)
         self.assertIn("Retry-After", limited.headers)
         self.assertIn("X-Request-ID", limited.headers)
 

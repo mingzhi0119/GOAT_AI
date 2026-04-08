@@ -139,15 +139,33 @@
         "summary": "Stream a chat completion over SSE",
         "description": "Stream an LLM response as Server-Sent Events.\n\nEach SSE event carries a typed JSON object.\nThe final event is ``{\"type\":\"done\"}``.\nThe client reads events with the native ``EventSource`` API or a fetch+ReadableStream.",
         "operationId": "chat_stream_api_chat_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ChatRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -160,34 +178,34 @@
             }
           },
           "401": {
-            "description": "Unauthorized",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            },
+            "description": "Unauthorized"
           },
           "422": {
-            "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
           }
         }
       }
@@ -271,15 +289,33 @@
         "summary": "Analyze an uploaded CSV/XLSX and return JSON",
         "description": "Accept a CSV or XLSX upload and return reusable analysis metadata as JSON.",
         "operationId": "analyze_upload_json_api_upload_analyze_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
                 "$ref": "#/components/schemas/Body_analyze_upload_json_api_upload_analyze_post"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -293,34 +329,34 @@
             }
           },
           "400": {
-            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Bad Request"
           },
           "401": {
-            "description": "Unauthorized",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Unauthorized"
           },
           "429": {
-            "description": "Too Many Requests",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Too Many Requests"
           },
           "422": {
             "description": "Validation Error",
@@ -663,6 +699,71 @@
         }
       }
     },
+    "/api/ready": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Readiness probe (SQLite + optional Ollama)",
+        "description": "Return 200 when SQLite and (unless skipped) Ollama are reachable; 503 otherwise.",
+        "operationId": "get_ready_api_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "503": {
+            "description": "Not ready; see JSON ``checks`` for failing dependency."
+          }
+        }
+      }
+    },
+    "/api/system/metrics": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Prometheus text metrics",
+        "description": "Expose in-process counters and histograms for Prometheus scraping.",
+        "operationId": "get_system_metrics_api_system_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "tags": [
@@ -729,6 +830,12 @@
           "content": {
             "type": "string",
             "title": "Content"
+          },
+          "file_context": {
+            "type": "boolean",
+            "title": "File Context",
+            "description": "True when this user message is upload-derived tabular file context.",
+            "default": false
           }
         },
         "type": "object",
@@ -832,17 +939,47 @@
       "ErrorResponse": {
         "properties": {
           "detail": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            ],
             "title": "Detail",
-            "description": "Human-readable error message."
+            "description": "Human-readable message or structured validation errors."
+          },
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Stable machine-readable error code."
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id",
+            "description": "Echo of X-Request-ID when the server generated or accepted one."
           }
         },
         "type": "object",
         "required": [
-          "detail"
+          "detail",
+          "code"
         ],
         "title": "ErrorResponse",
-        "description": "Standard error payload returned by HTTPException handlers."
+        "description": "Standard JSON error envelope (Phase 13 §13.0)."
       },
       "GPUStatusResponse": {
         "properties": {
@@ -960,6 +1097,11 @@
             "type": "string",
             "title": "Model"
           },
+          "schema_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Schema Version"
+          },
           "created_at": {
             "type": "string",
             "title": "Created At"
@@ -1015,6 +1157,7 @@
           "id",
           "title",
           "model",
+          "schema_version",
           "created_at",
           "updated_at",
           "messages"
@@ -1087,6 +1230,11 @@
             "type": "string",
             "title": "Model"
           },
+          "schema_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Schema Version"
+          },
           "created_at": {
             "type": "string",
             "title": "Created At"
@@ -1101,6 +1249,7 @@
           "id",
           "title",
           "model",
+          "schema_version",
           "created_at",
           "updated_at"
         ],

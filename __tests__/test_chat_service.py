@@ -33,6 +33,7 @@ class FakeSessionRepository:
             id=payload.session_id,
             title=payload.title,
             model=payload.model,
+            schema_version=payload.schema_version,
             created_at=payload.created_at,
             updated_at=payload.updated_at,
             messages=decoded.messages,
@@ -92,6 +93,7 @@ class ChatServiceTitleTests(unittest.TestCase):
                     id="sid-2",
                     title="Kept title",
                     model="m",
+                    schema_version=2,
                     created_at="2026-01-01T00:00:00+00:00",
                     updated_at="2026-01-01T00:00:01+00:00",
                     messages=[

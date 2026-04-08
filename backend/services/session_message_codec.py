@@ -6,8 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from backend.models.chat import ChatMessage
-from backend.services.tabular_context import LEGACY_CSV_FENCE_SUBSTRING
-from goat_ai.tools import FILE_CONTEXT_UPLOAD_PREFIX
+from goat_ai.tools import FILE_CONTEXT_UPLOAD_PREFIX, LEGACY_CSV_FENCE_SUBSTRING
 
 STORED_CHART_ROLE = "__chart__"
 STORED_FILE_CONTEXT_ROLE = "__file_context__"
@@ -31,14 +30,19 @@ class DecodedSessionPayload:
 
 
 def is_file_context_message(message: ChatMessage) -> bool:
-    """Return whether a chat message is the injected file-context prompt."""
-    return (
-        message.role == "user"
-        and LEGACY_CSV_FENCE_SUBSTRING in message.content
-        and (
-            message.content.startswith(FILE_CONTEXT_UPLOAD_PREFIX)
-            or message.content.startswith(FILE_CONTEXT_REQUESTED_PREFIX)
-        )
+    """Return whether this message should be stored as file context (explicit flag or legacy sniff)."""
+    if message.role != "user":
+        return False
+    if message.file_context:
+        return bool(message.content.strip())
+    return _legacy_sniff_file_context_content(message.content)
+
+
+def _legacy_sniff_file_context_content(content: str) -> bool:
+    """Detect legacy upload prompts that relied on embedded CSV markers (no API flag)."""
+    return LEGACY_CSV_FENCE_SUBSTRING in content and (
+        content.startswith(FILE_CONTEXT_UPLOAD_PREFIX)
+        or content.startswith(FILE_CONTEXT_REQUESTED_PREFIX)
     )
 
 

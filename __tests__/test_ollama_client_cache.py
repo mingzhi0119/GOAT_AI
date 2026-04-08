@@ -3,7 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import requests
+
 from goat_ai.config import Settings
+from goat_ai.exceptions import OllamaUnavailable
 from goat_ai.ollama_client import OllamaService
 
 
@@ -51,3 +54,62 @@ def test_get_model_capabilities_without_cache_calls_each_time() -> None:
         service.get_model_capabilities("gemma4:26b")
 
     assert post_mock.call_count == 2
+
+
+def test_list_model_names_retries_then_succeeds() -> None:
+    service = OllamaService(_settings(ttl=60))
+    failing = requests.ConnectionError("temporary outage")
+    success = Mock()
+    success.raise_for_status.return_value = None
+    success.json.return_value = {"models": [{"name": "qwen3"}]}
+
+    with (
+        patch("goat_ai.ollama_client.requests.get", side_effect=[failing, success]) as get_mock,
+        patch("goat_ai.ollama_client.time.sleep") as sleep_mock,
+        patch("goat_ai.ollama_client.random.uniform", return_value=0.0),
+    ):
+        names = service.list_model_names()
+
+    assert names == ["qwen3"]
+    assert get_mock.call_count == 2
+    assert sleep_mock.call_count == 1
+
+
+def test_read_circuit_breaker_opens_and_half_open_recovers() -> None:
+    base = _settings(ttl=0)
+    tuned = Settings(
+        **{**base.__dict__, "ollama_read_retry_attempts": 1, "ollama_circuit_breaker_failures": 1, "ollama_circuit_breaker_open_sec": 10}
+    )
+    service = OllamaService(tuned)
+
+    with patch(
+        "goat_ai.ollama_client.requests.get",
+        side_effect=requests.ConnectionError("down"),
+    ) as get_mock:
+        try:
+            service.list_model_names()
+            assert False, "Expected OllamaUnavailable"
+        except OllamaUnavailable:
+            pass
+    assert get_mock.call_count == 1
+
+    with patch("goat_ai.ollama_client.requests.get") as blocked_mock:
+        try:
+            service.list_model_names()
+            assert False, "Expected open breaker rejection"
+        except OllamaUnavailable:
+            pass
+    assert blocked_mock.call_count == 0
+
+    success = Mock()
+    success.raise_for_status.return_value = None
+    success.json.return_value = {"models": [{"name": "gemma4:26b"}]}
+    with (
+        patch("goat_ai.ollama_client.time.monotonic", return_value=999.0),
+        patch("goat_ai.ollama_client.requests.get", return_value=success) as recovered_get,
+    ):
+        service._breaker_open_until_monotonic = 100.0
+        names = service.list_model_names()
+
+    assert names == ["gemma4:26b"]
+    assert recovered_get.call_count == 1

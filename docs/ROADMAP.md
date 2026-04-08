@@ -1,6 +1,6 @@
-# GOAT AI Roadmap
+﻿# GOAT AI Roadmap
 
-> Last updated: 2026-04-07 — **Phase 11 shipped** in v1.3.0; API black-box re-verified (79 + 13 tests)
+> Last updated: 2026-04-07 — **Phase 11 shipped** in v1.3.0; **Phases 13-14**: 13 = §13.0 + Wave A/B (stable `request_id`, **liveness**/**readiness**, error `code`); 14 = semantics before directory migration (**consumes** §13.0 error model; **does not redefine** it)
 > Current release: **v1.3.0**
 > Compact snapshot: [PROJECT_STATUS.md](PROJECT_STATUS.md)
 
@@ -11,6 +11,7 @@
 | Phase | Content |
 |-------|---------|
 | 11 | **Industrialization and decoupling (complete):** `ChatStreamService` owns SSE/tool/safeguard streaming; `chat_orchestration.py` holds `PromptComposer` / `ChartToolOrchestrator` / `SessionPersistenceService`; `chat_service.py` is a thin `stream_chat_sse` entry; injectable `TabularContextExtractor` + `LLMClient.generate_completion` for titles; `log_service` import confined to adapters with architecture guard; wire markers centralized (`CHART_DATA_CSV_MARKER`, `FILE_CONTEXT_UPLOAD_PREFIX`, `LEGACY_CSV_FENCE_SUBSTRING`); `test_architecture_boundaries` runs under `unittest discover` |
+| 12 | **Hardening and scale-readiness (complete):** explicit chart data-source policy (`uploaded`/`demo`/`none`), architecture guardrails (backend/frontend + `log_service` confinement), latency p50/p95 with model buckets, expanded `/api/chat` black-box matrix, deploy post-check script, API contract CI sync gate, and model capability TTL cache |
 
 ## Shipped (v1.2.0)
 
@@ -23,15 +24,15 @@
 | 4 | Product polish: copy button, error boundary, refined branding assets, layout cleanup |
 | 5 | Reliability and UX: stop streaming, local session restore, SQLite conversation logging |
 | 6 | Core feature expansion: conversation history sidebar, file-context persistence across turns |
-| 7 | Quality and observability hardening: user-space log rotation, no-root deploy fallback, backend tests, frontend Vitest, CI, request IDs, latency metrics |
+| 7 | Quality and observability hardening: user-space log rotation, no-root deploy fallback, backend tests, frontend Vitest, CI, `request_id` / tracing headers, latency metrics |
 | 8 | Charting and telemetry: structured `chart_spec`, Apache ECharts `ChartCard`, real A100 GPU telemetry, rolling inference latency, Markdown export, dependency-safe frontend deploys |
-| 9 | Access and security: API key protection, rate limiting, request tracing headers, production-safe access controls |
+| 9 | Access and security: API key protection, rate limiting, `request_id` (`X-Request-ID`), production-safe access controls |
 | 10 | Native chart-tool path: constrained `ChartIntentV2` -> `ChartSpecV2` compiler, Ollama tool-capability checks, tool-call-only chart rendering |
 
 ### Phase 11 (archived objective — met)
 
 - Align with `AGENTS.md`: typed boundaries, router-thin API, orchestration in services, portable dev/prod.
-- **Follow-up (post–Phase 11):** optional deeper migration of legacy session **content** markers (`__chart__`, etc.) into versioned payload-only fields without breaking SQLite rows — not blocking; v2 payload + codec already separate display roles from chat turns.
+- **Follow-up (post-Phase 11):** optional deeper migration of legacy session **content** markers (`__chart__`, etc.) into versioned payload-only fields without breaking SQLite rows —not blocking; v2 payload + codec already separate display roles from chat turns.
 
 ### Near-term execution order (project-calibrated)
 
@@ -40,64 +41,149 @@ Aligned with `AGENTS.md` and **no-root / JupyterHub-style** production (`docs/OP
 | Horizon | Focus |
 |---------|--------|
 | **v1.3.x** | Ops hardening from Phase 12 backlog: systemd vs nohup playbook, SQLite backup/migration thresholds, security/audit as exposure grows. |
-| **v1.4** | Evaluate Postgres / jobs / multi-instance **after** ops gates from v1.3.x are stable. |
+| **v1.4.x** | **Phase 13** — §13.0 (migrations + error model), **Wave A** (structured logs + `request_id`, Prometheus metrics, **readiness** vs **liveness**, persistence failure signals), then **Wave B** (Ollama resilience, **idempotency**); SLO/load, backup, security/CI. **Postgres / multi-instance** only after Phase 13 exit criteria and v1.3.x ops gates are stable. Low-risk Phase 14 doc-only items may run in parallel when isolated. |
+| **v1.5+** | **Phase 14** —domain/application split, test harness + integration tier, optional message normalization & distributed tracing (**consumes** Phase 13 §13.0 error model; **does not redefine** it). |
 
 ---
 
-## Phase 12: Hardening and Scale Readiness
+### Phase 12 (archived objective — met)
 
-Status legend:
-- `[ ]` Not started
-- `[~]` In progress
-- `[x]` Completed
+- Scope achieved: guardrails for architecture boundaries, telemetry quality, API contract stability, and deploy acceptance checks are in place.
+- Verification artifacts:
+  - Orchestration split and collaborators: `backend/services/chat_stream_service.py`, `backend/services/chat_orchestration.py`, `backend/services/chat_service.py`
+  - Chart source policy and persistence: `backend/services/session_message_codec.py`, `backend/services/session_service.py`
+  - Architecture boundaries: `__tests__/test_architecture_boundaries.py`
+  - Latency p50/p95 + model buckets: `goat_ai/latency_metrics.py`, `backend/services/system_telemetry_service.py`
+  - `/api/chat` black-box matrix: `__tests__/test_api_blackbox_contract.py`
+  - Deploy post-check: `scripts/post_deploy_check.py`
+  - Contract CI gate: `tools/check_api_contract_sync.py`, `.github/workflows/ci.yml`
+  - Model capability TTL cache: `goat_ai/ollama_client.py`, `__tests__/test_ollama_client_cache.py`
 
-Objective:
-- Convert the recently stabilized contracts into durable guardrails so performance, architecture boundaries, and deploy behavior remain stable as features scale.
+---
 
-Execution plan:
+## Phase 13: Industrial 9/10 — Priority 1 (Run, Observe, Recover)
 
-1. `[x]` Decompose backend chat orchestration into focused collaborators
-   - **Landed:** `PromptComposer`, `ChartToolOrchestrator`, and `SessionPersistenceService` in `chat_orchestration.py`; **`ChatStreamService`** in `chat_stream_service.py`; thin `stream_chat_sse` in `chat_service.py`. SSE contract preserved.
+**Target release band:** **v1.4.x**  
+**Goal:** Production-grade **signals**, **stable error semantics**, **deploy** (**liveness** / **readiness**), **capacity clarity**, and **data/security baselines** on **SQLite + no-root + Ollama**—without large directory refactors (those stay in Phase 14).
 
-2. `[x]` Introduce explicit chart data-source policy models
-   - Add typed chart data source metadata (`uploaded`, `demo`, `none`) instead of implicit marker-driven behavior.
-   - Persist source provenance with session history for debugging and auditability.
+**Done for Phase 13:** exit criteria met per subsection; `PROJECT_STATUS.md` / release notes cite which boxes closed.
 
-3. `[x]` Add architecture guard tests (backend + frontend)
-   - Lock in backend layer boundaries (router/service/shared layer import rules).
-   - Lock in frontend boundary rule that hooks do not import components.
-   - **`log_service` confinement:** only `log_service.py` and `chat_runtime.py` may import `log_service` under `backend/services/` (enforced in `test_architecture_boundaries`).
+### 13.0 Cross-cutting prerequisites (before Wave A)
 
-4. `[x]` Define latency SLOs with percentile telemetry
-   - Extend telemetry from rolling mean to include p50/p95 for chat completion and first-token latency.
-   - Add model-aware buckets to catch regressions by model family.
+These are **not** "nice-to-have data tasks" — they unblock schema evolution and every downstream observability/reliability decision.
 
-5. `[x]` Expand `/api/chat` black-box scenario matrix
-   - Cover uploaded vs non-uploaded chart prompts, tools-supported vs tools-unsupported models, and mixed-language chart intents.
-   - Keep assertions centered on typed SSE contract behavior.
+- `[x]` **Migrations as artifacts** —`backend/migrations/` numbered SQL, applied in order at startup via `backend.services.db_migrations`; `schema_migrations` table stores SHA-256 checksums (tamper detection). **Landed:** `log_service.init_db` delegates to `apply_migrations`; `__tests__/test_db_migrations.py`.
+- `[x]` **Error model + exception registry** —Stable JSON `{ "detail", "code", "request_id" }`; `backend/api_errors.py` + `register_exception_handlers` in `backend/exception_handlers.py`; middleware 401/429 use same envelope; `X-Request-ID` honored when client sends it. **Landed:** `docs/API_ERRORS.md`, OpenAPI `ErrorResponse`, black-box assertions. **Follow-up:** per-route log level / metric label table remains Wave A-B.
 
-6. `[x]` Add deploy post-check acceptance script
-   - Validate health, runtime-target contract, and typed stream behavior immediately after deploy.
-   - Fail fast when process is alive but contract is broken.
+*Why this order:* structured logs and metrics need **stable `code` / classification**; **readiness** / **liveness** and runbooks need **consistent failure surface**; later Wave B retries need **explicit retryability** on errors.
 
-7. `[x]` Enforce docs-and-contract CI gate
-   - Require synchronized updates for `docs/openapi.json`, `docs/api.llm.yaml`, and black-box tests when API payloads change.
-   - Prevent drift between runtime behavior and committed contract artifacts.
+### Wave A — operational lift (exactly four)
 
-8. `[x]` Add model capability cache with TTL
+**Scope lock:** Wave A is **only** these four. Do **not** bundle Ollama retry/circuit breaker here — client resilience is **Wave B** so it does not steal observability delivery rhythm.
 
-Progress already landed in this phase:
+**Terminology:** Use **`request_id`** (header `X-Request-ID`, context `goat_ai.request_context`), **liveness** (`GET /api/health`), **readiness** (`GET /api/ready`), and **idempotency** (Wave B) consistently — not loose synonyms.
 
-- Backend chat orchestration uses `ChatStreamService` plus collaborators (`PromptComposer`, `ChartToolOrchestrator`, `SessionPersistenceService`) while preserving `/api/chat` SSE contract behavior (Phase 11 complete).
-- Chart rendering policy is now explicit about data source provenance (`uploaded`, `demo`, `none`) and persisted in session payloads.
-- Architecture guard tests lock backend and frontend layer boundaries to reduce regression risk.
-- Inference telemetry now exposes rolling average + p50/p95 for completion and first-token latency, including model-scoped buckets.
-- Black-box API coverage now includes chart tool behavior for uploaded and non-uploaded scenarios as well as tools-unsupported models.
-- Deploy scripts now run post-deploy contract checks before declaring success.
-- CI now blocks drift between runtime API contracts and committed `docs/openapi.json` + `docs/api.llm.yaml`.
-- Ollama model capability checks now use a configurable TTL cache to reduce repetitive capability probes.
-   - Cache tool-capability probes to reduce repeated upstream capability checks.
-   - Keep cache boundaries explicit and invalidate safely on model list changes.
+#### Verifiable thresholds (Wave A)
+
+- **A1** —At least one documented structured log line includes fields **`ts`**, **`level`**, **`message`**, **`request_id`** (when bound); ERROR / persistence lines SHOULD also carry **`code`** and **`event`** where applicable (see `docs/OPERATIONS.md`).
+- **A2** —Minimum Prometheus **label** sets: `http_requests_total` →`method`, `route`, `status`; `http_request_duration_seconds` histogram →`le` on buckets (plus `_sum` / `_count`); `chat_stream_completed_total` →none (**successful completion only; safeguard-blocked refusal flows excluded**); `ollama_errors_total` →`code`, `endpoint`, `http_status`; `sqlite_log_write_failures_total` →`operation`, `code`.
+- **A3** —**`/ready` not ready:** HTTP **503**; JSON body **`{ "ready": false, "checks": { ... } }`** with stable keys `settings`, `sqlite`, `ollama`. Structured ERROR logs for probe failures use fixed **`code`** values **`SQLITE_READINESS_FAILED`** and **`OLLAMA_READINESS_FAILED`** (see `backend/readiness_service.py`).
+- **A4** —Failure injection / proof: **`__tests__/test_log_service_wave_a.py`** (mocked SQLite fault + metric hook assertion); counter appears in `GET /api/system/metrics` text in integration/black-box runs.
+
+| # | Deliverable | Primary artifact | Owner | Exit criterion |
+|---|-------------|------------------|-------|----------------|
+| **A1** | **`[x]` Structured logging + `request_id` context** —JSON (or key=value) behind `GOAT_LOG_JSON=1`; honor inbound `X-Request-ID`; bind id in `contextvars` (`goat_ai.request_context`). | `docs/OPERATIONS.md`; `goat_ai/logging_config.py`; `goat_ai/request_context.py`; `backend/exception_handlers.py` | Backend + ops | Sample + field contract in OPERATIONS; ERROR / JSON errors share `request_id`; handlers set `X-Request-ID`. |
+| **A2** | **`[x]` Metrics** —`GET /api/system/metrics` (Prometheus text): `http_requests_total`, `http_request_duration_seconds`, `chat_stream_completed_total`, `ollama_errors_total`, `sqlite_log_write_failures_total`. | `backend/prometheus_metrics.py`; `goat_ai/telemetry_counters.py`; `__tests__/test_api_blackbox_contract.py` (`test_metrics_endpoint_prometheus_text`) | Backend + ops | OPERATIONS scrape note; black-box asserts required metric names. |
+| **A3** | **`[x]` Readiness vs liveness** —**`/api/health`** = **liveness**; **`GET /api/ready`** = **readiness** (SQLite + optional Ollama probe; `GOAT_READY_SKIP_OLLAMA_PROBE`). | `backend/readiness_service.py`; `scripts/post_deploy_check.py`; `__tests__/test_api_blackbox_contract.py` (`test_ready_endpoint_contract`) | Backend + ops | Post-deploy script requires `/ready`; black-box tests public **readiness** path. |
+| **A4** | **`[x]` Persistence failure signals** —On `log_service` session/conversation write failure: structured ERROR + `sqlite_log_write_failures_total` (**SSE** may still complete). | `backend/services/log_service.py`; `__tests__/test_log_service_wave_a.py` | Backend | Tests + metrics text include `sqlite_log_write_failures_total`. |
+
+### Wave B — client & API resilience (after Wave A)
+
+| # | Deliverable | Verifiable threshold (target) | Primary artifact | Owner | Exit |
+|---|-------------|-------------------------------|------------------|-------|------|
+| **B1** | `[x]` **Ollama client policy** —Retries with backoff + jitter for **idempotent** reads (`/api/tags`, `/api/show`); timeouts unchanged; circuit breaker (open / half-open). Registry **retryability** from §13.0. | Mocked HTTP tests prove backoff + breaker states without live Ollama. | `goat_ai/ollama_client.py`; `__tests__/` (new or extended); `docs/OPERATIONS.md` | Backend | OPERATIONS table + tests. |
+| **B2** | `[x]` **Idempotency** —Optional `Idempotency-Key` for **upload analyze JSON** and **session append** (SQLite TTL table or in-process LRU for single-node). | Duplicate key →same response body / no double write (black-box). | Relevant routers + services; `__tests__/test_api_blackbox_contract.py` (or sibling) | Backend | Black-box duplicate-key test. |
+| **B3** | `[x]` **Multi-instance stance** —OPERATIONS: in-memory limiter + rolling metrics are **per-process**; mitigations without Redis (sticky sessions, lower per-instance limits, external metrics aggregation). | Doc lists limitations + mitigations; no false "cluster-wide" claims. | `docs/OPERATIONS.md` | Ops + backend | Published limitations. |
+
+### 13.3 Performance and capacity
+
+- `[x]` **Published SLOs** —Table in OPERATIONS: first-token p95 budget, max concurrent SSE, max session payload / message count, upload time budget. **Exit:** linked from README.
+- `[x]` **Load script** —`tools/load_chat_smoke.py` or k6 + runbook; p50/p95 from `/api/system/inference` + RSS note. **Exit:** one command documented.
+- `[x]` **Hot path guardrails** —Profile chart compile + session JSON path; **max messages** or size →**422 or explicit truncate** (no silent corruption). **Exit:** documented + test.
+
+### 13.4 Data and state (post-migration-tooling)
+
+- `[x]` **Audit fields on sessions** —`schema_version`, `updated_at` (and safe extras); history API exposes only non-sensitive fields. **Exit:** contract + test (migrations from §13.0 carry the DDL).
+- `[x]` **Backup / restore runbook** —`test_backup_chat_db` →OPERATIONS (`sqlite3 .backup`, integrity, restore drill). **Exit:** linked one-pager.
+
+### 13.5 Security and tooling
+
+- `[ ]` **Dependency audit in CI** —`pip-audit` on `requirements.txt`; fail vs warn policy documented. **Exit:** CI green on main.
+- `[ ]` **Upload / API threat notes** —`docs/SECURITY.md`: extensions vs sniff, zip bombs, CSV formula injection, shared API key model. **Exit:** OPERATIONS links it.
+- `[ ]` **Python lint/format in CI** —`ruff check` + `ruff format` (or equivalent). **Exit:** CI job.
+
+### 13.6 Release and operations (beyond Wave A)
+
+- `[ ]` **Graceful shutdown** —Uvicorn/SSE drain expectations and max wait. **Exit:** OPERATIONS.
+- `[ ]` **Rollback runbook** —Previous tag + venv + DB backup + post-deploy check. **Exit:** OPERATIONS link.
+
+### 13.7 Phase 13 non-goals
+
+- Postgres / Redis **solely** to close Phase 13 —optional; Decision Log if introduced.
+- Full multi-tenant IAM —optional one-page threat model for shared API key is enough for Phase 13.
+
+### 13.8 Risk triggers (Phase 13 execution)
+
+| Trigger | Response |
+|---------|----------|
+| **SSE** error rate or timeout above agreed threshold | Pause **Wave B** (client retry / **idempotency**) until root cause triaged. |
+| **`/api/ready`** flapping or sustained non-200 in prod | Block **Phase 14** structural refactors until **readiness** and deploy checks are stable. |
+| **`sqlite_log_write_failures_total`** (or equivalent) abnormal for a sustained window | Prioritize recovery + backup/restore drill before new persistence features. |
+
+---
+
+## Phase 14: Industrial 9/10 —Priority 2 (Semantics, Then Structure)
+
+**Target release band:** **v1.5+** (may overlap **late v1.4.x** for low-risk doc-only items)  
+**Goal:** **Semantic convergence first, directory migration second**—policies and invariants stabilize meaning before `application/` vs `domain/` vs `infra/` reshaping. Phase 14 **consumes** the Phase 13 §13.0 **error model** (stable `code`, `request_id`, handlers); it **does not redefine** that contract—only uses it for policies, tests, and optional tracing.
+
+**Ordering principle (industrial default):** policy objects + invariants = **narrow, testable moves**; package reshuffle = **wide blast radius**. Do the former first.
+
+### 14.1 Domain semantics and policy objects (before big split)
+
+- `[ ]` **`docs/DOMAIN.md`** —Ubiquitous language: Session, Turn, FileContext, ChartIntent, ChartSpec, ToolCall, SafeguardDecision. **Exit:** PR template links for user-visible behavior changes.
+- `[ ]` **`SafeguardPolicy`** (or equivalent) —Typed inputs →decision; unit tests **without** HTTP. **Exit:** orchestration calls policy object, not ad hoc string rules.
+- `[ ]` **`ChartDataProvenancePolicy`** —Same: explicit provenance decisions vs implicit marker logic. **Exit:** tests without HTTP.
+- `[ ]` **Invariants** —Small pure helpers: e.g. chart spec persisted only with version; at most one file-context row semantics; failures are test-visible. **Exit:** tests fail when invariant broken.
+
+### 14.2 Large structural migration (after §14.1)
+
+- `[ ]` **Application / domain / infrastructure layout** —`backend/application/`, `backend/domain/`, adapters under clear names; `services/` as facades during migration; **update `import-linter` layers**. **Exit:** dependency graph doc; no new business rules in `routers/`.
+- `[ ]` **Session schema contract** —`docs/SESSION_SCHEMA.md`: message JSON version, read N- / write N, codec upgrade tests. **Exit:** round-trip old →new row tests (builds on Phase 13 migrations).
+- `[ ]` **Ports list** —AGENTS.md: stable `Protocol`s (`SessionRepository`, `LLMClient`, telemetry sink); one **fake repository** test without SQLite file.
+
+### 14.3 Testability
+
+- `[ ]` **Clock / random injection** —`Clock` (wall + monotonic) for TTL, rate limit, title paths; optional seeded RNG. **Exit:** no `time.sleep` for those behaviors.
+- `[ ]` **Single primary test entry** —**pytest** as primary for `__tests__/`; unittest shimmed where needed. **Exit:** one CI command documented.
+- `[ ]` **Integration tier** —`__tests__/integration/`: temp SQLite + `TestClient` for session + migrations (no Ollama). **Exit:** CI or optional job; under 30s runtime budget documented.
+
+### 14.4 Data (deep)
+
+- `[ ]` **Message store normalization** —`session_messages` (append-only); dual-read from legacy JSON until cutover. **Exit:** migration doc + integration tests.
+
+### 14.5 Security (deeper)
+
+- `[ ]` **AuthZ roadmap + enforcement** —Scoped keys or session ownership in **service** layer; Decision Log entry. **Exit:** minimal cross-session denial tests.
+- `[ ]` **Secrets hygiene automation** —Optional Gitleaks/trufflehog in CI; CONTRIBUTING: `.env.example` review on env changes.
+
+### 14.6 Observability (optional stretch)
+
+- `[ ]` **Distributed tracing** —OpenTelemetry + W3C `traceparent`; spans around Ollama; off by default, near-zero cost when disabled. **Exit:** one documented trace export path.
+
+### 14.7 Phase 14 references
+
+- [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) · [OPERATIONS.md](OPERATIONS.md) · [AGENTS.md](../AGENTS.md)
 
 ---
 
@@ -126,3 +212,6 @@ Progress already landed in this phase:
 | 2026-03-31 | Dual-port deploy reverted | Production uses `:62606` only |
 | 2026-04-07 | Process mgmt: systemd is additive, not a drop-in for nohup | Shared host may lack reliable `systemctl --user`; deploy contract keeps nohup + PID as permanent fallback per `AGENTS.md` / `OPERATIONS.md` |
 | 2026-04-07 | Phase 11 closed in v1.3.0 | `ChatStreamService` + orchestration split; tabular/title injection; log_service adapter-only guard; wire constants centralized; 79 unittest + 13 black-box OK |
+| 2026-04-07 | Phases 13-14 split from prior monolithic Phase 13 | **13** = priority 1; **14** = priority 2 (semantics before package reshuffle). |
+| 2026-04-07 | Phase 13 sequencing tightened | **§13.0** = migrations-as-artifacts + error model/registry **before** Wave A. **Wave A** = only four ops items (structured logs+`request_id`, metrics, **liveness**/**readiness**, persistence signals). **Ollama retry/circuit breaker** deferred to **Wave B** after Wave A. **Phase 14** = policy objects + invariants **before** `application/`/`domain/` split; **consumes** §13.0 error model, **does not redefine** it. |
+

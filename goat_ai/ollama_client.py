@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import random
 import threading
 import time
 from dataclasses import dataclass
@@ -12,6 +13,7 @@ import requests
 
 from goat_ai.config import Settings
 from goat_ai.exceptions import OllamaUnavailable
+from goat_ai.telemetry_counters import OLLAMA_ERROR_API_CODE, inc_ollama_error
 from goat_ai.tools import conversation_transcript, messages_for_ollama
 from goat_ai.types import ChatTurn
 
@@ -101,6 +103,52 @@ class OllamaService:
 
     def __init__(self, settings: Settings) -> None:
         self._s = settings
+        self._read_failure_count = 0
+        self._breaker_open_until_monotonic = 0.0
+        self._breaker_state = "closed"
+        self._breaker_lock = threading.Lock()
+
+    def _is_retryable_http_status(self, status_code: int) -> bool:
+        return status_code in {408, 425, 429, 500, 502, 503, 504}
+
+    def _before_read_call(self) -> None:
+        now = time.monotonic()
+        with self._breaker_lock:
+            if self._breaker_state != "open":
+                return
+            if now >= self._breaker_open_until_monotonic:
+                self._breaker_state = "half_open"
+                return
+        raise OllamaUnavailable("Ollama read circuit breaker is open")
+
+    def _mark_read_success(self) -> None:
+        with self._breaker_lock:
+            self._read_failure_count = 0
+            self._breaker_state = "closed"
+            self._breaker_open_until_monotonic = 0.0
+
+    def _mark_read_failure(self) -> None:
+        with self._breaker_lock:
+            if self._breaker_state == "half_open":
+                self._breaker_state = "open"
+                self._breaker_open_until_monotonic = (
+                    time.monotonic() + float(self._s.ollama_circuit_breaker_open_sec)
+                )
+                self._read_failure_count = self._s.ollama_circuit_breaker_failures
+                return
+
+            self._read_failure_count += 1
+            if self._read_failure_count >= self._s.ollama_circuit_breaker_failures:
+                self._breaker_state = "open"
+                self._breaker_open_until_monotonic = (
+                    time.monotonic() + float(self._s.ollama_circuit_breaker_open_sec)
+                )
+
+    def _sleep_before_retry(self, attempt_index: int) -> None:
+        base_sec = float(self._s.ollama_read_retry_base_ms) / 1000.0
+        jitter_sec = random.uniform(0.0, float(self._s.ollama_read_retry_jitter_ms) / 1000.0)
+        backoff_sec = base_sec * (2 ** max(0, attempt_index - 1))
+        time.sleep(max(0.0, backoff_sec + jitter_sec))
 
     def _post_chat(
         self,
@@ -122,26 +170,52 @@ class OllamaService:
             if status_code in {400, 404, 422, 500}:
                 logger.info("Ollama tool calling unavailable or rejected: %s", exc)
                 raise ValueError("tool calling unavailable") from exc
+            st = str(status_code) if status_code is not None else "none"
+            inc_ollama_error(code=OLLAMA_ERROR_API_CODE, endpoint="chat", http_status=st)
             raise OllamaUnavailable("Cannot reach Ollama /api/chat") from exc
         except requests.RequestException as exc:
+            inc_ollama_error(code=OLLAMA_ERROR_API_CODE, endpoint="chat", http_status="none")
             raise OllamaUnavailable("Cannot reach Ollama /api/chat") from exc
 
     # ── Model list ────────────────────────────────────────────────────────────
     def list_model_names(self) -> list[str]:
         """Return names of locally available Ollama models."""
-        try:
-            res = requests.get(f"{self._s.ollama_base_url}/api/tags", timeout=5)
-            res.raise_for_status()
-        except requests.RequestException as exc:
-            raise OllamaUnavailable("Cannot reach Ollama /api/tags") from exc
-        names = [m["name"] for m in res.json().get("models", [])]
-        # Invalidate capability cache when model inventory is queried freshly.
-        with self._cache_lock:
-            known = set(self._cap_cache.keys())
-            current = set(names)
-            for removed in known - current:
-                self._cap_cache.pop(removed, None)
-        return names
+        self._before_read_call()
+        attempts = max(1, int(self._s.ollama_read_retry_attempts))
+        last_exc: Exception | None = None
+        last_http_status = "none"
+        for attempt in range(1, attempts + 1):
+            try:
+                res = requests.get(f"{self._s.ollama_base_url}/api/tags", timeout=5)
+                res.raise_for_status()
+                self._mark_read_success()
+                names = [m["name"] for m in res.json().get("models", [])]
+                # Invalidate capability cache when model inventory is queried freshly.
+                with self._cache_lock:
+                    known = set(self._cap_cache.keys())
+                    current = set(names)
+                    for removed in known - current:
+                        self._cap_cache.pop(removed, None)
+                return names
+            except requests.HTTPError as exc:
+                status_code = exc.response.status_code if exc.response is not None else None
+                last_http_status = str(status_code) if status_code is not None else "none"
+                last_exc = exc
+                retryable = status_code is not None and self._is_retryable_http_status(status_code)
+                if retryable and attempt < attempts:
+                    self._sleep_before_retry(attempt)
+                    continue
+                break
+            except requests.RequestException as exc:
+                last_exc = exc
+                if attempt < attempts:
+                    self._sleep_before_retry(attempt)
+                    continue
+                break
+
+        self._mark_read_failure()
+        inc_ollama_error(code=OLLAMA_ERROR_API_CODE, endpoint="tags", http_status=last_http_status)
+        raise OllamaUnavailable("Cannot reach Ollama /api/tags") from last_exc
 
     def get_model_capabilities(self, model: str) -> list[str]:
         """Return the Ollama-reported capability strings for a model."""
@@ -155,26 +229,48 @@ class OllamaService:
                     if now < expires_at:
                         return list(capabilities)
 
-        try:
-            res = requests.post(
-                f"{self._s.ollama_base_url}/api/show",
-                json={"model": model},
-                timeout=5,
-            )
-            res.raise_for_status()
-        except requests.RequestException as exc:
-            raise OllamaUnavailable("Cannot reach Ollama /api/show") from exc
+        self._before_read_call()
+        attempts = max(1, int(self._s.ollama_read_retry_attempts))
+        last_exc: Exception | None = None
+        last_http_status = "none"
+        for attempt in range(1, attempts + 1):
+            try:
+                res = requests.post(
+                    f"{self._s.ollama_base_url}/api/show",
+                    json={"model": model},
+                    timeout=5,
+                )
+                res.raise_for_status()
+                self._mark_read_success()
+                capabilities = res.json().get("capabilities", [])
+                if not isinstance(capabilities, list):
+                    normalized: list[str] = []
+                else:
+                    normalized = [str(item) for item in capabilities]
 
-        capabilities = res.json().get("capabilities", [])
-        if not isinstance(capabilities, list):
-            normalized: list[str] = []
-        else:
-            normalized = [str(item) for item in capabilities]
+                if ttl_sec > 0:
+                    with self._cache_lock:
+                        self._cap_cache[model] = (now + ttl_sec, list(normalized))
+                return normalized
+            except requests.HTTPError as exc:
+                status_code = exc.response.status_code if exc.response is not None else None
+                last_http_status = str(status_code) if status_code is not None else "none"
+                last_exc = exc
+                retryable = status_code is not None and self._is_retryable_http_status(status_code)
+                if retryable and attempt < attempts:
+                    self._sleep_before_retry(attempt)
+                    continue
+                break
+            except requests.RequestException as exc:
+                last_exc = exc
+                if attempt < attempts:
+                    self._sleep_before_retry(attempt)
+                    continue
+                break
 
-        if ttl_sec > 0:
-            with self._cache_lock:
-                self._cap_cache[model] = (now + ttl_sec, list(normalized))
-        return normalized
+        self._mark_read_failure()
+        inc_ollama_error(code=OLLAMA_ERROR_API_CODE, endpoint="show", http_status=last_http_status)
+        raise OllamaUnavailable("Cannot reach Ollama /api/show") from last_exc
 
     def supports_tool_calling(self, model: str) -> bool:
         """Return whether Ollama reports native tool-calling support for the model."""
@@ -224,6 +320,7 @@ class OllamaService:
             )
             res.raise_for_status()
         except requests.RequestException as exc:
+            inc_ollama_error(code=OLLAMA_ERROR_API_CODE, endpoint="generate", http_status="none")
             raise OllamaUnavailable("Cannot reach Ollama /api/generate") from exc
         for line in res.iter_lines():
             if line:
@@ -252,6 +349,7 @@ class OllamaService:
             )
             res.raise_for_status()
         except requests.RequestException as exc:
+            inc_ollama_error(code=OLLAMA_ERROR_API_CODE, endpoint="generate", http_status="none")
             raise OllamaUnavailable("Cannot reach Ollama /api/generate") from exc
         data = res.json()
         return str(data.get("response") or "").strip()

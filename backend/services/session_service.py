@@ -90,17 +90,20 @@ def persist_chat_session(
     if resolved_chart_data_source == "none" and any(is_file_context_message(msg) for msg in final_messages):
         resolved_chart_data_source = "uploaded"
 
+    payload = build_session_payload(
+        messages=final_messages,
+        assistant_text=assistant_text,
+        chart_spec=chart_spec,
+        chart_data_source=resolved_chart_data_source,
+    )
+
     session_repository.upsert_session(
         SessionUpsertPayload(
             session_id=session_id,
             title=title,
             model=model,
-            payload=build_session_payload(
-                messages=final_messages,
-                assistant_text=assistant_text,
-                chart_spec=chart_spec,
-                chart_data_source=resolved_chart_data_source,
-            ),
+            schema_version=int(payload.get("version", 1)),
+            payload=payload,
             created_at=created_at,
             updated_at=now_iso,
         )

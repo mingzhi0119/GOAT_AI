@@ -1,6 +1,6 @@
 # GOAT AI Project Status
 
-Last updated: 2026-04-07
+Last updated: 2026-04-08
 
 ## Release
 
@@ -26,6 +26,13 @@ Last updated: 2026-04-07
 - Single-port runtime-target policy (`:62606`) across deploy scripts and runtime-target API
 - Post-deploy contract verification script integrated into Linux and Windows deploy flows
 - Model capability probing includes in-process TTL caching
+- Ollama idempotent-read resilience: retry with backoff+jitter and circuit-breaker states for `/api/tags` and `/api/show`
+- Optional `Idempotency-Key` support for `POST /api/upload/analyze` and chat session append path (`POST /api/chat` with `session_id`)
+- SQLite-backed idempotency TTL table (migration artifact) for duplicate request replay and write dedupe
+- Capacity guardrails on `POST /api/chat` now enforce max message count and max payload size (`422` on overflow)
+- Load smoke utility `tools/load_chat_smoke.py` provides one-command p50/p95 validation against chat SSE + optional `/api/system/inference` snapshot
+- Session history contract now includes `schema_version` audit field; `updated_at` remains part of list/detail APIs
+- SQLite backup/restore runbook published at `docs/BACKUP_RESTORE.md` and linked from OPERATIONS
 
 ## Current API surface
 

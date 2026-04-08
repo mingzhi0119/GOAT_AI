@@ -42,6 +42,22 @@ class EmbeddedCsvTabularExtractorTests(unittest.TestCase):
             ext.extract_dataframe([ChatMessage(role="assistant", content=block)]),
         )
 
+    def test_prioritizes_file_context_flagged_user_messages(self) -> None:
+        ext = EmbeddedCsvTabularExtractor()
+        plain_first = ChatMessage(
+            role="user",
+            content="CHART_DATA_CSV:\n```\nmonth,revenue\nJan,1\n```",
+        )
+        flagged_second = ChatMessage(
+            role="user",
+            content="CHART_DATA_CSV:\n```\nmonth,revenue\nFeb,2\n```",
+            file_context=True,
+        )
+        df = ext.extract_dataframe([plain_first, flagged_second])
+        self.assertIsNotNone(df)
+        assert df is not None
+        self.assertEqual(int(df.iloc[0]["revenue"]), 2)
+
     def test_unparseable_csv_returns_none_without_raising(self) -> None:
         ext = EmbeddedCsvTabularExtractor()
         # Empty body inside fences makes pandas raise EmptyDataError — caught in extractor.

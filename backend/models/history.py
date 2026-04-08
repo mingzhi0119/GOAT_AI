@@ -23,6 +23,7 @@ class HistorySessionSummary(BaseModel):
     id: str
     title: str
     model: str
+    schema_version: int = Field(..., ge=1)
     created_at: str
     updated_at: str
 

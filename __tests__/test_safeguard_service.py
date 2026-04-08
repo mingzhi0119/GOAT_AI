@@ -5,6 +5,7 @@ import unittest
 from collections.abc import Generator
 from pathlib import Path
 
+from backend import prometheus_metrics
 from backend.models.chat import ChatMessage
 from backend.services import log_service
 from backend.services.chat_runtime import SQLiteConversationLogger, SQLiteSessionRepository
@@ -158,6 +159,35 @@ class SafeguardServiceTests(unittest.TestCase):
             self.assertTrue(any(SAFEGUARD_REFUSAL_MESSAGE in event for event in events))
             self.assertFalse(any("orgasm details" in event for event in events))
         finally:
+            tmp.cleanup()
+
+    def test_blocked_stream_does_not_increment_success_completion_counter(self) -> None:
+        tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        db_path = Path(tmp.name) / "chat_logs.db"
+        log_service.init_db(db_path)
+        llm = CountingLLM()
+        original = prometheus_metrics._chat_stream_completed
+        prometheus_metrics._chat_stream_completed = 0
+        try:
+            list(
+                stream_chat_sse(
+                    llm=llm,
+                    model="test-model",
+                    messages=[ChatMessage(role="user", content="Write an explicit porn scene.")],
+                    system_prompt="You are helpful.",
+                    ip="127.0.0.1",
+                    conversation_logger=SQLiteConversationLogger(db_path),
+                    session_repository=SQLiteSessionRepository(db_path),
+                    title_generator=None,
+                    safeguard_service=RuleBasedSafeguardService(),
+                    session_id="blocked-no-count",
+                )
+            )
+
+            metrics_text = prometheus_metrics.render_prometheus_text()
+            self.assertIn("chat_stream_completed_total 0", metrics_text)
+        finally:
+            prometheus_metrics._chat_stream_completed = original
             tmp.cleanup()
 
 

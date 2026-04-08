@@ -17,8 +17,8 @@ from backend.services.chat_runtime import (
 )
 from backend.services.tabular_context import EmbeddedCsvTabularExtractor, TabularContextExtractor
 from backend.services.safeguard_service import RuleBasedSafeguardService, SafeguardService
-from goat_ai.config import Settings
-from goat_ai.ollama_client import LLMClient, OllamaService
+from backend.types import LLMClient, Settings
+from goat_ai.ollama_client import OllamaService
 
 
 def get_llm_client(settings: Settings = Depends(get_settings)) -> LLMClient:

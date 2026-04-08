@@ -13,6 +13,7 @@ export function hydrateHistorySession(session: HistorySessionDetail): Message[] 
       role: 'user',
       content: fileContextPrompt,
       hidden: true,
+      file_context: true,
     })
     mapped.push({
       id: crypto.randomUUID(),

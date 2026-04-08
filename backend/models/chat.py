@@ -9,6 +9,10 @@ class ChatMessage(BaseModel):
 
     role: str = Field(..., pattern="^(user|assistant|system)$")
     content: str
+    file_context: bool = Field(
+        default=False,
+        description="True when this user message is upload-derived tabular file context.",
+    )
 
 
 class ChatRequest(BaseModel):

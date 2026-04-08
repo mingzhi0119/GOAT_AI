@@ -108,5 +108,12 @@ npm run build
 - [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md): current shipped state
 - [docs/API_REFERENCE.md](docs/API_REFERENCE.md): endpoint contract
 - [docs/OPERATIONS.md](docs/OPERATIONS.md): deploy, env vars, ops notes
+- [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md): SQLite backup/restore drill
 - [docs/ROADMAP.md](docs/ROADMAP.md): shipped phases and refactor roadmap
 - [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md): coding standards
+
+Capacity/load validation:
+
+```bash
+python tools/load_chat_smoke.py --base-url http://127.0.0.1:62606 --model gemma4:26b --runs 20 --show-system-inference
+```
