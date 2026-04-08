@@ -87,7 +87,7 @@ Core API surface:
 - Idempotent retries are supported for `POST /api/upload/analyze` and chat session append requests (`POST /api/chat` with `session_id`)
 - Shared-host operations now include documented graceful shutdown, rollback, backup/restore, and post-deploy checks
 - RAG-0 is complete, and the first RAG-1/2 slice is live: `csv/xlsx` uploads now route through real ingestion/search/answer, `pdf/docx/md/txt` normalize into the same knowledge pipeline, and chat can use `knowledge_document_ids` for retrieval-backed replies
-- **RAG-ready gate:** the product may be described as **RAG-ready** only when `python tools/run_rag_eval.py` exits 0 (checked-in `evaldata/rag_eval_cases.jsonl`; see [evaldata/README.md](evaldata/README.md)) and retrieval quality notes in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) stay aligned with that runner. CI runs the same command on every backend build.
+- **RAG-ready gate:** the product may be described as **RAG-ready** only when `python -m tools.run_rag_eval` exits 0 (checked-in `evaldata/rag_eval_cases.jsonl`; see [evaldata/README.md](evaldata/README.md)) and retrieval quality notes in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) stay aligned with that runner. CI runs the same command on every backend build.
 
 ## Quick Start
 
@@ -138,7 +138,7 @@ python -m pytest __tests__/test_api_blackbox_contract.py -v
 Retrieval quality regression (RAG-3):
 
 ```bash
-python tools/run_rag_eval.py
+python -m tools.run_rag_eval
 ```
 
 Frontend:
@@ -165,5 +165,5 @@ npm run build
 Capacity/load validation:
 
 ```bash
-python tools/load_chat_smoke.py --base-url http://127.0.0.1:62606 --model gemma4:26b --runs 20 --show-system-inference
+python -m tools.load_chat_smoke --base-url http://127.0.0.1:62606 --model gemma4:26b --runs 20 --show-system-inference
 ```

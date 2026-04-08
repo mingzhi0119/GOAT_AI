@@ -526,13 +526,13 @@ Before every commit ask:
 ## 12. Documentation update rules
 
 - **Language** — All prose in **`docs/`** and **`README.md`** must be **English**. Do not commit Chinese or other non-English text in those paths.
-- **RAG quality (§14.7)** — Changes to retrieval/rerank/rewrite logic or `evaldata/rag_eval_cases.jsonl` must keep `python tools/run_rag_eval.py` green; document golden-set updates in `evaldata/README.md` / `evaldata/VERSION`. Operational knobs: [OPERATIONS.md](OPERATIONS.md) **RAG retrieval quality**.
+- **RAG quality (§14.7)** — Changes to retrieval/rerank/rewrite logic or `evaldata/rag_eval_cases.jsonl` must keep `python -m tools.run_rag_eval` green; document golden-set updates in `evaldata/README.md` / `evaldata/VERSION`. Operational knobs: [OPERATIONS.md](OPERATIONS.md) **RAG retrieval quality**.
 
 When behavior changes, update:
 
 - `README.md` — architecture, structure, or developer workflow
 - `docs/openapi.json` — committed OpenAPI from FastAPI (`backend.main:app`)
-- `docs/api.llm.yaml` — regenerate via `python tools/generate_llm_api_yaml.py`
+- `docs/api.llm.yaml` — regenerate via `python -m tools.generate_llm_api_yaml` (from repository root)
 - `docs/API_REFERENCE.md` — human-readable endpoint reference
 - `docs/OPERATIONS.md` — env vars, deploy, startup, host operations
 - `docs/PROJECT_STATUS.md` — current shipped state

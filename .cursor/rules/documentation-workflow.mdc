@@ -18,7 +18,7 @@ Update docs when behavior changes:
 |-------------|------|
 | Architecture, structure, developer workflow | `README.md` |
 | Committed OpenAPI from FastAPI | `docs/openapi.json` |
-| LLM-optimized compact API | `docs/api.llm.yaml` (regenerate via `tools/generate_llm_api_yaml.py`) |
+| LLM-optimized compact API | `docs/api.llm.yaml` (regenerate via `python -m tools.generate_llm_api_yaml` from repo root) |
 | Human-readable endpoints | `docs/API_REFERENCE.md` |
 | Env vars, deploy, startup, host ops | `docs/OPERATIONS.md` |
 | Current shipped state | `docs/PROJECT_STATUS.md` |

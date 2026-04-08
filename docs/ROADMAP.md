@@ -217,7 +217,7 @@ Aligned with the RAG subsection in [Current reality and improvement map](#curren
 
 | Track | Status | Exit |
 |-------|--------|------|
-| **Regression gate** | `[x]` | `tools/run_rag_eval.py` runs in **CI** (`.github/workflows/ci.yml` backend job); failure blocks merge. |
+| **Regression gate** | `[x]` | `python -m tools.run_rag_eval` runs in **CI** (`.github/workflows/ci.yml` backend job); failure blocks merge. |
 | **Thresholds** | `[x]` | RAG knobs and no-hit behavior documented in [OPERATIONS.md](OPERATIONS.md) **RAG retrieval quality**; [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) §12 points to OPERATIONS + evaldata. |
 | **Golden set** | `[x]` | [evaldata/README.md](../evaldata/README.md) + `evaldata/VERSION`; linked from [README.md](../README.md) and this roadmap. |
 | **Observability** | `[x]` | `knowledge_retrieval_requests_total{retrieval_profile,outcome}` and `knowledge_query_rewrite_applied_total{retrieval_profile}` on `GET /api/system/metrics`. |
@@ -325,4 +325,5 @@ This replaces the retired long-form `docs/RAG_ARCHITECTURE.md` (historical draft
 | 2026-04-08 | Engineering standards: single canonical doc | Full rules live in `docs/ENGINEERING_STANDARDS.md`; `AGENTS.md` is a short index. `docs/PLAN.md` retired; content folded into this roadmap. `docs/RAG_ARCHITECTURE.md` retired; RAG snapshot lives in ROADMAP appendix. |
 | 2026-04-08 | Docs: multi-environment portability | README/OPERATIONS/ENGINEERING_STANDARDS clarify the repo is not limited to one school host; optional high-risk features (e.g. code sandbox) are policy-gated per **ENGINEERING_STANDARDS §15**. |
 | 2026-04-08 | ROADMAP: current reality map + §14.7 | Added **Current reality and improvement map** (shared API key, SQLite/local vector, RAG loop, tests, domain semantics, shared-host process model) with **Summary** table; added **§14.7 RAG quality closure** (CI eval, thresholds, golden-set process, observability); **Next** program order is **0 = §14.7**, **1 = Phase 15**. |
-| 2026-04-08 | Phase 14.7 implemented | CI runs `python tools/run_rag_eval.py`; `evaldata/README.md` + `VERSION`; OPERATIONS **RAG retrieval quality**; Prometheus `knowledge_retrieval_requests_total` / `knowledge_query_rewrite_applied_total`; ENGINEERING_STANDARDS §12 RAG bullet. |
+| 2026-04-08 | Phase 14.7 implemented | CI runs `python -m tools.run_rag_eval`; `evaldata/README.md` + `VERSION`; OPERATIONS **RAG retrieval quality**; Prometheus `knowledge_retrieval_requests_total` / `knowledge_query_rewrite_applied_total`; ENGINEERING_STANDARDS §12 RAG bullet. |
+| 2026-04-08 | Developer CLI: `python -m tools.*` | `tools/` is a package (`tools/__init__.py`); run modules from repo root instead of `PYTHONPATH=.` in `.env`. CI uses `python -m tools.run_rag_eval` and `python -m tools.check_api_contract_sync`. |

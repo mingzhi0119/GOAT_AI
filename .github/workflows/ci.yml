@@ -38,9 +38,9 @@ jobs:
       - name: Import layer lint
         run: lint-imports
       - name: RAG eval regression (Phase 14.7)
-        run: python tools/run_rag_eval.py
+        run: python -m tools.run_rag_eval
       - name: API Contract Gate
-        run: python tools/check_api_contract_sync.py
+        run: python -m tools.check_api_contract_sync
       - name: Pytest
         run: python -m pytest __tests__/ -v --tb=short
 

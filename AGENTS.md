@@ -25,6 +25,10 @@ Editor rules under `.cursor/rules/` mirror the same principles; keep them aligne
 - Black-box: `__tests__/test_api_blackbox_contract.py` (plus auth/security suites when relevant).
 - Contracts: `docs/openapi.json`, `docs/api.llm.yaml`.
 
+## Developer CLI (`tools/`)
+
+Run from the **repository root** with **`python -m tools.<module>`** (e.g. `python -m tools.run_rag_eval`, `python -m tools.check_api_contract_sync`, `python -m tools.generate_llm_api_yaml`). See `.env.example` — do not rely on `PYTHONPATH` in `.env` for shell commands.
+
 ## Ops and roadmap pointers
 
 - Runbook-style ops: [`docs/OPERATIONS.md`](docs/OPERATIONS.md)

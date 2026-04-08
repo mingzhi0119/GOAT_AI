@@ -1,18 +1,19 @@
+"""Verify committed OpenAPI and LLM YAML match the FastAPI app.
+
+Run from the repository root::
+
+    python -m tools.check_api_contract_sync
+"""
 from __future__ import annotations
 
 import json
-import sys
 import tempfile
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
-# ruff: noqa: E402
 from backend.main import app
 from tools import generate_llm_api_yaml
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
 OPENAPI_PATH = REPO_ROOT / "docs" / "openapi.json"
 LLM_API_PATH = REPO_ROOT / "docs" / "api.llm.yaml"
 
@@ -27,7 +28,8 @@ def main() -> int:
     if generated_openapi != committed_openapi:
         print("Contract check failed: docs/openapi.json is out of sync.")
         print(
-            "Run: python -c \"import json; from backend.main import app; from pathlib import Path; Path('docs/openapi.json').write_text(json.dumps(app.openapi(), ensure_ascii=False, indent=2)+'\\n', encoding='utf-8')\""
+            "Run: python -c \"import json; from backend.main import app; from pathlib import Path; "
+            "Path('docs/openapi.json').write_text(json.dumps(app.openapi(), ensure_ascii=False, indent=2)+'\\n', encoding='utf-8')\""
         )
         return 1
 
@@ -40,7 +42,7 @@ def main() -> int:
     committed_llm = LLM_API_PATH.read_text(encoding="utf-8")
     if generated_llm != committed_llm:
         print("Contract check failed: docs/api.llm.yaml is out of sync.")
-        print("Run: python tools/generate_llm_api_yaml.py")
+        print("Run: python -m tools.generate_llm_api_yaml")
         return 1
 
     print("API contract artifacts are in sync.")

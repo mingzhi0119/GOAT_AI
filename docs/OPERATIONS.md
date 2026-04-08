@@ -24,6 +24,8 @@ python3 -m uvicorn server:app --host 0.0.0.0 --port 62606 --reload
 
 `lint-imports` enforces backend package layering (`pyproject.toml`); run it after dependency or router/service refactors.
 
+**Repository tools:** run CLI modules from the **repository root** with `python -m tools.<module>` (for example `python -m tools.run_rag_eval`, `python -m tools.check_api_contract_sync`). This avoids setting `PYTHONPATH` manually; `.env` is for app runtime, not your shell.
+
 ### SQLite schema migrations (Phase 13 §13.0)
 
 On startup, `log_service.init_db` runs **`backend/services/db_migrations.apply_migrations`**, which executes `backend/migrations/NNN_*.sql` in order and records each file's SHA-256 in the `schema_migrations` table. If a migration file changes after apply, the process **refuses to start** on checksum mismatch. Add new DDL only as a new numbered SQL file.
@@ -171,7 +173,7 @@ curl -sS -H "X-GOAT-API-Key: $GOAT_API_KEY" http://127.0.0.1:62606/api/system/me
 
 ### RAG retrieval quality (Phase 14.7)
 
-**Regression:** run `python tools/run_rag_eval.py` before merge when changing `backend/services/retrieval_quality/`, `tools/run_rag_eval.py`, or `evaldata/`. CI enforces this on every backend job.
+**Regression:** run `python -m tools.run_rag_eval` (from the repository root) before merge when changing `backend/services/retrieval_quality/`, `tools/run_rag_eval.py`, or `evaldata/`. CI enforces this on every backend job.
 
 **Knobs (environment + request):**
 
@@ -209,14 +211,14 @@ SLO starter table:
 |----------|--------|--------|
 | First-token latency p95 | <= 2000 ms | `GET /api/system/inference` (`first_token_p95_ms`) |
 | Full chat latency p95 | <= 12000 ms | `GET /api/system/inference` (`chat_p95_ms`) |
-| Max concurrent SSE streams (single process) | 20 | Runbook load validation (`tools/load_chat_smoke.py`) |
+| Max concurrent SSE streams (single process) | 20 | Runbook load validation (`python -m tools.load_chat_smoke`) |
 | Upload analyze JSON budget | <= 5 s for <= 20 MB supported knowledge file (`csv/xlsx/txt/md/pdf/docx`) | `POST /api/upload/analyze` smoke run |
 | Session append guardrails | hard-stop at configured maxes | `GOAT_MAX_CHAT_MESSAGES`, `GOAT_MAX_CHAT_PAYLOAD_BYTES` |
 
 Load smoke command:
 
 ```bash
-python tools/load_chat_smoke.py --base-url http://127.0.0.1:62606 --model gemma4:26b --runs 20 --show-system-inference
+python -m tools.load_chat_smoke --base-url http://127.0.0.1:62606 --model gemma4:26b --runs 20 --show-system-inference
 ```
 
 When API protection is enabled, pass `--api-key "$GOAT_API_KEY"`.

@@ -1,3 +1,9 @@
+"""Generate ``docs/api.llm.yaml`` from ``docs/openapi.json``.
+
+Run from the repository root::
+
+    python -m tools.generate_llm_api_yaml
+"""
 from __future__ import annotations
 
 import json

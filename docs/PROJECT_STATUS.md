@@ -7,10 +7,10 @@ Last updated: 2026-04-08
 - **Current release:** `v1.3.0`
 - **Shipped release milestone:** Phase 11 (industrialization / decoupling) is complete.
 - **Main-branch status:** Phase 13 closeout work is landed across migrations, error semantics, readiness/liveness split, metrics, idempotency, rollback/backup runbooks, and CI hardening. See [ROADMAP.md](ROADMAP.md).
-- **Phase 14 status:** RAG-0 through **RAG-3** are complete on main: persisted uploads, SQLite metadata, local `simple_local_v1` vector index, retrieval-backed chat, optional **lexical rerank** and **conservative query rewrite** via `retrieval_profile` (`default` / `rag3_lexical` / `rag3_quality`), plus `tools/run_rag_eval.py` over `evaldata/rag_eval_cases.jsonl`. **Vision MVP** (`POST /api/media/uploads`, `image_attachment_ids` on chat when the model reports vision) is landed.
-- **Phase 14.7 (RAG quality closure):** CI runs `python tools/run_rag_eval.py` on every backend pipeline; `GOAT_RAG_RERANK_MODE` and `retrieval_profile` are documented in [OPERATIONS.md](OPERATIONS.md); golden-set process in [evaldata/README.md](../evaldata/README.md); Prometheus exposes `knowledge_retrieval_requests_total` and `knowledge_query_rewrite_applied_total` at `GET /api/system/metrics`.
+- **Phase 14 status:** RAG-0 through **RAG-3** are complete on main: persisted uploads, SQLite metadata, local `simple_local_v1` vector index, retrieval-backed chat, optional **lexical rerank** and **conservative query rewrite** via `retrieval_profile` (`default` / `rag3_lexical` / `rag3_quality`), plus `python -m tools.run_rag_eval` over `evaldata/rag_eval_cases.jsonl`. **Vision MVP** (`POST /api/media/uploads`, `image_attachment_ids` on chat when the model reports vision) is landed.
+- **Phase 14.7 (RAG quality closure):** CI runs `python -m tools.run_rag_eval` on every backend pipeline; `GOAT_RAG_RERANK_MODE` and `retrieval_profile` are documented in [OPERATIONS.md](OPERATIONS.md); golden-set process in [evaldata/README.md](../evaldata/README.md); Prometheus exposes `knowledge_retrieval_requests_total` and `knowledge_query_rewrite_applied_total` at `GET /api/system/metrics`.
 - **Feature gates (§15):** `GET /api/system/features` exposes a stable `code_sandbox` snapshot (config + Docker probe; `policy_allowed` reserved for future AuthZ). `POST /api/code-sandbox/exec` is a scaffold: **503** + `FEATURE_UNAVAILABLE` when the **runtime** gate is closed; **403** + `FEATURE_DISABLED` reserved for **policy** denial; **501** when the gate passes but execution is not implemented.
-- **RAG-ready wording:** use the term **RAG-ready** in release notes or marketing only after `python tools/run_rag_eval.py` passes in CI or pre-release checks and this file still documents the same threshold.
+- **RAG-ready wording:** use the term **RAG-ready** in release notes or marketing only after `python -m tools.run_rag_eval` passes in CI or pre-release checks and this file still documents the same threshold.
 
 ## What is shipped
 
@@ -48,7 +48,7 @@ Last updated: 2026-04-08
 - Optional `Idempotency-Key` support for `POST /api/upload/analyze` and chat session append path (`POST /api/chat` with `session_id`)
 - SQLite-backed idempotency TTL table for duplicate request replay and write dedupe
 - Capacity guardrails on `POST /api/chat` enforce max message count and max payload size (`422` on overflow)
-- Load smoke utility `tools/load_chat_smoke.py` provides one-command p50/p95 validation against chat SSE plus optional `/api/system/inference` snapshot
+- Load smoke utility (`python -m tools.load_chat_smoke`) provides one-command p50/p95 validation against chat SSE plus optional `/api/system/inference` snapshot
 - Session history contract includes `schema_version` audit field; `updated_at` remains part of list/detail APIs
 - SQLite backup/restore runbook published at [BACKUP_RESTORE.md](BACKUP_RESTORE.md) and linked from OPERATIONS
 - Security/tooling baseline includes [SECURITY.md](SECURITY.md), `ruff check` in CI, `pip-audit` in CI, and changed-file `ruff format` gating for Python edits

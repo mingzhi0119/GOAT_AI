@@ -29,5 +29,5 @@ Goal: save tokens, avoid duplicate analysis, rely on stable contracts.
 ## API contract memory
 
 - Canonical machine-readable contract: `docs/openapi.json` (OpenAPI **3.2.0**), must match the FastAPI app. Regenerate from `backend.main:app` after endpoint/schema changes so committed spec and runtime `/openapi.json` do not drift.
-- Canonical compact LLM-facing file: `docs/api.llm.yaml`. Regenerate from `docs/openapi.json` via `python tools/generate_llm_api_yaml.py`; do not hand-maintain unless you are also updating the generator.
+- Canonical compact LLM-facing file: `docs/api.llm.yaml`. Regenerate from `docs/openapi.json` via `python -m tools.generate_llm_api_yaml` (from repository root); do not hand-maintain unless you are also updating the generator.
 - Canonical executable contract: black-box suite `__tests__/test_api_blackbox_contract.py`; keep it aligned with auth/security suites and use it as the first reference for API behavior.

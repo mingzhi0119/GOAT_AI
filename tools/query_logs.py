@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """GOAT AI — chat log query tool.
 
-Usage (run from any directory inside the project):
-    python3 tools/query_logs.py recent          # last 20 conversations
-    python3 tools/query_logs.py recent 50       # last N conversations
-    python3 tools/query_logs.py stats           # daily usage counts
-    python3 tools/query_logs.py search Porter   # keyword search in user messages
-    python3 tools/query_logs.py export          # dump all rows as CSV to stdout
-    python3 tools/query_logs.py export > logs.csv
+Usage from the **repository root** (recommended)::
+
+    python -m tools.query_logs recent
+    python -m tools.query_logs recent 50
+    python -m tools.query_logs stats
+    python -m tools.query_logs search Porter
+    python -m tools.query_logs export
 
 DB path: reads GOAT_LOG_PATH env var, otherwise <project_root>/chat_logs.db
 """
