@@ -46,7 +46,6 @@ export function historyKnowledgeAttachment(session: HistorySessionDetail): FileC
   return {
     filename: firstKnowledgeDocument.filename,
     documentId: firstKnowledgeDocument.document_id,
-    ingestionId: '',
     retrievalMode: 'knowledge_rag',
   }
 }

@@ -22,8 +22,19 @@ describe('useFileContext', () => {
     })
   })
 
-  it('stores and clears file context in localStorage', () => {
+  it('stores, merges, and clears file context in localStorage', () => {
     const { result } = renderHook(() => useFileContext())
+
+    act(() => {
+      result.current.setFileContext({
+        filename: 'data.csv',
+        suffixPrompt: 'Inspect this CSV for trends, anomalies, and key comparisons.',
+      })
+    })
+
+    expect(result.current.fileContext?.filename).toBe('data.csv')
+    expect(result.current.fileContext?.suffixPrompt).toContain('CSV')
+    expect(localStorage.getItem('goat-ai-file-context')).toContain('data.csv')
 
     act(() => {
       result.current.setFileContext({
@@ -31,12 +42,14 @@ describe('useFileContext', () => {
         documentId: 'doc-1',
         ingestionId: 'ing-1',
         retrievalMode: 'knowledge_rag',
+        suffixPrompt: 'Inspect this CSV for trends, anomalies, and key comparisons.',
+        templatePrompt: 'Analyze this CSV and tell me the main trends, outliers, and comparisons worth noting.',
       })
     })
 
-    expect(result.current.fileContext?.filename).toBe('data.csv')
     expect(result.current.fileContext?.documentId).toBe('doc-1')
-    expect(localStorage.getItem('goat-ai-file-context')).toContain('data.csv')
+    expect(result.current.fileContext?.templatePrompt).toContain('Analyze this CSV')
+    expect(result.current.fileContext?.suffixPrompt).toContain('CSV')
 
     act(() => {
       result.current.clearFileContext()

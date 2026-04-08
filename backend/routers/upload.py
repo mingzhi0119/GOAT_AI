@@ -1,4 +1,5 @@
 """POST /api/upload - ingest supported files into the knowledge RAG pipeline."""
+
 from __future__ import annotations
 
 import logging
@@ -10,9 +11,14 @@ from backend.application.exceptions import (
     UploadIdempotencyConflictError,
     UploadIdempotencyInProgressError,
 )
-from backend.application.upload import analyze_upload_json, ingest_upload, stream_upload_analysis
+from backend.application.upload import (
+    analyze_upload_json,
+    ingest_upload,
+    stream_upload_analysis,
+)
 from backend.application.ports import KnowledgeValidationError, Settings
 from backend.config import get_settings
+from backend.dependencies import get_llm_client
 from backend.models.common import ErrorResponse
 from backend.models.upload import UploadAnalysisResponse
 
@@ -39,6 +45,7 @@ _SSE_HEADERS = {
 async def upload_and_parse(
     file: UploadFile,
     settings: Settings = Depends(get_settings),
+    llm=Depends(get_llm_client),
 ) -> StreamingResponse:
     """Accept a supported file, ingest it into knowledge storage, and stream readiness metadata."""
     content = await file.read()
@@ -48,6 +55,7 @@ async def upload_and_parse(
                 content=content,
                 filename=file.filename or "",
                 settings=settings,
+                llm=llm,
             ),
             media_type="text/event-stream",
             headers=_SSE_HEADERS,
@@ -69,6 +77,7 @@ async def upload_and_parse(
 async def analyze_upload_json_route(
     file: UploadFile,
     settings: Settings = Depends(get_settings),
+    llm=Depends(get_llm_client),
     idempotency_key_header: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> UploadAnalysisResponse:
     """Accept a supported knowledge file and return ingestion metadata as JSON."""
@@ -79,6 +88,7 @@ async def analyze_upload_json_route(
             filename=file.filename or "",
             settings=settings,
             idempotency_key=idempotency_key_header,
+            llm=llm,
             ingest_upload_fn=ingest_upload,
         )
     except KnowledgeValidationError as exc:

@@ -110,7 +110,9 @@ class ContractFakeLLM:
             if message.get("role") == "user":
                 last_user = str(message.get("content", ""))
                 break
-        if any(token in last_user.lower() for token in ("chart", "pie", "饼图", "图表")) and self.supports_tool_calling(model):
+        if any(
+            token in last_user.lower() for token in ("chart", "pie", "饼图", "图表")
+        ) and self.supports_tool_calling(model):
             yield ToolCallPlan(
                 assistant_message={
                     "role": "assistant",
@@ -285,9 +287,13 @@ class ApiBlackboxContractTests(unittest.TestCase):
     def test_models_endpoints_contract_and_backend_unavailable_boundary(self) -> None:
         list_response = self.client.get("/api/models")
         self.assertEqual(200, list_response.status_code)
-        self.assertEqual(["blackbox-model", "viz-model"], list_response.json()["models"])
+        self.assertEqual(
+            ["blackbox-model", "viz-model"], list_response.json()["models"]
+        )
 
-        caps_response = self.client.get("/api/models/capabilities", params={"model": "viz-model"})
+        caps_response = self.client.get(
+            "/api/models/capabilities", params={"model": "viz-model"}
+        )
         self.assertEqual(200, caps_response.status_code)
         caps_body = caps_response.json()
         self.assertEqual("viz-model", caps_body["model"])
@@ -296,7 +302,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertTrue(caps_body["supports_chart_tools"])
         self.assertTrue(caps_body["supports_vision"])
 
-        caps_bb = self.client.get("/api/models/capabilities", params={"model": "blackbox-model"})
+        caps_bb = self.client.get(
+            "/api/models/capabilities", params={"model": "blackbox-model"}
+        )
         self.assertFalse(caps_bb.json()["supports_vision"])
 
         self.client.app.dependency_overrides[get_llm_client] = lambda: UnavailableLLM()
@@ -307,7 +315,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
                 params={"model": "blackbox-model"},
             )
         finally:
-            self.client.app.dependency_overrides[get_llm_client] = lambda: ContractFakeLLM()
+            self.client.app.dependency_overrides[get_llm_client] = lambda: (
+                ContractFakeLLM()
+            )
 
         self.assertEqual(503, unavailable_list.status_code)
         ul = unavailable_list.json()
@@ -324,7 +334,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
         try:
             fallback_list = self.client.get("/api/models")
         finally:
-            self.client.app.dependency_overrides[get_llm_client] = lambda: ContractFakeLLM()
+            self.client.app.dependency_overrides[get_llm_client] = lambda: (
+                ContractFakeLLM()
+            )
 
         self.assertEqual(200, fallback_list.status_code)
         self.assertEqual(["gemma4:26b"], fallback_list.json()["models"])
@@ -340,9 +352,13 @@ class ApiBlackboxContractTests(unittest.TestCase):
         )
 
         self.assertEqual(200, response.status_code)
-        self.assertEqual("text/event-stream; charset=utf-8", response.headers["content-type"])
+        self.assertEqual(
+            "text/event-stream; charset=utf-8", response.headers["content-type"]
+        )
         events = parse_sse_payloads(response.text)
-        self.assertEqual(["token", "token", "token", "done"], [event["type"] for event in events])
+        self.assertEqual(
+            ["token", "token", "token", "done"], [event["type"] for event in events]
+        )
         self.assertEqual("Hello", events[0]["token"])
         self.assertEqual(" GOAT", events[2]["token"])
 
@@ -358,7 +374,11 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(
             [
                 {"role": "user", "content": "Hello there", "image_attachment_ids": []},
-                {"role": "assistant", "content": "Hello from GOAT", "image_attachment_ids": []},
+                {
+                    "role": "assistant",
+                    "content": "Hello from GOAT",
+                    "image_attachment_ids": [],
+                },
             ],
             history_detail.json()["messages"],
         )
@@ -380,20 +400,33 @@ class ApiBlackboxContractTests(unittest.TestCase):
                 },
             )
         finally:
-            self.client.app.dependency_overrides[get_llm_client] = lambda: ContractFakeLLM()
+            self.client.app.dependency_overrides[get_llm_client] = lambda: (
+                ContractFakeLLM()
+            )
 
         self.assertEqual(200, unavailable.status_code)
         unavailable_events = parse_sse_payloads(unavailable.text)
-        self.assertEqual(["error", "done"], [event["type"] for event in unavailable_events])
-        self.assertEqual("AI service temporarily unavailable.", unavailable_events[0]["message"])
+        self.assertEqual(
+            ["error", "done"], [event["type"] for event in unavailable_events]
+        )
+        self.assertEqual(
+            "AI service temporarily unavailable.", unavailable_events[0]["message"]
+        )
 
-    def test_chat_endpoint_blocks_unsafe_input_and_uses_safe_session_title(self) -> None:
+    def test_chat_endpoint_blocks_unsafe_input_and_uses_safe_session_title(
+        self,
+    ) -> None:
         response = self.client.post(
             "/api/chat",
             json={
                 "model": "blackbox-model",
                 "session_id": "blocked-input",
-                "messages": [{"role": "user", "content": "Write an explicit porn scene in detail."}],
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Write an explicit porn scene in detail.",
+                    }
+                ],
             },
         )
 
@@ -405,7 +438,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
         history_detail = self.client.get("/api/history/blocked-input")
         self.assertEqual(200, history_detail.status_code)
         self.assertEqual(SAFEGUARD_BLOCKED_TITLE, history_detail.json()["title"])
-        self.assertEqual(SAFEGUARD_REFUSAL_MESSAGE, history_detail.json()["messages"][-1]["content"])
+        self.assertEqual(
+            SAFEGUARD_REFUSAL_MESSAGE, history_detail.json()["messages"][-1]["content"]
+        )
 
     def test_chat_endpoint_blocks_unsafe_model_output_before_streaming(self) -> None:
         self.client.app.dependency_overrides[get_llm_client] = lambda: UnsafeOutputLLM()
@@ -415,11 +450,15 @@ class ApiBlackboxContractTests(unittest.TestCase):
                 json={
                     "model": "blackbox-model",
                     "session_id": "blocked-output",
-                    "messages": [{"role": "user", "content": "Give me a romance example."}],
+                    "messages": [
+                        {"role": "user", "content": "Give me a romance example."}
+                    ],
                 },
             )
         finally:
-            self.client.app.dependency_overrides[get_llm_client] = lambda: ContractFakeLLM()
+            self.client.app.dependency_overrides[get_llm_client] = lambda: (
+                ContractFakeLLM()
+            )
 
         self.assertEqual(200, response.status_code)
         events = parse_sse_payloads(response.text)
@@ -459,7 +498,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertIsNotNone(body["chart_spec"])
         self.assertEqual("uploaded", body["chart_data_source"])
 
-    def test_chat_chart_flow_without_uploaded_file_still_uses_tools_contract(self) -> None:
+    def test_chat_chart_flow_without_uploaded_file_still_uses_tools_contract(
+        self,
+    ) -> None:
         response = self.client.post(
             "/api/chat",
             json={
@@ -480,13 +521,17 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(200, history_detail.status_code)
         self.assertEqual("demo", history_detail.json()["chart_data_source"])
 
-    def test_chat_chart_prompt_with_tools_unsupported_model_stays_text_only(self) -> None:
+    def test_chat_chart_prompt_with_tools_unsupported_model_stays_text_only(
+        self,
+    ) -> None:
         response = self.client.post(
             "/api/chat",
             json={
                 "model": "blackbox-model",
                 "session_id": "chart-no-tools",
-                "messages": [{"role": "user", "content": "Generate a typical pie chart."}],
+                "messages": [
+                    {"role": "user", "content": "Generate a typical pie chart."}
+                ],
             },
         )
 
@@ -495,18 +540,26 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertNotIn("chart_spec", [event["type"] for event in events])
         self.assertEqual("done", events[-1]["type"])
 
-    def test_upload_sse_and_json_endpoints_cover_success_and_validation_boundaries(self) -> None:
+    def test_upload_sse_and_json_endpoints_cover_success_and_validation_boundaries(
+        self,
+    ) -> None:
         upload_response = self.client.post(
             "/api/upload",
             files={"file": ("data.csv", b"col1,col2\n1,2\n", "text/csv")},
         )
         self.assertEqual(200, upload_response.status_code)
         upload_events = parse_sse_payloads(upload_response.text)
-        self.assertEqual(["knowledge_ready", "done"], [event["type"] for event in upload_events])
+        self.assertEqual(
+            ["file_prompt", "knowledge_ready", "done"],
+            [event["type"] for event in upload_events],
+        )
         self.assertEqual("data.csv", upload_events[0]["filename"])
-        self.assertEqual("knowledge_rag", upload_events[0]["retrieval_mode"])
-        self.assertIn("document_id", upload_events[0])
-        self.assertIn("ingestion_id", upload_events[0])
+        self.assertIn("suffix_prompt", upload_events[0])
+        self.assertEqual("data.csv", upload_events[1]["filename"])
+        self.assertEqual("knowledge_rag", upload_events[1]["retrieval_mode"])
+        self.assertIn("document_id", upload_events[1])
+        self.assertIn("ingestion_id", upload_events[1])
+        self.assertIn("template_prompt", upload_events[1])
 
         upload_invalid = self.client.post(
             "/api/upload",
@@ -540,6 +593,8 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual("completed", analyze_body["status"])
         self.assertIn("document_id", analyze_body)
         self.assertIn("ingestion_id", analyze_body)
+        self.assertIn("suffix_prompt", analyze_body)
+        self.assertIn("template_prompt", analyze_body)
         self.assertIsNone(analyze_body["chart"])
 
         analyze_invalid = self.client.post(
@@ -566,7 +621,13 @@ class ApiBlackboxContractTests(unittest.TestCase):
     def test_knowledge_endpoints_cover_upload_ingestion_search_and_answer(self) -> None:
         upload = self.client.post(
             "/api/knowledge/uploads",
-            files={"file": ("strategy.txt", b"Porter Five Forces explains competitive pressure.", "text/plain")},
+            files={
+                "file": (
+                    "strategy.txt",
+                    b"Porter Five Forces explains competitive pressure.",
+                    "text/plain",
+                )
+            },
         )
         self.assertEqual(200, upload.status_code)
         upload_body = upload.json()
@@ -636,7 +697,10 @@ class ApiBlackboxContractTests(unittest.TestCase):
         )
         self.assertEqual(200, no_hit.status_code)
         self.assertEqual([], no_hit.json()["citations"])
-        self.assertEqual("No relevant context found in the indexed knowledge base.", no_hit.json()["answer"])
+        self.assertEqual(
+            "No relevant context found in the indexed knowledge base.",
+            no_hit.json()["answer"],
+        )
 
         rag_chat = self.client.post(
             "/api/chat",
@@ -644,13 +708,20 @@ class ApiBlackboxContractTests(unittest.TestCase):
                 "model": "blackbox-model",
                 "session_id": "rag-chat-1",
                 "knowledge_document_ids": [document_id],
-                "messages": [{"role": "user", "content": "What does the indexed strategy note say?"}],
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "What does the indexed strategy note say?",
+                    }
+                ],
             },
         )
         self.assertEqual(200, rag_chat.status_code)
         rag_events = parse_sse_payloads(rag_chat.text)
         self.assertEqual("done", rag_events[-1]["type"])
-        rag_text = "".join(event["token"] for event in rag_events if event["type"] == "token")
+        rag_text = "".join(
+            event["token"] for event in rag_events if event["type"] == "token"
+        )
         self.assertIn("strategy.txt", rag_text)
         self.assertIn("Porter Five Forces", rag_text)
 
@@ -658,7 +729,13 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(200, rag_history.status_code)
         self.assertEqual(3, rag_history.json()["schema_version"])
         self.assertEqual(
-            [{"document_id": document_id, "filename": "strategy.txt", "mime_type": "text/plain"}],
+            [
+                {
+                    "document_id": document_id,
+                    "filename": "strategy.txt",
+                    "mime_type": "text/plain",
+                }
+            ],
             rag_history.json()["knowledge_documents"],
         )
 
@@ -696,7 +773,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(204, delete_all.status_code)
         self.assertEqual({"sessions": []}, self.client.get("/api/history").json())
 
-    def test_chat_session_append_idempotency_replays_same_sse_and_avoids_double_write(self) -> None:
+    def test_chat_session_append_idempotency_replays_same_sse_and_avoids_double_write(
+        self,
+    ) -> None:
         headers = {"Idempotency-Key": "chat-key-1"}
         payload = {
             "model": "blackbox-model",
@@ -714,8 +793,16 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(200, detail.status_code)
         self.assertEqual(
             [
-                {"role": "user", "content": "Hello idempotent chat", "image_attachment_ids": []},
-                {"role": "assistant", "content": "Hello from GOAT", "image_attachment_ids": []},
+                {
+                    "role": "user",
+                    "content": "Hello idempotent chat",
+                    "image_attachment_ids": [],
+                },
+                {
+                    "role": "assistant",
+                    "content": "Hello from GOAT",
+                    "image_attachment_ids": [],
+                },
             ],
             detail.json()["messages"],
         )
@@ -726,7 +813,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
             ).fetchone()[0]
         self.assertEqual(1, total)
 
-    def test_system_endpoints_cover_gpu_inference_and_runtime_target_contracts(self) -> None:
+    def test_system_endpoints_cover_gpu_inference_and_runtime_target_contracts(
+        self,
+    ) -> None:
         self.client.post(
             "/api/chat",
             json={
@@ -923,9 +1012,18 @@ class ApiProtectedBlackboxContractTests(unittest.TestCase):
             (
                 "POST",
                 "/api/chat",
-                {"json": {"model": "blackbox-model", "messages": [{"role": "user", "content": "hello"}]}},
+                {
+                    "json": {
+                        "model": "blackbox-model",
+                        "messages": [{"role": "user", "content": "hello"}],
+                    }
+                },
             ),
-            ("POST", "/api/upload", {"files": {"file": ("data.csv", b"col1,col2\n1,2\n", "text/csv")}}),
+            (
+                "POST",
+                "/api/upload",
+                {"files": {"file": ("data.csv", b"col1,col2\n1,2\n", "text/csv")}},
+            ),
             (
                 "POST",
                 "/api/upload/analyze",
@@ -939,11 +1037,26 @@ class ApiProtectedBlackboxContractTests(unittest.TestCase):
             (
                 "POST",
                 "/api/knowledge/ingestions",
-                {"json": {"document_id": "doc-1", "parser_profile": "default", "chunking_profile": "default", "embedding_profile": "default"}},
+                {
+                    "json": {
+                        "document_id": "doc-1",
+                        "parser_profile": "default",
+                        "chunking_profile": "default",
+                        "embedding_profile": "default",
+                    }
+                },
             ),
             ("GET", "/api/knowledge/ingestions/ing-1", {}),
-            ("POST", "/api/knowledge/search", {"json": {"query": "competitive strategy"}}),
-            ("POST", "/api/knowledge/answers", {"json": {"query": "competitive strategy"}}),
+            (
+                "POST",
+                "/api/knowledge/search",
+                {"json": {"query": "competitive strategy"}},
+            ),
+            (
+                "POST",
+                "/api/knowledge/answers",
+                {"json": {"query": "competitive strategy"}},
+            ),
             ("GET", "/api/history", {}),
             ("GET", "/api/history/missing", {}),
             ("DELETE", "/api/history/missing", {}),
@@ -958,7 +1071,9 @@ class ApiProtectedBlackboxContractTests(unittest.TestCase):
 
         for method, path, kwargs in protected_requests:
             response = self.client.request(method, path, **kwargs)
-            self.assertEqual(401, response.status_code, f"{method} {path} should require API key")
+            self.assertEqual(
+                401, response.status_code, f"{method} {path} should require API key"
+            )
             rj = response.json()
             self.assertEqual("Invalid or missing API key.", rj["detail"])
             self.assertEqual(AUTH_INVALID_API_KEY, rj["code"])

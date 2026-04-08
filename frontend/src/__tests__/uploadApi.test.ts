@@ -19,7 +19,8 @@ describe('upload api', () => {
 
   it('parses knowledge_ready events', async () => {
     const payload = [
-      'data: {"type":"knowledge_ready","filename":"data.csv","document_id":"doc-1","ingestion_id":"ing-1","status":"completed","retrieval_mode":"knowledge_rag"}\n',
+      'data: {"type":"file_prompt","filename":"data.csv","suffix_prompt":"Inspect this CSV for trends, anomalies, and key comparisons."}\n',
+      'data: {"type":"knowledge_ready","filename":"data.csv","suffix_prompt":"Inspect this CSV for trends, anomalies, and key comparisons.","document_id":"doc-1","ingestion_id":"ing-1","status":"completed","retrieval_mode":"knowledge_rag","template_prompt":"Analyze this CSV and tell me the main trends, outliers, and comparisons worth noting."}\n',
       'data: {"type":"done"}\n',
     ].join('')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(sseResponse(payload)))
@@ -28,8 +29,9 @@ describe('upload api', () => {
     for await (const event of streamUpload(new File(['x,y\n1,2'], 'data.csv'))) {
       events.push(event)
     }
-    expect(events).toHaveLength(2)
-    expect((events[0] as { type: string }).type).toBe('knowledge_ready')
-    expect((events[1] as { type: string }).type).toBe('done')
+    expect(events).toHaveLength(3)
+    expect((events[0] as { type: string }).type).toBe('file_prompt')
+    expect((events[1] as { type: string }).type).toBe('knowledge_ready')
+    expect((events[2] as { type: string }).type).toBe('done')
   })
 })

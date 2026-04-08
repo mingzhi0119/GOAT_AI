@@ -11,6 +11,7 @@ import ChatWindow from './components/ChatWindow'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
+import type { UploadStreamEvent } from './api/upload'
 
 /** Root application: compose stateful controllers and render the shell UI. */
 export default function App() {
@@ -80,13 +81,24 @@ export default function App() {
           void session.deleteHistorySession(sessionId)
         }}
         fileContext={session.fileContext}
-        onFileContext={ctx => {
-          session.setFileContext({
-            filename: ctx.filename,
-            documentId: ctx.document_id,
-            ingestionId: ctx.ingestion_id,
-            retrievalMode: ctx.retrieval_mode,
-          })
+        onUploadEvent={(event: UploadStreamEvent) => {
+          if (event.type === 'file_prompt') {
+            session.setFileContext({
+              filename: event.filename,
+              suffixPrompt: event.suffix_prompt,
+            })
+            return
+          }
+          if (event.type === 'knowledge_ready') {
+            session.setFileContext({
+              filename: event.filename,
+              documentId: event.document_id,
+              ingestionId: event.ingestion_id,
+              retrievalMode: event.retrieval_mode,
+              suffixPrompt: event.suffix_prompt,
+              templatePrompt: event.template_prompt,
+            })
+          }
         }}
         onClearFileContext={session.clearFileContextSession}
       />

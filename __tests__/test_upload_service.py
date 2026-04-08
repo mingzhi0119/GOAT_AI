@@ -31,7 +31,7 @@ class UploadServiceTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmpdir.cleanup()
 
-    def test_upload_stream_emits_knowledge_ready_event(self) -> None:
+    def test_upload_stream_emits_file_prompt_then_knowledge_ready_event(self) -> None:
         content = b"col1,col2\n1,2\n"
         events = list(
             stream_upload_analysis_sse(
@@ -40,16 +40,25 @@ class UploadServiceTests(unittest.TestCase):
                 settings=self.settings,
             )
         )
-        self.assertGreaterEqual(len(events), 2)
+        self.assertGreaterEqual(len(events), 3)
 
         first = events[0]
         self.assertTrue(first.startswith("data: "))
-        payload = json.loads(first[len("data: "):].strip())
-        self.assertEqual("knowledge_ready", payload["type"])
-        self.assertEqual("data.csv", payload["filename"])
-        self.assertEqual("knowledge_rag", payload["retrieval_mode"])
-        self.assertIn("document_id", payload)
-        self.assertIn("ingestion_id", payload)
+        first_payload = json.loads(first[len("data: ") :].strip())
+        self.assertEqual("file_prompt", first_payload["type"])
+        self.assertEqual("data.csv", first_payload["filename"])
+        self.assertIn("suffix_prompt", first_payload)
+
+        second = events[1]
+        self.assertTrue(second.startswith("data: "))
+        second_payload = json.loads(second[len("data: ") :].strip())
+        self.assertEqual("knowledge_ready", second_payload["type"])
+        self.assertEqual("data.csv", second_payload["filename"])
+        self.assertEqual("knowledge_rag", second_payload["retrieval_mode"])
+        self.assertIn("document_id", second_payload)
+        self.assertIn("ingestion_id", second_payload)
+        self.assertIn("suffix_prompt", second_payload)
+        self.assertIn("template_prompt", second_payload)
 
         self.assertFalse(any('"type": "chart_spec"' in event for event in events))
         self.assertTrue(any('"type": "done"' in event for event in events))

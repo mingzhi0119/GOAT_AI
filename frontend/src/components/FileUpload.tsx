@@ -1,21 +1,17 @@
 import { useCallback, useRef, useState, type DragEvent, type FC } from 'react'
-import {
-  streamUpload,
-  type UploadKnowledgeReadyEvent,
-} from '../api/upload'
+import { streamUpload, type UploadStreamEvent } from '../api/upload'
 
 interface Props {
-  onFileContext: (ctx: UploadKnowledgeReadyEvent) => void
+  onUploadEvent: (event: UploadStreamEvent) => void
 }
 
 /**
  * Drag-and-drop / click-to-browse upload area for supported knowledge files.
  *
- * On upload the backend ingests the file into the knowledge index and returns a
- * readiness event. The next chat turn then uses retrieval against that indexed
- * document.
+ * The backend now emits an early file-suffix prompt followed by the fully
+ * ingested knowledge metadata plus a model-recommended template prompt.
  */
-const FileUpload: FC<Props> = ({ onFileContext }) => {
+const FileUpload: FC<Props> = ({ onUploadEvent }) => {
   const [isDragging, setIsDragging] = useState(false)
   const [status, setStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle')
   const [fileName, setFileName] = useState<string | null>(null)
@@ -29,8 +25,11 @@ const FileUpload: FC<Props> = ({ onFileContext }) => {
       setStatus('uploading')
       try {
         for await (const event of streamUpload(file)) {
-          if (event.type === 'knowledge_ready') onFileContext(event)
-          else if (event.type === 'error') throw new Error(event.message)
+          if (event.type === 'file_prompt' || event.type === 'knowledge_ready') {
+            onUploadEvent(event)
+          } else if (event.type === 'error') {
+            throw new Error(event.message)
+          }
         }
         setStatus('done')
       } catch (err) {
@@ -38,7 +37,7 @@ const FileUpload: FC<Props> = ({ onFileContext }) => {
         setStatus('error')
       }
     },
-    [onFileContext],
+    [onUploadEvent],
   )
 
   const handleDrop = useCallback(
@@ -62,12 +61,12 @@ const FileUpload: FC<Props> = ({ onFileContext }) => {
 
   const label =
     status === 'uploading'
-      ? `Reading ${fileName ?? 'file'}…`
+      ? `Reading ${fileName ?? 'file'}...`
       : status === 'done'
-        ? `${fileName ?? 'File'} ready ✓\nAsk your question below`
+        ? `${fileName ?? 'File'} ready - ask your question below`
         : status === 'error'
-          ? 'Upload failed — retry'
-      : 'Drop CSV / XLSX / PDF / DOCX / MD\nor click to browse'
+          ? 'Upload failed - retry'
+          : 'Drop CSV / XLSX / PDF / DOCX / MD\nor click to browse'
 
   return (
     <div>

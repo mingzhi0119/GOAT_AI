@@ -2,6 +2,7 @@ import { type FC, type MouseEvent } from 'react'
 import FileUpload from './FileUpload'
 import GoatIcon from './GoatIcon'
 import type { HistorySessionItem } from '../api/history'
+import type { UploadStreamEvent } from '../api/upload'
 import type { ModelCapabilitiesResponse } from '../api/types'
 import type { FileContext } from '../hooks/useFileContext'
 import {
@@ -36,14 +37,7 @@ interface Props {
   onRefreshHistory: () => void
   onDeleteAllHistory: () => void
   fileContext: FileContext | null
-  onFileContext: (ctx: {
-    type: 'knowledge_ready'
-    filename: string
-    document_id: string
-    ingestion_id: string
-    status: string
-    retrieval_mode: string
-  }) => void
+  onUploadEvent: (event: UploadStreamEvent) => void
   onClearFileContext: () => void
 }
 
@@ -89,7 +83,7 @@ const Sidebar: FC<Props> = ({
   onRefreshHistory,
   onDeleteAllHistory,
   fileContext,
-  onFileContext,
+  onUploadEvent,
   onClearFileContext,
 }) => {
   const fmtDate = (value: string) => {
@@ -301,7 +295,7 @@ const Sidebar: FC<Props> = ({
           </p>
           <FileUpload
             key={fileContext?.filename ?? 'no-file'}
-            onFileContext={onFileContext}
+            onUploadEvent={onUploadEvent}
           />
           {fileContext && (
             <div

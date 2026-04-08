@@ -19,10 +19,24 @@ from goat_ai.config import Settings
 if FastAPI is not None:
     from backend.config import get_settings
     from backend.exception_handlers import register_exception_handlers
+    from backend.dependencies import get_llm_client
     from backend.routers import upload
 
 
-@unittest.skipUnless(FastAPI is not None and TestClient is not None, "fastapi not installed")
+class FakeUploadLLM:
+    def generate_completion(
+        self,
+        model: str,
+        prompt: str,
+        *,
+        ollama_options: dict[str, float | int] | None = None,
+    ) -> str:
+        return "Analyze this spreadsheet and tell me the main trends, outliers, and comparisons worth noting."
+
+
+@unittest.skipUnless(
+    FastAPI is not None and TestClient is not None, "fastapi not installed"
+)
 class UploadRouterIntegrationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmpdir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
@@ -45,6 +59,7 @@ class UploadRouterIntegrationTests(unittest.TestCase):
         register_exception_handlers(app)
         app.include_router(upload.router, prefix="/api")
         app.dependency_overrides[get_settings] = lambda: self.settings
+        app.dependency_overrides[get_llm_client] = lambda: FakeUploadLLM()
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
@@ -53,7 +68,9 @@ class UploadRouterIntegrationTests(unittest.TestCase):
     def test_upload_analyze_returns_knowledge_rag_metadata_without_chart(self) -> None:
         response = self.client.post(
             "/api/upload/analyze",
-            files={"file": ("data.csv", b"month,revenue\nJan,10\nFeb,12\n", "text/csv")},
+            files={
+                "file": ("data.csv", b"month,revenue\nJan,10\nFeb,12\n", "text/csv")
+            },
         )
 
         self.assertEqual(200, response.status_code)
@@ -62,6 +79,8 @@ class UploadRouterIntegrationTests(unittest.TestCase):
         self.assertIn("document_id", payload)
         self.assertIn("ingestion_id", payload)
         self.assertEqual("knowledge_rag", payload["retrieval_mode"])
+        self.assertIn("suffix_prompt", payload)
+        self.assertIn("template_prompt", payload)
         self.assertIsNone(payload["chart"])
 
     def test_upload_analyze_rejects_invalid_extension(self) -> None:
@@ -79,10 +98,12 @@ class UploadRouterIntegrationTests(unittest.TestCase):
         headers = {"Idempotency-Key": "upload-key-1"}
         canned = UploadAnalysisResponse(
             filename="data.csv",
+            suffix_prompt="Inspect this CSV for trends, anomalies, and key comparisons.",
             document_id="doc-cached",
             ingestion_id="ing-cached",
             status="completed",
             retrieval_mode="knowledge_rag",
+            template_prompt="Analyze this CSV and tell me the main trends, outliers, and comparisons worth noting.",
             chart=None,
         )
         with patch(

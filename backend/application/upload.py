@@ -1,18 +1,25 @@
 """Upload analysis use cases over the knowledge pipeline."""
+
 from __future__ import annotations
 
 from collections.abc import Generator
 from typing import Callable
 
-from backend.application.ports import KnowledgeValidationError, Settings
+from backend.application.ports import KnowledgeValidationError, Settings, LLMClient
 from backend.application.exceptions import (
     UploadIdempotencyConflictError,
     UploadIdempotencyInProgressError,
 )
 from backend.models.upload import UploadAnalysisResponse
-from backend.services.idempotency_service import SQLiteIdempotencyStore, build_request_hash
+from backend.services.idempotency_service import (
+    SQLiteIdempotencyStore,
+    build_request_hash,
+)
 from backend.services.knowledge_storage import SUPPORTED_KNOWLEDGE_EXTENSIONS
-from backend.services.upload_service import ingest_upload as _ingest_upload, stream_upload_analysis_sse as _stream_upload_analysis_sse
+from backend.services.upload_service import (
+    ingest_upload as _ingest_upload,
+    stream_upload_analysis_sse as _stream_upload_analysis_sse,
+)
 
 
 def _validate_upload_input(*, filename: str, content: bytes) -> None:
@@ -32,15 +39,26 @@ def stream_upload_analysis(
     content: bytes,
     filename: str,
     settings: Settings,
+    llm: LLMClient | None = None,
 ) -> Generator[str, None, None]:
     """Validate upload input and stream readiness metadata from the knowledge pipeline."""
     _validate_upload_input(filename=filename, content=content)
-    return _stream_upload_analysis_sse(content=content, filename=filename, settings=settings)
+    return _stream_upload_analysis_sse(
+        content=content, filename=filename, settings=settings, llm=llm
+    )
 
 
-def ingest_upload(*, content: bytes, filename: str, settings: Settings) -> UploadAnalysisResponse:
+def ingest_upload(
+    *,
+    content: bytes,
+    filename: str,
+    settings: Settings,
+    llm: LLMClient | None = None,
+) -> UploadAnalysisResponse:
     """Compatibility wrapper for the underlying upload ingestion use case."""
-    return _ingest_upload(content=content, filename=filename, settings=settings)
+    return _ingest_upload(
+        content=content, filename=filename, settings=settings, llm=llm
+    )
 
 
 def analyze_upload_json(
@@ -49,6 +67,7 @@ def analyze_upload_json(
     filename: str,
     settings: Settings,
     idempotency_key: str | None = None,
+    llm: LLMClient | None = None,
     ingest_upload_fn: Callable[..., UploadAnalysisResponse] = ingest_upload,
 ) -> UploadAnalysisResponse:
     """Validate upload input, ingest the file, and return JSON readiness metadata."""
@@ -58,7 +77,9 @@ def analyze_upload_json(
     request_hash = build_request_hash(filename.encode("utf-8") + b"\x00" + content)
 
     if key:
-        store = SQLiteIdempotencyStore(db_path=settings.log_db_path, ttl_sec=settings.idempotency_ttl_sec)
+        store = SQLiteIdempotencyStore(
+            db_path=settings.log_db_path, ttl_sec=settings.idempotency_ttl_sec
+        )
         claim = store.claim(
             key=key,
             route="/api/upload/analyze",
@@ -81,6 +102,7 @@ def analyze_upload_json(
             content=content,
             filename=filename,
             settings=settings,
+            llm=llm,
         )
     except KnowledgeValidationError:
         if key:

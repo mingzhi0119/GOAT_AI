@@ -31,9 +31,11 @@ export interface UseChatSessionReturn {
   refreshHistory: () => Promise<void>
   setFileContext: (ctx: {
     filename: string
-    documentId: string
-    ingestionId: string
-    retrievalMode: string
+    documentId?: string
+    ingestionId?: string
+    retrievalMode?: string
+    suffixPrompt?: string
+    templatePrompt?: string
   }) => void
   clearFileContextSession: () => void
 }
@@ -96,7 +98,7 @@ export function useChatSession({
         content,
         selectedModel,
         userName,
-        fileContext && !imageAttachmentIds?.length ? [fileContext.documentId] : undefined,
+        fileContext?.documentId && !imageAttachmentIds?.length ? [fileContext.documentId] : undefined,
         systemInstruction,
         ollamaOptions,
         setChartSpec,
