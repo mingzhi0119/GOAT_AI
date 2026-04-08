@@ -1,6 +1,6 @@
 # GOAT AI Project Status
 
-Last updated: 2026-04-08
+Last updated: 2026-04-09
 
 ## Release
 
@@ -10,6 +10,7 @@ Last updated: 2026-04-08
 - **Phase 14 status:** RAG-0 through **RAG-3** are complete on main: persisted uploads, SQLite metadata, local `simple_local_v1` vector index, retrieval-backed chat, optional **lexical rerank** and **conservative query rewrite** via `retrieval_profile` (`default` / `rag3_lexical` / `rag3_quality`), plus `python -m tools.run_rag_eval` over `evaldata/rag_eval_cases.jsonl`. **Vision MVP** (`POST /api/media/uploads`, `image_attachment_ids` on chat when the model reports vision) is landed.
 - **Phase 14.7 (RAG quality closure):** CI runs `python -m tools.run_rag_eval` on every backend pipeline; `GOAT_RAG_RERANK_MODE` and `retrieval_profile` are documented in [OPERATIONS.md](OPERATIONS.md); golden-set process in [evaldata/README.md](../evaldata/README.md); Prometheus exposes `knowledge_retrieval_requests_total` and `knowledge_query_rewrite_applied_total` at `GET /api/system/metrics`.
 - **Phase 15.1 (domain semantics):** [DOMAIN.md](DOMAIN.md) defines ubiquitous language; `backend.domain` holds safeguard policy, chart provenance helpers, and chart-spec version invariant; [.github/pull_request_template.md](../.github/pull_request_template.md) links DOMAIN + contract regen.
+- **Phase 15.4–15.6:** `session_messages` table (dual-read/write with legacy JSON blob); optional `sessions.owner_id`; read/write API keys and optional `X-GOAT-Owner-Id` for session scoping; lazy OpenTelemetry (`GOAT_OTEL_ENABLED`) with `traceparent` middleware and Ollama spans. See [SESSION_MESSAGES_MIGRATION.md](SESSION_MESSAGES_MIGRATION.md), [OPERATIONS.md](OPERATIONS.md), [test_api_authz.py](../__tests__/test_api_authz.py).
 - **Feature gates (§15):** `GET /api/system/features` exposes a stable `code_sandbox` snapshot (config + Docker probe; `policy_allowed` reserved for future AuthZ). `POST /api/code-sandbox/exec` is a scaffold: **503** + `FEATURE_UNAVAILABLE` when the **runtime** gate is closed; **403** + `FEATURE_DISABLED` reserved for **policy** denial; **501** when the gate passes but execution is not implemented.
 - **RAG-ready wording:** use the term **RAG-ready** in release notes or marketing only after `python -m tools.run_rag_eval` passes in CI or pre-release checks and this file still documents the same threshold.
 

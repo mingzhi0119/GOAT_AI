@@ -19,6 +19,8 @@ JSON error responses use a **stable envelope** so logs, metrics, and clients sha
 | `code` | HTTP | Retry hint* | Typical meaning |
 |--------|------|-------------|-----------------|
 | `AUTH_INVALID_API_KEY` | 401 | no | Missing or wrong `X-GOAT-API-Key` when `GOAT_API_KEY` is set |
+| `AUTH_WRITE_KEY_REQUIRED` | 403 | no | `GOAT_API_KEY_WRITE` is set but the request used the read key on a write route |
+| `AUTH_SESSION_OWNER_REQUIRED` | 403 | no | `GOAT_REQUIRE_SESSION_OWNER=1` but `X-GOAT-Owner-Id` was missing on chat/history |
 | `RATE_LIMITED` | 429 | yes (after Retry-After) | Per-key rate limit exceeded |
 | `BAD_REQUEST` | 400 | no | Bad upload / business validation |
 | `IDEMPOTENCY_CONFLICT` | 409 | no | `Idempotency-Key` reused with different payload or while original request is still pending |

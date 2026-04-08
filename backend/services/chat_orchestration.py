@@ -165,6 +165,7 @@ class SessionPersistenceService:
         started_at: float,
         first_token_ms: float | None = None,
         title_override: str | None = None,
+        session_owner_id: str = "",
     ) -> None:
         _persist_and_log_chat_result(
             model=model,
@@ -184,6 +185,7 @@ class SessionPersistenceService:
             started_at=started_at,
             first_token_ms=first_token_ms,
             title_override=title_override,
+            session_owner_id=session_owner_id,
         )
 
     def yield_blocked_response(
@@ -201,6 +203,7 @@ class SessionPersistenceService:
         session_repository: SessionRepository | None,
         title_generator: TitleGenerator | None,
         started_at: float,
+        session_owner_id: str = "",
     ) -> Generator[str, None, None]:
         yield from _yield_blocked_response(
             assessment=assessment,
@@ -216,6 +219,7 @@ class SessionPersistenceService:
             title_generator=title_generator,
             started_at=started_at,
             persistence=self,
+            session_owner_id=session_owner_id,
         )
 
 
@@ -238,6 +242,7 @@ def _persist_and_log_chat_result(
     chart_data_source: ChartDataSource = "none",
     first_token_ms: float | None = None,
     title_override: str | None = None,
+    session_owner_id: str = "",
 ) -> None:
     """Finalize telemetry, audit log, and optional session persistence."""
     elapsed_ms = round((time.monotonic() - started_at) * 1000)
@@ -269,6 +274,7 @@ def _persist_and_log_chat_result(
             knowledge_documents=knowledge_documents,
             chart_data_source=chart_data_source,
             title_override=title_override,
+            owner_id=session_owner_id,
         )
 
 
@@ -287,6 +293,7 @@ def _yield_blocked_response(
     title_generator: TitleGenerator | None,
     started_at: float,
     persistence: SessionPersistenceService | None = None,
+    session_owner_id: str = "",
 ) -> Generator[str, None, None]:
     """Emit a policy refusal and finalize logging/persistence."""
     refusal = assessment.refusal_message
@@ -309,6 +316,7 @@ def _yield_blocked_response(
             chart_data_source="none",
             started_at=started_at,
             title_override=SAFEGUARD_BLOCKED_TITLE,
+            session_owner_id=session_owner_id,
         )
         return
 
@@ -328,4 +336,5 @@ def _yield_blocked_response(
         started_at=started_at,
         chart_data_source="none",
         title_override=SAFEGUARD_BLOCKED_TITLE,
+        session_owner_id=session_owner_id,
     )

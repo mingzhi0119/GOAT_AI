@@ -91,6 +91,8 @@ class Settings:
     log_db_path: Path
     data_dir: Path = APP_ROOT / "data"
     api_key: str = ""
+    api_key_write: str = ""
+    require_session_owner: bool = False
     rate_limit_window_sec: int = 60
     rate_limit_max_requests: int = 60
     deploy_target: str = "auto"
@@ -194,6 +196,10 @@ def load_settings() -> Settings:
         raise ValueError("GOAT_RAG_RERANK_MODE must be one of: passthrough, lexical")
     _feature_sandbox = _env_bool("GOAT_FEATURE_CODE_SANDBOX", "false")
     _docker_sock = os.environ.get("GOAT_DOCKER_SOCKET", "").strip()
+    _api_key = os.environ.get("GOAT_API_KEY", "").strip()
+    _api_key_write = os.environ.get("GOAT_API_KEY_WRITE", "").strip()
+    if _api_key_write and not _api_key:
+        raise ValueError("GOAT_API_KEY_WRITE requires GOAT_API_KEY (read key) to be set.")
     return Settings(
         ollama_base_url=base,
         generate_timeout=int(os.environ.get("OLLAMA_GENERATE_TIMEOUT", "120")),
@@ -206,7 +212,9 @@ def load_settings() -> Settings:
         logo_svg=APP_ROOT / "static" / "urochester_simon_business_horizontal.svg",
         log_db_path=Path(os.environ.get("GOAT_LOG_PATH", _default_log_db)),
         data_dir=Path(os.environ.get("GOAT_DATA_DIR", _default_data_dir)),
-        api_key=os.environ.get("GOAT_API_KEY", "").strip(),
+        api_key=_api_key,
+        api_key_write=_api_key_write,
+        require_session_owner=_env_bool("GOAT_REQUIRE_SESSION_OWNER", "false"),
         rate_limit_window_sec=_rate_limit_window_sec,
         rate_limit_max_requests=_rate_limit_max_requests,
         deploy_target=_deploy_target,

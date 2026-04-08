@@ -141,11 +141,14 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(StarletteHTTPException)
     def _http_exception(_request: Request, exc: StarletteHTTPException) -> JSONResponse:
         detail: str | list[Any] | dict[str, Any] = exc.detail  # type: ignore[assignment]
+        if isinstance(detail, dict) and "code" in detail and "detail" in detail:
+            content = dict(detail)
+            rid = get_request_id()
+            if rid:
+                content.setdefault("request_id", rid)
+            return _attach_request_id(JSONResponse(status_code=exc.status_code, content=content))
         code = default_code_for_http_status(exc.status_code)
-        if isinstance(detail, str):
-            content = build_error_body(detail=detail, code=code, status_code=exc.status_code)
-        else:
-            content = build_error_body(detail=detail, code=code, status_code=exc.status_code)
+        content = build_error_body(detail=detail, code=code, status_code=exc.status_code)
         return _attach_request_id(JSONResponse(status_code=exc.status_code, content=content))
 
     @app.exception_handler(RequestValidationError)

@@ -1,6 +1,6 @@
 ﻿# GOAT AI Roadmap
 
-> Last updated: 2026-04-09 — **v1.3.0** tags Phase **11–12**; **main** additionally ships **Phase 13** (full closeout) and **Phase 14** through **14.6 RAG-3**. **Phase 15.2–15.3** initial slices are complete on main (see §15.2–15.3). **Next:** **Phase 15.4+** (session store, AuthZ, optional tracing); keep the **§14.7** RAG eval gate green as retrieval evolves. **Constraints vs roadmap:** see [Current reality and improvement map](#current-reality-and-improvement-map).
+> Last updated: 2026-04-09 — **v1.3.0** tags Phase **11–12**; **main** additionally ships **Phase 13** (full closeout) and **Phase 14** through **14.6 RAG-3**. **Phase 15.2–15.7** slices through **15.6** are complete on main (session store normalization, AuthZ keys + owner header, optional OTel). **Next:** further **Phase 15** structural work as listed below §15.7; keep the **§14.7** RAG eval gate green as retrieval evolves. **Constraints vs roadmap:** see [Current reality and improvement map](#current-reality-and-improvement-map).
 > Current release tag: **v1.3.0**
 > Compact snapshot: [PROJECT_STATUS.md](PROJECT_STATUS.md) · Engineering standards: [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md)
 
@@ -97,9 +97,9 @@ This section records **constraints that match today’s shipped architecture** a
 
 | Reality (main) | Improvement path | Roadmap / docs home |
 |----------------|------------------|---------------------|
-| Protection is **`GOAT_API_KEY` + `X-GOAT-API-Key`** when set; same key ⇒ single trust domain (no tenant or user identity in requests). | **Document** threat model, rotation, and blast radius; keep rate limits and health exceptions as today. | [SECURITY.md](SECURITY.md), [OPERATIONS.md](OPERATIONS.md); Phase **13** non-goals already allow a one-page shared-key model. |
-| Feature gates expose **`policy_allowed: null`** until AuthZ exists; runtime gating (503) is separate from policy (403). | **Optional:** scoped keys (read/write) or multiple keys via env — service-layer checks; **not** full IAM until product requires it. | Phase **15.5** (AuthZ roadmap + minimal enforcement); [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) §15. |
-| Per-user sessions in SQLite are **not** authenticated identities; history is a convenience store, not proof of principal. | **Future:** session ownership + denial tests only after AuthZ decision. | Phase **15.5**; Decision Log when/if product commits. |
+| Protection is **`GOAT_API_KEY` + `X-GOAT-API-Key`** when set; optional **`GOAT_API_KEY_WRITE`** splits read vs write HTTP methods; optional **`X-GOAT-Owner-Id`** + **`GOAT_REQUIRE_SESSION_OWNER`** scopes sessions (not end-user AuthN). | **Document** threat model, rotation, and blast radius; keep rate limits and health exceptions as today. | [SECURITY.md](SECURITY.md), [OPERATIONS.md](OPERATIONS.md); Phase **15.5** minimal enforcement. |
+| Feature gates expose **`policy_allowed: null`** until richer AuthZ exists; runtime gating (503) is separate from policy (403). | Scoped keys + owner header are **opt-in** via env; **not** full IAM until product requires it. | [test_api_authz.py](../__tests__/test_api_authz.py); [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) §15. |
+| Per-user sessions in SQLite are **not** authenticated identities; `owner_id` is a **convenience partition**, not proof of principal. | Stricter identity would require a Decision Log + product commitment. | [SESSION_MESSAGES_MIGRATION.md](SESSION_MESSAGES_MIGRATION.md); Decision Log 2026-04-08. |
 
 **Priority:** Docs + operational discipline **first**; code changes for multi-key **only** when exposure grows (see horizon **v1.3.x** in [Near-term execution order](#near-term-execution-order-project-calibrated)).
 
@@ -258,16 +258,16 @@ Aligned with the RAG subsection in [Current reality and improvement map](#curren
 
 ### 15.4 Data (deep)
 
-- `[ ]` **Message store normalization** —`session_messages` (append-only); dual-read from legacy JSON until cutover. **Exit:** migration doc + integration tests.
+- `[x]` **Message store normalization** —`session_messages` (append-only); dual-read + dual-write with legacy JSON. **Exit:** [SESSION_MESSAGES_MIGRATION.md](SESSION_MESSAGES_MIGRATION.md) + [integration test](../__tests__/integration/test_session_messages_dual_read.py).
 
 ### 15.5 Security (deeper)
 
-- `[ ]` **AuthZ roadmap + enforcement** —Scoped keys or session ownership in **service** layer; Decision Log entry. **Exit:** minimal cross-session denial tests.
-- `[ ]` **Secrets hygiene automation** —Optional Gitleaks/trufflehog in CI; CONTRIBUTING: `.env.example` review on env changes.
+- `[x]` **AuthZ roadmap + enforcement** —Scoped read/write keys (`GOAT_API_KEY` / `GOAT_API_KEY_WRITE`); session ownership via `X-GOAT-Owner-Id` + `GOAT_REQUIRE_SESSION_OWNER`; service-layer checks on history. **Exit:** [test_api_authz.py](../__tests__/test_api_authz.py). Decision Log: 2026-04-08.
+- `[x]` **Secrets hygiene automation** —Informational Gitleaks job in CI (`continue-on-error`); [CONTRIBUTING.md](../CONTRIBUTING.md) + `.env.example` pointers.
 
 ### 15.6 Observability (optional stretch)
 
-- `[ ]` **Distributed tracing** —OpenTelemetry + W3C `traceparent`; spans around Ollama; off by default, near-zero cost when disabled. **Exit:** one documented trace export path.
+- `[x]` **Distributed tracing** —`goat_ai/otel_tracing.py`: W3C `traceparent` middleware + spans around Ollama HTTP; default-off (`GOAT_OTEL_ENABLED=0`). **Exit:** [OPERATIONS.md](OPERATIONS.md) OpenTelemetry section.
 
 ### 15.7 Phase 15 — execution defaults and assumptions
 
@@ -326,4 +326,5 @@ This replaces the retired long-form `docs/RAG_ARCHITECTURE.md` (historical draft
 | 2026-04-08 | Docs: multi-environment portability | README/OPERATIONS/ENGINEERING_STANDARDS clarify the repo is not limited to one school host; optional high-risk features (e.g. code sandbox) are policy-gated per **ENGINEERING_STANDARDS §15**. |
 | 2026-04-08 | ROADMAP: current reality map + §14.7 | Added **Current reality and improvement map** (shared API key, SQLite/local vector, RAG loop, tests, domain semantics, shared-host process model) with **Summary** table; added **§14.7 RAG quality closure** (CI eval, thresholds, golden-set process, observability); **Next** program order is **0 = §14.7**, **1 = Phase 15**. |
 | 2026-04-08 | Phase 14.7 implemented | CI runs `python -m tools.run_rag_eval`; `evaldata/README.md` + `VERSION`; OPERATIONS **RAG retrieval quality**; Prometheus `knowledge_retrieval_requests_total` / `knowledge_query_rewrite_applied_total`; ENGINEERING_STANDARDS §12 RAG bullet. |
+| 2026-04-08 | Phase 15.4–15.6 (session_messages + AuthZ + optional OTel) | `session_messages` dual-read/write + `sessions.owner_id`; read/write API keys + optional `X-GOAT-Owner-Id`; lazy OpenTelemetry with `traceparent` propagation and Ollama spans; HTTP 403 envelopes preserve explicit `code` when handlers pass `build_error_body`. |
 | 2026-04-08 | Developer CLI: `python -m tools.*` | `tools/` is a package (`tools/__init__.py`); run modules from repo root instead of `PYTHONPATH=.` in `.env`. CI uses `python -m tools.run_rag_eval` and `python -m tools.check_api_contract_sync`. |

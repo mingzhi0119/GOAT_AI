@@ -2,6 +2,8 @@
 
 Persisted chat sessions store a **versioned JSON blob** in the SQLite `sessions.messages` column (see `backend/services/log_service.py`). Encoding and decoding live in `backend/services/session_message_codec.py`.
 
+**Phase 15.4:** visible turns are also stored in table **`session_messages`** (dual-write / dual-read with this JSON). See [SESSION_MESSAGES_MIGRATION.md](SESSION_MESSAGES_MIGRATION.md).
+
 ## Version constant
 
 - **`SESSION_PAYLOAD_VERSION`** is currently **`3`** (see `session_message_codec.py`).
@@ -43,6 +45,7 @@ Cosmetic or backward-compatible additions (optional fields ignored by older read
 ## Related docs
 
 - Domain terms: [DOMAIN.md](DOMAIN.md) (session / turn / schema version).
+- Normalized rows: [SESSION_MESSAGES_MIGRATION.md](SESSION_MESSAGES_MIGRATION.md).
 - Ports and layers: [PORTS.md](PORTS.md), [DEPENDENCY_GRAPH.md](DEPENDENCY_GRAPH.md).
 
 ## Integration test time budget (Phase 15.3)

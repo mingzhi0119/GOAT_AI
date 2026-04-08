@@ -24,9 +24,12 @@ class InMemorySessionRepository:
     def __init__(self) -> None:
         self._rows: dict[str, dict[str, object]] = {}
 
-    def list_sessions(self) -> list[SessionSummaryRecord]:
+    def list_sessions(self, owner_filter: str | None = None) -> list[SessionSummaryRecord]:
         out: list[SessionSummaryRecord] = []
         for sid, row in sorted(self._rows.items(), key=lambda kv: str(kv[1].get("updated_at", ""))):
+            row_owner = str(row.get("owner_id", ""))
+            if owner_filter is not None and row_owner != owner_filter:
+                continue
             out.append(
                 SessionSummaryRecord(
                     id=sid,
@@ -35,6 +38,7 @@ class InMemorySessionRepository:
                     schema_version=int(row.get("schema_version", 1)),
                     created_at=str(row["created_at"]),
                     updated_at=str(row["updated_at"]),
+                    owner_id=row_owner,
                 )
             )
         return out
@@ -52,6 +56,7 @@ class InMemorySessionRepository:
             schema_version=int(row.get("schema_version", 1)),
             created_at=str(row["created_at"]),
             updated_at=str(row["updated_at"]),
+            owner_id=str(row.get("owner_id", "")),
             messages=decoded.messages,
             chart_spec=decoded.chart_spec,
             file_context_prompt=decoded.file_context_prompt,
@@ -68,13 +73,18 @@ class InMemorySessionRepository:
             "created_at": payload.created_at,
             "updated_at": payload.updated_at,
             "messages": payload.payload,
+            "owner_id": payload.owner_id,
         }
 
     def delete_session(self, session_id: str) -> None:
         self._rows.pop(session_id, None)
 
-    def delete_all_sessions(self) -> None:
-        self._rows.clear()
+    def delete_all_sessions(self, owner_filter: str | None = None) -> None:
+        if owner_filter is None:
+            self._rows.clear()
+            return
+        for sid in [k for k, row in self._rows.items() if str(row.get("owner_id", "")) == owner_filter]:
+            del self._rows[sid]
 
 
 class TestFakeSessionRepository(unittest.TestCase):

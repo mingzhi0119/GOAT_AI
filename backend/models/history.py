@@ -38,6 +38,7 @@ class HistorySessionSummary(BaseModel):
     schema_version: int = Field(..., ge=1)
     created_at: str
     updated_at: str
+    owner_id: str = ""
 
 
 class HistorySessionListResponse(BaseModel):

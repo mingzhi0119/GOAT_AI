@@ -14,6 +14,7 @@ import requests
 
 from goat_ai.config import Settings
 from goat_ai.exceptions import OllamaUnavailable
+from goat_ai.otel_tracing import otel_span
 from goat_ai.telemetry_counters import OLLAMA_ERROR_API_CODE, inc_ollama_error
 from goat_ai.tools import (
     conversation_transcript,
@@ -176,12 +177,13 @@ class OllamaService:
         else:
             timeout = float(self._s.generate_timeout)
         try:
-            res = requests.post(
-                f"{self._s.ollama_base_url}/api/chat",
-                json=payload,
-                stream=stream,
-                timeout=timeout,
-            )
+            with otel_span("ollama.api.chat", stream=str(stream)):
+                res = requests.post(
+                    f"{self._s.ollama_base_url}/api/chat",
+                    json=payload,
+                    stream=stream,
+                    timeout=timeout,
+                )
             res.raise_for_status()
             return res
         except requests.HTTPError as exc:
@@ -203,6 +205,10 @@ class OllamaService:
     # ── Model list ────────────────────────────────────────────────────────────
     def list_model_names(self) -> list[str]:
         """Return names of locally available Ollama models."""
+        with otel_span("ollama.api.tags"):
+            return self._list_model_names_impl()
+
+    def _list_model_names_impl(self) -> list[str]:
         self._before_read_call()
         attempts = max(1, int(self._s.ollama_read_retry_attempts))
         last_exc: Exception | None = None
@@ -266,11 +272,12 @@ class OllamaService:
         last_http_status = "none"
         for attempt in range(1, attempts + 1):
             try:
-                res = requests.post(
-                    f"{self._s.ollama_base_url}/api/show",
-                    json={"model": model},
-                    timeout=5,
-                )
+                with otel_span("ollama.api.show", model=model):
+                    res = requests.post(
+                        f"{self._s.ollama_base_url}/api/show",
+                        json={"model": model},
+                        timeout=5,
+                    )
                 res.raise_for_status()
                 self._mark_read_success()
                 capabilities = res.json().get("capabilities", [])
@@ -355,12 +362,13 @@ class OllamaService:
         if ollama_options:
             payload["options"] = ollama_options
         try:
-            res = requests.post(
-                f"{self._s.ollama_base_url}/api/generate",
-                json=payload,
-                stream=True,
-                timeout=self._s.generate_timeout,
-            )
+            with otel_span("ollama.api.generate", stream="true"):
+                res = requests.post(
+                    f"{self._s.ollama_base_url}/api/generate",
+                    json=payload,
+                    stream=True,
+                    timeout=self._s.generate_timeout,
+                )
             res.raise_for_status()
         except requests.RequestException as exc:
             inc_ollama_error(
@@ -386,12 +394,13 @@ class OllamaService:
         if ollama_options:
             payload["options"] = ollama_options
         try:
-            res = requests.post(
-                f"{self._s.ollama_base_url}/api/generate",
-                json=payload,
-                stream=False,
-                timeout=self._s.generate_timeout,
-            )
+            with otel_span("ollama.api.generate", stream="false"):
+                res = requests.post(
+                    f"{self._s.ollama_base_url}/api/generate",
+                    json=payload,
+                    stream=False,
+                    timeout=self._s.generate_timeout,
+                )
             res.raise_for_status()
         except requests.RequestException as exc:
             inc_ollama_error(

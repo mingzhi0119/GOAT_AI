@@ -13,6 +13,11 @@ pypdf==6.1.2
 requests==2.33.0
 httpx==0.28.1
 
+# ── OpenTelemetry (optional; lazy-loaded when GOAT_OTEL_ENABLED=1) ───────────
+opentelemetry-api==1.28.2
+opentelemetry-sdk==1.28.2
+opentelemetry-exporter-otlp-proto-http==1.28.2
+
 # ── Tests / architecture ──────────────────────────────────────────────────────
 pytest==8.3.4
 import-linter==2.1

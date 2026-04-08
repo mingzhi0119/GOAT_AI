@@ -36,6 +36,7 @@ class FakeSessionRepository:
             schema_version=payload.schema_version,
             created_at=payload.created_at,
             updated_at=payload.updated_at,
+            owner_id=payload.owner_id,
             messages=decoded.messages,
             chart_spec=decoded.chart_spec,
             file_context_prompt=decoded.file_context_prompt,
@@ -43,13 +44,13 @@ class FakeSessionRepository:
             chart_data_source=decoded.chart_data_source,
         )
 
-    def list_sessions(self) -> list[object]:
+    def list_sessions(self, owner_filter: str | None = None) -> list[object]:
         return []
 
     def delete_session(self, session_id: str) -> None:
         self.sessions.pop(session_id, None)
 
-    def delete_all_sessions(self) -> None:
+    def delete_all_sessions(self, owner_filter: str | None = None) -> None:
         self.sessions.clear()
 
 
@@ -97,6 +98,7 @@ class ChatServiceTitleTests(unittest.TestCase):
                     schema_version=3,
                     created_at="2026-01-01T00:00:00+00:00",
                     updated_at="2026-01-01T00:00:01+00:00",
+                    owner_id="",
                     messages=[
                         {"role": "user", "content": "a"},
                         {"role": "assistant", "content": "b"},

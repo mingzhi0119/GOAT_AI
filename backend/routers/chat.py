@@ -23,6 +23,7 @@ from backend.routers.chat_options import ollama_options_from_chat_request
 from backend.services.chat_capacity_service import ChatCapacityError, validate_chat_capacity
 from backend.services.chat_message_merge import merge_request_image_attachments
 from backend.services.idempotency_service import SQLiteIdempotencyStore, build_request_hash
+from backend.api_errors import AUTH_SESSION_OWNER_REQUIRED, build_error_body
 from backend.services.chat_service import stream_chat_sse
 from backend.services.chat_runtime import ConversationLogger, SessionRepository, TitleGenerator
 from backend.services.media_service import load_images_base64_for_chat
@@ -93,6 +94,16 @@ def chat_stream(
         )
 
     merged_messages = merge_request_image_attachments(req)
+    session_owner_id = (request.headers.get("x-goat-owner-id") or "").strip()
+    if settings.require_session_owner and not session_owner_id:
+        raise HTTPException(
+            status_code=403,
+            detail=build_error_body(
+                detail="X-GOAT-Owner-Id is required when GOAT_REQUIRE_SESSION_OWNER is enabled.",
+                code=AUTH_SESSION_OWNER_REQUIRED,
+                status_code=403,
+            ),
+        )
     vision_b64: list[str] | None = None
     if req.image_attachment_ids:
         if not settings.use_chat_api:
@@ -130,6 +141,7 @@ def chat_stream(
         settings=settings,
         knowledge_document_ids=req.knowledge_document_ids,
         vision_last_user_images_base64=vision_b64,
+        session_owner_id=session_owner_id,
     )
 
     if not idempotency_key or not req.session_id:

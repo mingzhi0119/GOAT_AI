@@ -23,6 +23,112 @@ logger = logging.getLogger(__name__)
 _SQLITE_WRITE_METRIC_CODE = "SQLITE_WRITE_FAILED"
 
 
+def _payload_visible_messages(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Extract chat message dicts from a versioned session payload for ``session_messages`` rows."""
+    raw = payload.get("messages", [])
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        role = item.get("role")
+        content = item.get("content")
+        if role not in {"user", "assistant", "system"} or not isinstance(content, str):
+            continue
+        row: dict[str, Any] = {"role": str(role), "content": content}
+        raw_ids = item.get("image_attachment_ids")
+        if isinstance(raw_ids, list) and raw_ids:
+            ids: list[str] = []
+            for x in raw_ids:
+                if isinstance(x, str) and x.strip():
+                    ids.append(x.strip())
+            if ids:
+                row["image_attachment_ids"] = ids
+        out.append(row)
+    return out
+
+
+def _session_messages_table_exists(conn: sqlite3.Connection) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='session_messages'",
+    ).fetchone()
+    return row is not None
+
+
+def _sessions_has_owner_id_column(conn: sqlite3.Connection) -> bool:
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()]
+    return "owner_id" in cols
+
+
+def _replace_session_messages(
+    conn: sqlite3.Connection,
+    *,
+    session_id: str,
+    payload: dict[str, Any],
+) -> None:
+    """Sync ``session_messages`` to match the current snapshot payload (delete + insert)."""
+    if not _session_messages_table_exists(conn):
+        return
+    conn.execute("DELETE FROM session_messages WHERE session_id = ?", (session_id,))
+    now = datetime.now(timezone.utc).isoformat()
+    for seq, msg in enumerate(_payload_visible_messages(payload)):
+        ids_json = (
+            json.dumps(msg["image_attachment_ids"], ensure_ascii=False)
+            if msg.get("image_attachment_ids")
+            else None
+        )
+        conn.execute(
+            """
+            INSERT INTO session_messages (session_id, seq, role, content, image_attachment_ids, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (session_id, seq, msg["role"], msg["content"], ids_json, now),
+        )
+
+
+def _fetch_session_messages_list(conn: sqlite3.Connection, session_id: str) -> list[dict[str, Any]] | None:
+    """Return ordered message dicts from ``session_messages``, or ``None`` if no rows."""
+    if not _session_messages_table_exists(conn):
+        return None
+    rows = conn.execute(
+        """
+        SELECT role, content, image_attachment_ids
+        FROM session_messages
+        WHERE session_id = ?
+        ORDER BY seq ASC
+        """,
+        (session_id,),
+    ).fetchall()
+    if not rows:
+        return None
+    out: list[dict[str, Any]] = []
+    for role, content, ids_raw in rows:
+        item: dict[str, Any] = {"role": str(role), "content": str(content)}
+        if isinstance(ids_raw, str) and ids_raw.strip():
+            try:
+                parsed = json.loads(ids_raw)
+            except json.JSONDecodeError:
+                parsed = None
+            if isinstance(parsed, list) and parsed:
+                item["image_attachment_ids"] = parsed
+        out.append(item)
+    return out
+
+
+def _merge_session_messages_into_item(
+    *,
+    messages_value: list[dict[str, Any]] | dict[str, Any] | Any,
+    normalized: list[dict[str, Any]],
+) -> list[dict[str, Any]] | dict[str, Any]:
+    """Prefer normalized rows for the visible message list; keep dict envelope fields when present."""
+    if isinstance(messages_value, dict):
+        merged = dict(messages_value)
+        merged["messages"] = normalized
+        return merged
+    return normalized
+
+
 def init_db(db_path: Path) -> None:
     """Apply SQL migrations under ``backend/migrations`` (WAL enabled by runner).
 
@@ -97,24 +203,57 @@ def upsert_session(
     payload: dict[str, Any],
     created_at: str,
     updated_at: str,
+    owner_id: str = "",
 ) -> None:
     """Insert or update a persisted chat session with full message history."""
     try:
         encoded_payload = json.dumps(payload, ensure_ascii=False)
         with sqlite3.connect(db_path) as conn:
-            conn.execute(
-                """
-                INSERT INTO sessions (id, title, model, schema_version, created_at, updated_at, messages)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET
-                    title=excluded.title,
-                    model=excluded.model,
-                    schema_version=excluded.schema_version,
-                    updated_at=excluded.updated_at,
-                    messages=excluded.messages
-                """,
-                (session_id, title, model, int(schema_version), created_at, updated_at, encoded_payload),
-            )
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                if _sessions_has_owner_id_column(conn):
+                    conn.execute(
+                        """
+                        INSERT INTO sessions (id, title, model, schema_version, created_at, updated_at, messages, owner_id)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(id) DO UPDATE SET
+                            title=excluded.title,
+                            model=excluded.model,
+                            schema_version=excluded.schema_version,
+                            updated_at=excluded.updated_at,
+                            messages=excluded.messages,
+                            owner_id=excluded.owner_id
+                        """,
+                        (
+                            session_id,
+                            title,
+                            model,
+                            int(schema_version),
+                            created_at,
+                            updated_at,
+                            encoded_payload,
+                            owner_id,
+                        ),
+                    )
+                else:
+                    conn.execute(
+                        """
+                        INSERT INTO sessions (id, title, model, schema_version, created_at, updated_at, messages)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(id) DO UPDATE SET
+                            title=excluded.title,
+                            model=excluded.model,
+                            schema_version=excluded.schema_version,
+                            updated_at=excluded.updated_at,
+                            messages=excluded.messages
+                        """,
+                        (session_id, title, model, int(schema_version), created_at, updated_at, encoded_payload),
+                    )
+                _replace_session_messages(conn, session_id=session_id, payload=payload)
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
     except Exception:
         inc_sqlite_log_write_failure(operation="session_upsert", code=_SQLITE_WRITE_METRIC_CODE)
         logger.error(
@@ -131,18 +270,34 @@ def upsert_session(
         )
 
 
-def list_sessions(*, db_path: Path) -> list[dict[str, Any]]:
+def list_sessions(*, db_path: Path, owner_filter: str | None = None) -> list[dict[str, Any]]:
     """Return lightweight session metadata for sidebar listing."""
     try:
         with sqlite3.connect(db_path) as conn:
             conn.row_factory = sqlite3.Row
-            rows = conn.execute(
-                """
-                SELECT id, title, model, schema_version, created_at, updated_at
-                FROM sessions
-                ORDER BY updated_at DESC
-                """
-            ).fetchall()
+            if owner_filter is not None and _sessions_has_owner_id_column(conn):
+                rows = conn.execute(
+                    """
+                    SELECT id, title, model, schema_version, created_at, updated_at, owner_id
+                    FROM sessions
+                    WHERE owner_id = ?
+                    ORDER BY updated_at DESC
+                    """,
+                    (owner_filter,),
+                ).fetchall()
+            else:
+                sel = (
+                    "id, title, model, schema_version, created_at, updated_at, owner_id"
+                    if _sessions_has_owner_id_column(conn)
+                    else "id, title, model, schema_version, created_at, updated_at"
+                )
+                rows = conn.execute(
+                    f"""
+                    SELECT {sel}
+                    FROM sessions
+                    ORDER BY updated_at DESC
+                    """
+                ).fetchall()
         return [dict(r) for r in rows]
     except Exception:
         logger.exception("Failed to list sessions from %s", db_path)
@@ -154,20 +309,31 @@ def get_session(*, db_path: Path, session_id: str) -> dict[str, Any] | None:
     try:
         with sqlite3.connect(db_path) as conn:
             conn.row_factory = sqlite3.Row
+            sel_msg = (
+                "id, title, model, schema_version, created_at, updated_at, messages, owner_id"
+                if _sessions_has_owner_id_column(conn)
+                else "id, title, model, schema_version, created_at, updated_at, messages"
+            )
             row = conn.execute(
-                """
-                SELECT id, title, model, schema_version, created_at, updated_at, messages
+                f"""
+                SELECT {sel_msg}
                 FROM sessions
                 WHERE id = ?
                 """,
                 (session_id,),
             ).fetchone()
-        if row is None:
-            return None
-        item = dict(row)
-        raw_messages = item.get("messages", "[]")
-        parsed = json.loads(raw_messages) if isinstance(raw_messages, str) else []
-        item["messages"] = parsed if isinstance(parsed, (list, dict)) else []
+            if row is None:
+                return None
+            item = dict(row)
+            raw_messages = item.get("messages", "[]")
+            parsed = json.loads(raw_messages) if isinstance(raw_messages, str) else []
+            item["messages"] = parsed if isinstance(parsed, (list, dict)) else []
+            normalized = _fetch_session_messages_list(conn, session_id)
+        if normalized is not None:
+            item["messages"] = _merge_session_messages_into_item(
+                messages_value=item["messages"],
+                normalized=normalized,
+            )
         return item
     except Exception:
         logger.exception("Failed to fetch session %s from %s", session_id, db_path)
@@ -182,6 +348,8 @@ def delete_session(*, db_path: Path, session_id: str) -> None:
     """
     try:
         with sqlite3.connect(db_path) as conn:
+            if _session_messages_table_exists(conn):
+                conn.execute("DELETE FROM session_messages WHERE session_id = ?", (session_id,))
             conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
     except Exception:
         inc_sqlite_log_write_failure(operation="session_delete", code=_SQLITE_WRITE_METRIC_CODE)
@@ -199,11 +367,26 @@ def delete_session(*, db_path: Path, session_id: str) -> None:
         )
 
 
-def delete_all_sessions(*, db_path: Path) -> None:
-    """Remove all rows from ``sessions`` only; ``conversations`` audit rows remain."""
+def delete_all_sessions(*, db_path: Path, owner_filter: str | None = None) -> None:
+    """Remove rows from ``sessions`` (and ``session_messages``); ``conversations`` audit rows remain."""
     try:
         with sqlite3.connect(db_path) as conn:
-            conn.execute("DELETE FROM sessions")
+            if owner_filter is not None and _sessions_has_owner_id_column(conn):
+                ids = [
+                    str(r[0])
+                    for r in conn.execute(
+                        "SELECT id FROM sessions WHERE owner_id = ?",
+                        (owner_filter,),
+                    ).fetchall()
+                ]
+                if _session_messages_table_exists(conn):
+                    for sid in ids:
+                        conn.execute("DELETE FROM session_messages WHERE session_id = ?", (sid,))
+                conn.execute("DELETE FROM sessions WHERE owner_id = ?", (owner_filter,))
+            else:
+                if _session_messages_table_exists(conn):
+                    conn.execute("DELETE FROM session_messages")
+                conn.execute("DELETE FROM sessions")
     except Exception:
         inc_sqlite_log_write_failure(operation="session_delete_all", code=_SQLITE_WRITE_METRIC_CODE)
         logger.error(

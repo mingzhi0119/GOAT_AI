@@ -103,6 +103,8 @@ Self-managed VMs, Docker Compose, Kubernetes, or developer laptops use the same 
 | `GOAT_LOG_PATH` | SQLite path | `<project>/chat_logs.db` |
 | `GOAT_DATA_DIR` | Root directory for persisted uploads, normalized knowledge text, vector indexes, and vision attachments | `<project>/data` (gitignored by default; do not commit) |
 | `GOAT_API_KEY` | Protect non-health APIs via `X-GOAT-API-Key` | empty |
+| `GOAT_API_KEY_WRITE` | Optional second key: `GET`/`HEAD`/`OPTIONS` may use read key (`GOAT_API_KEY`); other methods require this write key when set | empty |
+| `GOAT_REQUIRE_SESSION_OWNER` | When `true`/`1`, chat and history routes require `X-GOAT-Owner-Id` (session scoping) | `false` |
 | `GOAT_RATE_LIMIT_WINDOW_SEC` | Rate limit window | `60` |
 | `GOAT_RATE_LIMIT_MAX_REQUESTS` | Max requests per window | `60` |
 | `GOAT_DEPLOY_TARGET` | `auto`, `server`, or `local` | `auto` |
@@ -125,6 +127,13 @@ Self-managed VMs, Docker Compose, Kubernetes, or developer laptops use the same 
 | `GOAT_MAX_CHAT_PAYLOAD_BYTES` | Max UTF-8 request payload bytes accepted by `POST /api/chat` (422 if exceeded) | `512000` |
 | `GOAT_FEATURE_CODE_SANDBOX` | Operator allows code-sandbox feature (`0`/`1`); `effective_enabled` still requires Docker probe | `0` |
 | `GOAT_DOCKER_SOCKET` | Override Docker socket/pipe path (empty = defaults: Unix `/var/run/docker.sock`, Windows `\\.\pipe\docker_engine`) | empty |
+
+### OpenTelemetry (optional, Phase 15.6)
+
+- Default **`GOAT_OTEL_ENABLED=0`** — tracing is off; the app does not eagerly import the OpenTelemetry SDK.
+- Set **`GOAT_OTEL_ENABLED=1`** to enable a `TracerProvider`, W3C **`traceparent`** / **`tracestate`** extraction on incoming HTTP requests (`backend/otel_middleware.py`), and spans around Ollama HTTP calls in `goat_ai/ollama_client.py`.
+- **`GOAT_OTEL_EXPORTER`:** `console` (default) prints spans to stderr; `otlp` sends to **`OTEL_EXPORTER_OTLP_ENDPOINT`** (OTLP/HTTP traces URL, e.g. `http://127.0.0.1:4318/v1/traces`).
+- Standard OpenTelemetry env vars apply alongside the above (see OpenTelemetry Python docs for OTLP tuning).
 
 ### Structured logging (Phase 13 Wave A)
 

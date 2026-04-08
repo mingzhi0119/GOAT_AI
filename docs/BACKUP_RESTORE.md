@@ -4,7 +4,7 @@ This runbook covers safe backup and restore for the chat/session SQLite database
 
 ## Scope
 
-- Source DB: `GOAT_LOG_PATH` (default `<repo>/chat_logs.db`)
+- Source DB: `GOAT_LOG_PATH` (default `<repo>/chat_logs.db`); includes `sessions`, `session_messages`, and related tables (see [SESSION_MESSAGES_MIGRATION.md](SESSION_MESSAGES_MIGRATION.md)).
 - Backup files: timestamped `chat_logs_YYYYMMDD_HHMMSS.db`
 - Default backup directory: `<repo>/backups` (override with `GOAT_BACKUP_DIR`)
 

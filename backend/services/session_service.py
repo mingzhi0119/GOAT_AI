@@ -72,6 +72,7 @@ def persist_chat_session(
     knowledge_documents: list[dict[str, str]] | None = None,
     chart_data_source: ChartDataSource = "none",
     title_override: str | None = None,
+    owner_id: str = "",
 ) -> None:
     """Persist the latest session snapshot, including optional chart state."""
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -111,5 +112,6 @@ def persist_chat_session(
             payload=payload,
             created_at=created_at,
             updated_at=now_iso,
+            owner_id=owner_id,
         )
     )

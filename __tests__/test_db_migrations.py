@@ -32,6 +32,8 @@ class DbMigrationsTests(unittest.TestCase):
                         "005_add_idempotency_keys",
                         "006_add_sessions_schema_version",
                         "007_add_knowledge_tables",
+                        "008_session_messages",
+                        "009_sessions_owner_id",
                     ],
                 )
                 cols = [r[1] for r in conn.execute("PRAGMA table_info(conversations)").fetchall()]
@@ -39,6 +41,7 @@ class DbMigrationsTests(unittest.TestCase):
                 self.assertIn("session_id", cols)
                 session_cols = [r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()]
                 self.assertIn("schema_version", session_cols)
+                self.assertIn("owner_id", session_cols)
                 knowledge_cols = [r[1] for r in conn.execute("PRAGMA table_info(knowledge_documents)").fetchall()]
                 self.assertIn("storage_path", knowledge_cols)
                 ingestion_cols = [r[1] for r in conn.execute("PRAGMA table_info(knowledge_ingestions)").fetchall()]
@@ -84,12 +87,13 @@ class DbMigrationsTests(unittest.TestCase):
             conn = sqlite3.connect(db_path)
             try:
                 n = conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]
-                self.assertEqual(n, 7)
+                self.assertEqual(n, 9)
                 cols = [r[1] for r in conn.execute("PRAGMA table_info(conversations)").fetchall()]
                 self.assertIn("user_name", cols)
                 self.assertIn("session_id", cols)
                 session_cols = [r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()]
                 self.assertIn("schema_version", session_cols)
+                self.assertIn("owner_id", session_cols)
                 knowledge_cols = [r[1] for r in conn.execute("PRAGMA table_info(knowledge_documents)").fetchall()]
                 self.assertIn("storage_path", knowledge_cols)
             finally:

@@ -20,6 +20,7 @@ class SessionSummaryRecord:
     schema_version: int
     created_at: str
     updated_at: str
+    owner_id: str
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,7 @@ class SessionUpsertPayload:
     payload: dict[str, object]
     created_at: str
     updated_at: str
+    owner_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -63,7 +65,7 @@ class ConversationLogEntry:
 class SessionRepository(Protocol):
     """Persistence boundary for stored session snapshots."""
 
-    def list_sessions(self) -> list[SessionSummaryRecord]: ...
+    def list_sessions(self, owner_filter: str | None = None) -> list[SessionSummaryRecord]: ...
 
     def get_session(self, session_id: str) -> SessionDetailRecord | None: ...
 
@@ -71,7 +73,7 @@ class SessionRepository(Protocol):
 
     def delete_session(self, session_id: str) -> None: ...
 
-    def delete_all_sessions(self) -> None: ...
+    def delete_all_sessions(self, owner_filter: str | None = None) -> None: ...
 
 
 class ConversationLogger(Protocol):
@@ -98,8 +100,8 @@ class SQLiteSessionRepository:
     def __init__(self, db_path: Path) -> None:
         self._db_path = db_path
 
-    def list_sessions(self) -> list[SessionSummaryRecord]:
-        rows = log_service.list_sessions(db_path=self._db_path)
+    def list_sessions(self, owner_filter: str | None = None) -> list[SessionSummaryRecord]:
+        rows = log_service.list_sessions(db_path=self._db_path, owner_filter=owner_filter)
         return [
             SessionSummaryRecord(
                 id=str(row["id"]),
@@ -108,6 +110,7 @@ class SQLiteSessionRepository:
                 schema_version=int(row.get("schema_version", 1)),
                 created_at=str(row["created_at"]),
                 updated_at=str(row["updated_at"]),
+                owner_id=str(row.get("owner_id", "")),
             )
             for row in rows
         ]
@@ -124,6 +127,7 @@ class SQLiteSessionRepository:
             schema_version=int(row.get("schema_version", 1)),
             created_at=str(row["created_at"]),
             updated_at=str(row["updated_at"]),
+            owner_id=str(row.get("owner_id", "")),
             messages=decoded.messages,
             chart_spec=decoded.chart_spec,
             file_context_prompt=decoded.file_context_prompt,
@@ -141,13 +145,14 @@ class SQLiteSessionRepository:
             payload=payload.payload,
             created_at=payload.created_at,
             updated_at=payload.updated_at,
+            owner_id=payload.owner_id,
         )
 
     def delete_session(self, session_id: str) -> None:
         log_service.delete_session(db_path=self._db_path, session_id=session_id)
 
-    def delete_all_sessions(self) -> None:
-        log_service.delete_all_sessions(db_path=self._db_path)
+    def delete_all_sessions(self, owner_filter: str | None = None) -> None:
+        log_service.delete_all_sessions(db_path=self._db_path, owner_filter=owner_filter)
 
 
 class SQLiteConversationLogger:

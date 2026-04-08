@@ -42,6 +42,7 @@ def stream_chat_sse(
     settings: Settings | None = None,
     knowledge_document_ids: list[str] | None = None,
     vision_last_user_images_base64: list[str] | None = None,
+    session_owner_id: str = "",
 ) -> Generator[str, None, None]:
     """Yield SSE-formatted events for a chat completion."""
     if knowledge_document_ids and settings is not None:
@@ -59,6 +60,7 @@ def stream_chat_sse(
             safeguard_service=safeguard_service,
             settings=settings,
             knowledge_document_ids=knowledge_document_ids,
+            session_owner_id=session_owner_id,
         )
         return
 
@@ -79,6 +81,7 @@ def stream_chat_sse(
         ollama_options=ollama_options,
         tabular_extractor=tabular_extractor,
         vision_last_user_images_base64=vision_last_user_images_base64,
+        session_owner_id=session_owner_id,
     )
 
 
@@ -97,6 +100,7 @@ def _stream_knowledge_chat_sse(
     safeguard_service: SafeguardService | None,
     settings: Settings,
     knowledge_document_ids: list[str],
+    session_owner_id: str = "",
 ) -> Generator[str, None, None]:
     """Serve a deterministic retrieval-backed answer for sessions bound to indexed documents."""
     persistence = SessionPersistenceService()
@@ -121,6 +125,7 @@ def _stream_knowledge_chat_sse(
                 session_repository=session_repository,
                 title_generator=title_generator,
                 started_at=started_at,
+                session_owner_id=session_owner_id,
             )
             return
 
@@ -166,6 +171,7 @@ def _stream_knowledge_chat_sse(
                 session_repository=session_repository,
                 title_generator=title_generator,
                 started_at=started_at,
+                session_owner_id=session_owner_id,
             )
             return
 
@@ -201,6 +207,7 @@ def _stream_knowledge_chat_sse(
         chart_data_source="none",
         started_at=started_at,
         first_token_ms=first_token_ms,
+        session_owner_id=session_owner_id,
     )
 
 

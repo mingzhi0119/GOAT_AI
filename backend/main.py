@@ -15,6 +15,7 @@ from backend.routers import chat, code_sandbox, history, knowledge, media, model
 from backend.services import log_service
 from goat_ai.latency_metrics import init_latency_metrics
 from goat_ai.logging_config import configure_logging
+from goat_ai.otel_tracing import init_otel_if_enabled, is_otel_enabled
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -44,8 +45,14 @@ def create_app() -> FastAPI:
     settings = get_settings()
     log_service.init_db(settings.log_db_path)
     init_latency_metrics(settings.latency_rolling_max_samples)
+    init_otel_if_enabled()
 
     register_exception_handlers(app)
+
+    if is_otel_enabled():
+        from backend.otel_middleware import OtelTraceContextMiddleware
+
+        app.add_middleware(OtelTraceContextMiddleware)
 
     app.add_middleware(
         CORSMiddleware,

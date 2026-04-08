@@ -15,7 +15,7 @@ layers = [
     "backend.services",
     "backend.domain",
     "backend.models",
-    "backend.http_security",
+    "backend.http_security | backend.otel_middleware",
     "backend.api_errors | backend.config | backend.types",
     "goat_ai",
 ]

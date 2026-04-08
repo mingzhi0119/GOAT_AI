@@ -108,6 +108,7 @@ schemas:
       schema_version: integer
       created_at: string
       updated_at: string
+      owner_id: string
       messages: HistorySessionMessage[]
       chart_spec: object|null
       file_context: HistorySessionFileContext|null
@@ -160,6 +161,7 @@ schemas:
       schema_version: integer
       created_at: string
       updated_at: string
+      owner_id: string
   InferenceLatencyResponse:
     type: object
     required:
@@ -461,6 +463,7 @@ endpoints:
       200: HistorySessionListResponse
       errors:
         - 401
+        - 403
         - 429
   - op: delete_all_history
     method: DELETE
@@ -469,6 +472,7 @@ endpoints:
       204: no_content
       errors:
         - 401
+        - 403
         - 429
   - op: get_history_session
     method: GET
@@ -479,6 +483,7 @@ endpoints:
       200: HistorySessionDetailResponse
       errors:
         - 401
+        - 403
         - 404
         - 429
   - op: delete_history_session
@@ -490,6 +495,8 @@ endpoints:
       204: no_content
       errors:
         - 401
+        - 403
+        - 404
         - 429
   - op: post_knowledge_upload
     method: POST

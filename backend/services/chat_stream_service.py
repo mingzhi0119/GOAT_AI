@@ -127,6 +127,7 @@ class ChatStreamService:
         ollama_options: dict[str, float | int] | None = None,
         tabular_extractor: TabularContextExtractor | None = None,
         vision_last_user_images_base64: list[str] | None = None,
+        session_owner_id: str = "",
     ) -> Generator[str, None, None]:
         """Yield SSE-formatted events for a chat completion."""
         run = self._phase_prepare_runtime(
@@ -146,6 +147,7 @@ class ChatStreamService:
             ollama_options=ollama_options,
             tabular_extractor=tabular_extractor,
             vision_last_user_images_base64=vision_last_user_images_base64,
+            session_owner_id=session_owner_id,
         )
         yield from self._phase_input_guard(run)
         error_message: str | None = None
@@ -181,6 +183,7 @@ class ChatStreamService:
         ollama_options: dict[str, float | int] | None,
         tabular_extractor: TabularContextExtractor | None,
         vision_last_user_images_base64: list[str] | None,
+        session_owner_id: str,
     ) -> SimpleNamespace:
         """Assemble collaborators, derived turns, and mutable stream state."""
         prompt_composer = PromptComposer()
@@ -245,6 +248,7 @@ class ChatStreamService:
             emitted_chart_spec=None,
             buffer=[],
             vision_last_user_images_base64=vision_last_user_images_base64,
+            session_owner_id=session_owner_id,
         )
 
     def _phase_input_guard(self, run: SimpleNamespace) -> Generator[str, None, None]:
@@ -271,6 +275,7 @@ class ChatStreamService:
             session_repository=run.session_repository,
             title_generator=run.title_generator,
             started_at=run.started_at,
+            session_owner_id=run.session_owner_id,
         )
 
     def _phase_llm_token_stream(self, run: SimpleNamespace) -> Generator[str, None, None]:
@@ -413,6 +418,7 @@ class ChatStreamService:
                 ),
                 started_at=run.started_at,
                 first_token_ms=first_token_ms,
+                session_owner_id=run.session_owner_id,
             )
         else:
             yield from run.persistence.yield_blocked_response(
@@ -428,4 +434,5 @@ class ChatStreamService:
                 session_repository=run.session_repository,
                 title_generator=run.title_generator,
                 started_at=run.started_at,
+                session_owner_id=run.session_owner_id,
             )
