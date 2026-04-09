@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from fastapi import Depends, HTTPException, Request
 
-from backend.application.authz_types import AuthorizationContext
-from backend.application.credential_registry import build_local_authorization_context
+from backend.domain.authz_types import AuthorizationContext
+from backend.domain.credential_registry import build_local_authorization_context
 from backend.api_errors import AUTH_INVALID_API_KEY, build_error_body
 from backend.config import get_settings
 from backend.services.chat_runtime import (

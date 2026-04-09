@@ -54,6 +54,8 @@ This document names **user-visible and persistence concepts** shared across chat
 | **AuthorizationContext** | Request-scoped authz state: `principal_id`, `tenant_id`, `scopes`, `credential_id`, legacy owner header, and auth mode. |
 | **AuthorizationDecision** | Pure allow/deny result with a stable `reason_code` plus optional concealment semantics for `404`-style denials. |
 
+Concrete modules: `backend.domain.authz_types` (`AuthorizationContext`), `backend.domain.authorization` (`AuthorizationDecision`, `PrincipalId`, `TenantId`, `Scope`), `backend.domain.credential_registry` (API credential parsing and `AuthorizationContext` resolution at ingress), `backend.services.authorizer` (resource-level checks against persisted records). See [DEPENDENCY_GRAPH.md](DEPENDENCY_GRAPH.md).
+
 ## Session payload versioning
 
 | Term | Meaning |

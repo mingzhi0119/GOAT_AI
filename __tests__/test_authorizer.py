@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-from backend.application.authz_types import AuthorizationContext
-from backend.application.authorizer import authorize_artifact_read, authorize_session_read
+from backend.domain.authz_types import AuthorizationContext
+from backend.services.authorizer import authorize_artifact_read, authorize_session_read
 from backend.domain.authorization import PrincipalId, TenantId
 from backend.services.artifact_service import PersistedArtifactRecord
 from backend.services.chat_runtime import SessionDetailRecord

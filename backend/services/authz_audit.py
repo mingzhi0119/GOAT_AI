@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from backend.application.authz_types import AuthorizationContext
+from backend.domain.authz_types import AuthorizationContext
 from backend.domain.authorization import AuthorizationDecision, ResourceRef
 
 logger = logging.getLogger("goat_ai.authz")

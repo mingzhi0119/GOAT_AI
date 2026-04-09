@@ -6,7 +6,7 @@ import json
 from dataclasses import dataclass
 from collections.abc import Generator
 
-from backend.application.authz_types import AuthorizationContext
+from backend.domain.authz_types import AuthorizationContext
 from fastapi.responses import StreamingResponse
 
 from backend.application.ports import (

@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from backend.application.credential_registry import (
+from backend.domain.credential_registry import (
     load_api_credentials,
     resolve_authorization_context,
 )

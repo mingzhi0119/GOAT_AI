@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 
-from backend.application.authz_types import AuthorizationContext
+from backend.domain.authz_types import AuthorizationContext
 from backend.application.media import create_media_upload
 from backend.application.ports import MediaValidationError, Settings
 from backend.config import get_settings

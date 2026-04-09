@@ -15,7 +15,7 @@ from backend.api_errors import (
     RATE_LIMITED,
     build_error_body,
 )
-from backend.application.credential_registry import (
+from backend.domain.credential_registry import (
     build_local_authorization_context,
     resolve_authorization_context,
 )

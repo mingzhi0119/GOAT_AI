@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Generator
 from typing import Callable
 
-from backend.application.authz_types import AuthorizationContext
+from backend.domain.authz_types import AuthorizationContext
 from backend.application.ports import KnowledgeValidationError, Settings, LLMClient
 from backend.application.exceptions import (
     UploadIdempotencyConflictError,

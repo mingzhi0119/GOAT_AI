@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any
 
-from backend.application.authz_types import AuthorizationContext
-from backend.application.authorizer import authorize_session_read
+from backend.domain.authz_types import AuthorizationContext
+from backend.services.authorizer import authorize_session_read
 from backend.application.exceptions import (
     HistoryOwnerRequiredError,
     HistorySessionNotFoundError,

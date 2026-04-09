@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.application.authz_types import AuthorizationContext
+from backend.domain.authz_types import AuthorizationContext
 from backend.application.ports import Settings
 from backend.models.knowledge import (
     KnowledgeAnswerRequest,

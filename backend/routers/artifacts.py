@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse
 
-from backend.application.authz_types import AuthorizationContext
+from backend.domain.authz_types import AuthorizationContext
 from backend.application.artifacts import download_artifact_response
 from backend.application.ports import SessionRepository, Settings
 from backend.config import get_settings

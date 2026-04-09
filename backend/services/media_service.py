@@ -14,8 +14,8 @@ import struct
 from pathlib import Path
 from uuid import uuid4
 
-from backend.application.authz_types import AuthorizationContext
-from backend.application.authorizer import authorize_media_read
+from backend.domain.authz_types import AuthorizationContext
+from backend.services.authorizer import authorize_media_read
 from backend.domain.authorization import ResourceRef
 from backend.models.media import MediaUploadResponse
 from backend.services.exceptions import MediaNotFound, MediaValidationError

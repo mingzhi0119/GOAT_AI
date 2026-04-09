@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from collections.abc import Generator
 
-from backend.application.authz_types import AuthorizationContext
+from backend.domain.authz_types import AuthorizationContext
 from backend.models.chat import ChatMessage
 from backend.services.chat_orchestration import SessionPersistenceService
 from backend.services.chat_runtime import (

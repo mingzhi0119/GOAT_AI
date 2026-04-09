@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from backend.api_errors import AUTH_SESSION_OWNER_REQUIRED, build_error_body
-from backend.application.authz_types import AuthorizationContext
+from backend.domain.authz_types import AuthorizationContext
 from backend.application.exceptions import (
     HistoryOwnerRequiredError,
     HistorySessionNotFoundError,

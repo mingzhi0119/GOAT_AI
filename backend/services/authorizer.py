@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from backend.application.authz_types import AuthorizationContext
+from backend.domain.authz_types import AuthorizationContext
 from backend.domain.authorization import AuthorizationDecision
-from backend.services.knowledge_repository import KnowledgeDocumentRecord
 from backend.services.artifact_service import PersistedArtifactRecord
 from backend.services.chat_runtime import SessionDetailRecord, SessionSummaryRecord
+from backend.services.knowledge_repository import KnowledgeDocumentRecord
 
 
 def _has_scope(ctx: AuthorizationContext, required_scope: str) -> bool:
@@ -37,7 +37,9 @@ def authorize_session_read(
     if session.tenant_id and session.tenant_id != ctx.tenant_id.value:
         return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
     if session.principal_id and session.principal_id != ctx.principal_id.value:
-        return AuthorizationDecision(False, "principal_mismatch", conceal_existence=True)
+        return AuthorizationDecision(
+            False, "principal_mismatch", conceal_existence=True
+        )
     if not _owner_visible(
         resource_owner_id=session.owner_id,
         legacy_owner_id=ctx.legacy_owner_id,
@@ -73,7 +75,9 @@ def authorize_artifact_read(
     if artifact.tenant_id and artifact.tenant_id != ctx.tenant_id.value:
         return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
     if artifact.principal_id and artifact.principal_id != ctx.principal_id.value:
-        return AuthorizationDecision(False, "principal_mismatch", conceal_existence=True)
+        return AuthorizationDecision(
+            False, "principal_mismatch", conceal_existence=True
+        )
     if not _owner_visible(
         resource_owner_id=artifact.owner_id,
         legacy_owner_id=ctx.legacy_owner_id,
@@ -94,7 +98,9 @@ def authorize_knowledge_document_read(
     if document.tenant_id and document.tenant_id != ctx.tenant_id.value:
         return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
     if document.principal_id and document.principal_id != ctx.principal_id.value:
-        return AuthorizationDecision(False, "principal_mismatch", conceal_existence=True)
+        return AuthorizationDecision(
+            False, "principal_mismatch", conceal_existence=True
+        )
     if not _owner_visible(
         resource_owner_id=document.owner_id,
         legacy_owner_id=ctx.legacy_owner_id,
@@ -133,7 +139,9 @@ def authorize_media_read(
     if tenant_id and tenant_id != ctx.tenant_id.value:
         return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
     if principal_id and principal_id != ctx.principal_id.value:
-        return AuthorizationDecision(False, "principal_mismatch", conceal_existence=True)
+        return AuthorizationDecision(
+            False, "principal_mismatch", conceal_existence=True
+        )
     if not _owner_visible(
         resource_owner_id=owner_id,
         legacy_owner_id=ctx.legacy_owner_id,

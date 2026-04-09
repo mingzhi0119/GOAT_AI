@@ -11,7 +11,7 @@ from backend.application.exceptions import (
     UploadIdempotencyConflictError,
     UploadIdempotencyInProgressError,
 )
-from backend.application.authz_types import AuthorizationContext
+from backend.domain.authz_types import AuthorizationContext
 from backend.application.upload import (
     analyze_upload_json,
     ingest_upload,

@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import FrozenSet
 
-from backend.application.authz_types import AuthorizationContext
+from backend.domain.authz_types import AuthorizationContext
 from backend.domain.authorization import PrincipalId, Scope, TenantId
 from goat_ai.config import Settings
 
@@ -109,7 +109,9 @@ def load_api_credentials(settings: Settings) -> list[ApiCredential]:
         credential_id = str(item.get("credential_id", "")).strip()
         secret = str(item.get("secret", "")).strip()
         principal_id = str(item.get("principal_id", "")).strip()
-        tenant_id = str(item.get("tenant_id", _DEFAULT_TENANT)).strip() or _DEFAULT_TENANT
+        tenant_id = (
+            str(item.get("tenant_id", _DEFAULT_TENANT)).strip() or _DEFAULT_TENANT
+        )
         status = str(item.get("status", "active")).strip() or "active"
         auth_mode = _AUTH_MODE_REGISTRY
         if not credential_id or not secret or not principal_id:

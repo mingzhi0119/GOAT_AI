@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from backend.application.authz_types import AuthorizationContext
-from backend.application.authorizer import (
+from backend.domain.authz_types import AuthorizationContext
+from backend.services.authorizer import (
     authorize_knowledge_document_read,
     authorize_knowledge_document_write,
 )

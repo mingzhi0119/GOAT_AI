@@ -6,8 +6,8 @@ from pathlib import Path
 
 from fastapi.responses import FileResponse
 
-from backend.application.authz_types import AuthorizationContext
-from backend.application.authorizer import authorize_artifact_read
+from backend.domain.authz_types import AuthorizationContext
+from backend.services.authorizer import authorize_artifact_read
 from backend.application.ports import ArtifactNotFound, SessionRepository, Settings
 from backend.domain.authorization import ResourceRef
 from backend.services.artifact_service import load_artifact_for_download

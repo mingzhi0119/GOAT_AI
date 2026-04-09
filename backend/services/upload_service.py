@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Generator
 
-from backend.application.authz_types import AuthorizationContext
-from backend.application.credential_registry import build_local_authorization_context
+from backend.domain.authz_types import AuthorizationContext
+from backend.domain.credential_registry import build_local_authorization_context
 from backend.models.knowledge import KnowledgeIngestionRequest
 from backend.models.upload import UploadAnalysisResponse
 from backend.services.exceptions import KnowledgeValidationError

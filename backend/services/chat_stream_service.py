@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 
-from backend.application.authz_types import AuthorizationContext
+from backend.domain.authz_types import AuthorizationContext
 from backend.models.chat import ChatMessage
 from backend.models.artifact import ChatArtifact
 from backend.prometheus_metrics import inc_chat_stream_completed

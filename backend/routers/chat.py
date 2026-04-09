@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from fastapi.responses import StreamingResponse
 
 from backend.api_errors import AUTH_SESSION_OWNER_REQUIRED, build_error_body
-from backend.application.authz_types import AuthorizationContext
+from backend.domain.authz_types import AuthorizationContext
 from backend.application.chat import prepare_chat_request, stream_chat_response
 from backend.application.exceptions import (
     ChatIdempotencyConflictError,

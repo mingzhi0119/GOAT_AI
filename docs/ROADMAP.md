@@ -1,4 +1,4 @@
-# GOAT AI Roadmap
+﻿# GOAT AI Roadmap
 
 > Last updated: 2026-04-09 - **v1.0.0** tags Phase **11-12**; **main** additionally ships **Phase 13**, **Phase 14** (through **14.7**), and **all of Phase 15** through **15.11**. **Next:** execute Phase **16C** before **16A** and **16B**.
 > Current release tag: **v1.0.0**
@@ -130,7 +130,7 @@ These slices address deferred items from 15.2 and 15.3 and extend the domain and
 - [x] Introduce typed `PrincipalId`, `TenantId`, `Scope`, `AuthorizationDecision`, and `AuthorizationContext`.
 - [x] Add a minimal credential registry with env fallback for existing shared-key deployments.
 - [x] Bind `AuthorizationContext` in HTTP middleware and expose it through a dependency.
-- [x] Start moving resource-level authorization into application-layer authorizers instead of routers/middleware.
+- [x] Move resource-level authorization into `backend.services.authorizer` (invoked from application use cases and services) instead of routers/middleware.
 - [x] Add structured allow/deny authz audit events with stable identifiers only.
 - [x] Add `tenant_id` / `principal_id` columns for sessions and chat artifacts using additive migrations.
 - [x] Extend the same tenancy envelope to knowledge documents and media uploads.
