@@ -33,7 +33,9 @@ class KnowledgePipelineNormalizationTests(unittest.TestCase):
         self.tmpdir.cleanup()
 
     def test_normalize_document_reads_pdf_text(self) -> None:
-        source_dir = self.settings.data_dir / "uploads" / "knowledge" / "doc-pdf" / "original"
+        source_dir = (
+            self.settings.data_dir / "uploads" / "knowledge" / "doc-pdf" / "original"
+        )
         source_dir.mkdir(parents=True, exist_ok=True)
         source_path = source_dir / "source.pdf"
         source_path.write_bytes(b"%PDF-1.4")
@@ -44,7 +46,9 @@ class KnowledgePipelineNormalizationTests(unittest.TestCase):
                 SimpleNamespace(extract_text=lambda: "Page two"),
             ]
         )
-        with patch("backend.services.knowledge_pipeline.PdfReader", return_value=fake_reader):
+        with patch(
+            "backend.services.knowledge_pipeline.PdfReader", return_value=fake_reader
+        ):
             text = normalize_document(
                 settings=self.settings,
                 document_id="doc-pdf",
@@ -54,7 +58,9 @@ class KnowledgePipelineNormalizationTests(unittest.TestCase):
         self.assertEqual("Page one\n\nPage two", text)
 
     def test_normalize_document_reads_docx_text(self) -> None:
-        source_dir = self.settings.data_dir / "uploads" / "knowledge" / "doc-docx" / "original"
+        source_dir = (
+            self.settings.data_dir / "uploads" / "knowledge" / "doc-docx" / "original"
+        )
         source_dir.mkdir(parents=True, exist_ok=True)
         source_path = source_dir / "source.docx"
         source_path.write_bytes(b"docx")
@@ -66,7 +72,10 @@ class KnowledgePipelineNormalizationTests(unittest.TestCase):
                 SimpleNamespace(text="Second paragraph"),
             ]
         )
-        with patch("backend.services.knowledge_pipeline.DocxDocument", return_value=fake_document):
+        with patch(
+            "backend.services.knowledge_pipeline.DocxDocument",
+            return_value=fake_document,
+        ):
             text = normalize_document(
                 settings=self.settings,
                 document_id="doc-docx",

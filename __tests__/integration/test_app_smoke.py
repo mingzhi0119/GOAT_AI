@@ -1,4 +1,5 @@
 """Smoke tests against the full app (SQLite + TestClient)."""
+
 from __future__ import annotations
 
 import pytest

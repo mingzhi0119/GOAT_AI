@@ -28,7 +28,9 @@ def init_otel_if_enabled() -> None:
     provider = TracerProvider(resource=Resource.create({"service.name": "goat-ai"}))
     exporter_kind = os.environ.get("GOAT_OTEL_EXPORTER", "console").strip().lower()
     if exporter_kind == "otlp":
-        from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+            OTLPSpanExporter,
+        )
 
         endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "").strip()
         if not endpoint:

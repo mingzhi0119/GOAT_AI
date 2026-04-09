@@ -4,6 +4,7 @@ Run from the repository root::
 
     python -m tools.generate_llm_api_yaml
 """
+
 from __future__ import annotations
 
 import json
@@ -44,7 +45,9 @@ def _render_scalar(value: Any) -> str:
     safe_plain = (
         text
         and "\n" not in text
-        and not text.startswith(("{", "[", "-", "!", "&", "*", "#", "?", ":", "@", "`", "\"", "'"))
+        and not text.startswith(
+            ("{", "[", "-", "!", "&", "*", "#", "?", ":", "@", "`", '"', "'")
+        )
         and ": " not in text
         and text not in {"null", "true", "false"}
     )
@@ -124,8 +127,7 @@ def _schema_summary(schema: dict[str, Any]) -> dict[str, Any]:
     properties = schema.get("properties")
     if isinstance(properties, dict) and properties:
         summary["properties"] = {
-            key: _schema_type(value)
-            for key, value in properties.items()
+            key: _schema_type(value) for key, value in properties.items()
         }
 
     if schema_type == "array" and "items" in schema:
@@ -212,7 +214,11 @@ def _response_schema(operation: dict[str, Any], status_code: str) -> Any:
     json_content = content.get("application/json")
     if isinstance(json_content, dict):
         schema = json_content.get("schema", {})
-        return _schema_type(schema) if "$ref" in schema or "type" in schema or "anyOf" in schema else "object"
+        return (
+            _schema_type(schema)
+            if "$ref" in schema or "type" in schema or "anyOf" in schema
+            else "object"
+        )
 
     if status_code == "204":
         return "no_content"
@@ -230,7 +236,7 @@ def _operation_name(path: str, method: str, operation: dict[str, Any]) -> str:
 
 def _path_without_prefix(path: str, prefix: str) -> str:
     if path.startswith(prefix):
-        trimmed = path[len(prefix):]
+        trimmed = path[len(prefix) :]
         return trimmed or "/"
     return path
 
@@ -336,7 +342,9 @@ def main() -> None:
     openapi = _load_openapi(OPENAPI_PATH)
     compact = _build_compact_spec(openapi)
     _write_yaml(compact, OUTPUT_PATH)
-    print(f"Generated {OUTPUT_PATH.relative_to(REPO_ROOT)} from {OPENAPI_PATH.relative_to(REPO_ROOT)}")
+    print(
+        f"Generated {OUTPUT_PATH.relative_to(REPO_ROOT)} from {OPENAPI_PATH.relative_to(REPO_ROOT)}"
+    )
 
 
 if __name__ == "__main__":

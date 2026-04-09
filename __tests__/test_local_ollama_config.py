@@ -10,14 +10,20 @@ from goat_ai import config
 
 class LocalOllamaConfigTests(unittest.TestCase):
     def test_default_uses_local_sibling_ollama_when_present(self) -> None:
-        with patch.object(config, "LOCAL_OLLAMA_INSTALL_DIR", Path("/tmp/ollama")), patch.object(
-            config, "LOCAL_OLLAMA_RUNTIME_DIR", Path("/tmp/ollama-local")
-        ), patch.object(config, "_has_local_ollama_layout", return_value=True):
-            self.assertEqual("http://127.0.0.1:11435", config._default_ollama_base_url())
+        with (
+            patch.object(config, "LOCAL_OLLAMA_INSTALL_DIR", Path("/tmp/ollama")),
+            patch.object(config, "LOCAL_OLLAMA_RUNTIME_DIR", Path("/tmp/ollama-local")),
+            patch.object(config, "_has_local_ollama_layout", return_value=True),
+        ):
+            self.assertEqual(
+                "http://127.0.0.1:11435", config._default_ollama_base_url()
+            )
 
     def test_default_falls_back_to_shared_server_when_local_missing(self) -> None:
         with patch.object(config, "_has_local_ollama_layout", return_value=False):
-            self.assertEqual("http://127.0.0.1:11434", config._default_ollama_base_url())
+            self.assertEqual(
+                "http://127.0.0.1:11434", config._default_ollama_base_url()
+            )
 
     def test_explicit_env_override_wins_over_local_default(self) -> None:
         original = os.environ.get("OLLAMA_BASE_URL")

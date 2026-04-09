@@ -34,7 +34,7 @@ Before committing:
 - No `print()`, commented-out code, or hardcoded secrets, ports, or paths
 - New functions are typed and have one-line docstrings where the repo expects them
 - New logic has tests where practical
-- `requirements.txt` and `package-lock.json` are updated if dependencies changed
+- `requirements.txt` / `requirements-ci.txt` and `package-lock.json` are updated if dependencies changed
 - Docs are updated per the table above when user-facing or ops behavior changes
 
 ## Recovery notes

@@ -1,4 +1,5 @@
 """Resolve chart data provenance (uploaded vs demo vs none) for tools and persistence."""
+
 from __future__ import annotations
 
 import pandas as pd

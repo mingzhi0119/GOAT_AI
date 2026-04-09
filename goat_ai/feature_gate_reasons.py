@@ -3,6 +3,7 @@
 Do not expose raw exception text or internal diagnostics as ``deny_reason``.
 See docs/ENGINEERING_STANDARDS.md §15.
 """
+
 from __future__ import annotations
 
 from typing import Final, Literal

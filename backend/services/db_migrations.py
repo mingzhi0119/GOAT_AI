@@ -3,6 +3,7 @@
 Each file is recorded in ``schema_migrations`` with a SHA-256 checksum of file bytes.
 Additive ``ALTER TABLE`` steps are idempotent when SQLite reports a duplicate column.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -50,7 +51,10 @@ def _execute_script(conn: sqlite3.Connection, sql: str, migration_id: str) -> No
         conn.executescript(sql)
     except sqlite3.OperationalError as exc:
         if _is_duplicate_column_error(exc):
-            logger.info("Migration %s: column already present, treating as applied", migration_id)
+            logger.info(
+                "Migration %s: column already present, treating as applied",
+                migration_id,
+            )
             return
         raise
 

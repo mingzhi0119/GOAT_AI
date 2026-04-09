@@ -1,4 +1,5 @@
 """Helpers for persisted session payload encoding and legacy compatibility."""
+
 from __future__ import annotations
 
 import json
@@ -73,7 +74,9 @@ def _normalize_message_dict(message: object) -> dict[str, Any] | None:
             if not isinstance(item, dict):
                 continue
             try:
-                artifacts.append(ChatArtifact.model_validate(item).model_dump(mode="json"))
+                artifacts.append(
+                    ChatArtifact.model_validate(item).model_dump(mode="json")
+                )
             except Exception:
                 continue
         if artifacts:
@@ -103,7 +106,11 @@ def build_session_payload(
         row: dict[str, object] = {"role": message.role, "content": message.content}
         if message.image_attachment_ids:
             row["image_attachment_ids"] = list(message.image_attachment_ids)
-        if message.role == "assistant" and message.content == assistant_text and assistant_artifacts:
+        if (
+            message.role == "assistant"
+            and message.content == assistant_text
+            and assistant_artifacts
+        ):
             row["artifacts"] = assistant_artifacts
         visible_messages.append(row)
 
@@ -176,7 +183,9 @@ def decode_session_payload(raw_payload: Any) -> DecodedSessionPayload:
         raw_chart = raw_payload.get("chart_spec")
         chart_spec = raw_chart if isinstance(raw_chart, dict) else None
         raw_file_context = raw_payload.get("file_context_prompt")
-        file_context_prompt = raw_file_context if isinstance(raw_file_context, str) else None
+        file_context_prompt = (
+            raw_file_context if isinstance(raw_file_context, str) else None
+        )
         raw_knowledge_documents = raw_payload.get("knowledge_documents", [])
         knowledge_documents: list[dict[str, str]] = []
         if isinstance(raw_knowledge_documents, list):
@@ -204,7 +213,8 @@ def decode_session_payload(raw_payload: Any) -> DecodedSessionPayload:
         raw_source = raw_payload.get("chart_data_source")
         chart_data_source: ChartDataSource = (
             raw_source
-            if isinstance(raw_source, str) and raw_source in {"uploaded", "demo", "none"}
+            if isinstance(raw_source, str)
+            and raw_source in {"uploaded", "demo", "none"}
             else ("uploaded" if file_context_prompt else "none")
         )
         return DecodedSessionPayload(

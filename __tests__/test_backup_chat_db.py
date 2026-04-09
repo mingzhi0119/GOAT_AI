@@ -1,4 +1,5 @@
 """Tests for scripts/backup_chat_db.py."""
+
 from __future__ import annotations
 
 import sqlite3

@@ -1,4 +1,5 @@
 """POST /api/media/uploads - register a vision image attachment."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile

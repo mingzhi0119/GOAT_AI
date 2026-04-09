@@ -1,4 +1,5 @@
 """Pydantic schemas for image attachment uploads (vision chat)."""
+
 from __future__ import annotations
 
 from pydantic import BaseModel, Field

@@ -1,4 +1,5 @@
 """Shared fixtures for integration tests (temp SQLite paths, TestClient)."""
+
 from __future__ import annotations
 
 import pytest
@@ -7,7 +8,9 @@ from backend.config import get_settings
 
 
 @pytest.fixture
-def integration_env(monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory) -> None:
+def integration_env(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> None:
     """Point GOAT SQLite paths at an isolated temp dir and skip Ollama readiness probe."""
     base = tmp_path_factory.mktemp("goat_integration")
     log_db = base / "chat_logs.db"

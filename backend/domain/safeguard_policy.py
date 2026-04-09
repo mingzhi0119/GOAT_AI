@@ -1,4 +1,5 @@
 """Rule-based safeguard policy — typed text in, :class:`SafeguardAssessment` out."""
+
 from __future__ import annotations
 
 import re
@@ -56,11 +57,15 @@ class SafeguardAssessment:
 class SafeguardPolicy(Protocol):
     """Campus-facing moderation: combined user+system text (input) or assistant text (output)."""
 
-    def review_input_candidate(self, *, combined_user_and_system_text: str) -> SafeguardAssessment:
+    def review_input_candidate(
+        self, *, combined_user_and_system_text: str
+    ) -> SafeguardAssessment:
         """Assess the concatenated last user turn plus optional system instruction."""
         ...
 
-    def review_output_assistant_text(self, *, assistant_text: str) -> SafeguardAssessment:
+    def review_output_assistant_text(
+        self, *, assistant_text: str
+    ) -> SafeguardAssessment:
         """Assess assistant output before streaming completion."""
         ...
 
@@ -76,30 +81,50 @@ def _contains_explicit_sexual_content(text: str) -> bool:
 class RuleBasedSafeguardPolicy:
     """Conservative keyword/regex policy; no network calls."""
 
-    def review_input_candidate(self, *, combined_user_and_system_text: str) -> SafeguardAssessment:
+    def review_input_candidate(
+        self, *, combined_user_and_system_text: str
+    ) -> SafeguardAssessment:
         candidate = combined_user_and_system_text.strip()
         if not candidate:
             return SafeguardAssessment(allowed=True, stage="input")
         if _MINOR_SEXUAL_TERMS.search(candidate):
-            return SafeguardAssessment(allowed=False, stage="input", reason_code="sexual_minors")
+            return SafeguardAssessment(
+                allowed=False, stage="input", reason_code="sexual_minors"
+            )
         if _matches_explicit_generation(candidate):
-            return SafeguardAssessment(allowed=False, stage="input", reason_code="explicit_sexual")
+            return SafeguardAssessment(
+                allowed=False, stage="input", reason_code="explicit_sexual"
+            )
         if _VIOLENT_INSTRUCTION_TERMS.search(candidate):
-            return SafeguardAssessment(allowed=False, stage="input", reason_code="violent_wrongdoing")
+            return SafeguardAssessment(
+                allowed=False, stage="input", reason_code="violent_wrongdoing"
+            )
         if _TARGETED_THREAT_TERMS.search(candidate):
-            return SafeguardAssessment(allowed=False, stage="input", reason_code="targeted_threat")
+            return SafeguardAssessment(
+                allowed=False, stage="input", reason_code="targeted_threat"
+            )
         return SafeguardAssessment(allowed=True, stage="input")
 
-    def review_output_assistant_text(self, *, assistant_text: str) -> SafeguardAssessment:
+    def review_output_assistant_text(
+        self, *, assistant_text: str
+    ) -> SafeguardAssessment:
         candidate = assistant_text.strip()
         if not candidate:
             return SafeguardAssessment(allowed=True, stage="output")
         if _MINOR_SEXUAL_TERMS.search(candidate):
-            return SafeguardAssessment(allowed=False, stage="output", reason_code="sexual_minors")
+            return SafeguardAssessment(
+                allowed=False, stage="output", reason_code="sexual_minors"
+            )
         if _contains_explicit_sexual_content(candidate):
-            return SafeguardAssessment(allowed=False, stage="output", reason_code="explicit_sexual")
+            return SafeguardAssessment(
+                allowed=False, stage="output", reason_code="explicit_sexual"
+            )
         if _VIOLENT_INSTRUCTION_TERMS.search(candidate):
-            return SafeguardAssessment(allowed=False, stage="output", reason_code="violent_wrongdoing")
+            return SafeguardAssessment(
+                allowed=False, stage="output", reason_code="violent_wrongdoing"
+            )
         if _TARGETED_THREAT_TERMS.search(candidate):
-            return SafeguardAssessment(allowed=False, stage="output", reason_code="targeted_threat")
+            return SafeguardAssessment(
+                allowed=False, stage="output", reason_code="targeted_threat"
+            )
         return SafeguardAssessment(allowed=True, stage="output")

@@ -1,4 +1,5 @@
 """Unit tests for tabular context extraction boundary."""
+
 from __future__ import annotations
 
 import unittest

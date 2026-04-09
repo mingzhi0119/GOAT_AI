@@ -1,0 +1,7 @@
+# CI and local dev: runtime pins plus lint, tests, and audit tooling.
+-r requirements.txt
+
+pytest==8.3.4
+import-linter==2.1
+ruff==0.15.9
+pip-audit==2.10.0

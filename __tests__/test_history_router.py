@@ -19,7 +19,9 @@ if FastAPI is not None:
     from backend.routers import history
 
 
-@unittest.skipUnless(FastAPI is not None and TestClient is not None, "fastapi not installed")
+@unittest.skipUnless(
+    FastAPI is not None and TestClient is not None, "fastapi not installed"
+)
 class HistoryRouterIntegrationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmpdir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)

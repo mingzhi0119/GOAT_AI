@@ -30,7 +30,9 @@ class LogServiceWaveATests(unittest.TestCase):
                 assistant_response="yo",
                 response_ms=1,
             )
-        inc_mock.assert_called_once_with(operation="conversation", code="SQLITE_WRITE_FAILED")
+        inc_mock.assert_called_once_with(
+            operation="conversation", code="SQLITE_WRITE_FAILED"
+        )
 
     @patch("backend.services.log_service.inc_sqlite_log_write_failure")
     def test_upsert_session_failure_calls_metric(self, inc_mock: MagicMock) -> None:
@@ -44,7 +46,9 @@ class LogServiceWaveATests(unittest.TestCase):
                 created_at="2020-01-01T00:00:00+00:00",
                 updated_at="2020-01-01T00:00:00+00:00",
             )
-        inc_mock.assert_called_once_with(operation="session_upsert", code="SQLITE_WRITE_FAILED")
+        inc_mock.assert_called_once_with(
+            operation="session_upsert", code="SQLITE_WRITE_FAILED"
+        )
 
 
 if __name__ == "__main__":

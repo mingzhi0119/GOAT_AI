@@ -1,4 +1,5 @@
 """Shared request-boundary helpers for upload endpoints."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -10,8 +11,7 @@ class UploadFileLike(Protocol):
 
     filename: str | None
 
-    async def read(self, size: int = -1) -> bytes:
-        ...
+    async def read(self, size: int = -1) -> bytes: ...
 
 
 class UploadValidationError(ValueError):

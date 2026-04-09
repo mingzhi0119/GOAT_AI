@@ -2,6 +2,7 @@
 
 Import these in routers; never instantiate services directly in route handlers.
 """
+
 from __future__ import annotations
 
 from fastapi import Depends
@@ -15,8 +16,14 @@ from backend.services.chat_runtime import (
     SQLiteSessionRepository,
     TitleGenerator,
 )
-from backend.services.tabular_context import EmbeddedCsvTabularExtractor, TabularContextExtractor
-from backend.services.safeguard_service import RuleBasedSafeguardService, SafeguardService
+from backend.services.tabular_context import (
+    EmbeddedCsvTabularExtractor,
+    TabularContextExtractor,
+)
+from backend.services.safeguard_service import (
+    RuleBasedSafeguardService,
+    SafeguardService,
+)
 from backend.types import LLMClient, Settings
 from goat_ai.ollama_client import OllamaService
 

@@ -185,7 +185,9 @@ def load_settings() -> Settings:
         raise ValueError("GOAT_MAX_CHAT_PAYLOAD_BYTES must be >= 1024")
     if _chat_first_event_timeout_sec < 1:
         raise ValueError("OLLAMA_CHAT_FIRST_EVENT_TIMEOUT must be >= 1")
-    _max_image_media_bytes = int(os.environ.get("GOAT_MAX_IMAGE_MEDIA_BYTES", str(12 * 1024 * 1024)))
+    _max_image_media_bytes = int(
+        os.environ.get("GOAT_MAX_IMAGE_MEDIA_BYTES", str(12 * 1024 * 1024))
+    )
     _max_image_edge_px = int(os.environ.get("GOAT_MAX_IMAGE_EDGE_PX", "2048"))
     if _max_image_media_bytes < 1024:
         raise ValueError("GOAT_MAX_IMAGE_MEDIA_BYTES must be >= 1024")
@@ -199,7 +201,9 @@ def load_settings() -> Settings:
     _api_key = os.environ.get("GOAT_API_KEY", "").strip()
     _api_key_write = os.environ.get("GOAT_API_KEY_WRITE", "").strip()
     if _api_key_write and not _api_key:
-        raise ValueError("GOAT_API_KEY_WRITE requires GOAT_API_KEY (read key) to be set.")
+        raise ValueError(
+            "GOAT_API_KEY_WRITE requires GOAT_API_KEY (read key) to be set."
+        )
     return Settings(
         ollama_base_url=base,
         generate_timeout=int(os.environ.get("OLLAMA_GENERATE_TIMEOUT", "120")),

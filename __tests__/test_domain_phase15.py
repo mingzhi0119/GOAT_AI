@@ -1,4 +1,5 @@
 """Unit tests for Phase 15.1 domain policies and invariants (no HTTP)."""
+
 from __future__ import annotations
 
 import unittest
@@ -17,7 +18,9 @@ from backend.domain.safeguard_policy import RuleBasedSafeguardPolicy
 class DomainSafeguardPolicyTests(unittest.TestCase):
     def test_input_allows_safe_text(self) -> None:
         p = RuleBasedSafeguardPolicy()
-        r = p.review_input_candidate(combined_user_and_system_text="Summarize Porter five forces for retail.")
+        r = p.review_input_candidate(
+            combined_user_and_system_text="Summarize Porter five forces for retail."
+        )
         self.assertTrue(r.allowed)
         self.assertEqual("input", r.stage)
 
@@ -31,7 +34,9 @@ class DomainSafeguardPolicyTests(unittest.TestCase):
 
     def test_output_blocks_explicit_in_assistant(self) -> None:
         p = RuleBasedSafeguardPolicy()
-        r = p.review_output_assistant_text(assistant_text="Here is explicit pornographic content.")
+        r = p.review_output_assistant_text(
+            assistant_text="Here is explicit pornographic content."
+        )
         self.assertFalse(r.allowed)
         self.assertEqual("output", r.stage)
 
@@ -52,11 +57,15 @@ class DomainChartProvenanceTests(unittest.TestCase):
     def test_persist_upgrade_none_to_uploaded_when_file_context(self) -> None:
         self.assertEqual(
             "uploaded",
-            resolve_chart_data_source_for_persist(declared="none", has_file_context_message=True),
+            resolve_chart_data_source_for_persist(
+                declared="none", has_file_context_message=True
+            ),
         )
         self.assertEqual(
             "none",
-            resolve_chart_data_source_for_persist(declared="none", has_file_context_message=False),
+            resolve_chart_data_source_for_persist(
+                declared="none", has_file_context_message=False
+            ),
         )
 
 

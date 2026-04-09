@@ -1,4 +1,5 @@
 """Unit tests for session title helpers extracted from chat orchestration."""
+
 from __future__ import annotations
 
 import unittest
@@ -179,7 +180,10 @@ class ChatServiceTitleTests(unittest.TestCase):
                 {"role": STORED_FILE_CONTEXT_ACK_ROLE, "content": FILE_CONTEXT_REPLY},
                 {"role": "user", "content": "show me a chart"},
                 {"role": "assistant", "content": "done"},
-                {"role": STORED_CHART_ROLE, "content": '{"type":"bar","title":"Revenue"}'},
+                {
+                    "role": STORED_CHART_ROLE,
+                    "content": '{"type":"bar","title":"Revenue"}',
+                },
             ]
         )
 

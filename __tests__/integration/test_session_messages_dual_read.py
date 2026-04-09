@@ -1,4 +1,5 @@
 """Integration checks for session_messages dual-write / dual-read (Phase 15.4)."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -16,7 +17,9 @@ from backend.services.session_message_codec import (
 pytestmark = pytest.mark.integration
 
 
-def test_upsert_writes_session_messages_and_get_reads_them(integration_env: None) -> None:
+def test_upsert_writes_session_messages_and_get_reads_them(
+    integration_env: None,
+) -> None:
     from backend.config import get_settings
 
     settings = get_settings()

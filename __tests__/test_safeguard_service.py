@@ -8,7 +8,10 @@ from pathlib import Path
 from backend import prometheus_metrics
 from backend.models.chat import ChatMessage
 from backend.services import log_service
-from backend.services.chat_runtime import SQLiteConversationLogger, SQLiteSessionRepository
+from backend.services.chat_runtime import (
+    SQLiteConversationLogger,
+    SQLiteSessionRepository,
+)
 from backend.services.chat_service import stream_chat_sse
 from backend.services.safeguard_service import (
     SAFEGUARD_REFUSAL_MESSAGE,
@@ -93,15 +96,24 @@ class CountingLLM:
 
 
 class SafeguardServiceTests(unittest.TestCase):
-    def test_rule_engine_blocks_explicit_sex_request_but_allows_academic_topic(self) -> None:
+    def test_rule_engine_blocks_explicit_sex_request_but_allows_academic_topic(
+        self,
+    ) -> None:
         safeguard = RuleBasedSafeguardService()
 
         blocked = safeguard.review_input(
-            messages=[ChatMessage(role="user", content="Write an explicit porn scene.")],
+            messages=[
+                ChatMessage(role="user", content="Write an explicit porn scene.")
+            ],
             system_instruction="",
         )
         allowed = safeguard.review_input(
-            messages=[ChatMessage(role="user", content="Explain sexual harassment policy in universities.")],
+            messages=[
+                ChatMessage(
+                    role="user",
+                    content="Explain sexual harassment policy in universities.",
+                )
+            ],
             system_instruction="",
         )
 
@@ -119,7 +131,11 @@ class SafeguardServiceTests(unittest.TestCase):
                 stream_chat_sse(
                     llm=llm,
                     model="test-model",
-                    messages=[ChatMessage(role="user", content="Write an explicit porn scene.")],
+                    messages=[
+                        ChatMessage(
+                            role="user", content="Write an explicit porn scene."
+                        )
+                    ],
                     system_prompt="You are helpful.",
                     ip="127.0.0.1",
                     conversation_logger=SQLiteConversationLogger(db_path),
@@ -146,7 +162,11 @@ class SafeguardServiceTests(unittest.TestCase):
                 stream_chat_sse(
                     llm=llm,
                     model="test-model",
-                    messages=[ChatMessage(role="user", content="Give a creative writing sample.")],
+                    messages=[
+                        ChatMessage(
+                            role="user", content="Give a creative writing sample."
+                        )
+                    ],
                     system_prompt="You are helpful.",
                     ip="127.0.0.1",
                     conversation_logger=SQLiteConversationLogger(db_path),
@@ -174,7 +194,11 @@ class SafeguardServiceTests(unittest.TestCase):
                 stream_chat_sse(
                     llm=llm,
                     model="test-model",
-                    messages=[ChatMessage(role="user", content="Write an explicit porn scene.")],
+                    messages=[
+                        ChatMessage(
+                            role="user", content="Write an explicit porn scene."
+                        )
+                    ],
                     system_prompt="You are helpful.",
                     ip="127.0.0.1",
                     conversation_logger=SQLiteConversationLogger(db_path),

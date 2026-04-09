@@ -1,4 +1,5 @@
 """Online backup of GOAT SQLite chat DB (safe while the app holds the file open)."""
+
 from __future__ import annotations
 
 import argparse
@@ -31,7 +32,9 @@ def _parse_max_files() -> int:
     return max(1, int(os.environ.get("GOAT_BACKUP_MAX_FILES", "14")))
 
 
-def prune_old_backups(backup_dir: Path, prefix: str, suffix: str, keep: int) -> list[Path]:
+def prune_old_backups(
+    backup_dir: Path, prefix: str, suffix: str, keep: int
+) -> list[Path]:
     """Remove oldest chat_logs_*.db beyond keep; returns deleted paths."""
     if not backup_dir.is_dir():
         return []
@@ -78,17 +81,34 @@ def backup_chat_db(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Backup GOAT chat SQLite DB via sqlite3.backup().")
-    parser.add_argument("--project-root", type=Path, default=None, help="Override GOAT_AI_ROOT")
-    parser.add_argument("--src", type=Path, default=None, help="Override database path (default from GOAT_LOG_PATH / settings)")
-    parser.add_argument("--dest-dir", type=Path, default=None, help="Override backup directory")
-    parser.add_argument("--max-files", type=int, default=None, help="Override GOAT_BACKUP_MAX_FILES")
+    parser = argparse.ArgumentParser(
+        description="Backup GOAT chat SQLite DB via sqlite3.backup()."
+    )
+    parser.add_argument(
+        "--project-root", type=Path, default=None, help="Override GOAT_AI_ROOT"
+    )
+    parser.add_argument(
+        "--src",
+        type=Path,
+        default=None,
+        help="Override database path (default from GOAT_LOG_PATH / settings)",
+    )
+    parser.add_argument(
+        "--dest-dir", type=Path, default=None, help="Override backup directory"
+    )
+    parser.add_argument(
+        "--max-files", type=int, default=None, help="Override GOAT_BACKUP_MAX_FILES"
+    )
     args = parser.parse_args()
 
-    project_root = (args.project_root.resolve() if args.project_root else _default_project_root())
+    project_root = (
+        args.project_root.resolve() if args.project_root else _default_project_root()
+    )
     settings = load_settings()
     src = args.src.resolve() if args.src else settings.log_db_path
-    dest_dir = args.dest_dir.resolve() if args.dest_dir else resolve_backup_dir(project_root)
+    dest_dir = (
+        args.dest_dir.resolve() if args.dest_dir else resolve_backup_dir(project_root)
+    )
     max_files = args.max_files if args.max_files is not None else _parse_max_files()
 
     out = backup_chat_db(src, dest_dir, max_files=max_files)

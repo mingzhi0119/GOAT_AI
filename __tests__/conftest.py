@@ -1,4 +1,5 @@
 """Pytest fixtures shared across backend unit tests."""
+
 from __future__ import annotations
 
 import pytest

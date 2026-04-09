@@ -1,4 +1,5 @@
 """Persist generated chat artifacts and derive downloadable files from assistant text."""
+
 from __future__ import annotations
 
 import csv
@@ -126,7 +127,12 @@ def load_artifact_for_download(
         raise ArtifactNotFound("Chat artifact not found.")
     if settings.require_session_owner and record.owner_id != request_owner:
         raise ArtifactNotFound("Chat artifact not found.")
-    if settings.require_session_owner is False and request_owner and record.owner_id and record.owner_id != request_owner:
+    if (
+        settings.require_session_owner is False
+        and request_owner
+        and record.owner_id
+        and record.owner_id != request_owner
+    ):
         raise ArtifactNotFound("Chat artifact not found.")
     if not Path(record.storage_path).is_file():
         raise ArtifactNotFound("Chat artifact not found.")
@@ -141,7 +147,9 @@ def _extract_artifact_candidates(*, assistant_text: str) -> list[PreparedArtifac
         ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
         if ext not in _SUPPORTED_EXTENSIONS or filename.lower() in seen:
             continue
-        prepared = _build_prepared_artifact(filename=filename, assistant_text=assistant_text)
+        prepared = _build_prepared_artifact(
+            filename=filename, assistant_text=assistant_text
+        )
         if prepared is None:
             continue
         out.append(prepared)
@@ -149,11 +157,15 @@ def _extract_artifact_candidates(*, assistant_text: str) -> list[PreparedArtifac
     return out
 
 
-def _build_prepared_artifact(*, filename: str, assistant_text: str) -> PreparedArtifact | None:
+def _build_prepared_artifact(
+    *, filename: str, assistant_text: str
+) -> PreparedArtifact | None:
     ext = filename.rsplit(".", 1)[-1].lower()
     if ext == "md":
         body = assistant_text.encode("utf-8")
-        return PreparedArtifact(filename=filename, mime_type="text/markdown", content=body)
+        return PreparedArtifact(
+            filename=filename, mime_type="text/markdown", content=body
+        )
     if ext == "txt":
         body = _markdown_to_plain_text(assistant_text).encode("utf-8")
         return PreparedArtifact(filename=filename, mime_type="text/plain", content=body)
@@ -236,7 +248,9 @@ def _extract_markdown_table_rows(text: str) -> list[list[str]]:
 
 
 def _markdown_to_plain_text(text: str) -> str:
-    plain = _ARTIFACT_LINK_RE.sub(lambda match: f"{match.group(1)} ({Path(match.group(2)).name})", text)
+    plain = _ARTIFACT_LINK_RE.sub(
+        lambda match: f"{match.group(1)} ({Path(match.group(2)).name})", text
+    )
     plain = re.sub(r"`{1,3}", "", plain)
     return plain.strip()
 

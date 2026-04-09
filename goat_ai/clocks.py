@@ -1,4 +1,5 @@
 """Injectable time sources for TTL, rate limits, and tests (no `time.sleep`)."""
+
 from __future__ import annotations
 
 import time
@@ -34,7 +35,9 @@ class SystemClock:
 class FakeClock:
     """Test clock with a controllable UTC instant and monotonic counter."""
 
-    _utc: datetime = field(default_factory=lambda: datetime(2026, 1, 1, tzinfo=timezone.utc))
+    _utc: datetime = field(
+        default_factory=lambda: datetime(2026, 1, 1, tzinfo=timezone.utc)
+    )
     _mono: float = 0.0
 
     def utc_now(self) -> datetime:

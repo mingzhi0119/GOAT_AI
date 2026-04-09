@@ -44,7 +44,9 @@ class LogServiceTests(unittest.TestCase):
         self.assertEqual("First chat", detail["title"])
         self.assertEqual(2, detail["schema_version"])
         self.assertIsInstance(detail["messages"], dict)
-        self.assertEqual([{"role": "user", "content": "hello"}], detail["messages"]["messages"])
+        self.assertEqual(
+            [{"role": "user", "content": "hello"}], detail["messages"]["messages"]
+        )
 
         log_service.log_conversation(
             db_path=self.db_path,
@@ -67,7 +69,9 @@ class LogServiceTests(unittest.TestCase):
         self.assertEqual(session_id, row[0])
 
         log_service.delete_session(db_path=self.db_path, session_id=session_id)
-        self.assertIsNone(log_service.get_session(db_path=self.db_path, session_id=session_id))
+        self.assertIsNone(
+            log_service.get_session(db_path=self.db_path, session_id=session_id)
+        )
 
         with sqlite3.connect(self.db_path) as conn:
             count = conn.execute(

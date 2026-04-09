@@ -54,7 +54,9 @@ class TestFeatureGates(unittest.TestCase):
             root = Path(tmp)
             bogus = root / "not_a_socket"
             bogus.write_text("x", encoding="utf-8")
-            s = _settings(root, feature_code_sandbox_enabled=True, docker_socket_path=str(bogus))
+            s = _settings(
+                root, feature_code_sandbox_enabled=True, docker_socket_path=str(bogus)
+            )
             self.assertFalse(probe_docker_available(s))
 
 

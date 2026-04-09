@@ -17,7 +17,10 @@ from backend.models.knowledge import (
     KnowledgeUploadResponse,
     KnowledgeUploadStatusResponse,
 )
-from backend.services.exceptions import KnowledgeDocumentNotFound, KnowledgeValidationError
+from backend.services.exceptions import (
+    KnowledgeDocumentNotFound,
+    KnowledgeValidationError,
+)
 from backend.services.retrieval_quality import (
     apply_rerank_hits,
     prepare_search_query,
@@ -31,7 +34,10 @@ from backend.services.knowledge_pipeline import (
     persist_vector_index,
     search_vector_index,
 )
-from goat_ai.telemetry_counters import inc_knowledge_query_rewrite_applied, inc_knowledge_retrieval
+from goat_ai.telemetry_counters import (
+    inc_knowledge_query_rewrite_applied,
+    inc_knowledge_retrieval,
+)
 
 from backend.services.knowledge_repository import (
     KnowledgeChunkRow,
@@ -59,7 +65,9 @@ class KnowledgeChatContext:
     citations: list[KnowledgeCitation]
 
 
-def create_knowledge_upload(*, file: AsyncUploadReader, settings: Settings) -> KnowledgeUploadResponse:
+def create_knowledge_upload(
+    *, file: AsyncUploadReader, settings: Settings
+) -> KnowledgeUploadResponse:
     """Persist a knowledge upload and register document metadata."""
     return create_knowledge_upload_from_bytes(
         content_type=file.content_type,
@@ -117,13 +125,19 @@ def create_knowledge_upload_from_bytes(
     )
 
 
-def get_knowledge_upload(*, document_id: str, settings: Settings) -> KnowledgeUploadStatusResponse:
+def get_knowledge_upload(
+    *, document_id: str, settings: Settings
+) -> KnowledgeUploadStatusResponse:
     """Lookup one persisted uploaded knowledge document."""
     repository = SQLiteKnowledgeRepository(settings.log_db_path)
     document = repository.get_document(document_id)
     if document is None:
         raise KnowledgeDocumentNotFound("Knowledge document not found.")
-    status = "indexed" if _document_has_completed_ingestion(document_id=document_id, settings=settings) else "uploaded"
+    status = (
+        "indexed"
+        if _document_has_completed_ingestion(document_id=document_id, settings=settings)
+        else "uploaded"
+    )
     return KnowledgeUploadStatusResponse(
         upload_id=document_id,
         document_id=document.id,
@@ -134,7 +148,9 @@ def get_knowledge_upload(*, document_id: str, settings: Settings) -> KnowledgeUp
     )
 
 
-def start_knowledge_ingestion(*, request: KnowledgeIngestionRequest, settings: Settings) -> KnowledgeIngestionResponse:
+def start_knowledge_ingestion(
+    *, request: KnowledgeIngestionRequest, settings: Settings
+) -> KnowledgeIngestionResponse:
     """Normalize, chunk, and index one persisted knowledge document."""
     repository = SQLiteKnowledgeRepository(settings.log_db_path)
     document = repository.get_document(request.document_id)
@@ -168,7 +184,9 @@ def start_knowledge_ingestion(*, request: KnowledgeIngestionRequest, settings: S
             document_id=document.id,
             filename=document.original_filename,
         )
-        persist_normalized_text(settings=settings, document_id=document.id, text=normalized_text)
+        persist_normalized_text(
+            settings=settings, document_id=document.id, text=normalized_text
+        )
         chunks = chunk_text(normalized_text)
         vector_ref = persist_vector_index(
             settings=settings,
@@ -221,7 +239,9 @@ def start_knowledge_ingestion(*, request: KnowledgeIngestionRequest, settings: S
     )
 
 
-def get_knowledge_ingestion_status(*, ingestion_id: str, settings: Settings) -> KnowledgeIngestionStatusResponse:
+def get_knowledge_ingestion_status(
+    *, ingestion_id: str, settings: Settings
+) -> KnowledgeIngestionStatusResponse:
     """Lookup one ingestion attempt."""
     repository = SQLiteKnowledgeRepository(settings.log_db_path)
     ingestion = repository.get_ingestion(ingestion_id)
@@ -237,11 +257,19 @@ def get_knowledge_ingestion_status(*, ingestion_id: str, settings: Settings) -> 
     )
 
 
-def search_knowledge(*, request: KnowledgeSearchRequest, settings: Settings) -> KnowledgeSearchResponse:
+def search_knowledge(
+    *, request: KnowledgeSearchRequest, settings: Settings
+) -> KnowledgeSearchResponse:
     """Search indexed chunks using the local simple vector backend."""
-    rewrite_enabled = resolve_query_rewrite_enabled(retrieval_profile=request.retrieval_profile)
-    effective_query = prepare_search_query(original_query=request.query, rewrite_enabled=rewrite_enabled)
-    mode = resolve_rerank_mode(retrieval_profile=request.retrieval_profile, settings=settings)
+    rewrite_enabled = resolve_query_rewrite_enabled(
+        retrieval_profile=request.retrieval_profile
+    )
+    effective_query = prepare_search_query(
+        original_query=request.query, rewrite_enabled=rewrite_enabled
+    )
+    mode = resolve_rerank_mode(
+        retrieval_profile=request.retrieval_profile, settings=settings
+    )
     hits = search_vector_index(
         settings=settings,
         backend_name=_VECTOR_BACKEND,
@@ -249,7 +277,9 @@ def search_knowledge(*, request: KnowledgeSearchRequest, settings: Settings) -> 
         document_filters=request.document_ids,
     )
     ranked = apply_rerank_hits(query=effective_query, mode=mode, hits=hits)
-    effective_out: str | None = effective_query if effective_query != request.query else None
+    effective_out: str | None = (
+        effective_query if effective_query != request.query else None
+    )
     top = ranked[: request.top_k]
     inc_knowledge_retrieval(
         retrieval_profile=request.retrieval_profile,
@@ -273,7 +303,9 @@ def search_knowledge(*, request: KnowledgeSearchRequest, settings: Settings) -> 
     )
 
 
-def answer_with_knowledge(*, request: KnowledgeAnswerRequest, settings: Settings) -> KnowledgeAnswerResponse:
+def answer_with_knowledge(
+    *, request: KnowledgeAnswerRequest, settings: Settings
+) -> KnowledgeAnswerResponse:
     """Return a deterministic retrieval-backed answer with citations."""
     search_response = search_knowledge(
         request=KnowledgeSearchRequest(
@@ -369,7 +401,9 @@ def resolve_knowledge_documents(
     deduped_ids = list(dict.fromkeys(document_ids))
     documents = repository.list_documents(deduped_ids)
     documents_by_id = {document.id: document for document in documents}
-    missing = [document_id for document_id in deduped_ids if document_id not in documents_by_id]
+    missing = [
+        document_id for document_id in deduped_ids if document_id not in documents_by_id
+    ]
     if missing:
         raise KnowledgeDocumentNotFound("Knowledge document not found.")
     return [documents_by_id[document_id] for document_id in deduped_ids]
@@ -383,7 +417,9 @@ def _fallback_answer_scope(
     settings: Settings,
 ) -> KnowledgeSearchResponse:
     """Fallback to attached-document leading chunks when lexical retrieval finds nothing."""
-    documents = resolve_knowledge_documents(document_ids=document_ids, settings=settings)
+    documents = resolve_knowledge_documents(
+        document_ids=document_ids, settings=settings
+    )
     repository = SQLiteKnowledgeRepository(settings.log_db_path)
     chunks = repository.get_chunks_for_documents(document_ids)
     chunks_by_document: dict[str, KnowledgeChunkRow] = {}

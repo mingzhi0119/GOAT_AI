@@ -3,6 +3,7 @@
 Routers must not import ``goat_ai`` directly; use this module for ``Settings`` and
 ``LLMClient`` annotations. Enforcement: ``lint-imports`` (see ``pyproject.toml``).
 """
+
 from __future__ import annotations
 
 from typing import Protocol, runtime_checkable

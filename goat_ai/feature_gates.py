@@ -1,4 +1,5 @@
 """Pure feature-gate resolution (no FastAPI). See docs/ENGINEERING_STANDARDS.md §15."""
+
 from __future__ import annotations
 
 import os
@@ -23,7 +24,9 @@ class CodeSandboxFeatureSnapshot:
     deny_reason: str | None
 
 
-def feature_gate_public_detail(*, feature_id: str, deny_reason: str, gate_kind: GateKind) -> str:
+def feature_gate_public_detail(
+    *, feature_id: str, deny_reason: str, gate_kind: GateKind
+) -> str:
     """Stable, client-safe message; internal diagnostics belong in logs only."""
     _ = feature_id
     if gate_kind == "policy":
@@ -31,9 +34,7 @@ def feature_gate_public_detail(*, feature_id: str, deny_reason: str, gate_kind: 
     if deny_reason == RUNTIME_DISABLED_BY_OPERATOR:
         return "This feature is disabled on this deployment."
     if deny_reason == RUNTIME_DOCKER_UNAVAILABLE:
-        return (
-            "This feature is not available because required runtime dependencies are missing or not ready."
-        )
+        return "This feature is not available because required runtime dependencies are missing or not ready."
     return "This feature is not available on this deployment."
 
 

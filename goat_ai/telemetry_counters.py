@@ -2,6 +2,7 @@
 
 Backend metrics exposition reads snapshots via ``snapshot_ollama_errors``.
 """
+
 from __future__ import annotations
 
 import threading

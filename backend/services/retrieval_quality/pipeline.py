@@ -4,7 +4,10 @@ from typing import Literal
 
 from backend.services.knowledge_pipeline import KnowledgeSearchHit
 from backend.services.retrieval_quality.query_rewrite import conservative_rewrite_query
-from backend.services.retrieval_quality.rerank import LexicalOverlapReranker, PassthroughReranker
+from backend.services.retrieval_quality.rerank import (
+    LexicalOverlapReranker,
+    PassthroughReranker,
+)
 
 
 def prepare_search_query(*, original_query: str, rewrite_enabled: bool) -> str:

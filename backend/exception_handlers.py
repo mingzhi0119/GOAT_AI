@@ -1,4 +1,5 @@
 """Register FastAPI handlers that emit the Phase 13 error envelope."""
+
 from __future__ import annotations
 
 import logging
@@ -49,7 +50,9 @@ def register_exception_handlers(app: FastAPI) -> None:
     """Attach handlers for domain and HTTP errors (call once on the app instance)."""
 
     @app.exception_handler(InferenceBackendUnavailable)
-    def _inference_unavailable(_request: Request, _exc: InferenceBackendUnavailable) -> JSONResponse:
+    def _inference_unavailable(
+        _request: Request, _exc: InferenceBackendUnavailable
+    ) -> JSONResponse:
         return _attach_request_id(
             JSONResponse(
                 status_code=503,
@@ -62,7 +65,9 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(KnowledgeFeatureNotImplemented)
-    def _knowledge_not_implemented(_request: Request, exc: KnowledgeFeatureNotImplemented) -> JSONResponse:
+    def _knowledge_not_implemented(
+        _request: Request, exc: KnowledgeFeatureNotImplemented
+    ) -> JSONResponse:
         return _attach_request_id(
             JSONResponse(
                 status_code=501,
@@ -74,7 +79,9 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(KnowledgeDocumentNotFound)
-    def _knowledge_not_found(_request: Request, exc: KnowledgeDocumentNotFound) -> JSONResponse:
+    def _knowledge_not_found(
+        _request: Request, exc: KnowledgeDocumentNotFound
+    ) -> JSONResponse:
         return _attach_request_id(
             JSONResponse(
                 status_code=404,
@@ -113,7 +120,9 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(FeatureNotAvailable)
-    def _feature_not_available(_request: Request, exc: FeatureNotAvailable) -> JSONResponse:
+    def _feature_not_available(
+        _request: Request, exc: FeatureNotAvailable
+    ) -> JSONResponse:
         if exc.gate_kind == "policy":
             status_code = 403
             code = FEATURE_DISABLED
@@ -143,7 +152,9 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(VisionNotSupported)
-    def _vision_not_supported(_request: Request, exc: VisionNotSupported) -> JSONResponse:
+    def _vision_not_supported(
+        _request: Request, exc: VisionNotSupported
+    ) -> JSONResponse:
         return _attach_request_id(
             JSONResponse(
                 status_code=422,
@@ -163,13 +174,21 @@ def register_exception_handlers(app: FastAPI) -> None:
             rid = get_request_id()
             if rid:
                 content.setdefault("request_id", rid)
-            return _attach_request_id(JSONResponse(status_code=exc.status_code, content=content))
+            return _attach_request_id(
+                JSONResponse(status_code=exc.status_code, content=content)
+            )
         code = default_code_for_http_status(exc.status_code)
-        content = build_error_body(detail=detail, code=code, status_code=exc.status_code)
-        return _attach_request_id(JSONResponse(status_code=exc.status_code, content=content))
+        content = build_error_body(
+            detail=detail, code=code, status_code=exc.status_code
+        )
+        return _attach_request_id(
+            JSONResponse(status_code=exc.status_code, content=content)
+        )
 
     @app.exception_handler(RequestValidationError)
-    def _validation_error(_request: Request, exc: RequestValidationError) -> JSONResponse:
+    def _validation_error(
+        _request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
         code = default_code_for_http_status(422)
         content = build_error_body(
             detail=jsonable_encoder(exc.errors()),
@@ -182,5 +201,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     def _unhandled_exception(request: Request, exc: Exception) -> JSONResponse:
         logger.exception("Unhandled error on %s", request.url.path)
         code = default_code_for_http_status(500)
-        content = build_error_body(detail="Internal server error", code=code, status_code=500)
+        content = build_error_body(
+            detail="Internal server error", code=code, status_code=500
+        )
         return _attach_request_id(JSONResponse(status_code=500, content=content))

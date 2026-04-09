@@ -1,4 +1,5 @@
 """SQLiteIdempotencyStore with FakeClock — no ``time.sleep`` for TTL behaviour."""
+
 from __future__ import annotations
 
 import shutil

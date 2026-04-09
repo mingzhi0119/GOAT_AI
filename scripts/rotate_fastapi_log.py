@@ -1,4 +1,5 @@
 """Rotate deploy.sh fastapi.log when it exceeds a size threshold (user-space, no logrotate)."""
+
 from __future__ import annotations
 
 import argparse
@@ -48,7 +49,11 @@ def prune_old_archives(archive_dir: Path, pattern_prefix: str, keep: int) -> lis
     if not archive_dir.is_dir():
         return []
     candidates = sorted(
-        (p for p in archive_dir.iterdir() if p.is_file() and p.name.startswith(pattern_prefix)),
+        (
+            p
+            for p in archive_dir.iterdir()
+            if p.is_file() and p.name.startswith(pattern_prefix)
+        ),
         key=lambda p: p.stat().st_mtime,
         reverse=True,
     )
@@ -88,21 +93,35 @@ def rotate_fastapi_log(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Rotate fastapi.log when it exceeds GOAT_LOG_MAX_MB.")
+    parser = argparse.ArgumentParser(
+        description="Rotate fastapi.log when it exceeds GOAT_LOG_MAX_MB."
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Print whether rotation would occur without writing",
     )
-    parser.add_argument("--max-mb", type=float, default=None, help="Override GOAT_LOG_MAX_MB")
-    parser.add_argument("--keep", type=int, default=None, help="Override GOAT_LOG_KEEP_ARCHIVES")
-    parser.add_argument("--project-root", type=Path, default=None, help="Override GOAT_AI_ROOT")
+    parser.add_argument(
+        "--max-mb", type=float, default=None, help="Override GOAT_LOG_MAX_MB"
+    )
+    parser.add_argument(
+        "--keep", type=int, default=None, help="Override GOAT_LOG_KEEP_ARCHIVES"
+    )
+    parser.add_argument(
+        "--project-root", type=Path, default=None, help="Override GOAT_AI_ROOT"
+    )
     args = parser.parse_args()
 
-    project_root = (args.project_root.resolve() if args.project_root else _default_project_root())
+    project_root = (
+        args.project_root.resolve() if args.project_root else _default_project_root()
+    )
     log_path = resolve_log_path(project_root)
     archive_dir = resolve_archive_dir(project_root)
-    max_bytes = int(args.max_mb * 1024 * 1024) if args.max_mb is not None else _parse_max_bytes()
+    max_bytes = (
+        int(args.max_mb * 1024 * 1024)
+        if args.max_mb is not None
+        else _parse_max_bytes()
+    )
     keep = args.keep if args.keep is not None else _parse_keep_archives()
 
     rotated = rotate_fastapi_log(

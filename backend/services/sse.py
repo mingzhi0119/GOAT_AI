@@ -1,4 +1,5 @@
 """Typed SSE event helpers shared across streaming endpoints."""
+
 from __future__ import annotations
 
 import json

@@ -11,6 +11,7 @@ Usage from the **repository root** (recommended)::
 
 DB path: reads GOAT_LOG_PATH env var, otherwise <project_root>/chat_logs.db
 """
+
 from __future__ import annotations
 
 import csv
@@ -29,7 +30,9 @@ DB_PATH = Path(os.environ.get("GOAT_LOG_PATH", str(_DEFAULT_DB)))
 
 def _connect() -> sqlite3.Connection:
     if not DB_PATH.exists():
-        sys.exit(f"[query_logs] DB not found: {DB_PATH}\nHas the server received any chat requests yet?")
+        sys.exit(
+            f"[query_logs] DB not found: {DB_PATH}\nHas the server received any chat requests yet?"
+        )
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
@@ -40,6 +43,7 @@ def _hr(width: int = 80) -> None:
 
 
 # ── Commands ──────────────────────────────────────────────────────────────────
+
 
 def cmd_recent(n: int = 20) -> None:
     """Show the N most recent conversations (default 20)."""
@@ -57,9 +61,11 @@ def cmd_recent(n: int = 20) -> None:
     _hr()
     for row in rows:
         question = textwrap.shorten(row["user_message"], width=120, placeholder="…")
-        answer   = textwrap.shorten(row["assistant_response"], width=120, placeholder="…")
+        answer = textwrap.shorten(row["assistant_response"], width=120, placeholder="…")
         ms = f"{row['response_ms']} ms" if row["response_ms"] is not None else "—"
-        print(f"[#{row['id']}] {row['created_at']}  |  {row['ip']}  |  {row['model']}  |  turns={row['turn_count']}  |  {ms}")
+        print(
+            f"[#{row['id']}] {row['created_at']}  |  {row['ip']}  |  {row['model']}  |  turns={row['turn_count']}  |  {ms}"
+        )
         print(f"  Q: {question}")
         print(f"  A: {answer}")
         _hr()
@@ -109,7 +115,7 @@ def cmd_search(keyword: str) -> None:
     _hr()
     for row in rows:
         question = textwrap.shorten(row["user_message"], width=120, placeholder="…")
-        answer   = textwrap.shorten(row["assistant_response"], width=120, placeholder="…")
+        answer = textwrap.shorten(row["assistant_response"], width=120, placeholder="…")
         print(f"[#{row['id']}] {row['created_at']}  |  {row['ip']}  |  {row['model']}")
         print(f"  Q: {question}")
         print(f"  A: {answer}")
@@ -134,6 +140,7 @@ _USAGE = textwrap.dedent("""\
       python3 tools/query_logs.py search KEYWORD — search user messages
       python3 tools/query_logs.py export         — dump all rows as CSV to stdout
 """)
+
 
 def main() -> None:
     args = sys.argv[1:]

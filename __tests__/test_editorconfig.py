@@ -9,10 +9,14 @@ class EditorConfigTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         editorconfig = root / ".editorconfig"
 
-        self.assertTrue(editorconfig.exists(), ".editorconfig must exist at the repo root")
+        self.assertTrue(
+            editorconfig.exists(), ".editorconfig must exist at the repo root"
+        )
 
         raw = editorconfig.read_bytes()
-        self.assertFalse(raw.startswith(b"\xef\xbb\xbf"), ".editorconfig must not use a UTF-8 BOM")
+        self.assertFalse(
+            raw.startswith(b"\xef\xbb\xbf"), ".editorconfig must not use a UTF-8 BOM"
+        )
 
         text = editorconfig.read_text(encoding="utf-8")
         self.assertIn("root = true", text)

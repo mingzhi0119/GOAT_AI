@@ -1,4 +1,5 @@
 """Public entry for chat streaming, including knowledge-backed RAG answers."""
+
 from __future__ import annotations
 
 import time
@@ -6,10 +7,17 @@ from collections.abc import Generator
 
 from backend.models.chat import ChatMessage
 from backend.services.chat_orchestration import SessionPersistenceService
-from backend.services.chat_runtime import ConversationLogger, SessionRepository, TitleGenerator
+from backend.services.chat_runtime import (
+    ConversationLogger,
+    SessionRepository,
+    TitleGenerator,
+)
 from backend.services.chat_stream_service import ChatStreamService
 from backend.services.exceptions import KnowledgeDocumentNotFound
-from backend.services.knowledge_service import build_chat_knowledge_context, resolve_knowledge_documents
+from backend.services.knowledge_service import (
+    build_chat_knowledge_context,
+    resolve_knowledge_documents,
+)
 from backend.services.safeguard_service import SafeguardService
 from backend.services.session_service import last_user_message
 from backend.services.sse import sse_done_event, sse_error_event

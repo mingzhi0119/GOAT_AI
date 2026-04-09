@@ -3,6 +3,7 @@
 Layering between packages is enforced by ``lint-imports`` (see ``pyproject.toml``).
 This file adds a cheap, explicit guard on *direct* imports in ``backend/routers/*.py``.
 """
+
 from __future__ import annotations
 
 import ast
@@ -38,4 +39,6 @@ def test_router_files_avoid_forbidden_direct_imports(path: Path) -> None:
     source = path.read_text(encoding="utf-8")
     tree = ast.parse(source, filename=str(path))
     bad = _collect_forbidden_modules(tree)
-    assert not bad, f"{path.relative_to(path.parents[2])}: forbidden direct imports {bad}"
+    assert not bad, (
+        f"{path.relative_to(path.parents[2])}: forbidden direct imports {bad}"
+    )

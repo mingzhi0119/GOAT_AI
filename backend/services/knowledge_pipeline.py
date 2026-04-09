@@ -12,7 +12,10 @@ import pandas as pd
 from docx import Document as DocxDocument
 from pypdf import PdfReader
 
-from backend.services.knowledge_storage import knowledge_document_dir, knowledge_vector_dir
+from backend.services.knowledge_storage import (
+    knowledge_document_dir,
+    knowledge_vector_dir,
+)
 from goat_ai.config import Settings
 
 _TOKEN_RE = re.compile(r"[A-Za-z0-9_]+")
@@ -37,7 +40,9 @@ class KnowledgeSearchHit:
 
 
 def normalize_document(*, settings: Settings, document_id: str, filename: str) -> str:
-    source_path = _source_path(settings=settings, document_id=document_id, filename=filename)
+    source_path = _source_path(
+        settings=settings, document_id=document_id, filename=filename
+    )
     ext = source_path.suffix.lower()
     if ext == ".csv":
         dataframe = pd.read_csv(source_path)
@@ -58,7 +63,10 @@ def persist_normalized_text(*, settings: Settings, document_id: str, text: str) 
     output_path = normalized_dir / "extracted.txt"
     output_path.write_text(text, encoding="utf-8")
     metadata_path = normalized_dir / "metadata.json"
-    metadata_path.write_text(json.dumps({"char_length": len(text)}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    metadata_path.write_text(
+        json.dumps({"char_length": len(text)}, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
     return output_path
 
 
@@ -73,7 +81,14 @@ def chunk_text(text: str, *, max_chars: int = 800) -> list[KnowledgeChunk]:
         candidate = piece if not current else f"{current}\n\n{piece}"
         if current and len(candidate) > max_chars:
             end = start + len(current)
-            chunks.append(KnowledgeChunk(chunk_index=len(chunks), text=current, char_start=start, char_end=end))
+            chunks.append(
+                KnowledgeChunk(
+                    chunk_index=len(chunks),
+                    text=current,
+                    char_start=start,
+                    char_end=end,
+                )
+            )
             cursor = end
             current = piece
             start = cursor
@@ -84,7 +99,14 @@ def chunk_text(text: str, *, max_chars: int = 800) -> list[KnowledgeChunk]:
         cursor = start + len(current)
 
     if current:
-        chunks.append(KnowledgeChunk(chunk_index=len(chunks), text=current, char_start=start, char_end=start + len(current)))
+        chunks.append(
+            KnowledgeChunk(
+                chunk_index=len(chunks),
+                text=current,
+                char_start=start,
+                char_end=start + len(current),
+            )
+        )
     return chunks
 
 
@@ -112,7 +134,9 @@ def persist_vector_index(
             for chunk in chunks
         ],
     }
-    output_path.write_text(json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8")
+    output_path.write_text(
+        json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
     return str(output_path)
 
 
@@ -136,7 +160,9 @@ def search_vector_index(
             continue
         filename = str(payload["filename"])
         for chunk in payload.get("chunks", []):
-            score = _cosine_similarity(query_vector, [float(value) for value in chunk.get("vector", [])])
+            score = _cosine_similarity(
+                query_vector, [float(value) for value in chunk.get("vector", [])]
+            )
             if score <= 0:
                 continue
             hits.append(
@@ -175,7 +201,11 @@ def _pdf_to_text(source_path: Path) -> str:
 
 def _docx_to_text(source_path: Path) -> str:
     document = DocxDocument(str(source_path))
-    paragraphs = [paragraph.text.strip() for paragraph in document.paragraphs if paragraph.text.strip()]
+    paragraphs = [
+        paragraph.text.strip()
+        for paragraph in document.paragraphs
+        if paragraph.text.strip()
+    ]
     text = "\n\n".join(paragraphs)
     if not text.strip():
         raise ValueError("DOCX extraction produced no text.")

@@ -29,7 +29,7 @@ This document records the current threat model and the guardrails that matter fo
 
 ## Dependency and CI hygiene
 
-- `pip-audit` runs in CI against `requirements.txt` to surface known dependency vulnerabilities.
+- `pip-audit` runs in CI against `requirements-ci.txt` (runtime `requirements.txt` plus lint/test tooling) to surface known dependency vulnerabilities.
 - `ruff check` runs in CI to catch style and correctness regressions early.
 - Formatting checks should stay lightweight enough to avoid forcing a repository-wide rewrite for legacy files.
 

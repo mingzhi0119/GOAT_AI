@@ -1,4 +1,5 @@
 """Versioned chart spec models; chart intent lives in ``goat_ai.chart_intent_v2``."""
+
 from __future__ import annotations
 
 from typing import Literal

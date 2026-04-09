@@ -31,7 +31,9 @@ def can_bind_runtime_target(host: str, port: int) -> tuple[bool, str]:
     return True, "bind check passed"
 
 
-def make_runtime_target(mode: str, host: str, port: int, reason: str) -> ResolvedRuntimeTarget:
+def make_runtime_target(
+    mode: str, host: str, port: int, reason: str
+) -> ResolvedRuntimeTarget:
     return ResolvedRuntimeTarget(
         mode=mode,
         host=host,
@@ -51,7 +53,9 @@ def ordered_runtime_targets(
     bind_probe = probe or can_bind_runtime_target
     can_bind_server, reason = bind_probe(host, settings.server_port)
     if settings.deploy_target == "local":
-        target_reason = "GOAT_DEPLOY_TARGET=local is deprecated; enforcing server port policy"
+        target_reason = (
+            "GOAT_DEPLOY_TARGET=local is deprecated; enforcing server port policy"
+        )
     elif settings.deploy_target == "server":
         target_reason = "GOAT_DEPLOY_TARGET explicitly set to server"
     elif can_bind_server:
@@ -59,7 +63,9 @@ def ordered_runtime_targets(
     else:
         target_reason = f"server port unavailable: {reason}"
 
-    return [make_runtime_target("server62606", host, settings.server_port, target_reason)]
+    return [
+        make_runtime_target("server62606", host, settings.server_port, target_reason)
+    ]
 
 
 def current_runtime_target(
@@ -70,14 +76,26 @@ def current_runtime_target(
 ) -> ResolvedRuntimeTarget:
     """Describe the currently active runtime target."""
     if current_port == settings.server_port:
-        return make_runtime_target("server62606", host, current_port, "current process bound to server port")
-    return make_runtime_target("explicit_override", host, current_port, "current process bound to custom port")
+        return make_runtime_target(
+            "server62606", host, current_port, "current process bound to server port"
+        )
+    return make_runtime_target(
+        "explicit_override", host, current_port, "current process bound to custom port"
+    )
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Resolve GOAT AI runtime target ports.")
-    parser.add_argument("--ordered-ports", action="store_true", help="Print target ports in preference order, one per line.")
-    parser.add_argument("--json", action="store_true", help="Print the resolved target list as JSON.")
+    parser = argparse.ArgumentParser(
+        description="Resolve GOAT AI runtime target ports."
+    )
+    parser.add_argument(
+        "--ordered-ports",
+        action="store_true",
+        help="Print target ports in preference order, one per line.",
+    )
+    parser.add_argument(
+        "--json", action="store_true", help="Print the resolved target list as JSON."
+    )
     return parser.parse_args()
 
 

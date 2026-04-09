@@ -1,4 +1,5 @@
 """stream_chat_sse with a fake LLM client (no Ollama)."""
+
 from __future__ import annotations
 
 import tempfile
@@ -121,7 +122,13 @@ class FakeChartToolLLMClient(FakeLLMClient):
                                 "chart_type": "line",
                                 "title": "Revenue trend",
                                 "x_key": "month",
-                                "series": [{"key": "revenue", "name": "Revenue", "aggregate": "none"}],
+                                "series": [
+                                    {
+                                        "key": "revenue",
+                                        "name": "Revenue",
+                                        "aggregate": "none",
+                                    }
+                                ],
                             },
                         }
                     }
@@ -193,10 +200,15 @@ def test_stream_chat_sse_emits_tokens_done_and_records_latency() -> None:
 
 
 def test_sse_event_format() -> None:
-    assert sse_event({"type": "token", "token": "x"}) == 'data: {"type": "token", "token": "x"}\n\n'
+    assert (
+        sse_event({"type": "token", "token": "x"})
+        == 'data: {"type": "token", "token": "x"}\n\n'
+    )
 
 
-def test_stream_chat_sse_emits_chart_only_after_native_tool_followup_completes() -> None:
+def test_stream_chat_sse_emits_chart_only_after_native_tool_followup_completes() -> (
+    None
+):
     tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
     db_path = Path(tmp.name) / "chat_logs.db"
     log_service.init_db(db_path)
@@ -212,7 +224,9 @@ def test_stream_chat_sse_emits_chart_only_after_native_tool_followup_completes()
                 model="test-model",
                 messages=[
                     ChatMessage(role="user", content=file_context),
-                    ChatMessage(role="assistant", content="I have loaded the file context."),
+                    ChatMessage(
+                        role="assistant", content="I have loaded the file context."
+                    ),
                     ChatMessage(role="user", content="Please chart the revenue trend."),
                 ],
                 system_prompt="You are helpful.",
@@ -227,7 +241,9 @@ def test_stream_chat_sse_emits_chart_only_after_native_tool_followup_completes()
             i for i, event in enumerate(events) if '"type": "chart_spec"' in event
         )
         answer_index = next(
-            i for i, event in enumerate(events) if "Here is the chart-driven answer." in event
+            i
+            for i, event in enumerate(events)
+            if "Here is the chart-driven answer." in event
         )
         assert answer_index < chart_index
         assert any('"type": "done"' in event for event in events)
@@ -257,7 +273,9 @@ def test_stream_chat_sse_allows_tool_chart_without_uploaded_file_context() -> No
         tmp.cleanup()
 
 
-def test_stream_chat_sse_does_not_emit_chart_from_legacy_pseudo_block_when_tools_unsupported() -> None:
+def test_stream_chat_sse_does_not_emit_chart_from_legacy_pseudo_block_when_tools_unsupported() -> (
+    None
+):
     class FakeLegacyChartBlockLLMClient(FakeLLMClient):
         def stream_tokens(
             self,
@@ -286,7 +304,9 @@ def test_stream_chat_sse_does_not_emit_chart_from_legacy_pseudo_block_when_tools
                 model="test-model",
                 messages=[
                     ChatMessage(role="user", content=file_context),
-                    ChatMessage(role="assistant", content="I have loaded the file context."),
+                    ChatMessage(
+                        role="assistant", content="I have loaded the file context."
+                    ),
                     ChatMessage(role="user", content="Please chart the revenue trend."),
                 ],
                 system_prompt="You are helpful.",
@@ -318,8 +338,12 @@ def test_stream_chat_sse_emits_tokens_before_done_with_safeguard_enabled() -> No
             )
         )
 
-        first_token_index = next(i for i, event in enumerate(events) if '"type": "token"' in event)
-        done_index = next(i for i, event in enumerate(events) if '"type": "done"' in event)
+        first_token_index = next(
+            i for i, event in enumerate(events) if '"type": "token"' in event
+        )
+        done_index = next(
+            i for i, event in enumerate(events) if '"type": "done"' in event
+        )
         assert first_token_index < done_index
     finally:
         tmp.cleanup()

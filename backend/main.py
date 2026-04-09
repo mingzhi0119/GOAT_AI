@@ -1,4 +1,5 @@
 """GOAT AI FastAPI application factory."""
+
 from __future__ import annotations
 
 import logging
@@ -11,7 +12,17 @@ from fastapi.staticfiles import StaticFiles
 from backend.config import CORS_ORIGINS, get_settings
 from backend.exception_handlers import register_exception_handlers
 from backend.http_security import register_http_security
-from backend.routers import artifacts, chat, code_sandbox, history, knowledge, media, models, system, upload
+from backend.routers import (
+    artifacts,
+    chat,
+    code_sandbox,
+    history,
+    knowledge,
+    media,
+    models,
+    system,
+    upload,
+)
 from backend.services import log_service
 from goat_ai.latency_metrics import init_latency_metrics
 from goat_ai.logging_config import configure_logging
@@ -31,14 +42,32 @@ def create_app() -> FastAPI:
         description="Simon Business School Strategic Intelligence API",
         openapi_tags=[
             {"name": "system", "description": "Health and server telemetry endpoints."},
-            {"name": "models", "description": "Model discovery endpoints for Ollama-backed chat."},
-            {"name": "chat", "description": "Streaming conversational analysis endpoints."},
-            {"name": "upload", "description": "Tabular file analysis endpoints for CSV/XLSX uploads."},
-            {"name": "history", "description": "Persisted chat session listing and retrieval."},
-            {"name": "knowledge", "description": "Contract-first knowledge ingestion and retrieval endpoints."},
+            {
+                "name": "models",
+                "description": "Model discovery endpoints for Ollama-backed chat.",
+            },
+            {
+                "name": "chat",
+                "description": "Streaming conversational analysis endpoints.",
+            },
+            {
+                "name": "upload",
+                "description": "Tabular file analysis endpoints for CSV/XLSX uploads.",
+            },
+            {
+                "name": "history",
+                "description": "Persisted chat session listing and retrieval.",
+            },
+            {
+                "name": "knowledge",
+                "description": "Contract-first knowledge ingestion and retrieval endpoints.",
+            },
             {"name": "media", "description": "Image uploads for vision-capable chat."},
             {"name": "artifacts", "description": "Download generated chat files."},
-            {"name": "code_sandbox", "description": "Capability-gated code execution (scaffold)."},
+            {
+                "name": "code_sandbox",
+                "description": "Capability-gated code execution (scaffold).",
+            },
         ],
     )
     app.openapi_version = "3.2.0"

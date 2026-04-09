@@ -1,4 +1,5 @@
 """Unit tests for goat_ai.latency_metrics."""
+
 from __future__ import annotations
 
 from goat_ai.latency_metrics import (

@@ -1,4 +1,5 @@
 """SQLite-backed idempotency key service (Phase 13 Wave B)."""
+
 from __future__ import annotations
 
 import hashlib
@@ -37,7 +38,9 @@ class ClaimResult:
 class SQLiteIdempotencyStore:
     """Persist and replay idempotent responses for selected API boundaries."""
 
-    def __init__(self, *, db_path: Path, ttl_sec: int, clock: Clock | None = None) -> None:
+    def __init__(
+        self, *, db_path: Path, ttl_sec: int, clock: Clock | None = None
+    ) -> None:
         self._db_path = db_path
         self._ttl_sec = max(1, ttl_sec)
         self._clock: Clock = clock if clock is not None else SystemClock()
@@ -75,7 +78,15 @@ class SQLiteIdempotencyStore:
                         (key, route, scope, request_hash, status, created_at, expires_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (key, route, scope, request_hash, _STATUS_PENDING, now_iso, expires_iso),
+                    (
+                        key,
+                        route,
+                        scope,
+                        request_hash,
+                        _STATUS_PENDING,
+                        now_iso,
+                        expires_iso,
+                    ),
                 )
                 conn.commit()
                 return ClaimResult(state="claimed")
@@ -112,7 +123,11 @@ class SQLiteIdempotencyStore:
                 conn.commit()
                 return ClaimResult(state="claimed")
 
-            if status == _STATUS_COMPLETED and response_status is not None and response_body is not None:
+            if (
+                status == _STATUS_COMPLETED
+                and response_status is not None
+                and response_body is not None
+            ):
                 conn.commit()
                 return ClaimResult(
                     state="replay",
@@ -137,7 +152,9 @@ class SQLiteIdempotencyStore:
         content_type: str,
         body: str,
     ) -> None:
-        expires_iso = (self._clock.utc_now() + timedelta(seconds=self._ttl_sec)).isoformat()
+        expires_iso = (
+            self._clock.utc_now() + timedelta(seconds=self._ttl_sec)
+        ).isoformat()
         with sqlite3.connect(self._db_path) as conn:
             conn.execute(
                 """

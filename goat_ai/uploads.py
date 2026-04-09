@@ -25,7 +25,9 @@ class TabularLoadResult:
         return self.dataframe is not None and self.user_error is None
 
 
-def load_tabular_upload(uploaded_file: TabularUploadLike, settings: Settings) -> TabularLoadResult:
+def load_tabular_upload(
+    uploaded_file: TabularUploadLike, settings: Settings
+) -> TabularLoadResult:
     """Validate size/rows and load CSV or Excel into a DataFrame."""
     if uploaded_file.size > settings.max_upload_bytes:
         logger.warning("Upload rejected: size %s exceeds limit", uploaded_file.size)

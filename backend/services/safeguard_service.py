@@ -1,4 +1,5 @@
 """Safeguard moderation boundary for chat — re-exports domain policy + adapter."""
+
 from __future__ import annotations
 
 from typing import Protocol
@@ -59,7 +60,9 @@ class RuleBasedSafeguardService:
         candidate = "\n".join(
             [last_user_message(messages), system_instruction.strip()]
         ).strip()
-        return self._policy.review_input_candidate(combined_user_and_system_text=candidate)
+        return self._policy.review_input_candidate(
+            combined_user_and_system_text=candidate
+        )
 
     def review_output(
         self,

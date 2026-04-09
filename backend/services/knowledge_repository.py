@@ -156,7 +156,15 @@ class SQLiteKnowledgeRepository:
                 SET status = ?, updated_at = ?, chunk_count = ?, completed_at = ?, error_code = ?, error_detail = ?
                 WHERE id = ?
                 """,
-                (status, updated_at, chunk_count, completed_at, error_code, error_detail, ingestion_id),
+                (
+                    status,
+                    updated_at,
+                    chunk_count,
+                    completed_at,
+                    error_code,
+                    error_detail,
+                    ingestion_id,
+                ),
             )
 
     def get_ingestion(self, ingestion_id: str) -> KnowledgeIngestionRecord | None:
@@ -175,9 +183,13 @@ class SQLiteKnowledgeRepository:
             return None
         return KnowledgeIngestionRecord(**dict(row))
 
-    def replace_chunks(self, *, ingestion_id: str, document_id: str, chunks: list[KnowledgeChunkRow]) -> None:
+    def replace_chunks(
+        self, *, ingestion_id: str, document_id: str, chunks: list[KnowledgeChunkRow]
+    ) -> None:
         with sqlite3.connect(self._db_path) as conn:
-            conn.execute("DELETE FROM knowledge_chunks WHERE ingestion_id = ?", (ingestion_id,))
+            conn.execute(
+                "DELETE FROM knowledge_chunks WHERE ingestion_id = ?", (ingestion_id,)
+            )
             conn.executemany(
                 """
                 INSERT INTO knowledge_chunks
@@ -202,7 +214,9 @@ class SQLiteKnowledgeRepository:
                 ],
             )
 
-    def get_chunks_for_documents(self, document_ids: list[str] | None = None) -> list[KnowledgeChunkRow]:
+    def get_chunks_for_documents(
+        self, document_ids: list[str] | None = None
+    ) -> list[KnowledgeChunkRow]:
         with sqlite3.connect(self._db_path) as conn:
             conn.row_factory = sqlite3.Row
             if document_ids:

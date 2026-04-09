@@ -1,4 +1,5 @@
 """System telemetry assembly for HTTP APIs (latency snapshot, runtime target resolution)."""
+
 from __future__ import annotations
 
 from backend.config import BACKEND_HOST, BACKEND_PORT
@@ -56,5 +57,7 @@ def build_runtime_target_response(settings: Settings) -> RuntimeTargetResponse:
     return RuntimeTargetResponse(
         deploy_target=settings.deploy_target,
         current=RuntimeTargetItemResponse(**current.__dict__),
-        ordered_targets=[RuntimeTargetItemResponse(**item.__dict__) for item in ordered],
+        ordered_targets=[
+            RuntimeTargetItemResponse(**item.__dict__) for item in ordered
+        ],
     )

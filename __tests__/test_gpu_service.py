@@ -36,7 +36,9 @@ class GPUServiceTests(unittest.TestCase):
         self.assertEqual(1000.0, parsed.memory_used_mb)
 
     def test_read_gpu_status_when_smi_missing(self) -> None:
-        with patch("backend.services.gpu_service.subprocess.run", side_effect=FileNotFoundError):
+        with patch(
+            "backend.services.gpu_service.subprocess.run", side_effect=FileNotFoundError
+        ):
             status = read_gpu_status(self._settings())
         self.assertFalse(status.available)
         self.assertIn("nvidia-smi", status.message)

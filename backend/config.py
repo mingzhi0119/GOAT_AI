@@ -3,6 +3,7 @@
 Delegates to `goat_ai.config.Settings` for shared env vars.
 `get_settings()` is LRU-cached so env vars are read exactly once at startup.
 """
+
 from __future__ import annotations
 
 import os

@@ -5,7 +5,9 @@ from typing import Literal
 from goat_ai.config import Settings
 
 
-def resolve_rerank_mode(*, retrieval_profile: str, settings: Settings) -> Literal["passthrough", "lexical"]:
+def resolve_rerank_mode(
+    *, retrieval_profile: str, settings: Settings
+) -> Literal["passthrough", "lexical"]:
     """Map client profile + env defaults to a rerank strategy."""
     p = retrieval_profile.strip().lower()
     if p in ("rag3_lexical", "rag3_quality"):

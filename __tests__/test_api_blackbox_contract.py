@@ -389,7 +389,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
         history_detail = self.client.get("/api/history/chat-1")
         self.assertEqual(200, history_detail.status_code)
         self.assertEqual("Generated session title", history_detail.json()["title"])
-        self.assertEqual(SESSION_PAYLOAD_VERSION, history_detail.json()["schema_version"])
+        self.assertEqual(
+            SESSION_PAYLOAD_VERSION, history_detail.json()["schema_version"]
+        )
         self.assertEqual(
             [
                 {

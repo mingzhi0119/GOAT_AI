@@ -1,4 +1,5 @@
 """Typed runtime interfaces and adapters for chat/session infrastructure."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -66,7 +67,9 @@ class ConversationLogEntry:
 class SessionRepository(Protocol):
     """Persistence boundary for stored session snapshots."""
 
-    def list_sessions(self, owner_filter: str | None = None) -> list[SessionSummaryRecord]: ...
+    def list_sessions(
+        self, owner_filter: str | None = None
+    ) -> list[SessionSummaryRecord]: ...
 
     def get_session(self, session_id: str) -> SessionDetailRecord | None: ...
 
@@ -105,8 +108,12 @@ class SQLiteSessionRepository:
     def __init__(self, db_path: Path) -> None:
         self._db_path = db_path
 
-    def list_sessions(self, owner_filter: str | None = None) -> list[SessionSummaryRecord]:
-        rows = log_service.list_sessions(db_path=self._db_path, owner_filter=owner_filter)
+    def list_sessions(
+        self, owner_filter: str | None = None
+    ) -> list[SessionSummaryRecord]:
+        rows = log_service.list_sessions(
+            db_path=self._db_path, owner_filter=owner_filter
+        )
         return [
             SessionSummaryRecord(
                 id=str(row["id"]),
@@ -157,7 +164,9 @@ class SQLiteSessionRepository:
         log_service.delete_session(db_path=self._db_path, session_id=session_id)
 
     def delete_all_sessions(self, owner_filter: str | None = None) -> None:
-        log_service.delete_all_sessions(db_path=self._db_path, owner_filter=owner_filter)
+        log_service.delete_all_sessions(
+            db_path=self._db_path, owner_filter=owner_filter
+        )
 
     def create_chat_artifact(self, record: PersistedArtifactRecord) -> None:
         log_service.create_chat_artifact(
@@ -174,7 +183,9 @@ class SQLiteSessionRepository:
         )
 
     def get_chat_artifact(self, artifact_id: str) -> PersistedArtifactRecord | None:
-        row = log_service.get_chat_artifact(db_path=self._db_path, artifact_id=artifact_id)
+        row = log_service.get_chat_artifact(
+            db_path=self._db_path, artifact_id=artifact_id
+        )
         if row is None:
             return None
         return PersistedArtifactRecord(

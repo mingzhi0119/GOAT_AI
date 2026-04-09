@@ -1,4 +1,5 @@
 """Pydantic schemas for system telemetry endpoints."""
+
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
@@ -62,8 +63,12 @@ class CodeSandboxFeaturePayload(BaseModel):
         default=None,
         description="Reserved for authorization; null until AuthZ lands.",
     )
-    allowed_by_config: bool = Field(description="Operator enabled the feature in deployment config.")
-    available_on_host: bool = Field(description="Probed runtime dependency (e.g. Docker) appears usable.")
+    allowed_by_config: bool = Field(
+        description="Operator enabled the feature in deployment config."
+    )
+    available_on_host: bool = Field(
+        description="Probed runtime dependency (e.g. Docker) appears usable."
+    )
     effective_enabled: bool = Field(description="Both config and probe satisfied.")
     deny_reason: str | None = Field(
         default=None,

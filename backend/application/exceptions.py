@@ -1,4 +1,5 @@
 """Application-layer exceptions used to keep routers thin."""
+
 from __future__ import annotations
 
 from backend.application.ports import (  # noqa: F401

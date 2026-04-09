@@ -343,8 +343,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-python@v5
-        with: { python-version: "3.14" }
-      - run: pip install -r requirements.txt
+        with:
+          python-version: "3.14"
+      - uses: astral-sh/setup-uv@v8.0.0
+        with:
+          enable-cache: true
+      - run: uv pip install --system -r requirements-ci.txt
       - run: python -m pytest __tests__/ -v --tb=short
 
   test-frontend:
@@ -457,8 +461,8 @@ pytest==8.x
 httpx==0.x           # FastAPI TestClient support
 ```
 
-- Keep `requirements.txt` as the install source of truth used in deploy and CI.
-- Run `pip install -r requirements.txt` in CI - never `pip install package` ad-hoc.
+- Keep `requirements.txt` as the runtime install source of truth for deploy; CI and full local dev use `requirements-ci.txt` (`-r requirements.txt` plus lint/test/audit pins).
+- Run `uv pip install --system -r requirements-ci.txt` in CI (after `astral-sh/setup-uv`) - never `pip install package` ad-hoc.
 
 ### Node / npm
 
@@ -477,7 +481,7 @@ Before every commit ask:
 - [ ] No `print()`, `TODO`, or commented-out code left in.
 - [ ] New logic has a corresponding test (at least a happy-path unit test).
 - [ ] No hardcoded paths, ports, secrets, or usernames.
-- [ ] `requirements.txt` / `package-lock.json` updated if dependencies changed.
+- [ ] `requirements.txt` / `requirements-ci.txt` / `package-lock.json` updated if dependencies changed.
 - [ ] The change runs with `python -m pytest __tests__/ -v` green and `npm test -- --run` green.
 - [ ] `OPERATIONS.md` updated if a new env var or startup step was added.
 

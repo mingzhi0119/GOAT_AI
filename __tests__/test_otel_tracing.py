@@ -1,4 +1,5 @@
 """Tests for optional OpenTelemetry helpers (default-off)."""
+
 from __future__ import annotations
 
 import os

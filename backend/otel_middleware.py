@@ -1,4 +1,5 @@
 """ASGI middleware — propagates W3C ``traceparent`` when OpenTelemetry is enabled."""
+
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable

@@ -1,4 +1,5 @@
 """System router - telemetry endpoints."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
@@ -15,7 +16,12 @@ from backend.application.system import (
 from backend.application.ports import Settings
 from backend.config import get_settings
 from backend.models.common import ErrorResponse
-from backend.models.system import GPUStatusResponse, InferenceLatencyResponse, RuntimeTargetResponse, SystemFeaturesResponse
+from backend.models.system import (
+    GPUStatusResponse,
+    InferenceLatencyResponse,
+    RuntimeTargetResponse,
+    SystemFeaturesResponse,
+)
 
 router = APIRouter()
 
@@ -48,7 +54,9 @@ def get_inference_latency_route() -> InferenceLatencyResponse:
     summary="Read capability-gated feature flags",
     responses={401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
 )
-def get_system_features_route(settings: Settings = Depends(get_settings)) -> SystemFeaturesResponse:
+def get_system_features_route(
+    settings: Settings = Depends(get_settings),
+) -> SystemFeaturesResponse:
     """Return config + host probes for optional high-risk features (see docs/ENGINEERING_STANDARDS.md §15)."""
     return get_system_features(settings)
 
@@ -59,7 +67,9 @@ def get_system_features_route(settings: Settings = Depends(get_settings)) -> Sys
     summary="Read resolved deployment target order",
     responses={401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
 )
-def get_runtime_target_route(settings: Settings = Depends(get_settings)) -> RuntimeTargetResponse:
+def get_runtime_target_route(
+    settings: Settings = Depends(get_settings),
+) -> RuntimeTargetResponse:
     """Return the current runtime target and the ordered deployment fallback list."""
     return get_runtime_target(settings)
 
@@ -67,7 +77,9 @@ def get_runtime_target_route(settings: Settings = Depends(get_settings)) -> Runt
 @router.get(
     "/ready",
     summary="Readiness probe (SQLite + optional Ollama)",
-    responses={503: {"description": "Not ready; see JSON ``checks`` for failing dependency."}},
+    responses={
+        503: {"description": "Not ready; see JSON ``checks`` for failing dependency."}
+    },
 )
 def get_ready_route(settings: Settings = Depends(get_settings)):
     """Return 200 when SQLite and (unless skipped) Ollama are reachable; 503 otherwise."""

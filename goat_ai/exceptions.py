@@ -1,4 +1,5 @@
 """Domain exceptions for the shared goat_ai layer (no HTTP imports)."""
+
 from __future__ import annotations
 
 

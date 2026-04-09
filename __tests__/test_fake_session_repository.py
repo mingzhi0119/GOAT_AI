@@ -1,4 +1,5 @@
 """In-memory SessionRepository — no SQLite file; validates payload decode round-trip."""
+
 from __future__ import annotations
 
 import unittest
@@ -26,9 +27,13 @@ class InMemorySessionRepository:
         self._rows: dict[str, dict[str, object]] = {}
         self._artifacts: dict[str, PersistedArtifactRecord] = {}
 
-    def list_sessions(self, owner_filter: str | None = None) -> list[SessionSummaryRecord]:
+    def list_sessions(
+        self, owner_filter: str | None = None
+    ) -> list[SessionSummaryRecord]:
         out: list[SessionSummaryRecord] = []
-        for sid, row in sorted(self._rows.items(), key=lambda kv: str(kv[1].get("updated_at", ""))):
+        for sid, row in sorted(
+            self._rows.items(), key=lambda kv: str(kv[1].get("updated_at", ""))
+        ):
             row_owner = str(row.get("owner_id", ""))
             if owner_filter is not None and row_owner != owner_filter:
                 continue
@@ -50,7 +55,9 @@ class InMemorySessionRepository:
         if row is None:
             return None
         raw_messages = row.get("messages", [])
-        decoded = decode_session_payload(raw_messages if isinstance(raw_messages, (list, dict)) else [])
+        decoded = decode_session_payload(
+            raw_messages if isinstance(raw_messages, (list, dict)) else []
+        )
         return SessionDetailRecord(
             id=str(row["id"]),
             title=str(row["title"]),
@@ -85,7 +92,11 @@ class InMemorySessionRepository:
         if owner_filter is None:
             self._rows.clear()
             return
-        for sid in [k for k, row in self._rows.items() if str(row.get("owner_id", "")) == owner_filter]:
+        for sid in [
+            k
+            for k, row in self._rows.items()
+            if str(row.get("owner_id", "")) == owner_filter
+        ]:
             del self._rows[sid]
 
     def create_chat_artifact(self, record: PersistedArtifactRecord) -> None:
@@ -126,4 +137,10 @@ class TestFakeSessionRepository(unittest.TestCase):
         assert detail is not None
         decoded = decode_session_payload(payload_dict)
         self.assertEqual(detail.messages, decoded.messages)
-        self.assertEqual(detail.messages, [{"role": "user", "content": "Hello"}, {"role": "assistant", "content": "Hi there"}])
+        self.assertEqual(
+            detail.messages,
+            [
+                {"role": "user", "content": "Hello"},
+                {"role": "assistant", "content": "Hi there"},
+            ],
+        )

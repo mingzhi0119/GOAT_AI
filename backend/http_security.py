@@ -42,7 +42,9 @@ class InMemoryRateLimiter:
     _requests_by_key: dict[str, deque[float]] = field(default_factory=dict)
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
-    def allow(self, key: str, *, now: float, window_sec: int, max_requests: int) -> tuple[bool, int]:
+    def allow(
+        self, key: str, *, now: float, window_sec: int, max_requests: int
+    ) -> tuple[bool, int]:
         with self._lock:
             bucket = self._requests_by_key.setdefault(key, deque())
             cutoff = now - float(window_sec)
@@ -136,7 +138,9 @@ def register_http_security(app: FastAPI) -> None:
     limiter = InMemoryRateLimiter()
 
     @app.middleware("http")
-    async def security_middleware(request: Request, call_next: Callable[[Request], Response]) -> Response:
+    async def security_middleware(
+        request: Request, call_next: Callable[[Request], Response]
+    ) -> Response:
         inbound = request.headers.get(_REQUEST_ID_HEADER, "").strip()
         request_id = inbound if inbound else str(uuid.uuid4())
         token = set_request_id(request_id)

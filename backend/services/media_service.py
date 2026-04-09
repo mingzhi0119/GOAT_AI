@@ -2,6 +2,7 @@
 
 Router layer reads multipart bytes; this module stays free of FastAPI imports.
 """
+
 from __future__ import annotations
 
 import base64
@@ -75,8 +76,7 @@ def create_media_upload_from_bytes(
     orig_name = filename.strip() or "image"
     meta = base / "meta.txt"
     meta.write_text(
-        f"filename={orig_name}\n"
-        f"kind={kind}\n",
+        f"filename={orig_name}\nkind={kind}\n",
         encoding="utf-8",
     )
 
@@ -101,9 +101,15 @@ def load_normalized_base64_for_ollama(*, attachment_id: str, settings: Settings)
     return base64.b64encode(data).decode("ascii")
 
 
-def load_images_base64_for_chat(*, attachment_ids: list[str], settings: Settings) -> list[str]:
+def load_images_base64_for_chat(
+    *, attachment_ids: list[str], settings: Settings
+) -> list[str]:
     """Load multiple attachments in request order."""
     out: list[str] = []
     for aid in attachment_ids:
-        out.append(load_normalized_base64_for_ollama(attachment_id=aid.strip(), settings=settings))
+        out.append(
+            load_normalized_base64_for_ollama(
+                attachment_id=aid.strip(), settings=settings
+            )
+        )
     return out

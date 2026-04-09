@@ -1,10 +1,14 @@
 """History sidebar use cases over SessionRepository."""
+
 from __future__ import annotations
 
 from dataclasses import asdict
 from typing import Any
 
-from backend.application.exceptions import HistoryOwnerRequiredError, HistorySessionNotFoundError
+from backend.application.exceptions import (
+    HistoryOwnerRequiredError,
+    HistorySessionNotFoundError,
+)
 from backend.application.ports import SessionRepository, Settings
 from backend.models.history import (
     HistorySessionDetailResponse,
@@ -46,7 +50,10 @@ def list_history_sessions(
 ) -> HistorySessionListResponse:
     """Return persisted session metadata rows for the history sidebar."""
     owner_filter = resolve_owner_filter(settings=settings, request_owner=request_owner)
-    sessions = [_session_summary_as_dict(session) for session in repository.list_sessions(owner_filter=owner_filter)]
+    sessions = [
+        _session_summary_as_dict(session)
+        for session in repository.list_sessions(owner_filter=owner_filter)
+    ]
     return HistorySessionListResponse.model_validate({"sessions": sessions})
 
 

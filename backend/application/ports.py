@@ -1,8 +1,16 @@
 """Application-layer contract face for routers and use-case wiring."""
+
 from __future__ import annotations
 
-from backend.services.chat_capacity_service import ChatCapacityError, validate_chat_capacity  # noqa: F401
-from backend.services.chat_runtime import ConversationLogger, SessionRepository, TitleGenerator  # noqa: F401
+from backend.services.chat_capacity_service import (
+    ChatCapacityError,
+    validate_chat_capacity,
+)
+from backend.services.chat_runtime import (
+    ConversationLogger,
+    SessionRepository,
+    TitleGenerator,
+)  # noqa: F401
 from backend.services.exceptions import (  # noqa: F401
     FeatureNotAvailable,
     InferenceBackendUnavailable,
@@ -33,5 +41,6 @@ __all__ = [
     "Settings",
     "TabularContextExtractor",
     "TitleGenerator",
+    "validate_chat_capacity",
     "VisionNotSupported",
 ]

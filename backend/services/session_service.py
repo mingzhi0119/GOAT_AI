@@ -1,4 +1,5 @@
 """Session persistence and title-generation helpers for chat flows."""
+
 from __future__ import annotations
 
 import logging
@@ -7,8 +8,15 @@ from datetime import datetime, timezone
 from backend.domain.chart_provenance_policy import resolve_chart_data_source_for_persist
 from backend.domain.chart_types import ChartDataSource
 from backend.models.chat import ChatMessage
-from backend.services.chat_runtime import SessionRepository, SessionUpsertPayload, TitleGenerator
-from backend.services.session_message_codec import build_session_payload, is_file_context_message
+from backend.services.chat_runtime import (
+    SessionRepository,
+    SessionUpsertPayload,
+    TitleGenerator,
+)
+from backend.services.session_message_codec import (
+    build_session_payload,
+    is_file_context_message,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +101,9 @@ def persist_chat_session(
     )
     resolved_chart_data_source = resolve_chart_data_source_for_persist(
         declared=chart_data_source,
-        has_file_context_message=any(is_file_context_message(msg) for msg in final_messages),
+        has_file_context_message=any(
+            is_file_context_message(msg) for msg in final_messages
+        ),
     )
 
     payload = build_session_payload(

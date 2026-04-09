@@ -50,7 +50,9 @@ class _FakeLLM:
         tools: list[dict[str, object]],
         ollama_options: dict[str, float | int] | None = None,
     ):
-        yield from self.stream_tokens(model, messages, system_prompt, ollama_options=ollama_options)
+        yield from self.stream_tokens(
+            model, messages, system_prompt, ollama_options=ollama_options
+        )
 
     def plan_tool_call(
         self,
@@ -86,7 +88,9 @@ class _FakeLLM:
 
 
 class _FakeTitle:
-    def generate_title(self, *, model: str, user_text: str, assistant_text: str) -> str | None:
+    def generate_title(
+        self, *, model: str, user_text: str, assistant_text: str
+    ) -> str | None:
         return "title"
 
 

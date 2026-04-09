@@ -1,10 +1,14 @@
 """History router - exposes sidebar conversation session APIs."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from backend.api_errors import AUTH_SESSION_OWNER_REQUIRED, build_error_body
-from backend.application.exceptions import HistoryOwnerRequiredError, HistorySessionNotFoundError
+from backend.application.exceptions import (
+    HistoryOwnerRequiredError,
+    HistorySessionNotFoundError,
+)
 from backend.application.history import (
     delete_all_history_sessions,
     get_history_session_detail,
@@ -14,7 +18,10 @@ from backend.application.ports import SessionRepository, Settings
 from backend.config import get_settings
 from backend.dependencies import get_session_repository
 from backend.models.common import ErrorResponse
-from backend.models.history import HistorySessionDetailResponse, HistorySessionListResponse
+from backend.models.history import (
+    HistorySessionDetailResponse,
+    HistorySessionListResponse,
+)
 
 router = APIRouter()
 
@@ -38,7 +45,11 @@ def _raise_owner_required(exc: HistoryOwnerRequiredError) -> None:
     "/history",
     response_model=HistorySessionListResponse,
     summary="List persisted chat sessions",
-    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
+    responses={
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+    },
 )
 def list_history(
     request: Request,
@@ -61,7 +72,11 @@ def list_history(
     "/history",
     status_code=204,
     summary="Delete all persisted chat sessions",
-    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
+    responses={
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+    },
 )
 def delete_all_history(
     request: Request,

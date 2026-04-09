@@ -1,4 +1,5 @@
 """SSE chat stream orchestration — tool loops, safeguard buffering, emission."""
+
 from __future__ import annotations
 
 import logging
@@ -17,13 +18,25 @@ from backend.services.chat_orchestration import (
     PromptComposer,
     SessionPersistenceService,
 )
-from backend.services.chat_runtime import ConversationLogger, SessionRepository, TitleGenerator
+from backend.services.chat_runtime import (
+    ConversationLogger,
+    SessionRepository,
+    TitleGenerator,
+)
 from backend.services.artifact_service import create_chat_artifacts_from_text
 from backend.services.safeguard_service import SafeguardAssessment, SafeguardService
 from backend.domain.chart_types import ChartDataSource
 from backend.services.session_service import last_user_message
-from backend.services.sse import sse_done_event, sse_error_event, sse_event, sse_token_event
-from backend.services.tabular_context import EmbeddedCsvTabularExtractor, TabularContextExtractor
+from backend.services.sse import (
+    sse_done_event,
+    sse_error_event,
+    sse_event,
+    sse_token_event,
+)
+from backend.services.tabular_context import (
+    EmbeddedCsvTabularExtractor,
+    TabularContextExtractor,
+)
 from backend.types import Settings
 from goat_ai.echarts_tool import GENERATE_CHART_V2_SCHEMA
 from goat_ai.exceptions import OllamaUnavailable
@@ -37,7 +50,9 @@ _CHART_BLOCK_RE = re.compile(r":::chart[\s\S]*?:::", re.DOTALL)
 
 def _to_chat_turns(messages: list[ChatMessage]) -> list[ChatTurn]:
     """Convert Pydantic chat messages to goat_ai chat turns."""
-    return [ChatTurn(role=message.role, content=message.content) for message in messages]
+    return [
+        ChatTurn(role=message.role, content=message.content) for message in messages
+    ]
 
 
 def _strip_chart_block(text: str) -> str:
@@ -207,7 +222,9 @@ class ChatStreamService:
             user_name=user_name,
             system_instruction=system_instruction,
         )
-        holdback_tokens = _STREAM_OUTPUT_HOLDBACK_TOKENS if safeguard_service is not None else 0
+        holdback_tokens = (
+            _STREAM_OUTPUT_HOLDBACK_TOKENS if safeguard_service is not None else 0
+        )
         output_buffer = _StreamingOutputBuffer(
             safeguard_service,
             latest_user_text,
@@ -225,7 +242,9 @@ class ChatStreamService:
         chart_dataframe: pd.DataFrame | None = None
         chart_data_source: ChartDataSource = "none"
         if should_use_native_chart_tools:
-            chart_dataframe, chart_data_source = chart_orchestrator.resolve_dataframe(messages)
+            chart_dataframe, chart_data_source = chart_orchestrator.resolve_dataframe(
+                messages
+            )
 
         return SimpleNamespace(
             llm=llm,
@@ -290,7 +309,9 @@ class ChatStreamService:
             session_owner_id=run.session_owner_id,
         )
 
-    def _phase_llm_token_stream(self, run: SimpleNamespace) -> Generator[str, None, None]:
+    def _phase_llm_token_stream(
+        self, run: SimpleNamespace
+    ) -> Generator[str, None, None]:
         """Stream model tokens (native chart tool path or plain completion)."""
         if getattr(run, "input_blocked", False):
             return
@@ -300,7 +321,9 @@ class ChatStreamService:
         else:
             yield from self._stream_plain_completion(run)
 
-    def _stream_native_chart_tool_path(self, run: SimpleNamespace) -> Generator[str, None, None]:
+    def _stream_native_chart_tool_path(
+        self, run: SimpleNamespace
+    ) -> Generator[str, None, None]:
         followup_messages: list[dict[str, object]] | None = None
         for event in run.llm.stream_tokens_with_tools(
             run.model,
@@ -352,7 +375,9 @@ class ChatStreamService:
         elif not run.buffer:
             yield from self._stream_plain_completion(run)
 
-    def _stream_plain_completion(self, run: SimpleNamespace) -> Generator[str, None, None]:
+    def _stream_plain_completion(
+        self, run: SimpleNamespace
+    ) -> Generator[str, None, None]:
         for token in run.llm.stream_tokens(
             run.model,
             run.turns,
@@ -435,7 +460,8 @@ class ChatStreamService:
                 chart_spec=chart_spec,
                 knowledge_documents=run.knowledge_documents,
                 assistant_artifacts=[
-                    artifact.model_dump(mode="json") for artifact in run.emitted_artifacts
+                    artifact.model_dump(mode="json")
+                    for artifact in run.emitted_artifacts
                 ],
                 chart_data_source=(
                     run.chart_data_source if chart_spec is not None else "none"

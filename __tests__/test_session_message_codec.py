@@ -1,4 +1,5 @@
 """Session payload codec: explicit file_context vs legacy content sniff."""
+
 from __future__ import annotations
 
 import unittest
@@ -14,7 +15,9 @@ from goat_ai.tools import CHART_DATA_CSV_MARKER, LEGACY_CSV_FENCE_SUBSTRING
 
 class SessionMessageCodecTests(unittest.TestCase):
     def test_file_context_flag_does_not_require_csv_fence(self) -> None:
-        msg = ChatMessage(role="user", content="tabular context body", file_context=True)
+        msg = ChatMessage(
+            role="user", content="tabular context body", file_context=True
+        )
         self.assertTrue(is_file_context_message(msg))
 
     def test_legacy_upload_prompt_still_detected_without_flag(self) -> None:

@@ -1,4 +1,5 @@
 """Tests for scripts/rotate_fastapi_log.py."""
+
 from __future__ import annotations
 
 import tempfile

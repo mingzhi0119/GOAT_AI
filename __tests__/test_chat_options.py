@@ -3,7 +3,10 @@ from __future__ import annotations
 import unittest
 
 from backend.models.chat import ChatMessage, ChatRequest
-from backend.routers.chat_options import build_ollama_options, ollama_options_from_chat_request
+from backend.routers.chat_options import (
+    build_ollama_options,
+    ollama_options_from_chat_request,
+)
 
 
 class ChatOptionsTests(unittest.TestCase):

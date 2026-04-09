@@ -20,7 +20,7 @@ class DocsLanguageTests(unittest.TestCase):
 
         han_pattern = re.compile(r"[\u4e00-\u9fff]")
         mojibake_pattern = re.compile(r"[鈥鈫搂閴脳鉁鉂馃]")
-        replacement_char = "\uFFFD"
+        replacement_char = "\ufffd"
 
         violations: list[str] = []
         for path in targets:
@@ -28,10 +28,18 @@ class DocsLanguageTests(unittest.TestCase):
             if text.startswith("\ufeff"):
                 violations.append(f"{path.relative_to(root)}:1: BOM header present")
             for lineno, line in enumerate(text.splitlines(), start=1):
-                if han_pattern.search(line) or mojibake_pattern.search(line) or replacement_char in line:
+                if (
+                    han_pattern.search(line)
+                    or mojibake_pattern.search(line)
+                    or replacement_char in line
+                ):
                     violations.append(f"{path.relative_to(root)}:{lineno}: {line}")
 
-        self.assertEqual([], violations, "Docs and memory files must stay English-only and free of mojibake")
+        self.assertEqual(
+            [],
+            violations,
+            "Docs and memory files must stay English-only and free of mojibake",
+        )
 
 
 if __name__ == "__main__":

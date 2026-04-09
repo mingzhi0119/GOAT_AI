@@ -1,10 +1,16 @@
 """System use cases for telemetry, readiness, and feature gates."""
+
 from __future__ import annotations
 
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 from backend.application.ports import Settings
-from backend.models.system import GPUStatusResponse, InferenceLatencyResponse, RuntimeTargetResponse, SystemFeaturesResponse
+from backend.models.system import (
+    GPUStatusResponse,
+    InferenceLatencyResponse,
+    RuntimeTargetResponse,
+    SystemFeaturesResponse,
+)
 from backend.prometheus_metrics import render_prometheus_text
 from backend.readiness_service import evaluate_readiness
 from backend.services.gpu_service import read_gpu_status as _read_gpu_status

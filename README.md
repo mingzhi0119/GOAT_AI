@@ -98,7 +98,7 @@ Development:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-ci.txt
 cp .env.example .env
 python3 -m uvicorn server:app --host 0.0.0.0 --port 62606 --reload
 ```

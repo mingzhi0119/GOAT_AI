@@ -1,4 +1,5 @@
 """POST /api/chat - streaming chat completion via Server-Sent Events."""
+
 from __future__ import annotations
 
 import logging

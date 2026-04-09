@@ -7,6 +7,7 @@ so they never interrupt a live SSE stream.
 Schema changes are applied via ``backend/migrations`` (see ``db_migrations``).
 WAL journal mode is enabled by the migration runner.
 """
+
 from __future__ import annotations
 
 import json
@@ -91,11 +92,21 @@ def _replace_session_messages(
             INSERT INTO session_messages (session_id, seq, role, content, image_attachment_ids, artifacts_json, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (session_id, seq, msg["role"], msg["content"], ids_json, artifacts_json, now),
+            (
+                session_id,
+                seq,
+                msg["role"],
+                msg["content"],
+                ids_json,
+                artifacts_json,
+                now,
+            ),
         )
 
 
-def _fetch_session_messages_list(conn: sqlite3.Connection, session_id: str) -> list[dict[str, Any]] | None:
+def _fetch_session_messages_list(
+    conn: sqlite3.Connection, session_id: str
+) -> list[dict[str, Any]] | None:
     """Return ordered message dicts from ``session_messages``, or ``None`` if no rows."""
     if not _session_messages_table_exists(conn):
         return None
@@ -201,7 +212,9 @@ def log_conversation(
                 ),
             )
     except Exception:
-        inc_sqlite_log_write_failure(operation="conversation", code=_SQLITE_WRITE_METRIC_CODE)
+        inc_sqlite_log_write_failure(
+            operation="conversation", code=_SQLITE_WRITE_METRIC_CODE
+        )
         logger.error(
             "Failed to log conversation to SQLite",
             extra={
@@ -269,7 +282,15 @@ def upsert_session(
                             updated_at=excluded.updated_at,
                             messages=excluded.messages
                         """,
-                        (session_id, title, model, int(schema_version), created_at, updated_at, encoded_payload),
+                        (
+                            session_id,
+                            title,
+                            model,
+                            int(schema_version),
+                            created_at,
+                            updated_at,
+                            encoded_payload,
+                        ),
                     )
                 _replace_session_messages(conn, session_id=session_id, payload=payload)
                 conn.commit()
@@ -277,7 +298,9 @@ def upsert_session(
                 conn.rollback()
                 raise
     except Exception:
-        inc_sqlite_log_write_failure(operation="session_upsert", code=_SQLITE_WRITE_METRIC_CODE)
+        inc_sqlite_log_write_failure(
+            operation="session_upsert", code=_SQLITE_WRITE_METRIC_CODE
+        )
         logger.error(
             "Failed to upsert session in SQLite",
             extra={
@@ -292,7 +315,9 @@ def upsert_session(
         )
 
 
-def list_sessions(*, db_path: Path, owner_filter: str | None = None) -> list[dict[str, Any]]:
+def list_sessions(
+    *, db_path: Path, owner_filter: str | None = None
+) -> list[dict[str, Any]]:
     """Return lightweight session metadata for sidebar listing."""
     try:
         with sqlite3.connect(db_path) as conn:
@@ -371,12 +396,18 @@ def delete_session(*, db_path: Path, session_id: str) -> None:
     try:
         with sqlite3.connect(db_path) as conn:
             if _session_messages_table_exists(conn):
-                conn.execute("DELETE FROM session_messages WHERE session_id = ?", (session_id,))
+                conn.execute(
+                    "DELETE FROM session_messages WHERE session_id = ?", (session_id,)
+                )
             if _chat_artifacts_table_exists(conn):
-                conn.execute("DELETE FROM chat_artifacts WHERE session_id = ?", (session_id,))
+                conn.execute(
+                    "DELETE FROM chat_artifacts WHERE session_id = ?", (session_id,)
+                )
             conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
     except Exception:
-        inc_sqlite_log_write_failure(operation="session_delete", code=_SQLITE_WRITE_METRIC_CODE)
+        inc_sqlite_log_write_failure(
+            operation="session_delete", code=_SQLITE_WRITE_METRIC_CODE
+        )
         logger.error(
             "Failed to delete session from SQLite",
             extra={
@@ -405,9 +436,13 @@ def delete_all_sessions(*, db_path: Path, owner_filter: str | None = None) -> No
                 ]
                 if _session_messages_table_exists(conn):
                     for sid in ids:
-                        conn.execute("DELETE FROM session_messages WHERE session_id = ?", (sid,))
+                        conn.execute(
+                            "DELETE FROM session_messages WHERE session_id = ?", (sid,)
+                        )
                 if _chat_artifacts_table_exists(conn):
-                    conn.execute("DELETE FROM chat_artifacts WHERE owner_id = ?", (owner_filter,))
+                    conn.execute(
+                        "DELETE FROM chat_artifacts WHERE owner_id = ?", (owner_filter,)
+                    )
                 conn.execute("DELETE FROM sessions WHERE owner_id = ?", (owner_filter,))
             else:
                 if _session_messages_table_exists(conn):
@@ -416,7 +451,9 @@ def delete_all_sessions(*, db_path: Path, owner_filter: str | None = None) -> No
                     conn.execute("DELETE FROM chat_artifacts")
                 conn.execute("DELETE FROM sessions")
     except Exception:
-        inc_sqlite_log_write_failure(operation="session_delete_all", code=_SQLITE_WRITE_METRIC_CODE)
+        inc_sqlite_log_write_failure(
+            operation="session_delete_all", code=_SQLITE_WRITE_METRIC_CODE
+        )
         logger.error(
             "Failed to delete all sessions from SQLite",
             extra={
@@ -465,7 +502,9 @@ def create_chat_artifact(
                 ),
             )
     except Exception:
-        inc_sqlite_log_write_failure(operation="chat_artifact_create", code=_SQLITE_WRITE_METRIC_CODE)
+        inc_sqlite_log_write_failure(
+            operation="chat_artifact_create", code=_SQLITE_WRITE_METRIC_CODE
+        )
         logger.error(
             "Failed to persist chat artifact in SQLite",
             extra={
@@ -495,5 +534,7 @@ def get_chat_artifact(*, db_path: Path, artifact_id: str) -> dict[str, Any] | No
             ).fetchone()
         return dict(row) if row is not None else None
     except Exception:
-        logger.exception("Failed to fetch chat artifact %s from %s", artifact_id, db_path)
+        logger.exception(
+            "Failed to fetch chat artifact %s from %s", artifact_id, db_path
+        )
         return None

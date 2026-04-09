@@ -1,4 +1,5 @@
 """Knowledge use cases over the knowledge pipeline."""
+
 from __future__ import annotations
 
 from backend.application.ports import Settings
@@ -27,7 +28,9 @@ def create_upload(*, file, settings: Settings) -> KnowledgeUploadResponse:
     return create_knowledge_upload(file=file, settings=settings)
 
 
-def get_upload_status(*, document_id: str, settings: Settings) -> KnowledgeUploadStatusResponse:
+def get_upload_status(
+    *, document_id: str, settings: Settings
+) -> KnowledgeUploadStatusResponse:
     return get_knowledge_upload(document_id=document_id, settings=settings)
 
 
@@ -47,9 +50,13 @@ def get_ingestion_status(
     return get_knowledge_ingestion_status(ingestion_id=ingestion_id, settings=settings)
 
 
-def search(*, request: KnowledgeSearchRequest, settings: Settings) -> KnowledgeSearchResponse:
+def search(
+    *, request: KnowledgeSearchRequest, settings: Settings
+) -> KnowledgeSearchResponse:
     return search_knowledge(request=request, settings=settings)
 
 
-def answer(*, request: KnowledgeAnswerRequest, settings: Settings) -> KnowledgeAnswerResponse:
+def answer(
+    *, request: KnowledgeAnswerRequest, settings: Settings
+) -> KnowledgeAnswerResponse:
     return answer_with_knowledge(request=request, settings=settings)

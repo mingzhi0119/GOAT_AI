@@ -1,4 +1,5 @@
 """Application-layer Ollama model helpers."""
+
 from __future__ import annotations
 
 import unittest
@@ -7,7 +8,10 @@ from unittest.mock import MagicMock
 from goat_ai.exceptions import OllamaUnavailable
 
 from backend.services.exceptions import InferenceBackendUnavailable
-from backend.services.ollama_models_service import list_models_for_api, model_capabilities_for_api
+from backend.services.ollama_models_service import (
+    list_models_for_api,
+    model_capabilities_for_api,
+)
 
 
 class OllamaModelsServiceTests(unittest.TestCase):

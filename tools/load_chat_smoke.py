@@ -4,6 +4,7 @@ Run from the repository root::
 
     python -m tools.load_chat_smoke --base-url http://127.0.0.1:62606 --model <name> --runs 20
 """
+
 from __future__ import annotations
 
 import argparse
@@ -110,7 +111,9 @@ def _print_system_inference(*, base_url: str, api_key: str, timeout_sec: int) ->
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Load smoke test for POST /api/chat SSE.")
+    parser = argparse.ArgumentParser(
+        description="Load smoke test for POST /api/chat SSE."
+    )
     parser.add_argument("--base-url", default="http://127.0.0.1:62606")
     parser.add_argument("--model", default="gemma4:26b")
     parser.add_argument("--runs", type=int, default=20)

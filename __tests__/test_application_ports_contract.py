@@ -8,7 +8,10 @@ from backend.application import ports
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-_TARGET_DIRS = (REPO_ROOT / "backend" / "application", REPO_ROOT / "backend" / "routers")
+_TARGET_DIRS = (
+    REPO_ROOT / "backend" / "application",
+    REPO_ROOT / "backend" / "routers",
+)
 _FORBIDDEN_IMPORTS = {
     "backend.services.chat_capacity_service",
     "backend.services.exceptions",
@@ -42,7 +45,11 @@ def _scan_module_for_forbidden_imports(path: Path) -> list[str]:
             if path.name != "ports.py" and node.module in _FORBIDDEN_IMPORTS:
                 offenders.append(node.module)
             if path.name != "ports.py" and node.module == "backend.types":
-                bad_names = [alias.name for alias in node.names if alias.name in _FORBIDDEN_TYPES_IMPORTS]
+                bad_names = [
+                    alias.name
+                    for alias in node.names
+                    if alias.name in _FORBIDDEN_TYPES_IMPORTS
+                ]
                 offenders.extend(f"{node.module}:{name}" for name in bad_names)
         elif isinstance(node, ast.Import):
             for alias in node.names:
@@ -55,14 +62,18 @@ class ApplicationPortsContractTests(unittest.TestCase):
     def test_ports_exports_stable_surface(self) -> None:
         self.assertTrue(_EXPECTED_EXPORTS.issubset(set(ports.__all__)))
 
-    def test_application_and_router_modules_do_not_import_service_boundaries_directly(self) -> None:
+    def test_application_and_router_modules_do_not_import_service_boundaries_directly(
+        self,
+    ) -> None:
         offenders: list[str] = []
         for directory in _TARGET_DIRS:
             for path in sorted(directory.glob("*.py")):
                 if path.name == "__init__.py":
                     continue
                 bad = _scan_module_for_forbidden_imports(path)
-                offenders.extend(f"{path.relative_to(REPO_ROOT)} -> {item}" for item in bad)
+                offenders.extend(
+                    f"{path.relative_to(REPO_ROOT)} -> {item}" for item in bad
+                )
 
         self.assertFalse(
             offenders,

@@ -1,4 +1,5 @@
 """Tests for ``backend/services/db_migrations`` (Phase 13 §13.0)."""
+
 from __future__ import annotations
 
 import shutil
@@ -20,7 +21,9 @@ class DbMigrationsTests(unittest.TestCase):
             apply_migrations(db_path)
             conn = sqlite3.connect(db_path)
             try:
-                rows = conn.execute("SELECT id FROM schema_migrations ORDER BY id").fetchall()
+                rows = conn.execute(
+                    "SELECT id FROM schema_migrations ORDER BY id"
+                ).fetchall()
                 ids = [r[0] for r in rows]
                 self.assertEqual(
                     ids,
@@ -37,21 +40,51 @@ class DbMigrationsTests(unittest.TestCase):
                         "010_chat_artifacts",
                     ],
                 )
-                cols = [r[1] for r in conn.execute("PRAGMA table_info(conversations)").fetchall()]
+                cols = [
+                    r[1]
+                    for r in conn.execute("PRAGMA table_info(conversations)").fetchall()
+                ]
                 self.assertIn("user_name", cols)
                 self.assertIn("session_id", cols)
-                session_cols = [r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()]
+                session_cols = [
+                    r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()
+                ]
                 self.assertIn("schema_version", session_cols)
                 self.assertIn("owner_id", session_cols)
-                knowledge_cols = [r[1] for r in conn.execute("PRAGMA table_info(knowledge_documents)").fetchall()]
+                knowledge_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(knowledge_documents)"
+                    ).fetchall()
+                ]
                 self.assertIn("storage_path", knowledge_cols)
-                ingestion_cols = [r[1] for r in conn.execute("PRAGMA table_info(knowledge_ingestions)").fetchall()]
+                ingestion_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(knowledge_ingestions)"
+                    ).fetchall()
+                ]
                 self.assertIn("vector_backend", ingestion_cols)
-                chunk_cols = [r[1] for r in conn.execute("PRAGMA table_info(knowledge_chunks)").fetchall()]
+                chunk_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(knowledge_chunks)"
+                    ).fetchall()
+                ]
                 self.assertIn("vector_ref", chunk_cols)
-                session_message_cols = [r[1] for r in conn.execute("PRAGMA table_info(session_messages)").fetchall()]
+                session_message_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(session_messages)"
+                    ).fetchall()
+                ]
                 self.assertIn("artifacts_json", session_message_cols)
-                artifact_cols = [r[1] for r in conn.execute("PRAGMA table_info(chat_artifacts)").fetchall()]
+                artifact_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(chat_artifacts)"
+                    ).fetchall()
+                ]
                 self.assertIn("storage_path", artifact_cols)
             finally:
                 conn.close()
@@ -93,15 +126,30 @@ class DbMigrationsTests(unittest.TestCase):
             try:
                 n = conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]
                 self.assertEqual(n, 10)
-                cols = [r[1] for r in conn.execute("PRAGMA table_info(conversations)").fetchall()]
+                cols = [
+                    r[1]
+                    for r in conn.execute("PRAGMA table_info(conversations)").fetchall()
+                ]
                 self.assertIn("user_name", cols)
                 self.assertIn("session_id", cols)
-                session_cols = [r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()]
+                session_cols = [
+                    r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()
+                ]
                 self.assertIn("schema_version", session_cols)
                 self.assertIn("owner_id", session_cols)
-                knowledge_cols = [r[1] for r in conn.execute("PRAGMA table_info(knowledge_documents)").fetchall()]
+                knowledge_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(knowledge_documents)"
+                    ).fetchall()
+                ]
                 self.assertIn("storage_path", knowledge_cols)
-                artifact_cols = [r[1] for r in conn.execute("PRAGMA table_info(chat_artifacts)").fetchall()]
+                artifact_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(chat_artifacts)"
+                    ).fetchall()
+                ]
                 self.assertIn("storage_path", artifact_cols)
             finally:
                 conn.close()
@@ -115,7 +163,9 @@ class DbMigrationsTests(unittest.TestCase):
             with patch("backend.services.db_migrations._MIGRATIONS_DIR", mig):
                 apply_migrations(db_path)
             tampered = mig / "004_add_conversations_session_id.sql"
-            tampered.write_text(tampered.read_text(encoding="utf-8") + "\n-- tamper\n", encoding="utf-8")
+            tampered.write_text(
+                tampered.read_text(encoding="utf-8") + "\n-- tamper\n", encoding="utf-8"
+            )
             with patch("backend.services.db_migrations._MIGRATIONS_DIR", mig):
                 with self.assertRaises(RuntimeError) as ctx:
                     apply_migrations(db_path)

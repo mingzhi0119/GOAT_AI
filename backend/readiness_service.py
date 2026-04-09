@@ -1,4 +1,5 @@
 """Readiness checks: SQLite + optional Ollama probe."""
+
 from __future__ import annotations
 
 import logging
@@ -47,7 +48,11 @@ def evaluate_readiness(settings: Settings) -> tuple[dict[str, Any], int]:
         try:
             response = requests.get(url, timeout=2.0)
             response.raise_for_status()
-            checks["ollama"] = {"ok": True, "url": url, "http_status": response.status_code}
+            checks["ollama"] = {
+                "ok": True,
+                "url": url,
+                "http_status": response.status_code,
+            }
         except Exception as exc:
             ready = False
             logger.error(

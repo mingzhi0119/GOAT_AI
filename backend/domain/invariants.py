@@ -1,4 +1,5 @@
 """Pure checks for persisted session / chart shapes (fail fast in builders)."""
+
 from __future__ import annotations
 
 

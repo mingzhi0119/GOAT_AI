@@ -1,4 +1,5 @@
 """Chart intent models for native tool calling — shared layer (no FastAPI / backend imports)."""
+
 from __future__ import annotations
 
 from typing import Literal

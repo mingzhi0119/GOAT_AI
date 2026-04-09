@@ -1,4 +1,5 @@
 """GET /api/models - return names of available Ollama models."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
@@ -16,7 +17,11 @@ router = APIRouter()
     "/models",
     response_model=ModelsResponse,
     summary="List available Ollama models",
-    responses={401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
+    responses={
+        401: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+    },
 )
 def list_models_route(llm: LLMClient = Depends(get_llm_client)) -> ModelsResponse:
     """Return the list of locally available Ollama model names."""
@@ -27,7 +32,11 @@ def list_models_route(llm: LLMClient = Depends(get_llm_client)) -> ModelsRespons
     "/models/capabilities",
     response_model=ModelCapabilitiesResponse,
     summary="Read capabilities for one Ollama model",
-    responses={401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
+    responses={
+        401: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+    },
 )
 def get_model_capabilities_route(
     model: str,

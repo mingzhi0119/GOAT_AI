@@ -10,7 +10,9 @@ from typing import Generator
 
 import pandas as pd
 
-from backend.domain.chart_provenance_policy import resolve_dataframe_for_native_chart_tool
+from backend.domain.chart_provenance_policy import (
+    resolve_dataframe_for_native_chart_tool,
+)
 from backend.domain.chart_types import ChartDataSource
 from backend.models.chat import ChatMessage
 from backend.services.chart_compiler_v2 import compile_chart_spec_v2

@@ -1,4 +1,5 @@
 """Per-request correlation id (async context); shared by logging and API errors."""
+
 from __future__ import annotations
 
 from contextvars import ContextVar, Token

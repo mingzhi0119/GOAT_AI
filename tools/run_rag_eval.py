@@ -4,6 +4,7 @@ Run from the repository root::
 
     python -m tools.run_rag_eval
 """
+
 from __future__ import annotations
 
 import argparse
@@ -34,7 +35,9 @@ def _run_case(case: dict[str, object]) -> None:
     op = str(case["op"])
     if op == "rewrite":
         got = conservative_rewrite_query(str(case["input"]))
-        assert got == str(case["expected"]), f"{case['id']}: expected {case['expected']!r}, got {got!r}"
+        assert got == str(case["expected"]), (
+            f"{case['id']}: expected {case['expected']!r}, got {got!r}"
+        )
         return
     if op == "lexical_rerank":
         hits = [
@@ -48,7 +51,9 @@ def _run_case(case: dict[str, object]) -> None:
             for h in case["hits"]  # type: ignore[assignment]
         ]
         ranked = lexical_rerank_hits(query=str(case["query"]), hits=hits)
-        assert ranked[0].chunk_id == str(case["expect_top_chunk_id"]), f"{case['id']}: wrong top hit"
+        assert ranked[0].chunk_id == str(case["expect_top_chunk_id"]), (
+            f"{case['id']}: wrong top hit"
+        )
         return
     if op == "passthrough":
         hits = [
@@ -62,13 +67,17 @@ def _run_case(case: dict[str, object]) -> None:
             for h in case["hits"]  # type: ignore[assignment]
         ]
         out = PassthroughReranker().rerank(query=str(case["query"]), hits=hits)
-        assert out[0].chunk_id == str(case["expect_top_chunk_id"]), f"{case['id']}: wrong top hit"
+        assert out[0].chunk_id == str(case["expect_top_chunk_id"]), (
+            f"{case['id']}: wrong top hit"
+        )
         return
     raise AssertionError(f"unknown op: {op}")
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="RAG golden-set regression (Phase 14.7).")
+    parser = argparse.ArgumentParser(
+        description="RAG golden-set regression (Phase 14.7)."
+    )
     parser.add_argument(
         "--min-cases",
         type=int,

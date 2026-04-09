@@ -1,4 +1,5 @@
 """GPU telemetry service backed by nvidia-smi."""
+
 from __future__ import annotations
 
 import logging
@@ -25,7 +26,9 @@ def _parse_gpu_row(line: str) -> GPUStatusResponse:
     """Parse one nvidia-smi CSV row into API response shape."""
     parts = [p.strip() for p in line.split(",")]
     if len(parts) < 7:
-        return GPUStatusResponse(available=False, active=False, message="GPU telemetry parse error")
+        return GPUStatusResponse(
+            available=False, active=False, message="GPU telemetry parse error"
+        )
     utilization = _parse_float(parts[2]) or 0.0
     return GPUStatusResponse(
         available=True,
@@ -78,14 +81,18 @@ def read_gpu_status(settings: Settings) -> GPUStatusResponse:
         )
 
     if result.returncode != 0:
-        logger.warning("nvidia-smi failed (%s): %s", result.returncode, result.stderr.strip())
+        logger.warning(
+            "nvidia-smi failed (%s): %s", result.returncode, result.stderr.strip()
+        )
         return GPUStatusResponse(
             available=False,
             active=False,
             message="Telemetry unavailable",
         )
 
-    first_line = next((ln.strip() for ln in result.stdout.splitlines() if ln.strip()), "")
+    first_line = next(
+        (ln.strip() for ln in result.stdout.splitlines() if ln.strip()), ""
+    )
     if not first_line:
         return GPUStatusResponse(
             available=False,

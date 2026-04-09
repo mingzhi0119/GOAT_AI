@@ -1,4 +1,5 @@
 """Black-box tests for Phase 15.5 AuthZ: scoped API keys and session ownership."""
+
 from __future__ import annotations
 
 import tempfile
@@ -21,7 +22,10 @@ if TestClient is not None:
     from backend.main import create_app
     from backend.models.chat import ChatMessage
     from backend.services import log_service
-    from backend.services.session_message_codec import SESSION_PAYLOAD_VERSION, build_session_payload
+    from backend.services.session_message_codec import (
+        SESSION_PAYLOAD_VERSION,
+        build_session_payload,
+    )
     from test_api_blackbox_contract import ContractFakeLLM, FakeTitleGenerator
 
 
@@ -64,7 +68,10 @@ class ApiAuthzTests(unittest.TestCase):
         response = self.client.post(
             "/api/chat",
             headers=headers,
-            json={"model": "blackbox-model", "messages": [{"role": "user", "content": "hello"}]},
+            json={
+                "model": "blackbox-model",
+                "messages": [{"role": "user", "content": "hello"}],
+            },
         )
         self.assertEqual(403, response.status_code)
         body = response.json()
@@ -83,7 +90,10 @@ class ApiAuthzTests(unittest.TestCase):
         response = self.client.post(
             "/api/chat",
             headers=headers,
-            json={"model": "blackbox-model", "messages": [{"role": "user", "content": "hello"}]},
+            json={
+                "model": "blackbox-model",
+                "messages": [{"role": "user", "content": "hello"}],
+            },
         )
         self.assertEqual(403, response.status_code)
         self.assertEqual(AUTH_SESSION_OWNER_REQUIRED, response.json()["code"])

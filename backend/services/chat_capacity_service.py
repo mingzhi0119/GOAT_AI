@@ -1,4 +1,5 @@
 """Capacity guardrails for chat request size (Phase 13.3)."""
+
 from __future__ import annotations
 
 import json
@@ -13,7 +14,9 @@ class ChatCapacityError(ValueError):
 
 def _chat_payload_bytes(req: ChatRequest) -> int:
     payload = req.model_dump(mode="json")
-    encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode(
+        "utf-8"
+    )
     return len(encoded)
 
 

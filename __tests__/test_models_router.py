@@ -92,7 +92,9 @@ class FakeModelsLLMClient:
         return ""
 
 
-@unittest.skipUnless(FastAPI is not None and TestClient is not None, "fastapi not installed")
+@unittest.skipUnless(
+    FastAPI is not None and TestClient is not None, "fastapi not installed"
+)
 class ModelsRouterIntegrationTests(unittest.TestCase):
     def setUp(self) -> None:
         app = FastAPI()
@@ -101,7 +103,9 @@ class ModelsRouterIntegrationTests(unittest.TestCase):
         self.client = TestClient(app)
 
     def test_model_capabilities_endpoint_reports_tool_support(self) -> None:
-        response = self.client.get("/api/models/capabilities", params={"model": "qwen3"})
+        response = self.client.get(
+            "/api/models/capabilities", params={"model": "qwen3"}
+        )
 
         self.assertEqual(200, response.status_code)
         payload = response.json()

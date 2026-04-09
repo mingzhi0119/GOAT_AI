@@ -1,4 +1,5 @@
 """Pydantic schemas for chat history endpoints."""
+
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
@@ -59,5 +60,9 @@ class HistorySessionDetailResponse(HistorySessionSummary):
     messages: list[HistorySessionMessage]
     chart_spec: dict[str, object] | None = None
     file_context: HistorySessionFileContext | None = None
-    knowledge_documents: list[HistorySessionKnowledgeDocument] = Field(default_factory=list)
-    chart_data_source: str | None = Field(default=None, pattern="^(uploaded|demo|none)$")
+    knowledge_documents: list[HistorySessionKnowledgeDocument] = Field(
+        default_factory=list
+    )
+    chart_data_source: str | None = Field(
+        default=None, pattern="^(uploaded|demo|none)$"
+    )

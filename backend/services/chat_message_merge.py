@@ -1,4 +1,5 @@
 """Merge wire-level chat fields into message rows for persistence and streaming."""
+
 from __future__ import annotations
 
 from backend.models.chat import ChatMessage, ChatRequest

@@ -1,4 +1,5 @@
 """Ollama model listing and capability queries for HTTP APIs."""
+
 from __future__ import annotations
 
 import logging

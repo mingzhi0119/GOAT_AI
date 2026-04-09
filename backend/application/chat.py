@@ -1,4 +1,5 @@
 """Chat request preflight and request-shape normalization."""
+
 from __future__ import annotations
 
 import json
@@ -27,7 +28,10 @@ from backend.application.exceptions import (
 )
 from backend.models.chat import ChatMessage, ChatRequest
 from backend.services.chat_message_merge import merge_request_image_attachments
-from backend.services.idempotency_service import SQLiteIdempotencyStore, build_request_hash
+from backend.services.idempotency_service import (
+    SQLiteIdempotencyStore,
+    build_request_hash,
+)
 from backend.services.media_service import load_images_base64_for_chat
 from backend.services.chat_service import stream_chat_sse
 
@@ -106,7 +110,9 @@ def _idempotency_request_bytes(req: ChatRequest, user_name: str) -> bytes:
         "body": req.model_dump(mode="json"),
         "user_name": user_name,
     }
-    text = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    text = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
     return text.encode("utf-8")
 
 

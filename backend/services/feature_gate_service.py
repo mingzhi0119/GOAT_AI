@@ -1,9 +1,13 @@
 """Service boundary for capability-based feature gates (§15)."""
+
 from __future__ import annotations
 
 from backend.services.exceptions import FeatureNotAvailable
 from goat_ai.config import Settings
-from goat_ai.feature_gates import CodeSandboxFeatureSnapshot, compute_code_sandbox_snapshot
+from goat_ai.feature_gates import (
+    CodeSandboxFeatureSnapshot,
+    compute_code_sandbox_snapshot,
+)
 from goat_ai.telemetry_counters import inc_feature_gate_denial
 
 

@@ -3,6 +3,7 @@
 Used by ``GET /api/system/inference`` for the UI status strip. Single-process
 assumption: one Uvicorn worker; no cross-worker aggregation.
 """
+
 from __future__ import annotations
 
 import threading
@@ -19,7 +20,12 @@ _max_samples = 20
 
 def init_latency_metrics(max_samples: int) -> None:
     """Configure deque capacity; safe to call once at app startup."""
-    global _chat_ms, _first_token_ms, _chat_ms_by_model, _first_token_ms_by_model, _max_samples
+    global \
+        _chat_ms, \
+        _first_token_ms, \
+        _chat_ms_by_model, \
+        _first_token_ms_by_model, \
+        _max_samples
     n = max(1, int(max_samples))
     with _lock:
         _max_samples = n
@@ -108,7 +114,9 @@ def get_inference_snapshot() -> dict[str, float | int]:
         first_token_p95_ms = _p95(first_values)
 
         model_buckets: dict[str, dict[str, float | int]] = {}
-        all_models = set((_chat_ms_by_model or {}).keys()) | set((_first_token_ms_by_model or {}).keys())
+        all_models = set((_chat_ms_by_model or {}).keys()) | set(
+            (_first_token_ms_by_model or {}).keys()
+        )
         for model in sorted(all_models):
             chat_model = list((_chat_ms_by_model or {}).get(model, []))
             first_model = list((_first_token_ms_by_model or {}).get(model, []))

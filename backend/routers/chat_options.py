@@ -1,4 +1,5 @@
 """Helpers to map ChatRequest sampling fields to Ollama ``options``."""
+
 from __future__ import annotations
 
 from backend.models.chat import ChatRequest

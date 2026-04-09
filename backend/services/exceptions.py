@@ -1,4 +1,5 @@
 """Domain exceptions raised by application services (mapped to HTTP in ``main``)."""
+
 from __future__ import annotations
 
 from typing import Literal
@@ -12,7 +13,9 @@ class KnowledgeFeatureNotImplemented(Exception):
     """Raised for contract-first knowledge endpoints that are defined before implementation lands."""
 
     def __init__(self) -> None:
-        super().__init__("Knowledge API contract is defined, but the RAG implementation has not landed yet.")
+        super().__init__(
+            "Knowledge API contract is defined, but the RAG implementation has not landed yet."
+        )
 
 
 class KnowledgeDocumentNotFound(Exception):
@@ -38,7 +41,9 @@ class ArtifactNotFound(Exception):
 class VisionNotSupported(Exception):
     """Raised when the selected model lacks Ollama-reported vision capability."""
 
-    def __init__(self, message: str = "Selected model does not support vision.") -> None:
+    def __init__(
+        self, message: str = "Selected model does not support vision."
+    ) -> None:
         super().__init__(message)
 
 

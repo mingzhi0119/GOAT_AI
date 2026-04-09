@@ -13,18 +13,20 @@ def _read_text(path: Path) -> str:
 
 def _python_files(root: Path) -> list[Path]:
     return sorted(
-        path
-        for path in root.rglob("*.py")
-        if "__pycache__" not in path.parts
+        path for path in root.rglob("*.py") if "__pycache__" not in path.parts
     )
 
 
 def _ts_files(root: Path) -> list[Path]:
-    return sorted(path for path in root.rglob("*.ts") if "node_modules" not in path.parts)
+    return sorted(
+        path for path in root.rglob("*.ts") if "node_modules" not in path.parts
+    )
 
 
 def _tsx_files(root: Path) -> list[Path]:
-    return sorted(path for path in root.rglob("*.tsx") if "node_modules" not in path.parts)
+    return sorted(
+        path for path in root.rglob("*.tsx") if "node_modules" not in path.parts
+    )
 
 
 class ArchitectureBoundaryTests(unittest.TestCase):
@@ -36,7 +38,9 @@ class ArchitectureBoundaryTests(unittest.TestCase):
             if "from fastapi import" in text or "import fastapi" in text:
                 offenders.append(str(path.relative_to(REPO_ROOT)))
 
-        self.assertFalse(offenders, f"backend/services must not import fastapi directly: {offenders}")
+        self.assertFalse(
+            offenders, f"backend/services must not import fastapi directly: {offenders}"
+        )
 
     def test_goat_ai_shared_layer_does_not_import_fastapi(self) -> None:
         shared_dir = REPO_ROOT / "goat_ai"
@@ -46,12 +50,19 @@ class ArchitectureBoundaryTests(unittest.TestCase):
             if "from fastapi import" in text or "import fastapi" in text:
                 offenders.append(str(path.relative_to(REPO_ROOT)))
 
-        self.assertFalse(offenders, f"goat_ai shared layer must not import fastapi: {offenders}")
+        self.assertFalse(
+            offenders, f"goat_ai shared layer must not import fastapi: {offenders}"
+        )
 
     def test_backend_routers_avoid_direct_infra_libraries(self) -> None:
         routers_dir = REPO_ROOT / "backend" / "routers"
         offenders: list[str] = []
-        banned_markers = ("import sqlite3", "from sqlite3", "import requests", "from requests")
+        banned_markers = (
+            "import sqlite3",
+            "from sqlite3",
+            "import requests",
+            "from requests",
+        )
         for path in _python_files(routers_dir):
             text = _read_text(path)
             if any(marker in text for marker in banned_markers):
@@ -103,7 +114,9 @@ class ArchitectureBoundaryTests(unittest.TestCase):
             if any(marker in text for marker in component_markers):
                 offenders.append(str(path.relative_to(REPO_ROOT)))
 
-        self.assertFalse(offenders, f"frontend hooks must not import from components: {offenders}")
+        self.assertFalse(
+            offenders, f"frontend hooks must not import from components: {offenders}"
+        )
 
 
 if __name__ == "__main__":

@@ -10,7 +10,11 @@ from backend.application.knowledge import (
     search,
     start_ingestion,
 )
-from backend.application.ports import KnowledgeDocumentNotFound, KnowledgeValidationError, Settings
+from backend.application.ports import (
+    KnowledgeDocumentNotFound,
+    KnowledgeValidationError,
+    Settings,
+)
 from backend.config import get_settings
 from backend.models.common import ErrorResponse
 from backend.models.knowledge import (
@@ -42,7 +46,11 @@ def _raise_bad_request(exc: KnowledgeValidationError) -> None:
     "/knowledge/uploads",
     response_model=KnowledgeUploadResponse,
     summary="Register a knowledge file upload",
-    responses={400: {"model": ErrorResponse}, 401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
+    responses={
+        400: {"model": ErrorResponse},
+        401: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+    },
 )
 def post_knowledge_upload(
     file: UploadFile,
@@ -59,7 +67,11 @@ def post_knowledge_upload(
     "/knowledge/uploads/{document_id}",
     response_model=KnowledgeUploadStatusResponse,
     summary="Read one persisted knowledge upload",
-    responses={401: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
+    responses={
+        401: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+    },
 )
 def get_knowledge_upload_status(
     document_id: str,
@@ -76,7 +88,12 @@ def get_knowledge_upload_status(
     "/knowledge/ingestions",
     response_model=KnowledgeIngestionResponse,
     summary="Start a knowledge ingestion job",
-    responses={400: {"model": ErrorResponse}, 401: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
+    responses={
+        400: {"model": ErrorResponse},
+        401: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+    },
 )
 def post_knowledge_ingestion(
     request: KnowledgeIngestionRequest,
@@ -95,7 +112,11 @@ def post_knowledge_ingestion(
     "/knowledge/ingestions/{ingestion_id}",
     response_model=KnowledgeIngestionStatusResponse,
     summary="Read one knowledge ingestion job",
-    responses={401: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
+    responses={
+        401: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+    },
 )
 def get_knowledge_ingestion(
     ingestion_id: str,

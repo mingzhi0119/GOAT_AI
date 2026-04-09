@@ -68,7 +68,9 @@ def recommend_template_prompt(
 
     if llm is not None:
         try:
-            completion = llm.generate_completion(DEFAULT_PROMPT_RECOMMENDER_MODEL, prompt)
+            completion = llm.generate_completion(
+                DEFAULT_PROMPT_RECOMMENDER_MODEL, prompt
+            )
             cleaned = _clean_prompt_text(completion)
             if cleaned:
                 return cleaned
@@ -102,9 +104,7 @@ def _build_retrieval_evidence(
             settings=settings,
         )
         snippets = [
-            f"- {hit.snippet.strip()}"
-            for hit in response.hits
-            if hit.snippet.strip()
+            f"- {hit.snippet.strip()}" for hit in response.hits if hit.snippet.strip()
         ]
         if snippets:
             return "\n".join(snippets)[:_MAX_EVIDENCE_CHARS]
@@ -112,7 +112,9 @@ def _build_retrieval_evidence(
         pass
 
     try:
-        text = normalize_document(settings=settings, document_id=document_id, filename=filename)
+        text = normalize_document(
+            settings=settings, document_id=document_id, filename=filename
+        )
     except Exception:
         return ""
     return text[:_MAX_EVIDENCE_CHARS]
@@ -134,8 +136,10 @@ def _build_recommendation_prompt(*, filename: str, evidence: str) -> str:
 
 
 def _clean_prompt_text(text: str) -> str:
-    cleaned = " ".join(segment.strip() for segment in text.splitlines() if segment.strip())
+    cleaned = " ".join(
+        segment.strip() for segment in text.splitlines() if segment.strip()
+    )
     cleaned = cleaned.strip().strip('"').strip("'").strip()
     if len(cleaned) > _MAX_TEMPLATE_PROMPT_CHARS:
-        cleaned = cleaned[: _MAX_TEMPLATE_PROMPT_CHARS].rstrip()
+        cleaned = cleaned[:_MAX_TEMPLATE_PROMPT_CHARS].rstrip()
     return cleaned

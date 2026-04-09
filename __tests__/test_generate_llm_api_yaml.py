@@ -9,7 +9,9 @@ from tools import generate_llm_api_yaml
 
 class GenerateLlmApiYamlTests(unittest.TestCase):
     def test_build_compact_spec_includes_expected_endpoints(self) -> None:
-        openapi = generate_llm_api_yaml._load_openapi(generate_llm_api_yaml.OPENAPI_PATH)
+        openapi = generate_llm_api_yaml._load_openapi(
+            generate_llm_api_yaml.OPENAPI_PATH
+        )
 
         compact = generate_llm_api_yaml._build_compact_spec(openapi)
 
@@ -17,9 +19,12 @@ class GenerateLlmApiYamlTests(unittest.TestCase):
         self.assertEqual("3.2.0", compact["source"]["openapi_version"])
         ops = {item["op"]: item for item in compact["endpoints"]}
         self.assertIn("chat_stream", ops)
-        self.assertIn("analyze_upload_json", ops)
-        self.assertEqual("/upload/analyze", ops["analyze_upload_json"]["path"])
-        self.assertEqual("UploadAnalysisResponse", ops["analyze_upload_json"]["response"]["200"])
+        self.assertIn("analyze_upload_json_route", ops)
+        self.assertEqual("/upload/analyze", ops["analyze_upload_json_route"]["path"])
+        self.assertEqual(
+            "UploadAnalysisResponse",
+            ops["analyze_upload_json_route"]["response"]["200"],
+        )
 
     def test_write_yaml_outputs_expected_header(self) -> None:
         document = {

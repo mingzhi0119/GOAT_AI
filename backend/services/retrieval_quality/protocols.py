@@ -8,7 +8,9 @@ from backend.services.knowledge_pipeline import KnowledgeSearchHit
 class KnowledgeReranker(Protocol):
     """Swappable rerank seam; implementations stay free of HTTP concerns."""
 
-    def rerank(self, *, query: str, hits: list[KnowledgeSearchHit]) -> list[KnowledgeSearchHit]: ...
+    def rerank(
+        self, *, query: str, hits: list[KnowledgeSearchHit]
+    ) -> list[KnowledgeSearchHit]: ...
 
 
 class KnowledgeQueryRewriter(Protocol):
