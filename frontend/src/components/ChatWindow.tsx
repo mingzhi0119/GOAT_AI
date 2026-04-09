@@ -24,6 +24,7 @@ const BASE_PROMPTS = [
 const KNOWLEDGE_FILE_EXTENSIONS = new Set(['csv', 'xlsx', 'pdf', 'docx', 'md', 'txt'])
 const IMAGE_FILE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp'])
 const TEXTAREA_MAX_HEIGHT_PX = 144
+const TEXTAREA_MIN_HEIGHT_PX = 44
 
 type PromptItem =
   | { text: string; kind: 'base' }
@@ -128,8 +129,11 @@ const ChatWindow: FC<Props> = ({
     const textarea = textareaRef.current
     if (!textarea) return
     textarea.style.height = 'auto'
-    const nextHeight = Math.min(textarea.scrollHeight, TEXTAREA_MAX_HEIGHT_PX)
-    textarea.style.height = `${Math.max(48, nextHeight)}px`
+    const hasContent = input.trim().length > 0
+    const nextHeight = hasContent
+      ? Math.min(textarea.scrollHeight, TEXTAREA_MAX_HEIGHT_PX)
+      : TEXTAREA_MIN_HEIGHT_PX
+    textarea.style.height = `${Math.max(TEXTAREA_MIN_HEIGHT_PX, nextHeight)}px`
     textarea.style.overflowY = textarea.scrollHeight > TEXTAREA_MAX_HEIGHT_PX ? 'auto' : 'hidden'
   }, [input])
 
@@ -153,7 +157,7 @@ const ChatWindow: FC<Props> = ({
         throw new Error(event.message)
       }
     }
-    setAttachmentStatus(`${file.name} is ready for RAG`)
+    setAttachmentStatus(`${file.name} ready`)
   }
 
   const handleAttachmentPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -326,7 +330,6 @@ const ChatWindow: FC<Props> = ({
                     color: 'var(--text-main)',
                   }}
                 >
-                  <span className="font-medium">RAG</span>
                   <span className="max-w-[220px] truncate">{fileContext.filename}</span>
                   <div className="inline-flex items-center rounded-full border overflow-hidden">
                     <button
@@ -418,14 +421,14 @@ const ChatWindow: FC<Props> = ({
           )}
 
           <div
-            className="rounded-[26px] border px-3 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.18)]"
+            className="rounded-[26px] border px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.18)]"
             style={{
               borderColor: 'rgba(255,255,255,0.09)',
               background:
                 'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%)',
             }}
           >
-            <div className="flex items-end gap-3">
+            <div className="flex flex-col gap-3">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -435,23 +438,7 @@ const ChatWindow: FC<Props> = ({
                 onChange={handleAttachmentPick}
               />
 
-              <button
-                type="button"
-                disabled={isStreaming || attachmentUploading}
-                onClick={() => fileInputRef.current?.click()}
-                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl transition-all disabled:opacity-40"
-                style={{
-                  border: '1px solid rgba(255,255,255,0.14)',
-                  color: 'var(--text-main)',
-                  background:
-                    'linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.04) 100%)',
-                }}
-                title={supportsVision ? 'Attach images or knowledge files' : 'Attach a knowledge file'}
-              >
-                <PlusIcon />
-              </button>
-
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0">
                 <textarea
                   ref={textareaRef}
                   value={input}
@@ -460,37 +447,63 @@ const ChatWindow: FC<Props> = ({
                   placeholder="Message GOAT AI"
                   rows={1}
                   disabled={isStreaming}
-                  className="w-full resize-none bg-transparent px-1 py-1 text-sm focus:outline-none"
+                  className="w-full resize-none bg-transparent px-0 py-0 text-sm focus:outline-none"
                   style={{
                     color: 'var(--text-main)',
-                    lineHeight: '24px',
-                    minHeight: '48px',
+                    lineHeight: '22px',
+                    minHeight: `${TEXTAREA_MIN_HEIGHT_PX}px`,
                     maxHeight: `${TEXTAREA_MAX_HEIGHT_PX}px`,
                   }}
                 />
-                <div className="flex items-center justify-between gap-3 px-1 pt-1 text-[11px]">
-                  <span style={{ color: 'var(--text-muted)' }}>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <button
+                    type="button"
+                    disabled={isStreaming || attachmentUploading}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl transition-all disabled:opacity-40 hover:opacity-80"
+                    style={{
+                      border: '1px solid rgba(255,255,255,0.14)',
+                      color: 'var(--text-main)',
+                      background:
+                        'linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.04) 100%)',
+                    }}
+                    title={
+                      supportsVision ? 'Attach images or knowledge files' : 'Attach a knowledge file'
+                    }
+                  >
+                    <PlusIcon />
+                  </button>
+
+                  <span
+                    className="truncate text-[11px]"
+                    style={{ color: 'color-mix(in srgb, var(--text-muted) 82%, transparent)' }}
+                  >
                     {supportsVision
                       ? 'Attach PNG, JPG, WEBP, CSV, XLSX, PDF, DOCX, MD, or TXT'
                       : 'Attach CSV, XLSX, PDF, DOCX, MD, or TXT'}
                   </span>
-                  <span style={{ color: 'var(--text-muted)' }}>
-                    Enter to send, Shift+Enter for a new line
-                  </span>
                 </div>
-              </div>
 
-              <div className="flex flex-shrink-0 items-center gap-2 pb-1">
-                <GpuStatusDot
-                  gpuStatus={gpuStatus}
-                  gpuError={gpuError}
-                  inferenceLatency={inferenceLatency}
-                />
+                <div className="flex flex-shrink-0 items-center gap-3">
+                  <GpuStatusDot
+                    gpuStatus={gpuStatus}
+                    gpuError={gpuError}
+                    inferenceLatency={inferenceLatency}
+                  />
+                  <span
+                    className="whitespace-nowrap text-[11px]"
+                    style={{ color: 'color-mix(in srgb, var(--text-muted) 82%, transparent)' }}
+                  >
+                    Enter to Send
+                  </span>
                 <button
                   type="button"
                   onClick={isStreaming ? onStop : handleSubmit}
                   disabled={!isStreaming && !canSend}
-                  className="rounded-2xl px-5 py-3 text-sm font-semibold transition-all disabled:opacity-40"
+                  className="self-center rounded-2xl px-5 py-2.5 text-sm font-semibold transition-all disabled:opacity-40"
                   style={{
                     background: isStreaming
                       ? '#dc2626'
@@ -502,6 +515,7 @@ const ChatWindow: FC<Props> = ({
                 >
                   {isStreaming ? 'Stop' : 'Send'}
                 </button>
+                </div>
               </div>
             </div>
           </div>

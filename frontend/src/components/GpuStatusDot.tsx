@@ -60,7 +60,7 @@ const GpuStatusDot: FC<Props> = ({ gpuStatus, gpuError, inferenceLatency }) => {
         : 'GPU telemetry unavailable'
 
   return (
-    <div className="relative flex-shrink-0 self-center -translate-x-1">
+    <div className="relative flex-shrink-0 self-center">
       <button
         type="button"
         className="rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--bg-chat)] focus:ring-yellow-500"
