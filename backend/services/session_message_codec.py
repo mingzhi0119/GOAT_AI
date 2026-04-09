@@ -3,26 +3,23 @@
 from __future__ import annotations
 
 import json
-import logging
 from dataclasses import dataclass
 from typing import Any
-
-_log = logging.getLogger(__name__)
-
-
-class SessionSchemaError(ValueError):
-    """Raised when a session payload carries an unrecognized schema version.
-
-    Callers that need strict version gating can catch this; the default
-    ``decode_session_payload`` path logs a warning and continues decoding
-    because older-versioned sessions are still structurally compatible.
-    """
 
 from backend.domain.chart_types import ChartDataSource
 from backend.domain.invariants import chart_spec_requires_version_field
 from backend.models.artifact import ChatArtifact
 from backend.models.chat import ChatMessage
 from goat_ai.tools import FILE_CONTEXT_UPLOAD_PREFIX, LEGACY_CSV_FENCE_SUBSTRING
+
+
+class SessionSchemaError(ValueError):
+    """Raised when a session payload carries an unrecognized schema version.
+
+    Readers must reject future schema versions explicitly so deployments fail
+    loudly instead of silently mis-decoding data written by a newer binary.
+    """
+
 
 STORED_CHART_ROLE = "__chart__"
 STORED_FILE_CONTEXT_ROLE = "__file_context__"
@@ -187,12 +184,9 @@ def decode_session_payload(raw_payload: Any) -> DecodedSessionPayload:
     if isinstance(raw_payload, dict):
         raw_version = raw_payload.get("version")
         if isinstance(raw_version, int) and raw_version > SESSION_PAYLOAD_VERSION:
-            _log.warning(
-                "session_payload_version_unknown",
-                extra={
-                    "stored_version": raw_version,
-                    "supported_version": SESSION_PAYLOAD_VERSION,
-                },
+            raise SessionSchemaError(
+                "Unsupported future session payload version "
+                f"{raw_version}; supported <= {SESSION_PAYLOAD_VERSION}"
             )
         raw_messages = raw_payload.get("messages", [])
         messages: list[dict[str, str]] = []

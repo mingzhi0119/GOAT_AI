@@ -7,7 +7,6 @@ FastAPI TestClient stack. No live Ollama required.
 
 from __future__ import annotations
 
-import os
 import pytest
 from pathlib import Path
 
@@ -53,6 +52,7 @@ def test_list_history_returns_seeded_sessions(app_client: object) -> None:
     db = settings.log_db_path
 
     from backend.services import log_service
+
     log_service.init_db(db)
     _seed_session(db, "sess-list-1", "Session One")
     _seed_session(db, "sess-list-2", "Session Two")
@@ -77,6 +77,7 @@ def test_get_history_session_detail_returns_messages(app_client: object) -> None
     db = settings.log_db_path
 
     from backend.services import log_service
+
     log_service.init_db(db)
     _seed_session(db, "sess-detail-1", "Detail Test")
 
@@ -109,6 +110,7 @@ def test_delete_history_session_removes_it(app_client: object) -> None:
     db = settings.log_db_path
 
     from backend.services import log_service
+
     log_service.init_db(db)
     _seed_session(db, "sess-del-1", "To Delete")
 
@@ -137,6 +139,7 @@ def test_delete_all_history_removes_all(app_client: object) -> None:
     db = settings.log_db_path
 
     from backend.services import log_service
+
     log_service.init_db(db)
     _seed_session(db, "sess-all-1", "Alpha")
     _seed_session(db, "sess-all-2", "Beta")

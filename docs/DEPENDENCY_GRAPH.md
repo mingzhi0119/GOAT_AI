@@ -26,9 +26,9 @@ flowchart TB
 - `backend.application` is use-case orchestration.
 - `goat_ai` is the innermost shared library and does not import `backend`.
 
-## Current (incremental)
+## Current (audited on main)
 
-As of Phase 15.9, `backend.application` owns all history, knowledge, media, system, model, upload, chat, and code-sandbox use cases. The graph above is the directional target, now fully applied to the history layer.
+As of the Phase 15.9 closeout audit, `backend.application` owns all history, knowledge, media, system, model, upload, chat, artifact-download, and code-sandbox use cases. Routers are now thin HTTP adapters: they read request inputs and headers, resolve dependencies, call one application entrypoint, and map domain/application errors to HTTP responses.
 
 Wired routes:
 
@@ -41,6 +41,7 @@ Wired routes:
 - `GET /api/system/*` and `GET /api/ready` flow through `backend.application.system`.
 - `POST /api/upload` and `POST /api/upload/analyze` flow through `backend.application.upload`.
 - `POST /api/chat` uses `backend.application.chat` for request preflight before streaming.
+- `GET /api/artifacts/{artifact_id}` flows through `backend.application.artifacts`.
 - `POST /api/code-sandbox/exec` uses `backend.application.code_sandbox` for the feature gate.
 - `backend.application.ports` is the shared contract face for `Settings`, `LLMClient`, `SessionRepository`, `ConversationLogger`, `TitleGenerator`, `SafeguardService`, `TabularContextExtractor`, and the stable shared exceptions; `backend.application.exceptions` keeps application-specific error classes.
 - Routers and application modules should not import `backend.services.exceptions` or `backend.services.chat_capacity_service` directly.

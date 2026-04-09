@@ -4,7 +4,7 @@ Last updated: 2026-04-09
 
 ## Release
 
-- **Current release:** `v1.3.0`
+- **Current release:** `v1.0.0`
 - **Shipped release milestone:** Phase 11 (industrialization / decoupling) is complete.
 - **Main-branch status:** Phase 13 closeout work is landed across migrations, error semantics, readiness/liveness split, metrics, idempotency, rollback/backup runbooks, and CI hardening. See [ROADMAP.md](ROADMAP.md).
 - **Phase 14 status:** RAG-0 through **RAG-3** are complete on main: persisted uploads, SQLite metadata, local `simple_local_v1` vector index, retrieval-backed chat, optional **lexical rerank** and **conservative query rewrite** via `retrieval_profile` (`default` / `rag3_lexical` / `rag3_quality`), plus `python -m tools.run_rag_eval` over `evaldata/rag_eval_cases.jsonl`. **Vision MVP** (`POST /api/media/uploads`, `image_attachment_ids` on chat when the model reports vision) is landed.
@@ -12,10 +12,11 @@ Last updated: 2026-04-09
 - **Phase 15.1 (domain semantics):** [DOMAIN.md](DOMAIN.md) defines ubiquitous language; `backend.domain` holds safeguard policy, chart provenance helpers, and chart-spec version invariant; [.github/pull_request_template.md](../.github/pull_request_template.md) links DOMAIN + contract regen.
 - **Phase 15 structural closeout:** `backend.application` now owns history, knowledge, media, models, system, upload/analyze, chat preflight, and code-sandbox gating so routers stay thin while public API shapes remain unchanged; `backend.application.ports` is the shared contract face for `Settings`, Protocols, and stable exception re-exports.
 - **Phase 15.4-15.6:** `session_messages` table (dual-read/write with legacy JSON blob); optional `sessions.owner_id`; read/write API keys and optional `X-GOAT-Owner-Id` for session scoping; lazy OpenTelemetry (`GOAT_OTEL_ENABLED`) with `traceparent` middleware and Ollama spans. See [SESSION_MESSAGES_MIGRATION.md](SESSION_MESSAGES_MIGRATION.md), [OPERATIONS.md](OPERATIONS.md), [test_api_authz.py](../__tests__/test_api_authz.py).
-- **Phase 15.8:** `Clock` injected into `register_http_security` rate-limiter; `FakeClock`-based tests (`test_rate_limit_clock.py`) replace `time.sleep` in that path.
-- **Phase 15.9:** `delete_history_session` use case added to `backend.application.history`; router (`DELETE /api/history/{id}`) calls the application function, not the repository directly. See [DEPENDENCY_GRAPH.md](DEPENDENCY_GRAPH.md).
-- **Phase 15.10:** Integration tests: session history round-trips (`test_session_history.py`) and knowledge upload→ingest→search pipeline (`test_knowledge_flow.py`). `/api/knowledge/answers` semantic divergence documented and contract-tested.
-- **Phase 15.11:** `RateLimitDecision` in `backend.domain.rate_limit_policy`; `SessionSchemaError` + future-version warning in `decode_session_payload`; [DOMAIN.md](DOMAIN.md) updated with rate-limit and session-versioning terms.
+- **Phase 15.8 status:** complete. `Clock` is injected into `register_http_security`, and the title/session-persist path now accepts injected `Clock` as well; tests cover deterministic timestamps without wall-clock sleeps.
+- **Phase 15.9 status:** complete. Router/application boundary audit is closed: history, knowledge, upload, chat, system, models, media, artifacts, and code-sandbox routes are thin adapters over `backend.application`, and [DEPENDENCY_GRAPH.md](DEPENDENCY_GRAPH.md) reflects the audited wiring.
+- **Phase 15.10 status:** complete. Integration tests now cover session history round-trips (`test_session_history.py`), knowledge upload→ingest→search and `/api/knowledge/answers` contract (`test_knowledge_flow.py`), plus retrieval-backed chat prompt injection and persistence (`test_chat_with_knowledge.py`).
+- **Phase 15.11 status:** complete. `RateLimitDecision` and `RateLimitPolicy` exist in `backend.domain.rate_limit_policy`, [DOMAIN.md](DOMAIN.md) documents rate-limit and session-versioning terms, and `decode_session_payload` now raises `SessionSchemaError` for unsupported future payload versions.
+- **Phase 15 overall:** complete on main. Remaining roadmap work is now Phase 16 planning and decision-log sequencing.
 - **Feature gates (Section 15):** `GET /api/system/features` exposes a stable `code_sandbox` snapshot (config + Docker probe; `policy_allowed` reserved for future AuthZ). `POST /api/code-sandbox/exec` is a scaffold: **503** + `FEATURE_UNAVAILABLE` when the **runtime** gate is closed; **403** + `FEATURE_DISABLED` reserved for **policy** denial; **501** when the gate passes but execution is not implemented.
 - **RAG-ready wording:** use the term **RAG-ready** in release notes or marketing only after `python -m tools.run_rag_eval` passes in CI or pre-release checks and this file still documents the same threshold.
 
@@ -118,4 +119,3 @@ Last updated: 2026-04-09
 - [ROLLBACK.md](ROLLBACK.md)
 - [SECURITY.md](SECURITY.md)
 - [ROADMAP.md](ROADMAP.md)
-

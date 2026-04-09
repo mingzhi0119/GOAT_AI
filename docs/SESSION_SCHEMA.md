@@ -6,9 +6,9 @@ Persisted chat sessions store a **versioned JSON blob** in the SQLite `sessions.
 
 ## Version constant
 
-- **`SESSION_PAYLOAD_VERSION`** is currently **`3`** (see `session_message_codec.py`).
+- **`SESSION_PAYLOAD_VERSION`** is currently **`4`** (see `session_message_codec.py`).
 - Bump this constant when you change the **semantic shape** of the stored object (new required fields, incompatible message layout, renamed keys consumed at read time).
-- After a bump, ensure `decode_session_payload` accepts both the new shape and any in-flight legacy rows you still need to support (or document a one-time migration).
+- After a bump, ensure `decode_session_payload` accepts both the new shape and any in-flight legacy rows you still need to support. Future schema versions must raise `SessionSchemaError` on older binaries rather than silently downgrade.
 
 ## Versioned object shape (`build_session_payload` / dict decode)
 

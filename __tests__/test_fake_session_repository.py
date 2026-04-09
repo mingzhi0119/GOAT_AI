@@ -144,3 +144,27 @@ class TestFakeSessionRepository(unittest.TestCase):
                 {"role": "assistant", "content": "Hi there"},
             ],
         )
+
+    def test_get_session_raises_on_future_payload_version(self) -> None:
+        from backend.services.session_message_codec import SessionSchemaError
+
+        repo = InMemorySessionRepository()
+        sid = "sess-future"
+        ts = datetime(2026, 4, 8, 12, 0, 0, tzinfo=timezone.utc).isoformat()
+        repo._rows[sid] = {
+            "id": sid,
+            "title": "Future",
+            "model": "m1",
+            "schema_version": SESSION_PAYLOAD_VERSION + 1,
+            "created_at": ts,
+            "updated_at": ts,
+            "messages": {
+                "version": SESSION_PAYLOAD_VERSION + 1,
+                "messages": [{"role": "user", "content": "Hello"}],
+                "chart_data_source": "none",
+            },
+            "owner_id": "",
+        }
+
+        with self.assertRaises(SessionSchemaError):
+            repo.get_session(sid)

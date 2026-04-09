@@ -1,12 +1,12 @@
 # GOAT AI Roadmap
 
-> Last updated: 2026-04-08 - **v1.3.0** tags Phase **11-12**; **main** additionally ships **Phase 13**, **Phase 14** (through **14.7**), and **Phase 15** through **15.11**. All of these are archived below. **Next:** Phase 16 items (code sandbox, Postgres, multi-tenant AuthN) each require a Decision Log entry before implementation.
-> Current release tag: **v1.3.0**
+> Last updated: 2026-04-09 - **v1.0.0** tags Phase **11-12**; **main** additionally ships **Phase 13**, **Phase 14** (through **14.7**), and **all of Phase 15** through **15.11**. **Next:** choose and sequence Phase 16 decision-log items before implementation.
+> Current release tag: **v1.0.0**
 > Compact snapshot: [PROJECT_STATUS.md](PROJECT_STATUS.md) - Engineering standards: [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md)
 
 ---
 
-## Shipped (v1.3.0)
+## Shipped (v1.0.0)
 
 | Phase | Content |
 |-------|---------|
@@ -39,13 +39,17 @@ Phase 15 worked from domain meaning outward to package layout. Section 15.1 prod
 
 ---
 
-## Remaining Phase 15 work
+## Archived: Phase 15.8-15.11 - closeout slices (complete)
+
+Phase 15 is now fully complete on main. Sections 15.8-15.11 are retained here as the final closeout record before Phase 16 planning begins.
 
 These slices address deferred items from 15.2 and 15.3 and extend the domain and test foundations laid in 15.1 and 15.3. They are lower blast-radius than the structural migration and can proceed independently.
 
 ### 15.8 Clock injection — completion (deferred from 15.3)
 
 **Goal:** eliminate the remaining `time.time()` / `datetime.now()` call-sites that affect testable behavior in the chat, rate-limit, and title-generation paths; replace them with injected `Clock` so unit tests need no `time.sleep`.
+
+**Current status (2026-04-09):** complete. The rate-limiter path is wired to `Clock` and covered by `__tests__/test_rate_limit_clock.py`, and the title/session-persist path now accepts injected `Clock` with deterministic coverage in `__tests__/test_chat_service.py`.
 
 | Task | Exit criterion |
 |------|----------------|
@@ -60,6 +64,8 @@ These slices address deferred items from 15.2 and 15.3 and extend the domain and
 
 **Goal:** ensure no residual business logic lives in `backend/routers/` or is split across `backend/services/` in a way that violates the `application → services → domain` import order.
 
+**Current status (2026-04-09):** complete. The history delete path was moved into `backend.application.history.delete_history_session`, and the broader router/application audit is now closed across history, knowledge, upload, chat, system, models, media, artifacts, and code-sandbox routes. [DEPENDENCY_GRAPH.md](DEPENDENCY_GRAPH.md) reflects the audited wiring.
+
 | Task | Exit criterion |
 |------|----------------|
 | Audit `backend/routers/` for inline orchestration or domain decisions | Any found logic moved to `backend/application/`; routers become thin validate-call-return shells |
@@ -72,6 +78,8 @@ These slices address deferred items from 15.2 and 15.3 and extend the domain and
 ### 15.10 Integration test expansion (follow-up from 15.3)
 
 **Goal:** extend `__tests__/integration/` beyond the health/readiness smoke test to cover the three highest-value end-to-end flows, using real SQLite + temp `GOAT_DATA_DIR` but mocking Ollama at the `LLMClient` Protocol boundary.
+
+**Current status (2026-04-09):** complete. `__tests__/integration/test_session_history.py`, `__tests__/integration/test_knowledge_flow.py`, and `__tests__/integration/test_chat_with_knowledge.py` now cover the session-history flow, knowledge upload→ingest→search flow, `/api/knowledge/answers` semantic contract, and retrieval-backed chat prompt injection.
 
 | Flow | Exit criterion |
 |------|----------------|
@@ -86,6 +94,8 @@ These slices address deferred items from 15.2 and 15.3 and extend the domain and
 ### 15.11 Domain model hardening (follow-up from 15.1)
 
 **Goal:** promote the two most rule-heavy cross-cutting concerns — rate limiting and session schema validation — into typed domain objects, and expand `DOMAIN.md` to cover them.
+
+**Current status (2026-04-09):** complete. `backend.domain.rate_limit_policy` and the associated domain tests exist, [DOMAIN.md](DOMAIN.md) has the new terms, and `decode_session_payload` now raises `SessionSchemaError` for unsupported future payload versions.
 
 | Task | Exit criterion |
 |------|----------------|
@@ -102,11 +112,9 @@ These slices address deferred items from 15.2 and 15.3 and extend the domain and
 
 | Order | Focus | Notes |
 |-------|--------|--------|
-| **0** | **15.8 Clock injection** | Lowest blast radius; unlocks deterministic tests for rate-limit and title paths |
-| **1** | **15.10 Integration test expansion** | Promoted ahead of 15.9 — locks down freshly shipped retrieval-backed chat, artifact SSE, and RAG binding before any structural refactor can regress them |
-| **2** | **15.9 Application layer audit** | Structural cleanup; lower regression risk now that 15.10 coverage is in place |
-| **3** | **15.11 Domain model hardening** | Solidifies policy objects before any AuthZ or multi-tenant expansion |
-| **4** | **Phase 16 (future)** | Code-execution sandbox, Postgres migration, multi-tenant AuthN — each requires a Decision Log entry before implementation |
+| **0** | **Phase 16A: production-safe capability gates** | Decide whether code sandboxing is a near-term product need; requires Decision Log plus explicit isolation contract |
+| **1** | **Phase 16B: storage evolution** | Decide whether SQLite limits justify Postgres and migration complexity yet |
+| **2** | **Phase 16C: identity and tenancy** | Decide whether shared-key + owner header is still enough, or whether real AuthN/AuthZ is now warranted |
 
 > **Known semantic divergence (tracked):** `POST /api/knowledge/answers` still returns a raw snippet-dump (`"Relevant retrieved context:\n" + bullets`, `snippet[:220]`) with no LLM in the loop. The chat path (`POST /api/chat` with `knowledge_document_ids`) sends the same retrieved context to the model with an explicit "synthesize rather than dumping snippets" instruction. These two endpoints now have different answer semantics for the same underlying retrieval. The 15.10 integration tests will make this divergence explicit; resolution (whether to add LLM synthesis to `/answers` or document the difference as intentional) is a product decision to be made at that point.
 
@@ -114,9 +122,9 @@ These slices address deferred items from 15.2 and 15.3 and extend the domain and
 
 | Horizon | Focus |
 |---------|--------|
-| **v1.3.x** | Ops hardening carry-overs: SQLite backup thresholds, security audit as exposure grows |
-| **v1.4.x–v1.5.x** | Phase 13 and 14 maintenance only; active work is Phase 15.8–15.11 |
-| **v1.6+** | Phase 16 — capability gates (code sandbox), optional Postgres, minimal multi-tenant AuthN; each is a Decision Log item before any code lands |
+| **v1.0.x** | Ops hardening carry-overs: SQLite backup thresholds, security audit as exposure grows |
+| **v1.1.x** | Phase 16 decision logs and the first selected implementation slice |
+| **v1.2+** | Phase 16 — capability gates (code sandbox), optional Postgres, minimal multi-tenant AuthN; each is a Decision Log item before any code lands |
 
 ---
 
@@ -156,8 +164,8 @@ This section records **constraints that match today's shipped architecture** and
 
 | Reality (main) | Improvement path | Roadmap / docs home |
 |----------------|------------------|---------------------|
-| Contract tests and architecture guards exist; integration tier covers health/readiness smoke only. | **Phase 15.10:** knowledge pipeline, chat-with-retrieval, session history round-trips in `__tests__/integration/`. | Section **15.10**; [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) testing rules. |
-| Clock not injected in chat, rate-limit, or title paths. | **Phase 15.8:** thread `Clock` through remaining callsites; eliminate `time.sleep` in those tests. | Section **15.8**. |
+| Contract tests and architecture guards exist; integration tier now covers health/readiness smoke, session history, knowledge upload→ingest→search, and retrieval-backed chat. | Maintain coverage and CI runtime budget as retrieval behavior evolves. | Section **15.10**; [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) testing rules. |
+| Clock is injected into idempotency, rate-limit, and title/session-persist paths. | Keep new time-based behavior testable through `Clock` rather than wall-clock sleeps. | Section **15.8**. |
 
 **Priority:** **High** leverage — lowers cost of Phase 16 and any retrieval changes.
 
@@ -165,8 +173,8 @@ This section records **constraints that match today's shipped architecture** and
 
 | Reality (main) | Improvement path | Roadmap / docs home |
 |----------------|------------------|---------------------|
-| `SafeguardPolicy`, chart provenance policy, and `chart_spec_requires_version_field` invariant exist in `backend.domain`. | **Phase 15.11:** `RateLimitPolicy` domain object + session-read schema invariant. | Section **15.11**; [DOMAIN.md](DOMAIN.md). |
-| Application layer migration complete; residual business logic in routers/services not yet audited. | **Phase 15.9:** structured audit + DEPENDENCY_GRAPH.md update. | Section **15.9**. |
+| `SafeguardPolicy`, chart provenance policy, `chart_spec_requires_version_field`, and `RateLimitPolicy` exist in `backend.domain`; future session payload versions now fail loudly on read. | Maintain the invariant when evolving session schema. | Section **15.11**; [DOMAIN.md](DOMAIN.md). |
+| Application layer migration is complete and router boundaries have been audited. | Maintain the import direction and keep new business rules in `application` or `domain`, not routers. | Section **15.9**. |
 
 **Priority:** Before any Phase 16 AuthZ or datastore expansion.
 
@@ -186,10 +194,10 @@ This section records **constraints that match today's shipped architecture** and
 | Shared key + future minimal AuthZ | Section 15.5 (done); Phase 16 for full IAM |
 | Single-instance SQLite + local vector | OPERATIONS, Phase 13 risk triggers; Postgres = Decision Log |
 | RAG eval + thresholds + CI | Section 14.7 (done — maintain green) |
-| Clock injection (chat/rate-limit/title) | **Section 15.8** |
-| Application layer audit | **Section 15.9** |
-| Integration test expansion | **Section 15.10** |
-| Domain invariants (rate-limit policy, session read) | **Section 15.11** |
+| Clock injection (chat/rate-limit/title) | Closed in **Section 15.8** |
+| Application layer audit | Closed in **Section 15.9** |
+| Integration test expansion | Closed in **Section 15.10** |
+| Domain invariants (rate-limit policy, session read) | Closed in **Section 15.11** |
 | Deploy / process lifecycle | OPERATIONS, Phase 13 closed |
 
 ---
@@ -230,7 +238,7 @@ Current behavior:
 | 2026-03-30 | No React Router | Single-page app; extra routing complexity had little benefit |
 | 2026-03-31 | Dual-port deploy reverted | Production uses `:62606` only |
 | 2026-04-07 | Process mgmt: systemd is additive, not a drop-in for nohup | Shared host may lack reliable `systemctl --user`; deploy contract keeps nohup + PID as permanent fallback |
-| 2026-04-07 | Phase 11 closed in v1.3.0 | `ChatStreamService` + orchestration split; tabular/title injection; log_service adapter-only guard; wire constants centralized; 79 unittest + 13 black-box passed |
+| 2026-04-07 | Phase 11 closed in v1.0.0 | `ChatStreamService` + orchestration split; tabular/title injection; log_service adapter-only guard; wire constants centralized; 79 unittest + 13 black-box passed |
 | 2026-04-07 | Phases 13–14 split from prior monolithic Phase 13 | **13** = priority 1 (ops); **14** = priority 2 (RAG/vision). |
 | 2026-04-07 | Phase 13 sequencing tightened | Section 13.0 = migrations + error model before Wave A; Wave A = four ops items; Ollama retry/circuit breaker deferred to Wave B; Phase 15 = policy objects + invariants before package split. |
 | 2026-04-08 | Phase 13.5 closed | `pip-audit` + `ruff check` in CI; `docs/SECURITY.md` published; vulnerable dependency pins updated. |
@@ -246,4 +254,5 @@ Current behavior:
 | 2026-04-08 | Phase 14.7 implemented | CI runs `python -m tools.run_rag_eval`; `evaldata/README.md` + `VERSION`; OPERATIONS RAG retrieval quality; Prometheus `knowledge_retrieval_requests_total` / `knowledge_query_rewrite_applied_total`; ENGINEERING_STANDARDS Section 12 RAG bullet. |
 | 2026-04-08 | Phase 15.4–15.6 complete | `session_messages` dual-read/write + `sessions.owner_id`; read/write API keys + optional `X-GOAT-Owner-Id`; lazy OpenTelemetry with `traceparent` and Ollama spans. |
 | 2026-04-08 | Developer CLI: `python -m tools.*` | `tools/` is a package (`tools/__init__.py`); run modules from repo root. CI uses `python -m tools.run_rag_eval` and `python -m tools.check_api_contract_sync`. |
-| 2026-04-08 | Phase 15.8–15.11 complete | 15.8: `Clock` injected into `register_http_security` rate-limiter; `FakeClock`-based tests replace any time.sleep in that path. 15.9: `delete_history_session` use case added to `backend.application.history`; router no longer calls `session_repository` directly. 15.10: integration tests for session history and knowledge upload→ingest→search pipeline; `/api/knowledge/answers` semantic divergence documented. 15.11: `RateLimitDecision` + `RateLimitPolicy` domain objects; `SessionSchemaError` + future-version warning in `decode_session_payload`; `DOMAIN.md` updated. |
+| 2026-04-09 | Phase 15.8, 15.10, and 15.11 closed on main | 15.8: `Clock` now reaches rate-limit and title/session-persist flows. 15.10: integration coverage includes retrieval-backed chat in addition to history and knowledge-pipeline flows. 15.11: future-version session payloads now raise `SessionSchemaError` on read. |
+| 2026-04-09 | Phase 15.9 closed; Phase 15 fully complete on main | Router/application boundaries audited across history, knowledge, upload, chat, system, models, media, artifacts, and code-sandbox routes; `lint-imports` kept green; dependency graph docs updated. |

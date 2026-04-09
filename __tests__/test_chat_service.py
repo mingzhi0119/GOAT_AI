@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unittest
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from backend.models.chat import ChatMessage
 from backend.services.chat_runtime import SessionDetailRecord, SessionUpsertPayload
@@ -20,6 +21,7 @@ from backend.services.session_service import (
     persist_chat_session,
     session_title_for_upsert,
 )
+from goat_ai.clocks import FakeClock
 
 
 @dataclass
@@ -172,6 +174,28 @@ class ChatServiceTitleTests(unittest.TestCase):
         self.assertIsNotNone(stored.file_context_prompt)
         self.assertEqual("uploaded", stored.chart_data_source)
         self.assertEqual(SESSION_PAYLOAD_VERSION, stored.schema_version)
+
+    def test_persist_chat_session_uses_injected_clock_for_timestamps(self) -> None:
+        repository = FakeSessionRepository(sessions={})
+        clock = FakeClock(
+            _utc=datetime(2026, 4, 9, 12, 34, 56, tzinfo=timezone.utc),
+        )
+        persist_chat_session(
+            session_id="sid-5",
+            model="m",
+            final_messages=[ChatMessage(role="user", content="What changed?")],
+            assistant_text="Here is the update.",
+            chart_spec=None,
+            session_repository=repository,
+            title_generator=FakeTitleGenerator("Stored title"),
+            clock=clock,
+        )
+
+        stored = repository.get_session("sid-5")
+        self.assertIsNotNone(stored)
+        assert stored is not None
+        self.assertEqual("2026-04-09T12:34:56+00:00", stored.created_at)
+        self.assertEqual("2026-04-09T12:34:56+00:00", stored.updated_at)
 
     def test_decode_session_payload_keeps_legacy_storage_compatible(self) -> None:
         decoded = decode_session_payload(

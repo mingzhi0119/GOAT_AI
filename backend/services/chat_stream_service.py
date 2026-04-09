@@ -38,6 +38,7 @@ from backend.services.tabular_context import (
     TabularContextExtractor,
 )
 from backend.types import Settings
+from goat_ai.clocks import Clock
 from goat_ai.echarts_tool import GENERATE_CHART_V2_SCHEMA
 from goat_ai.exceptions import OllamaUnavailable
 from goat_ai.ollama_client import LLMClient
@@ -125,6 +126,9 @@ class _StreamingOutputBuffer:
 
 class ChatStreamService:
     """Owns the chat SSE generator: native chart tools, safeguards, persistence hooks."""
+
+    def __init__(self, *, clock: Clock | None = None) -> None:
+        self._clock = clock
 
     def stream(
         self,
@@ -214,7 +218,7 @@ class ChatStreamService:
         chart_orchestrator = ChartToolOrchestrator(
             tabular_extractor or EmbeddedCsvTabularExtractor(),
         )
-        persistence = SessionPersistenceService()
+        persistence = SessionPersistenceService(clock=self._clock)
         turns = _to_chat_turns(messages)
         latest_user_text = last_user_message(messages)
         effective_prompt = prompt_composer.compose(

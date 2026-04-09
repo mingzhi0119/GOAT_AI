@@ -1,4 +1,4 @@
-"""Unit tests for Phase 15.1 domain policies and invariants (no HTTP)."""
+"""Unit tests for Phase 15.1 and 15.11 domain policies and invariants."""
 
 from __future__ import annotations
 
@@ -41,7 +41,6 @@ class DomainSafeguardPolicyTests(unittest.TestCase):
         self.assertEqual("output", r.stage)
 
     def test_output_allows_academic_use_of_explicit(self) -> None:
-        # "explicit" alone must NOT trigger — it is common in business/academic writing.
         p = RuleBasedSafeguardPolicy()
         cases = [
             "5. The Call to Action (The Ask): Be explicit about the funding you need.",
@@ -128,10 +127,10 @@ class DomainSessionSchemaErrorTests(unittest.TestCase):
         self.assertIsInstance(err, ValueError)
         self.assertIn("bad version", str(err))
 
-    def test_decode_future_version_logs_warning_and_decodes(self) -> None:
-        import logging
+    def test_decode_future_version_raises_schema_error(self) -> None:
         from backend.services.session_message_codec import (
             SESSION_PAYLOAD_VERSION,
+            SessionSchemaError,
             decode_session_payload,
         )
 
@@ -140,11 +139,10 @@ class DomainSessionSchemaErrorTests(unittest.TestCase):
             "messages": [{"role": "user", "content": "hi"}],
             "chart_data_source": "none",
         }
-        with self.assertLogs("backend.services.session_message_codec", level=logging.WARNING):
-            result = decode_session_payload(future_payload)
-        self.assertEqual(1, len(result.messages))
+        with self.assertRaises(SessionSchemaError):
+            decode_session_payload(future_payload)
 
-    def test_decode_current_version_no_warning(self) -> None:
+    def test_decode_current_version_succeeds(self) -> None:
         from backend.services.session_message_codec import (
             SESSION_PAYLOAD_VERSION,
             decode_session_payload,
@@ -155,15 +153,11 @@ class DomainSessionSchemaErrorTests(unittest.TestCase):
             "messages": [{"role": "assistant", "content": "hello"}],
             "chart_data_source": "none",
         }
-        # assertNoLogs requires Python 3.10+ — use assertRaises(AssertionError) pattern
-        try:
-            with self.assertLogs(
-                "backend.services.session_message_codec", level="WARNING"
-            ):
-                decode_session_payload(payload)
-            self.fail("Expected no warning logs but got some")
-        except AssertionError:
-            pass  # assertLogs raises AssertionError when no logs — that's what we want
+        result = decode_session_payload(payload)
+        self.assertEqual(
+            [{"role": "assistant", "content": "hello"}],
+            result.messages,
+        )
 
 
 if __name__ == "__main__":

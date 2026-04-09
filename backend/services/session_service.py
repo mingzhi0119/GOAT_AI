@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 
 from backend.domain.chart_provenance_policy import resolve_chart_data_source_for_persist
 from backend.domain.chart_types import ChartDataSource
@@ -17,6 +16,7 @@ from backend.services.session_message_codec import (
     build_session_payload,
     is_file_context_message,
 )
+from goat_ai.clocks import Clock, SystemClock
 
 logger = logging.getLogger(__name__)
 
@@ -82,9 +82,11 @@ def persist_chat_session(
     chart_data_source: ChartDataSource = "none",
     title_override: str | None = None,
     owner_id: str = "",
+    clock: Clock | None = None,
 ) -> None:
     """Persist the latest session snapshot, including optional chart state."""
-    now_iso = datetime.now(timezone.utc).isoformat()
+    active_clock = clock if clock is not None else SystemClock()
+    now_iso = active_clock.utc_now().isoformat()
     existing = session_repository.get_session(session_id)
     created_at = existing.created_at if existing is not None else now_iso
     title = (

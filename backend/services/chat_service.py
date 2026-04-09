@@ -23,6 +23,7 @@ from backend.services.session_service import last_user_message
 from backend.services.sse import sse_done_event, sse_error_event
 from backend.services.tabular_context import TabularContextExtractor
 from backend.types import Settings
+from goat_ai.clocks import Clock
 from goat_ai.ollama_client import LLMClient
 
 
@@ -47,6 +48,7 @@ def stream_chat_sse(
     knowledge_document_ids: list[str] | None = None,
     vision_last_user_images_base64: list[str] | None = None,
     session_owner_id: str = "",
+    clock: Clock | None = None,
 ) -> Generator[str, None, None]:
     """Yield SSE-formatted events for a chat completion."""
     if knowledge_document_ids and settings is not None:
@@ -69,10 +71,11 @@ def stream_chat_sse(
             knowledge_document_ids=knowledge_document_ids,
             llm=llm,
             session_owner_id=session_owner_id,
+            clock=clock,
         )
         return
 
-    yield from ChatStreamService().stream(
+    yield from ChatStreamService(clock=clock).stream(
         llm=llm,
         model=model,
         messages=messages,
@@ -114,9 +117,10 @@ def _stream_knowledge_chat_sse(
     settings: Settings,
     knowledge_document_ids: list[str],
     session_owner_id: str = "",
+    clock: Clock | None = None,
 ) -> Generator[str, None, None]:
     """Serve a retrieval-backed chat answer using the main chat streaming stack."""
-    persistence = SessionPersistenceService()
+    persistence = SessionPersistenceService(clock=clock)
     started_at = time.monotonic()
 
     if safeguard_service is not None:
@@ -167,7 +171,7 @@ def _stream_knowledge_chat_sse(
         context_block=context.context_block,
         has_hits=bool(context.citations),
     )
-    yield from ChatStreamService().stream(
+    yield from ChatStreamService(clock=clock).stream(
         llm=llm,
         model=model,
         messages=messages,

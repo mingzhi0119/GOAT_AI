@@ -46,11 +46,10 @@ This document names **user-visible and persistence concepts** shared across chat
 | Term | Meaning |
 |------|---------|
 | **SESSION_PAYLOAD_VERSION** | Current version integer (`4` as of Phase 15.11) in `session_message_codec`. Bump when the persisted JSON shape changes in a non-backwards-compatible way. |
-| **SessionSchemaError** | Raised (or logged as warning) when a stored payload carries a version integer higher than `SESSION_PAYLOAD_VERSION`. Older versions are decoded tolerantly. |
+| **SessionSchemaError** | Raised when a stored payload carries a version integer higher than `SESSION_PAYLOAD_VERSION`. Older versions are decoded tolerantly; future versions fail loud on read. |
 | **Legacy list payload** | Pre-version-dict format: a JSON array of role-tagged objects. Decoded by `_decode_legacy_session_payload` for backwards compatibility. |
 
 ## PR checklist (user-visible behavior)
 
 - [ ] Updated this file if any term above changed meaning, or added a new ubiquitous term.
 - [ ] Contract artifacts (`docs/openapi.json`, `docs/api.llm.yaml`) regenerated if HTTP schemas changed.
-

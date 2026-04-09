@@ -9,8 +9,6 @@ from unittest.mock import patch
 
 from backend.services.safeguard_service import (
     ModeScopedSafeguardService,
-    RuleBasedSafeguardService,
-    SafeguardAssessment,
 )
 from goat_ai.config import Settings, load_settings
 
@@ -225,7 +223,9 @@ class TestChatStreamWithDisabledSafeguard(unittest.TestCase):
             def stream_tokens(self, model, messages, system_prompt, **kw):  # type: ignore[override]
                 yield "Here is explicit porn content."
 
-            def stream_tokens_with_tools(self, model, messages, system_prompt, *, tools, **kw):  # type: ignore[override]
+            def stream_tokens_with_tools(
+                self, model, messages, system_prompt, *, tools, **kw
+            ):  # type: ignore[override]
                 yield from self.stream_tokens(model, messages, system_prompt)
 
             def plan_tool_call(self, model, messages, system_prompt, *, tools, **kw):  # type: ignore[override]
@@ -257,7 +257,10 @@ class TestChatStreamWithDisabledSafeguard(unittest.TestCase):
             )
 
     def test_enabled_safeguard_blocks_unsafe_output(self) -> None:
-        from backend.services.safeguard_service import SAFEGUARD_REFUSAL_MESSAGE, RuleBasedSafeguardService
+        from backend.services.safeguard_service import (
+            SAFEGUARD_REFUSAL_MESSAGE,
+            RuleBasedSafeguardService,
+        )
 
         events = self._stream(RuleBasedSafeguardService())
         self.assertTrue(any(SAFEGUARD_REFUSAL_MESSAGE in e for e in events))

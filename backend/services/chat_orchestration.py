@@ -29,6 +29,7 @@ from backend.services.safeguard_service import (
 from backend.services.session_service import last_user_message, persist_chat_session
 from backend.services.sse import sse_done_event, sse_token_event
 from backend.services.tabular_context import TabularContextExtractor
+from goat_ai.clocks import Clock
 from goat_ai.echarts_tool import parse_chart_intent_v2
 from goat_ai.latency_metrics import record_chat_first_token_ms, record_chat_inference_ms
 from goat_ai.ollama_client import LLMClient, ToolCallPlan
@@ -147,6 +148,9 @@ class ChartToolOrchestrator:
 class SessionPersistenceService:
     """Finalize telemetry and session persistence for chat streams."""
 
+    def __init__(self, *, clock: Clock | None = None) -> None:
+        self._clock = clock
+
     def persist_and_log_chat_result(
         self,
         *,
@@ -190,6 +194,7 @@ class SessionPersistenceService:
             first_token_ms=first_token_ms,
             title_override=title_override,
             session_owner_id=session_owner_id,
+            clock=self._clock,
         )
 
     def yield_blocked_response(
@@ -248,6 +253,7 @@ def _persist_and_log_chat_result(
     first_token_ms: float | None = None,
     title_override: str | None = None,
     session_owner_id: str = "",
+    clock: Clock | None = None,
 ) -> None:
     """Finalize telemetry, audit log, and optional session persistence."""
     elapsed_ms = round((time.monotonic() - started_at) * 1000)
@@ -281,6 +287,7 @@ def _persist_and_log_chat_result(
             chart_data_source=chart_data_source,
             title_override=title_override,
             owner_id=session_owner_id,
+            clock=clock,
         )
 
 
