@@ -117,6 +117,10 @@ class Settings:
     rag_rerank_mode: Literal["passthrough", "lexical"] = "passthrough"
     feature_code_sandbox_enabled: bool = False
     docker_socket_path: str = ""
+    # Safeguard (content moderation) configuration.
+    # safeguard_enabled=False or safeguard_mode="off" → no safeguard, None injected downstream.
+    safeguard_enabled: bool = True
+    safeguard_mode: Literal["off", "input_only", "output_only", "full"] = "full"
 
     @property
     def user_facing_error(self) -> str:
@@ -198,6 +202,12 @@ def load_settings() -> Settings:
         raise ValueError("GOAT_RAG_RERANK_MODE must be one of: passthrough, lexical")
     _feature_sandbox = _env_bool("GOAT_FEATURE_CODE_SANDBOX", "false")
     _docker_sock = os.environ.get("GOAT_DOCKER_SOCKET", "").strip()
+    _safeguard_enabled = _env_bool("GOAT_SAFEGUARD_ENABLED", "true")
+    _safeguard_mode = os.environ.get("GOAT_SAFEGUARD_MODE", "full").strip().lower()
+    if _safeguard_mode not in ("off", "input_only", "output_only", "full"):
+        raise ValueError(
+            "GOAT_SAFEGUARD_MODE must be one of: off, input_only, output_only, full"
+        )
     _api_key = os.environ.get("GOAT_API_KEY", "").strip()
     _api_key_write = os.environ.get("GOAT_API_KEY_WRITE", "").strip()
     if _api_key_write and not _api_key:
@@ -243,4 +253,8 @@ def load_settings() -> Settings:
         rag_rerank_mode=cast(Literal["passthrough", "lexical"], _rag_rerank),
         feature_code_sandbox_enabled=_feature_sandbox,
         docker_socket_path=_docker_sock,
+        safeguard_enabled=_safeguard_enabled,
+        safeguard_mode=cast(
+            Literal["off", "input_only", "output_only", "full"], _safeguard_mode
+        ),
     )

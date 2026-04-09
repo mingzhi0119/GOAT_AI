@@ -68,6 +68,23 @@ def delete_all_history_sessions(
     repository.delete_all_sessions(owner_filter=owner_filter)
 
 
+def delete_history_session(
+    *,
+    repository: SessionRepository,
+    session_id: str,
+    settings: Settings,
+    request_owner: str,
+) -> None:
+    """Delete one session, enforcing owner visibility rules."""
+    get_history_session_detail(
+        repository=repository,
+        session_id=session_id,
+        settings=settings,
+        request_owner=request_owner,
+    )
+    repository.delete_session(session_id)
+
+
 def get_history_session_detail(
     *,
     repository: SessionRepository,

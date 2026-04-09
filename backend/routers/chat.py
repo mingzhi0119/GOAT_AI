@@ -71,7 +71,7 @@ def chat_stream(
     session_repository: SessionRepository = Depends(get_session_repository),
     title_generator: TitleGenerator = Depends(get_title_generator),
     tabular_extractor: TabularContextExtractor = Depends(get_tabular_context_extractor),
-    safeguard_service: SafeguardService = Depends(get_safeguard_service),
+    safeguard_service: SafeguardService | None = Depends(get_safeguard_service),
     settings: Settings = Depends(get_settings),
     idempotency_key_header: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> StreamingResponse:

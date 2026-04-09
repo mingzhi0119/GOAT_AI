@@ -127,7 +127,7 @@ def stream_chat_response(
     session_repository: SessionRepository,
     title_generator: TitleGenerator,
     tabular_extractor: TabularContextExtractor,
-    safeguard_service: SafeguardService,
+    safeguard_service: SafeguardService | None,
     settings: Settings,
     idempotency_key: str,
 ) -> StreamingResponse:

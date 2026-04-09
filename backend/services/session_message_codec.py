@@ -3,8 +3,20 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from typing import Any
+
+_log = logging.getLogger(__name__)
+
+
+class SessionSchemaError(ValueError):
+    """Raised when a session payload carries an unrecognized schema version.
+
+    Callers that need strict version gating can catch this; the default
+    ``decode_session_payload`` path logs a warning and continues decoding
+    because older-versioned sessions are still structurally compatible.
+    """
 
 from backend.domain.chart_types import ChartDataSource
 from backend.domain.invariants import chart_spec_requires_version_field
@@ -173,6 +185,15 @@ def decode_session_payload(raw_payload: Any) -> DecodedSessionPayload:
         return _decode_legacy_session_payload(raw_payload)
 
     if isinstance(raw_payload, dict):
+        raw_version = raw_payload.get("version")
+        if isinstance(raw_version, int) and raw_version > SESSION_PAYLOAD_VERSION:
+            _log.warning(
+                "session_payload_version_unknown",
+                extra={
+                    "stored_version": raw_version,
+                    "supported_version": SESSION_PAYLOAD_VERSION,
+                },
+            )
         raw_messages = raw_payload.get("messages", [])
         messages: list[dict[str, str]] = []
         if isinstance(raw_messages, list):

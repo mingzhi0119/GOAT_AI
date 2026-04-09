@@ -33,6 +33,22 @@ This document names **user-visible and persistence concepts** shared across chat
 | **SafeguardAssessment** | `allowed` / `reason_code` / `stage` - output of **safeguard policy** (`backend.domain.safeguard_policy`) on combined user+system text (input) or assistant text (output). |
 | **Policy refusal** | Fixed refusal copy + blocked title when input or streaming output fails policy. |
 
+## Rate limiting
+
+| Term | Meaning |
+|------|---------|
+| **RateLimitDecision** | Immutable result of one rate-limit evaluation (`allowed: bool`, `retry_after: int`). Defined in `backend.domain.rate_limit_policy`. |
+| **Sliding window** | The in-process `InMemoryRateLimiter` uses a per-key timestamp deque; requests older than `window_sec` are evicted before each check. |
+| **Clock injection** | The rate-limiter `allow()` accepts `now: float` so tests pass a `FakeClock.monotonic()` value without real time passing. |
+
+## Session payload versioning
+
+| Term | Meaning |
+|------|---------|
+| **SESSION_PAYLOAD_VERSION** | Current version integer (`4` as of Phase 15.11) in `session_message_codec`. Bump when the persisted JSON shape changes in a non-backwards-compatible way. |
+| **SessionSchemaError** | Raised (or logged as warning) when a stored payload carries a version integer higher than `SESSION_PAYLOAD_VERSION`. Older versions are decoded tolerantly. |
+| **Legacy list payload** | Pre-version-dict format: a JSON array of role-tagged objects. Decoded by `_decode_legacy_session_payload` for backwards compatibility. |
+
 ## PR checklist (user-visible behavior)
 
 - [ ] Updated this file if any term above changed meaning, or added a new ubiquitous term.

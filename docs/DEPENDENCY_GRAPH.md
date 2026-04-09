@@ -28,12 +28,13 @@ flowchart TB
 
 ## Current (incremental)
 
-As of the Phase 15 structural closeout work, `backend.application` now owns the main history use cases, knowledge/media/system/model entry points, upload/analyze preflight, chat preflight, and the code-sandbox gate. The graph above is the directional target, not a claim that every helper inside those modules has been eliminated.
+As of Phase 15.9, `backend.application` owns all history, knowledge, media, system, model, upload, chat, and code-sandbox use cases. The graph above is the directional target, now fully applied to the history layer.
 
-Partial wiring:
+Wired routes:
 
 - `GET /api/history` and `DELETE /api/history` flow through `backend.application.history`.
-- `GET /api/history/{id}` and `DELETE /api/history/{id}` flow through `backend.application.history`.
+- `GET /api/history/{id}` flows through `backend.application.history.get_history_session_detail`.
+- `DELETE /api/history/{id}` flows through `backend.application.history.delete_history_session` (Phase 15.9: moved from router directly calling `session_repository.delete_session()`).
 - `POST /api/knowledge/*` flows through `backend.application.knowledge`.
 - `POST /api/media/uploads` flows through `backend.application.media`.
 - `GET /api/models` and `GET /api/models/capabilities` flow through `backend.application.models`.

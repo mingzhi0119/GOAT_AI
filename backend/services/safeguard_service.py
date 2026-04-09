@@ -18,6 +18,7 @@ from backend.services.session_service import last_user_message
 __all__ = [
     "SAFEGUARD_BLOCKED_TITLE",
     "SAFEGUARD_REFUSAL_MESSAGE",
+    "ModeScopedSafeguardService",
     "PolicyStage",
     "RuleBasedSafeguardPolicy",
     "RuleBasedSafeguardService",
@@ -43,6 +44,51 @@ class SafeguardService(Protocol):
         user_text: str,
         assistant_text: str,
     ) -> SafeguardAssessment: ...
+
+
+_ALLOWED_INPUT = SafeguardAssessment(allowed=True, stage="input")
+_ALLOWED_OUTPUT = SafeguardAssessment(allowed=True, stage="output")
+
+
+class ModeScopedSafeguardService:
+    """Wraps RuleBasedSafeguardService and suppresses one check direction based on mode.
+
+    mode="input_only"  — review_output always returns allowed (only input is moderated)
+    mode="output_only" — review_input always returns allowed (only output is moderated)
+    mode="full"        — both checks active; identical to RuleBasedSafeguardService
+
+    The factory in backend/dependencies.py returns None for mode="off", so this
+    class never needs to handle that case.
+    """
+
+    def __init__(self, *, mode: str) -> None:
+        self._inner = RuleBasedSafeguardService()
+        # mode is already validated by load_settings(); store for introspection/tests.
+        self._mode = mode
+
+    def review_input(
+        self,
+        *,
+        messages: list[ChatMessage],
+        system_instruction: str,
+    ) -> SafeguardAssessment:
+        if self._mode == "output_only":
+            return _ALLOWED_INPUT
+        return self._inner.review_input(
+            messages=messages, system_instruction=system_instruction
+        )
+
+    def review_output(
+        self,
+        *,
+        user_text: str,
+        assistant_text: str,
+    ) -> SafeguardAssessment:
+        if self._mode == "input_only":
+            return _ALLOWED_OUTPUT
+        return self._inner.review_output(
+            user_text=user_text, assistant_text=assistant_text
+        )
 
 
 class RuleBasedSafeguardService:

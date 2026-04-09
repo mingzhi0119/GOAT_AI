@@ -11,6 +11,7 @@ from backend.application.exceptions import (
 )
 from backend.application.history import (
     delete_all_history_sessions,
+    delete_history_session as delete_history_session_use_case,
     get_history_session_detail,
     list_history_sessions,
 )
@@ -148,7 +149,7 @@ def delete_history_session(
     """Delete one persisted session."""
     request_owner = _owner_header_value(request)
     try:
-        get_history_session_detail(
+        delete_history_session_use_case(
             repository=session_repository,
             session_id=session_id,
             settings=settings,
@@ -158,6 +159,4 @@ def delete_history_session(
         _raise_owner_required(exc)
     except HistorySessionNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    session_repository.delete_session(session_id)
     return Response(status_code=204)

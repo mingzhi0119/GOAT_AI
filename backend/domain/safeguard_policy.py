@@ -18,9 +18,18 @@ _GENERATION_VERBS = re.compile(
     r"\b(write|generate|describe|depict|draw|create|roleplay|imagine|craft|story|scene)\b",
     re.IGNORECASE,
 )
+# Unambiguous terms — block on standalone occurrence in both input and output.
 _EXPLICIT_SEXUAL_TERMS = re.compile(
-    r"\b(explicit|porn|porno|nsfw|nude|naked|性交|色情|淫秽|做爱|强奸|rape|blowjob|handjob|cum|ejaculat|orgasm)\b",
+    r"\b(porn|porno|nsfw|nude|naked|性交|色情|淫秽|做爱|强奸|rape|blowjob|handjob|cum|ejaculat|orgasm)\b",
     re.IGNORECASE,
+)
+# "explicit" is too generic to block alone (e.g. "be explicit about your ask",
+# "explicitly state the terms").  Only block when it co-occurs with a clear
+# sexual indicator within the same passage (up to 200 chars apart).
+_EXPLICIT_SEXUAL_COMPOUND = re.compile(
+    r"\bexplicit\b.{0,200}?\b(porn|porno|sex(?:ual)?|nude|naked|nsfw|erotic|adult.content|性|色情)\b|"
+    r"\b(porn|porno|sex(?:ual)?|nude|naked|nsfw|erotic|adult.content|性|色情)\b.{0,200}?\bexplicit\b",
+    re.IGNORECASE | re.DOTALL,
 )
 _MINOR_SEXUAL_TERMS = re.compile(
     r"\b(minor|child|kid|underage|teenager|loli|幼女|未成年)\b.*\b(sex|sexual|porn|nude|裸|性交|色情)\b|"
@@ -71,11 +80,14 @@ class SafeguardPolicy(Protocol):
 
 
 def _matches_explicit_generation(text: str) -> bool:
-    return bool(_GENERATION_VERBS.search(text) and _EXPLICIT_SEXUAL_TERMS.search(text))
+    return bool(
+        _GENERATION_VERBS.search(text)
+        and (_EXPLICIT_SEXUAL_TERMS.search(text) or _EXPLICIT_SEXUAL_COMPOUND.search(text))
+    )
 
 
 def _contains_explicit_sexual_content(text: str) -> bool:
-    return bool(_EXPLICIT_SEXUAL_TERMS.search(text))
+    return bool(_EXPLICIT_SEXUAL_TERMS.search(text) or _EXPLICIT_SEXUAL_COMPOUND.search(text))
 
 
 class RuleBasedSafeguardPolicy:

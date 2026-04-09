@@ -21,7 +21,7 @@ from backend.services.tabular_context import (
     TabularContextExtractor,
 )
 from backend.services.safeguard_service import (
-    RuleBasedSafeguardService,
+    ModeScopedSafeguardService,
     SafeguardService,
 )
 from backend.types import LLMClient, Settings
@@ -61,6 +61,20 @@ def get_tabular_context_extractor() -> TabularContextExtractor:
     return EmbeddedCsvTabularExtractor()
 
 
-def get_safeguard_service() -> SafeguardService:
-    """Return the safeguard policy service used to moderate chat input/output."""
-    return RuleBasedSafeguardService()
+def get_safeguard_service(
+    settings: Settings = Depends(get_settings),
+) -> SafeguardService | None:
+    """Return the active safeguard service, or None when moderation is disabled.
+
+    Controlled by two env vars (see docs/OPERATIONS.md — Safeguard configuration):
+      GOAT_SAFEGUARD_ENABLED=false  → always returns None (master kill-switch)
+      GOAT_SAFEGUARD_MODE=off       → also returns None
+      GOAT_SAFEGUARD_MODE=input_only|output_only|full → returns a ModeScopedSafeguardService
+
+    Returning None is correct: chat_stream_service already guards every safeguard
+    call with `if safeguard is None` checks, so None means "allow everything through"
+    without any scattered conditionals in the calling code.
+    """
+    if not settings.safeguard_enabled or settings.safeguard_mode == "off":
+        return None
+    return ModeScopedSafeguardService(mode=settings.safeguard_mode)

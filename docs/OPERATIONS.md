@@ -180,6 +180,28 @@ curl -sS -H "X-GOAT-API-Key: $GOAT_API_KEY" http://127.0.0.1:62606/api/system/me
 - Same key + different payload returns `409` (`code = IDEMPOTENCY_CONFLICT`)
 - Storage: SQLite `idempotency_keys` table with TTL cleanup on claim
 
+### Safeguard configuration
+
+The regex-based content moderation layer can be tuned or disabled entirely via two env vars.
+
+| Variable | Values | Default | Behavior |
+|----------|--------|---------|----------|
+| `GOAT_SAFEGUARD_ENABLED` | `true` / `false` | `true` | Master kill-switch. `false` disables all moderation. |
+| `GOAT_SAFEGUARD_MODE` | `off` / `input_only` / `output_only` / `full` | `full` | Scope of moderation when enabled. |
+
+**Mode semantics:**
+
+| Mode | Input check | Output check |
+|------|-------------|--------------|
+| `full` (default) | active | active |
+| `input_only` | active | skipped |
+| `output_only` | skipped | active |
+| `off` | skipped | skipped |
+
+Setting `GOAT_SAFEGUARD_ENABLED=false` and `GOAT_SAFEGUARD_MODE=off` are equivalent — both cause the dependency factory to inject `None`, which the chat streaming stack treats as "allow everything".
+
+**Architecture note:** disabling safeguard injects `None` into the dependency chain. The streaming services already handle `safeguard is None` at every call site without extra conditionals, so there is no risk of a null-pointer path being left open.
+
 ### RAG retrieval quality (Phase 14.7)
 
 **Regression:** run `python -m tools.run_rag_eval` (from the repository root) before merge when changing `backend/services/retrieval_quality/`, `tools/run_rag_eval.py`, or `evaldata/`. CI enforces this on every backend job.

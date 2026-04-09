@@ -95,6 +95,16 @@ fi
 cd "$PROJECT_DIR"
 git checkout "$GIT_REF"
 
+# Re-derive EFFECTIVE_OLLAMA_URL from project .env when not already set in shell,
+# so deploy skips local-Ollama startup when OLLAMA_BASE_URL is configured there.
+if [ -z "${OLLAMA_BASE_URL:-}" ] && [ -f "${PROJECT_DIR}/.env" ]; then
+  _dotenv_ollama="$(grep -m1 '^OLLAMA_BASE_URL=' "${PROJECT_DIR}/.env" 2>/dev/null | cut -d= -f2- | tr -d "'\"")"
+  if [ -n "$_dotenv_ollama" ]; then
+    OLLAMA_BASE_URL="$_dotenv_ollama"
+    EFFECTIVE_OLLAMA_URL="$_dotenv_ollama"
+  fi
+fi
+
 if [ "${SYNC_GIT}" = "1" ]; then
   echo "Syncing to origin/${GIT_BRANCH}"
   git fetch --all --prune

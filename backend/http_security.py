@@ -5,6 +5,8 @@ import threading
 import time
 import uuid
 from collections import deque
+
+from goat_ai.clocks import Clock, SystemClock
 from dataclasses import dataclass, field
 from typing import Callable, cast
 
@@ -134,8 +136,9 @@ def _build_rate_limited_response(request_id: str, retry_after: int) -> JSONRespo
     return response
 
 
-def register_http_security(app: FastAPI) -> None:
+def register_http_security(app: FastAPI, *, clock: Clock | None = None) -> None:
     limiter = InMemoryRateLimiter()
+    _clock = clock if clock is not None else SystemClock()
 
     @app.middleware("http")
     async def security_middleware(
@@ -171,7 +174,7 @@ def register_http_security(app: FastAPI) -> None:
 
                 allowed, retry_after = limiter.allow(
                     provided_api_key,
-                    now=time.monotonic(),
+                    now=_clock.monotonic(),
                     window_sec=settings.rate_limit_window_sec,
                     max_requests=settings.rate_limit_max_requests,
                 )
