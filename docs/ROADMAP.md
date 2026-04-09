@@ -1,4 +1,4 @@
-﻿# GOAT AI Roadmap
+# GOAT AI Roadmap
 
 > Last updated: 2026-04-09 - **v1.3.0** tags Phase **11-12**; **main** additionally ships **Phase 13** (full closeout) and **Phase 14** through **14.6 RAG-3**. **Phase 15.2-15.7** slices through **15.6** are complete on main (session store normalization, AuthZ keys + owner header, optional OTel). **Next:** further **Phase 15** structural work as listed below Section 15.7; keep the **Section 14.7** RAG eval gate green as retrieval evolves. **Constraints vs roadmap:** see [Current reality and improvement map](#current-reality-and-improvement-map).
 > Current release tag: **v1.3.0**
