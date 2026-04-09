@@ -37,9 +37,12 @@ This document names **user-visible and persistence concepts** shared across chat
 
 | Term | Meaning |
 |------|---------|
+| **RateLimitSubject** | Stable subject for a rate-limit bucket: `api_key_fingerprint`, `owner_id`, `route_group`, `method_class`. |
+| **RateLimitPolicy** | Pure sliding-window policy that owns `window_sec`, `max_requests`, subject key derivation, and admission decisions. |
+| **RateLimitStore** | Storage adapter for sliding-window timestamps. The in-memory implementation keeps per-key request times and prunes expired entries on read. |
 | **RateLimitDecision** | Immutable result of one rate-limit evaluation (`allowed: bool`, `retry_after: int`). Defined in `backend.domain.rate_limit_policy`. |
-| **Sliding window** | The in-process `InMemoryRateLimiter` uses a per-key timestamp deque; requests older than `window_sec` are evicted before each check. |
-| **Clock injection** | The rate-limiter `allow()` accepts `now: float` so tests pass a `FakeClock.monotonic()` value without real time passing. |
+| **Sliding window** | `RateLimitPolicy.decide()` evaluates the timestamps returned by `RateLimitStore` against `window_sec`, blocking when `max_requests` is reached. |
+| **Clock injection** | HTTP security passes `Clock.monotonic()` into the rate-limit policy/store path so tests can use a `FakeClock` without real time passing. |
 
 ## Session payload versioning
 

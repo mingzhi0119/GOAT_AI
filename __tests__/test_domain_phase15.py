@@ -159,6 +159,47 @@ class DomainSessionSchemaErrorTests(unittest.TestCase):
             result.messages,
         )
 
+    def test_decode_legacy_list_payload_remains_supported(self) -> None:
+        from backend.services.session_message_codec import decode_session_payload
+
+        legacy_payload = [
+            {"role": "user", "content": "hello"},
+            {"role": "__file_context__", "content": "uploaded table"},
+            {"role": "__chart__", "content": '{"version": "2.0", "title": "chart"}'},
+            {"role": "__file_context_ack__", "content": "ignored"},
+            {"role": "assistant", "content": "reply"},
+        ]
+        result = decode_session_payload(legacy_payload)
+        self.assertEqual(
+            [
+                {"role": "user", "content": "hello"},
+                {"role": "assistant", "content": "reply"},
+            ],
+            result.messages,
+        )
+        self.assertEqual("uploaded table", result.file_context_prompt)
+        self.assertEqual("uploaded", result.chart_data_source)
+        self.assertEqual({"version": "2.0", "title": "chart"}, result.chart_spec)
+
+    def test_decode_malformed_dict_payload_is_tolerant(self) -> None:
+        from backend.services.session_message_codec import decode_session_payload
+
+        malformed_payload = {
+            "messages": [
+                {"role": "assistant", "content": 123},
+                {"role": "robot", "content": "ignored"},
+                "not-a-dict",
+            ],
+            "chart_data_source": "bad-value",
+            "knowledge_documents": [{"document_id": "", "filename": "", "mime_type": ""}],
+        }
+        result = decode_session_payload(malformed_payload)
+        self.assertEqual([], result.messages)
+        self.assertIsNone(result.chart_spec)
+        self.assertIsNone(result.file_context_prompt)
+        self.assertEqual([], result.knowledge_documents)
+        self.assertEqual("none", result.chart_data_source)
+
 
 if __name__ == "__main__":
     unittest.main()

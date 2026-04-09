@@ -49,7 +49,7 @@ These slices address deferred items from 15.2 and 15.3 and extend the domain and
 
 **Goal:** eliminate the remaining `time.time()` / `datetime.now()` call-sites that affect testable behavior in the chat, rate-limit, and title-generation paths; replace them with injected `Clock` so unit tests need no `time.sleep`.
 
-**Current status (2026-04-09):** complete. The rate-limiter path is wired to `Clock` and covered by `__tests__/test_rate_limit_clock.py`, and the title/session-persist path now accepts injected `Clock` with deterministic coverage in `__tests__/test_chat_service.py`.
+**Current status (2026-04-09):** complete. The rate-limit path is wired to `Clock` through the policy/store split and covered by `__tests__/test_rate_limit_clock.py`, and the title/session-persist path now accepts injected `Clock` with deterministic coverage in `__tests__/test_chat_service.py`.
 
 | Task | Exit criterion |
 |------|----------------|
@@ -95,11 +95,11 @@ These slices address deferred items from 15.2 and 15.3 and extend the domain and
 
 **Goal:** promote the two most rule-heavy cross-cutting concerns — rate limiting and session schema validation — into typed domain objects, and expand `DOMAIN.md` to cover them.
 
-**Current status (2026-04-09):** complete. `backend.domain.rate_limit_policy` and the associated domain tests exist, [DOMAIN.md](DOMAIN.md) has the new terms, and `decode_session_payload` now raises `SessionSchemaError` for unsupported future payload versions.
+**Current status (2026-04-09):** complete. `backend.domain.rate_limit_policy` now exposes `RateLimitSubject`, `RateLimitPolicy`, and `RateLimitDecision`; HTTP security delegates to a policy/store pair; [DOMAIN.md](DOMAIN.md) has the new terms; and `decode_session_payload` now raises `SessionSchemaError` for unsupported future payload versions while preserving legacy compatibility.
 
 | Task | Exit criterion |
 |------|----------------|
-| `RateLimitPolicy` in `backend.domain`: encapsulates window size, limit, and key derivation | Unit-tested in `test_domain_phase15.py`; middleware delegates decision to policy object |
+| `RateLimitSubject` / `RateLimitPolicy` in `backend.domain`: encapsulate bucket identity, window size, limit, and key derivation | Unit-tested in `test_domain_rate_limit_policy.py` and `test_domain_phase15.py`; middleware delegates to policy + store |
 | Session read invariant: validate `schema_version` on decode, not only on write | `decode_session_payload` raises a typed `SessionSchemaError` on unknown version; covered in `test_fake_session_repository.py` |
 | `DOMAIN.md` updated with rate-limit and session-version terms | PR checklist link active; no new ubiquitous terms undocumented |
 | `import-linter` layer for `backend.domain` unchanged (no new upward imports) | CI green |
@@ -173,7 +173,7 @@ This section records **constraints that match today's shipped architecture** and
 
 | Reality (main) | Improvement path | Roadmap / docs home |
 |----------------|------------------|---------------------|
-| `SafeguardPolicy`, chart provenance policy, `chart_spec_requires_version_field`, and `RateLimitPolicy` exist in `backend.domain`; future session payload versions now fail loudly on read. | Maintain the invariant when evolving session schema. | Section **15.11**; [DOMAIN.md](DOMAIN.md). |
+| `SafeguardPolicy`, chart provenance policy, `chart_spec_requires_version_field`, and `RateLimitSubject` / `RateLimitPolicy` exist in `backend.domain`; `RateLimitStore` lives in services; future session payload versions now fail loudly on read. | Maintain the invariant when evolving session schema. | Section **15.11**; [DOMAIN.md](DOMAIN.md). |
 | Application layer migration is complete and router boundaries have been audited. | Maintain the import direction and keep new business rules in `application` or `domain`, not routers. | Section **15.9**. |
 
 **Priority:** Before any Phase 16 AuthZ or datastore expansion.
@@ -254,5 +254,5 @@ Current behavior:
 | 2026-04-08 | Phase 14.7 implemented | CI runs `python -m tools.run_rag_eval`; `evaldata/README.md` + `VERSION`; OPERATIONS RAG retrieval quality; Prometheus `knowledge_retrieval_requests_total` / `knowledge_query_rewrite_applied_total`; ENGINEERING_STANDARDS Section 12 RAG bullet. |
 | 2026-04-08 | Phase 15.4–15.6 complete | `session_messages` dual-read/write + `sessions.owner_id`; read/write API keys + optional `X-GOAT-Owner-Id`; lazy OpenTelemetry with `traceparent` and Ollama spans. |
 | 2026-04-08 | Developer CLI: `python -m tools.*` | `tools/` is a package (`tools/__init__.py`); run modules from repo root. CI uses `python -m tools.run_rag_eval` and `python -m tools.check_api_contract_sync`. |
-| 2026-04-09 | Phase 15.8, 15.10, and 15.11 closed on main | 15.8: `Clock` now reaches rate-limit and title/session-persist flows. 15.10: integration coverage includes retrieval-backed chat in addition to history and knowledge-pipeline flows. 15.11: future-version session payloads now raise `SessionSchemaError` on read. |
+| 2026-04-09 | Phase 15.8, 15.10, and 15.11 closed on main | 15.8: `Clock` now reaches rate-limit and title/session-persist flows. 15.10: integration coverage includes retrieval-backed chat in addition to history and knowledge-pipeline flows. 15.11: domain rate-limit policy/store split is landed and future-version session payloads now raise `SessionSchemaError` on read. |
 | 2026-04-09 | Phase 15.9 closed; Phase 15 fully complete on main | Router/application boundaries audited across history, knowledge, upload, chat, system, models, media, artifacts, and code-sandbox routes; `lint-imports` kept green; dependency graph docs updated. |

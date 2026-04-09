@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from backend.config import CORS_ORIGINS, get_settings
+from backend.domain.rate_limit_policy import RateLimitPolicy
 from backend.exception_handlers import register_exception_handlers
 from backend.http_security import register_http_security
 from backend.routers import (
@@ -24,6 +25,8 @@ from backend.routers import (
     upload,
 )
 from backend.services import log_service
+from backend.services.rate_limit_store import InMemorySlidingWindowRateLimitStore
+from goat_ai.config import Settings
 from goat_ai.latency_metrics import init_latency_metrics
 from goat_ai.logging_config import configure_logging
 from goat_ai.otel_tracing import init_otel_if_enabled, is_otel_enabled
@@ -91,7 +94,19 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    register_http_security(app)
+    rate_limit_store = InMemorySlidingWindowRateLimitStore()
+
+    def rate_limit_policy_factory(settings: Settings) -> RateLimitPolicy:
+        return RateLimitPolicy(
+            window_sec=settings.rate_limit_window_sec,
+            max_requests=settings.rate_limit_max_requests,
+        )
+
+    register_http_security(
+        app,
+        rate_limit_policy_factory=rate_limit_policy_factory,
+        rate_limit_store=rate_limit_store,
+    )
 
     app.include_router(models.router, prefix="/api", tags=["models"])
     app.include_router(chat.router, prefix="/api", tags=["chat"])

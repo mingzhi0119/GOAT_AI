@@ -1,14 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 import logging
-import threading
 import time
 import uuid
-from collections import deque
-
-from goat_ai.clocks import Clock, SystemClock
-from dataclasses import dataclass, field
-from typing import Callable, cast
+from typing import Callable, Protocol, cast
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
@@ -21,12 +17,14 @@ from backend.api_errors import (
 )
 from backend.config import get_settings
 from backend.prometheus_metrics import record_http_request
+from goat_ai.clocks import Clock, SystemClock
 from goat_ai.config import Settings
 from goat_ai.request_context import reset_request_id, set_request_id
 
 _HEALTH_PATH = "/api/health"
 _READY_PATH = "/api/ready"
 _API_KEY_HEADER = "X-GOAT-API-Key"
+_OWNER_ID_HEADER = "X-GOAT-Owner-Id"
 _REQUEST_ID_HEADER = "X-Request-ID"
 _RETRY_AFTER_HEADER = "Retry-After"
 _RATE_LIMIT_MESSAGE = "Too many requests. Please try again shortly."
@@ -39,26 +37,27 @@ access_logger = logging.getLogger("goat_ai.access")
 SettingsFactory = Callable[[], Settings]
 
 
-@dataclass
-class InMemoryRateLimiter:
-    _requests_by_key: dict[str, deque[float]] = field(default_factory=dict)
-    _lock: threading.Lock = field(default_factory=threading.Lock)
+class RateLimitDecisionLike(Protocol):
+    allowed: bool
+    retry_after: int
 
-    def allow(
-        self, key: str, *, now: float, window_sec: int, max_requests: int
-    ) -> tuple[bool, int]:
-        with self._lock:
-            bucket = self._requests_by_key.setdefault(key, deque())
-            cutoff = now - float(window_sec)
-            while bucket and bucket[0] <= cutoff:
-                bucket.popleft()
 
-            if len(bucket) >= max_requests:
-                retry_after = max(1, int(bucket[0] + float(window_sec) - now))
-                return False, retry_after
+class RateLimitStoreLike(Protocol):
+    def get_timestamps(self, key: str, *, now: float, window_sec: int) -> list[float]:
+        ...
 
-            bucket.append(now)
-            return True, 0
+    def replace_timestamps(self, key: str, timestamps: list[float]) -> None:
+        ...
+
+
+class RateLimitPolicyLike(Protocol):
+    window_sec: int
+
+    def key_for(self, subject: object) -> str:
+        ...
+
+    def decide(self, observed_timestamps: list[float], *, now: float) -> RateLimitDecisionLike:
+        ...
 
 
 def _resolve_settings(app: FastAPI) -> Settings:
@@ -136,8 +135,30 @@ def _build_rate_limited_response(request_id: str, retry_after: int) -> JSONRespo
     return response
 
 
-def register_http_security(app: FastAPI, *, clock: Clock | None = None) -> None:
-    limiter = InMemoryRateLimiter()
+def _method_class(method: str) -> str:
+    return "read" if method in _READ_METHODS else "write"
+
+
+def _fingerprint_api_key(api_key: str) -> str:
+    return hashlib.sha256(api_key.encode("utf-8")).hexdigest()
+
+
+def _build_rate_limit_subject(request: Request, provided_api_key: str) -> dict[str, str]:
+    return {
+        "api_key_fingerprint": _fingerprint_api_key(provided_api_key),
+        "method_class": _method_class(request.method),
+        "owner_id": (request.headers.get(_OWNER_ID_HEADER) or "").strip(),
+        "route_group": _route_template(request),
+    }
+
+
+def register_http_security(
+    app: FastAPI,
+    *,
+    clock: Clock | None = None,
+    rate_limit_policy_factory: Callable[[Settings], RateLimitPolicyLike],
+    rate_limit_store: RateLimitStoreLike,
+) -> None:
     _clock = clock if clock is not None else SystemClock()
 
     @app.middleware("http")
@@ -172,15 +193,20 @@ def register_http_security(app: FastAPI, *, clock: Clock | None = None) -> None:
                     status_code = 403
                     return _build_forbidden_write_key_response(request_id)
 
-                allowed, retry_after = limiter.allow(
-                    provided_api_key,
-                    now=_clock.monotonic(),
-                    window_sec=settings.rate_limit_window_sec,
-                    max_requests=settings.rate_limit_max_requests,
+                rate_limit_policy = rate_limit_policy_factory(settings)
+                subject = _build_rate_limit_subject(request, provided_api_key)
+                rate_limit_key = rate_limit_policy.key_for(subject)
+                now = _clock.monotonic()
+                timestamps = rate_limit_store.get_timestamps(
+                    rate_limit_key,
+                    now=now,
+                    window_sec=rate_limit_policy.window_sec,
                 )
-                if not allowed:
+                decision = rate_limit_policy.decide(timestamps, now=now)
+                if not decision.allowed:
                     status_code = 429
-                    return _build_rate_limited_response(request_id, retry_after)
+                    return _build_rate_limited_response(request_id, decision.retry_after)
+                rate_limit_store.replace_timestamps(rate_limit_key, [*timestamps, now])
 
             response = await call_next(request)
             status_code = response.status_code

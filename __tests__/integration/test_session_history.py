@@ -57,7 +57,7 @@ def test_list_history_returns_seeded_sessions(app_client: object) -> None:
     _seed_session(db, "sess-list-1", "Session One")
     _seed_session(db, "sess-list-2", "Session Two")
 
-    response = app_client.get("/api/history/sessions")
+    response = app_client.get("/api/history")
     assert response.status_code == 200
     body = response.json()
     ids = {s["id"] for s in body["sessions"]}
@@ -81,7 +81,7 @@ def test_get_history_session_detail_returns_messages(app_client: object) -> None
     log_service.init_db(db)
     _seed_session(db, "sess-detail-1", "Detail Test")
 
-    response = app_client.get("/api/history/sessions/sess-detail-1")
+    response = app_client.get("/api/history/sess-detail-1")
     assert response.status_code == 200
     body = response.json()
     assert body["id"] == "sess-detail-1"
@@ -94,7 +94,7 @@ def test_get_history_session_detail_not_found(app_client: object) -> None:
     from fastapi.testclient import TestClient
 
     assert isinstance(app_client, TestClient)
-    response = app_client.get("/api/history/sessions/no-such-session")
+    response = app_client.get("/api/history/no-such-session")
     assert response.status_code == 404
 
 
@@ -114,16 +114,16 @@ def test_delete_history_session_removes_it(app_client: object) -> None:
     log_service.init_db(db)
     _seed_session(db, "sess-del-1", "To Delete")
 
-    assert app_client.get("/api/history/sessions/sess-del-1").status_code == 200
-    assert app_client.delete("/api/history/sessions/sess-del-1").status_code == 204
-    assert app_client.get("/api/history/sessions/sess-del-1").status_code == 404
+    assert app_client.get("/api/history/sess-del-1").status_code == 200
+    assert app_client.delete("/api/history/sess-del-1").status_code == 204
+    assert app_client.get("/api/history/sess-del-1").status_code == 404
 
 
 def test_delete_history_session_not_found(app_client: object) -> None:
     from fastapi.testclient import TestClient
 
     assert isinstance(app_client, TestClient)
-    response = app_client.delete("/api/history/sessions/ghost-session")
+    response = app_client.delete("/api/history/ghost-session")
     assert response.status_code == 404
 
 
@@ -144,6 +144,6 @@ def test_delete_all_history_removes_all(app_client: object) -> None:
     _seed_session(db, "sess-all-1", "Alpha")
     _seed_session(db, "sess-all-2", "Beta")
 
-    assert app_client.delete("/api/history/sessions").status_code == 204
-    body = app_client.get("/api/history/sessions").json()
+    assert app_client.delete("/api/history").status_code == 204
+    body = app_client.get("/api/history").json()
     assert body["sessions"] == []

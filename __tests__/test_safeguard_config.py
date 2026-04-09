@@ -39,18 +39,18 @@ def _settings(root: Path, **kwargs: object) -> Settings:
 class TestSafeguardSettingsDefaults(unittest.TestCase):
     def test_defaults_are_safe(self) -> None:
         """Default: safeguard enabled, mode=full (no regression on existing behaviour)."""
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             s = _settings(Path(tmp))
             self.assertTrue(s.safeguard_enabled)
             self.assertEqual("full", s.safeguard_mode)
 
     def test_explicit_disabled(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             s = _settings(Path(tmp), safeguard_enabled=False)
             self.assertFalse(s.safeguard_enabled)
 
     def test_mode_values(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             for mode in ("off", "input_only", "output_only", "full"):
                 s = _settings(Path(tmp), safeguard_mode=mode)  # type: ignore[arg-type]
                 self.assertEqual(mode, s.safeguard_mode)
@@ -101,7 +101,7 @@ class TestGetSafeguardServiceFactory(unittest.TestCase):
         """Call get_safeguard_service() with an injected Settings, bypassing FastAPI."""
         from backend.dependencies import get_safeguard_service
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             s = _settings(Path(tmp), **kwargs)
             # get_safeguard_service is a FastAPI Depends factory; call it like a plain
             # function by passing the settings argument directly.
@@ -238,7 +238,7 @@ class TestChatStreamWithDisabledSafeguard(unittest.TestCase):
             def generate_completion(self, model, prompt, **kw) -> str:  # type: ignore[override]
                 return ""
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             db = Path(tmp) / "chat.db"
             log_service.init_db(db)
             return list(

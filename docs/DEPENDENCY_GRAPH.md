@@ -43,6 +43,7 @@ Wired routes:
 - `POST /api/chat` uses `backend.application.chat` for request preflight before streaming.
 - `GET /api/artifacts/{artifact_id}` flows through `backend.application.artifacts`.
 - `POST /api/code-sandbox/exec` uses `backend.application.code_sandbox` for the feature gate.
+- `backend.http_security` remains a thin middleware adapter: it derives the rate-limit subject from request context, calls `backend.domain.rate_limit_policy.RateLimitPolicy`, and persists timestamps through `backend.services.rate_limit_store.InMemorySlidingWindowRateLimitStore`.
 - `backend.application.ports` is the shared contract face for `Settings`, `LLMClient`, `SessionRepository`, `ConversationLogger`, `TitleGenerator`, `SafeguardService`, `TabularContextExtractor`, and the stable shared exceptions; `backend.application.exceptions` keeps application-specific error classes.
 - Routers and application modules should not import `backend.services.exceptions` or `backend.services.chat_capacity_service` directly.
 
