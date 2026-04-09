@@ -443,22 +443,29 @@ def create_app() -> FastAPI:
 # requirements.txt - exact pins, grouped
 # Web framework
 fastapi==0.135.2
-uvicorn[standard]==0.35.0
-python-multipart==0.0.20
+uvicorn==0.35.0
+python-multipart==0.0.22
 
 # Data
-pandas==2.2.3
+pandas==3.0.2
 openpyxl==3.1.5
+python-docx==1.2.0
+pypdf==6.9.2
 
 # HTTP client
-requests==2.32.3
+requests==2.33.0
+httpx==0.28.1
+
+# OpenTelemetry (optional; lazy-loaded when GOAT_OTEL_ENABLED=1)
+opentelemetry-api==1.28.2
+opentelemetry-sdk==1.28.2
+opentelemetry-exporter-otlp-proto-http==1.28.2
 
 # Validation / config
 pydantic==2.x.x
 
-# Testing
+# Testing (requirements-ci.txt adds these on top of requirements.txt)
 pytest==8.x
-httpx==0.x           # FastAPI TestClient support
 ```
 
 - Keep `requirements.txt` as the runtime install source of truth for deploy; CI and full local dev use `requirements-ci.txt` (`-r requirements.txt` plus lint/test/audit pins).
