@@ -15,6 +15,10 @@ from backend.api_errors import (
     RATE_LIMITED,
     build_error_body,
 )
+from backend.application.credential_registry import (
+    build_local_authorization_context,
+    resolve_authorization_context,
+)
 from backend.config import get_settings
 from backend.prometheus_metrics import record_http_request
 from goat_ai.clocks import Clock, SystemClock
@@ -31,6 +35,16 @@ _RATE_LIMIT_MESSAGE = "Too many requests. Please try again shortly."
 _UNAUTHORIZED_MESSAGE = "Invalid or missing API key."
 _READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 _WRITE_KEY_DETAIL = "Write operations require the write API key."
+_WRITE_SCOPES = frozenset(
+    {
+        "chat:write",
+        "history:write",
+        "knowledge:write",
+        "media:write",
+        "artifact:write",
+        "sandbox:execute",
+    }
+)
 
 access_logger = logging.getLogger("goat_ai.access")
 
@@ -78,21 +92,6 @@ def _route_template(request: Request) -> str:
     if isinstance(path_attr, str) and path_attr:
         return path_attr
     return request.url.path.split("?")[0]
-
-
-def _api_key_role(settings: Settings, provided: str) -> str | None:
-    """Return ``read``, ``write``, ``full``, or ``None`` if invalid."""
-    if not provided:
-        return None
-    if settings.api_key_write:
-        if provided == settings.api_key:
-            return "read"
-        if provided == settings.api_key_write:
-            return "write"
-        return None
-    if settings.api_key and provided == settings.api_key:
-        return "full"
-    return None
 
 
 def _build_forbidden_write_key_response(request_id: str) -> JSONResponse:
@@ -143,6 +142,12 @@ def _fingerprint_api_key(api_key: str) -> str:
     return hashlib.sha256(api_key.encode("utf-8")).hexdigest()
 
 
+def _has_any_write_scope(scopes: object) -> bool:
+    if not isinstance(scopes, frozenset):
+        return False
+    return bool(_WRITE_SCOPES & scopes)
+
+
 def _build_rate_limit_subject(request: Request, provided_api_key: str) -> dict[str, str]:
     return {
         "api_key_fingerprint": _fingerprint_api_key(provided_api_key),
@@ -179,19 +184,26 @@ def register_http_security(
                 return response
 
             settings = _resolve_settings(app)
+            request.state.request_id = request_id
             if settings.api_key:
                 provided_api_key = request.headers.get(_API_KEY_HEADER, "").strip()
-                role = _api_key_role(settings, provided_api_key)
-                if role is None:
+                legacy_owner_id = (request.headers.get(_OWNER_ID_HEADER) or "").strip()
+                auth_context = resolve_authorization_context(
+                    provided_api_key=provided_api_key,
+                    settings=settings,
+                    legacy_owner_id=legacy_owner_id,
+                )
+                if auth_context is None:
                     status_code = 401
                     return _build_unauthorized_response(request_id)
                 if (
                     settings.api_key_write
                     and request.method not in _READ_METHODS
-                    and role == "read"
+                    and not _has_any_write_scope(auth_context.scopes)
                 ):
                     status_code = 403
                     return _build_forbidden_write_key_response(request_id)
+                request.state.authorization_context = auth_context
 
                 rate_limit_policy = rate_limit_policy_factory(settings)
                 subject = _build_rate_limit_subject(request, provided_api_key)
@@ -207,6 +219,8 @@ def register_http_security(
                     status_code = 429
                     return _build_rate_limited_response(request_id, decision.retry_after)
                 rate_limit_store.replace_timestamps(rate_limit_key, [*timestamps, now])
+            else:
+                request.state.authorization_context = build_local_authorization_context()
 
             response = await call_next(request)
             status_code = response.status_code

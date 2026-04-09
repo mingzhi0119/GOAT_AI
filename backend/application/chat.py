@@ -6,6 +6,7 @@ import json
 from dataclasses import dataclass
 from collections.abc import Generator
 
+from backend.application.authz_types import AuthorizationContext
 from fastapi.responses import StreamingResponse
 
 from backend.application.ports import (
@@ -48,6 +49,7 @@ class PreparedChatRequest:
 
     merged_messages: list[ChatMessage]
     session_owner_id: str
+    auth_context: AuthorizationContext
     vision_last_user_images_base64: list[str] | None
     ollama_options: dict[str, float | int] | None
 
@@ -68,9 +70,11 @@ def prepare_chat_request(
     req: ChatRequest,
     settings: Settings,
     llm: LLMClient,
-    session_owner_id: str,
+    auth_context: AuthorizationContext,
+    request_id: str = "",
 ) -> PreparedChatRequest:
     """Validate chat request constraints and resolve derived request state."""
+    session_owner_id = auth_context.legacy_owner_id
     validate_chat_capacity(req=req, settings=settings)
     if req.knowledge_document_ids and req.image_attachment_ids:
         raise ChatKnowledgeImageConflictError(
@@ -89,6 +93,8 @@ def prepare_chat_request(
         vision_b64 = load_images_base64_for_chat(
             attachment_ids=req.image_attachment_ids,
             settings=settings,
+            auth_context=auth_context,
+            request_id=request_id,
         )
         try:
             caps = llm.get_model_capabilities(req.model)
@@ -100,6 +106,7 @@ def prepare_chat_request(
     return PreparedChatRequest(
         merged_messages=merged_messages,
         session_owner_id=session_owner_id,
+        auth_context=auth_context,
         vision_last_user_images_base64=vision_b64,
         ollama_options=_build_ollama_options(req),
     )
@@ -130,6 +137,7 @@ def stream_chat_response(
     safeguard_service: SafeguardService | None,
     settings: Settings,
     idempotency_key: str,
+    request_id: str = "",
 ) -> StreamingResponse:
     """Build the SSE response for chat, including optional idempotency replay."""
     source_stream = stream_chat_sse(
@@ -152,6 +160,8 @@ def stream_chat_response(
         knowledge_document_ids=req.knowledge_document_ids,
         vision_last_user_images_base64=prepared.vision_last_user_images_base64,
         session_owner_id=prepared.session_owner_id,
+        auth_context=prepared.auth_context,
+        request_id=request_id,
     )
 
     if not idempotency_key or not req.session_id:

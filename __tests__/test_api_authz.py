@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from dataclasses import replace
 from datetime import datetime, timezone
+import io
 from pathlib import Path
 
 try:
@@ -120,6 +121,59 @@ class ApiAuthzTests(unittest.TestCase):
         )
         headers = {"X-GOAT-API-Key": "read-key", "X-GOAT-Owner-Id": "bob"}
         response = self.client.get("/api/history/sess-authz-1", headers=headers)
+        self.assertEqual(404, response.status_code)
+
+    def test_read_key_forbidden_on_knowledge_upload(self) -> None:
+        response = self.client.post(
+            "/api/knowledge/uploads",
+            headers={"X-GOAT-API-Key": "read-key"},
+            files={"file": ("notes.txt", io.BytesIO(b"alpha"), "text/plain")},
+        )
+        self.assertEqual(403, response.status_code)
+        self.assertEqual(AUTH_WRITE_KEY_REQUIRED, response.json()["code"])
+
+    def test_knowledge_owner_mismatch_returns_404(self) -> None:
+        upload = self.client.post(
+            "/api/knowledge/uploads",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+            files={"file": ("notes.txt", io.BytesIO(b"alpha beta"), "text/plain")},
+        )
+        self.assertEqual(200, upload.status_code)
+        document_id = upload.json()["document_id"]
+
+        response = self.client.get(
+            f"/api/knowledge/uploads/{document_id}",
+            headers={"X-GOAT-API-Key": "read-key", "X-GOAT-Owner-Id": "bob"},
+        )
+        self.assertEqual(404, response.status_code)
+
+    def test_media_owner_mismatch_returns_404_during_chat(self) -> None:
+        png = (
+            b"\x89PNG\r\n\x1a\n"
+            b"\x00\x00\x00\rIHDR"
+            b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00"
+            b"\x90wS\xde"
+            b"\x00\x00\x00\x0cIDATx\x9cc`\x00\x00\x00\x02\x00\x01"
+            b"\xe2!\xbc3"
+            b"\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+        upload = self.client.post(
+            "/api/media/uploads",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+            files={"file": ("tiny.png", io.BytesIO(png), "image/png")},
+        )
+        self.assertEqual(200, upload.status_code)
+        attachment_id = upload.json()["attachment_id"]
+
+        response = self.client.post(
+            "/api/chat",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "bob"},
+            json={
+                "model": "blackbox-model",
+                "messages": [{"role": "user", "content": "describe"}],
+                "image_attachment_ids": [attachment_id],
+            },
+        )
         self.assertEqual(404, response.status_code)
 
 

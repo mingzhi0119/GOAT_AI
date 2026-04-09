@@ -18,6 +18,9 @@ class KnowledgeDocumentRecord:
     created_at: str
     updated_at: str
     deleted_at: str | None
+    owner_id: str = ""
+    tenant_id: str = "tenant:default"
+    principal_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -62,8 +65,8 @@ class SQLiteKnowledgeRepository:
             conn.execute(
                 """
                 INSERT INTO knowledge_documents
-                    (id, source_type, original_filename, mime_type, sha256, storage_path, byte_size, status, created_at, updated_at, deleted_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (id, source_type, original_filename, mime_type, sha256, storage_path, byte_size, status, created_at, updated_at, deleted_at, owner_id, tenant_id, principal_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     record.id,
@@ -77,6 +80,9 @@ class SQLiteKnowledgeRepository:
                     record.created_at,
                     record.updated_at,
                     record.deleted_at,
+                    record.owner_id,
+                    record.tenant_id,
+                    record.principal_id,
                 ),
             )
 
@@ -85,7 +91,7 @@ class SQLiteKnowledgeRepository:
             conn.row_factory = sqlite3.Row
             row = conn.execute(
                 """
-                SELECT id, source_type, original_filename, mime_type, sha256, storage_path, byte_size, status, created_at, updated_at, deleted_at
+                SELECT id, source_type, original_filename, mime_type, sha256, storage_path, byte_size, status, created_at, updated_at, deleted_at, owner_id, tenant_id, principal_id
                 FROM knowledge_documents
                 WHERE id = ? AND deleted_at IS NULL
                 """,
@@ -103,12 +109,26 @@ class SQLiteKnowledgeRepository:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 f"""
-                SELECT id, source_type, original_filename, mime_type, sha256, storage_path, byte_size, status, created_at, updated_at, deleted_at
+                SELECT id, source_type, original_filename, mime_type, sha256, storage_path, byte_size, status, created_at, updated_at, deleted_at, owner_id, tenant_id, principal_id
                 FROM knowledge_documents
                 WHERE deleted_at IS NULL AND id IN ({placeholders})
                 ORDER BY created_at ASC
                 """,
                 tuple(document_ids),
+            ).fetchall()
+        return [KnowledgeDocumentRecord(**dict(row)) for row in rows]
+
+    def list_documents_for_tenant(self, tenant_id: str) -> list[KnowledgeDocumentRecord]:
+        with sqlite3.connect(self._db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT id, source_type, original_filename, mime_type, sha256, storage_path, byte_size, status, created_at, updated_at, deleted_at, owner_id, tenant_id, principal_id
+                FROM knowledge_documents
+                WHERE deleted_at IS NULL AND tenant_id = ?
+                ORDER BY created_at ASC
+                """,
+                (tenant_id,),
             ).fetchall()
         return [KnowledgeDocumentRecord(**dict(row)) for row in rows]
 

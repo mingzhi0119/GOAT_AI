@@ -28,7 +28,10 @@ class InMemorySessionRepository:
         self._artifacts: dict[str, PersistedArtifactRecord] = {}
 
     def list_sessions(
-        self, owner_filter: str | None = None
+        self,
+        owner_filter: str | None = None,
+        *,
+        tenant_filter: str | None = None,
     ) -> list[SessionSummaryRecord]:
         out: list[SessionSummaryRecord] = []
         for sid, row in sorted(
@@ -36,6 +39,9 @@ class InMemorySessionRepository:
         ):
             row_owner = str(row.get("owner_id", ""))
             if owner_filter is not None and row_owner != owner_filter:
+                continue
+            row_tenant = str(row.get("tenant_id", "tenant:default"))
+            if tenant_filter is not None and row_tenant != tenant_filter:
                 continue
             out.append(
                 SessionSummaryRecord(
@@ -46,6 +52,8 @@ class InMemorySessionRepository:
                     created_at=str(row["created_at"]),
                     updated_at=str(row["updated_at"]),
                     owner_id=row_owner,
+                    tenant_id=row_tenant,
+                    principal_id=str(row.get("principal_id", "")),
                 )
             )
         return out
@@ -66,6 +74,8 @@ class InMemorySessionRepository:
             created_at=str(row["created_at"]),
             updated_at=str(row["updated_at"]),
             owner_id=str(row.get("owner_id", "")),
+            tenant_id=str(row.get("tenant_id", "tenant:default")),
+            principal_id=str(row.get("principal_id", "")),
             messages=decoded.messages,
             chart_spec=decoded.chart_spec,
             file_context_prompt=decoded.file_context_prompt,
@@ -83,19 +93,30 @@ class InMemorySessionRepository:
             "updated_at": payload.updated_at,
             "messages": payload.payload,
             "owner_id": payload.owner_id,
+            "tenant_id": payload.tenant_id,
+            "principal_id": payload.principal_id,
         }
 
     def delete_session(self, session_id: str) -> None:
         self._rows.pop(session_id, None)
 
-    def delete_all_sessions(self, owner_filter: str | None = None) -> None:
-        if owner_filter is None:
+    def delete_all_sessions(
+        self,
+        owner_filter: str | None = None,
+        *,
+        tenant_filter: str | None = None,
+    ) -> None:
+        if owner_filter is None and tenant_filter is None:
             self._rows.clear()
             return
         for sid in [
             k
             for k, row in self._rows.items()
-            if str(row.get("owner_id", "")) == owner_filter
+            if (owner_filter is None or str(row.get("owner_id", "")) == owner_filter)
+            and (
+                tenant_filter is None
+                or str(row.get("tenant_id", "tenant:default")) == tenant_filter
+            )
         ]:
             del self._rows[sid]
 
@@ -164,6 +185,8 @@ class TestFakeSessionRepository(unittest.TestCase):
                 "chart_data_source": "none",
             },
             "owner_id": "",
+            "tenant_id": "tenant:default",
+            "principal_id": "",
         }
 
         with self.assertRaises(SessionSchemaError):

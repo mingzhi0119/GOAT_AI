@@ -44,6 +44,16 @@ This document names **user-visible and persistence concepts** shared across chat
 | **Sliding window** | `RateLimitPolicy.decide()` evaluates the timestamps returned by `RateLimitStore` against `window_sec`, blocking when `max_requests` is reached. |
 | **Clock injection** | HTTP security passes `Clock.monotonic()` into the rate-limit policy/store path so tests can use a `FakeClock` without real time passing. |
 
+## Authorization and tenancy
+
+| Term | Meaning |
+|------|---------|
+| **Credential principal** | Minimal trusted caller identity derived from an API credential. It is not end-user identity. |
+| **Tenant** | Explicit resource boundary carried in authz context and persisted metadata; v1 defaults to `tenant:default`. |
+| **Scope** | Stable authorization capability string such as `history:read` or `artifact:write`. |
+| **AuthorizationContext** | Request-scoped authz state: `principal_id`, `tenant_id`, `scopes`, `credential_id`, legacy owner header, and auth mode. |
+| **AuthorizationDecision** | Pure allow/deny result with a stable `reason_code` plus optional concealment semantics for `404`-style denials. |
+
 ## Session payload versioning
 
 | Term | Meaning |

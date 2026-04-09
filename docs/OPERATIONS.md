@@ -104,6 +104,7 @@ Self-managed VMs, Docker Compose, Kubernetes, or developer laptops use the same 
 | `GOAT_DATA_DIR` | Root directory for persisted uploads, normalized knowledge text, vector indexes, and vision attachments | `<project>/data` (gitignored by default; do not commit) |
 | `GOAT_API_KEY` | Protect non-health APIs via `X-GOAT-API-Key` | empty |
 | `GOAT_API_KEY_WRITE` | Optional second key: `GET`/`HEAD`/`OPTIONS` may use read key (`GOAT_API_KEY`); other methods require this write key when set | empty |
+| `GOAT_API_CREDENTIALS_JSON` | Optional JSON credential registry; when empty, the app derives default read/write credentials from `GOAT_API_KEY` and `GOAT_API_KEY_WRITE` | empty |
 | `GOAT_REQUIRE_SESSION_OWNER` | When `true`/`1`, chat and history routes require `X-GOAT-Owner-Id` (session scoping) | `false` |
 | `GOAT_RATE_LIMIT_WINDOW_SEC` | Rate limit window | `60` |
 | `GOAT_RATE_LIMIT_MAX_REQUESTS` | Max requests per window | `60` |
@@ -145,6 +146,53 @@ Example line:
 
 ```json
 {"ts": "2026-04-07 12:00:00,000", "level": "INFO", "logger": "goat_ai.access", "message": "http_request", "request_id": "550e8400-e29b-41d4-a716-446655440000", "route": "/api/history", "status": 200, "duration_ms": 2.145}
+
+### Credential-backed authorization (Phase 16C)
+
+- The server still accepts `X-GOAT-API-Key` at ingress, but requests now resolve to a request-scoped authorization context with:
+  - `principal_id`
+  - `tenant_id`
+  - `scopes`
+  - `credential_id`
+  - legacy `X-GOAT-Owner-Id`
+- This is credential-backed authorization, not end-user identity.
+- When `GOAT_API_CREDENTIALS_JSON` is empty:
+  - `GOAT_API_KEY` becomes `principal:read-default` with read scopes
+  - `GOAT_API_KEY_WRITE` becomes `principal:write-default` with read+write scopes
+  - default tenant is `tenant:default`
+- Cross-owner or cross-tenant reads are concealed as `404` where possible.
+- Missing API key remains `401`; insufficient scope remains `403`.
+
+Example `GOAT_API_CREDENTIALS_JSON`:
+
+```json
+[
+  {
+    "credential_id": "cred-read-analytics",
+    "secret": "replace-me",
+    "principal_id": "principal:analytics-read",
+    "tenant_id": "tenant:default",
+    "status": "active",
+    "scopes": ["history:read", "knowledge:read", "media:read", "artifact:read"]
+  }
+]
+```
+
+### Authorization audit events (Phase 16C)
+
+- Logger: `goat_ai.authz`
+- Event name: `authorization_decision`
+- Stable fields:
+  - `principal_id`
+  - `tenant_id`
+  - `credential_id`
+  - `action`
+  - `resource_type`
+  - `resource_id`
+  - `result`
+  - `reason_code`
+  - `request_id`
+- Never log raw API keys or credential secrets.
 ```
 
 ### Metrics (Prometheus)
@@ -338,4 +386,3 @@ Treat the following as operational stop signs during Phase 13 rollout work:
 
 For exact request and response details, use [API_REFERENCE.md](API_REFERENCE.md).  
 For current upload/API threat notes, use [SECURITY.md](SECURITY.md).
-

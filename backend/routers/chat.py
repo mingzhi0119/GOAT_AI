@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from fastapi.responses import StreamingResponse
 
 from backend.api_errors import AUTH_SESSION_OWNER_REQUIRED, build_error_body
+from backend.application.authz_types import AuthorizationContext
 from backend.application.chat import prepare_chat_request, stream_chat_response
 from backend.application.exceptions import (
     ChatIdempotencyConflictError,
@@ -28,6 +29,7 @@ from backend.application.ports import (
 )
 from backend.config import get_settings
 from backend.dependencies import (
+    get_authorization_context,
     get_conversation_logger,
     get_llm_client,
     get_safeguard_service,
@@ -73,20 +75,20 @@ def chat_stream(
     tabular_extractor: TabularContextExtractor = Depends(get_tabular_context_extractor),
     safeguard_service: SafeguardService | None = Depends(get_safeguard_service),
     settings: Settings = Depends(get_settings),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
     idempotency_key_header: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> StreamingResponse:
     """Stream an LLM response as Server-Sent Events."""
     client_ip: str = request.client.host if request.client else "unknown"
     user_name = request.headers.get("x-user-name", "").strip()
     idempotency_key = (idempotency_key_header or "").strip()
-    session_owner_id = (request.headers.get("x-goat-owner-id") or "").strip()
-
     try:
         prepared = prepare_chat_request(
             req=req,
             settings=settings,
             llm=llm,
-            session_owner_id=session_owner_id,
+            auth_context=auth_context,
+            request_id=getattr(request.state, "request_id", ""),
         )
         return stream_chat_response(
             req=req,
@@ -101,6 +103,7 @@ def chat_stream(
             safeguard_service=safeguard_service,
             settings=settings,
             idempotency_key=idempotency_key,
+            request_id=getattr(request.state, "request_id", ""),
         )
     except ChatCapacityError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

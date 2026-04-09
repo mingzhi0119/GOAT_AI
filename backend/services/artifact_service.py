@@ -37,6 +37,8 @@ class PersistedArtifactRecord:
     storage_path: str
     source_message_index: int
     created_at: str
+    tenant_id: str = "tenant:default"
+    principal_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -65,6 +67,8 @@ def create_chat_artifacts_from_text(
     settings: Settings,
     session_id: str | None,
     owner_id: str,
+    tenant_id: str = "tenant:default",
+    principal_id: str = "",
     source_message_index: int,
     register_artifact: Callable[[PersistedArtifactRecord], None],
 ) -> list[ChatArtifact]:
@@ -77,6 +81,8 @@ def create_chat_artifacts_from_text(
             settings=settings,
             session_id=session_id or "",
             owner_id=owner_id,
+            tenant_id=tenant_id,
+            principal_id=principal_id,
             source_message_index=source_message_index,
             register_artifact=register_artifact,
         )
@@ -90,6 +96,8 @@ def persist_artifact(
     settings: Settings,
     session_id: str,
     owner_id: str,
+    tenant_id: str,
+    principal_id: str,
     source_message_index: int,
     register_artifact: Callable[[PersistedArtifactRecord], None],
 ) -> PersistedArtifactRecord:
@@ -109,6 +117,8 @@ def persist_artifact(
         storage_path=str(target),
         source_message_index=source_message_index,
         created_at=_now_iso(),
+        tenant_id=tenant_id,
+        principal_id=principal_id,
     )
     register_artifact(record)
     return record

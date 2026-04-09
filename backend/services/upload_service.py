@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Generator
 
+from backend.application.authz_types import AuthorizationContext
+from backend.application.credential_registry import build_local_authorization_context
 from backend.models.knowledge import KnowledgeIngestionRequest
 from backend.models.upload import UploadAnalysisResponse
 from backend.services.exceptions import KnowledgeValidationError
@@ -25,19 +27,23 @@ def ingest_upload(
     content: bytes,
     filename: str,
     settings: Settings,
+    auth_context: AuthorizationContext | None = None,
     llm: LLMClient | None = None,
 ) -> UploadAnalysisResponse:
     """Persist, ingest, and return RAG knowledge metadata for one uploaded document."""
+    active_auth = auth_context or build_local_authorization_context()
     upload = create_knowledge_upload_from_bytes(
         content=content,
         filename=filename,
         content_type=None,
         settings=settings,
+        auth_context=active_auth,
     )
     try:
         ingestion = start_knowledge_ingestion(
             request=KnowledgeIngestionRequest(document_id=upload.document_id),
             settings=settings,
+            auth_context=active_auth,
         )
     except ValueError as exc:
         raise KnowledgeValidationError(str(exc)) from exc
@@ -64,6 +70,7 @@ def stream_upload_analysis_sse(
     content: bytes,
     filename: str,
     settings: Settings,
+    auth_context: AuthorizationContext | None = None,
     llm: LLMClient | None = None,
 ) -> Generator[str, None, None]:
     """Ingest the uploaded file into the knowledge pipeline and emit readiness metadata."""
@@ -77,7 +84,11 @@ def stream_upload_analysis_sse(
             }
         )
         result = ingest_upload(
-            content=content, filename=filename, settings=settings, llm=llm
+            content=content,
+            filename=filename,
+            settings=settings,
+            auth_context=auth_context,
+            llm=llm,
         )
     except KnowledgeValidationError as exc:
         yield sse_error_event(str(exc))

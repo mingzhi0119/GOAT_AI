@@ -5,32 +5,25 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any
 
+from backend.application.authz_types import AuthorizationContext
+from backend.application.authorizer import authorize_session_read
 from backend.application.exceptions import (
     HistoryOwnerRequiredError,
     HistorySessionNotFoundError,
 )
 from backend.application.ports import SessionRepository, Settings
+from backend.domain.authorization import ResourceRef
 from backend.models.history import (
     HistorySessionDetailResponse,
     HistorySessionFileContext,
     HistorySessionKnowledgeDocument,
     HistorySessionListResponse,
 )
+from backend.services.authz_audit import emit_authorization_audit
 
 
 def _session_summary_as_dict(session: Any) -> dict[str, object]:
     return asdict(session)
-
-
-def _session_visible_to_request_owner(
-    *,
-    session_owner_id: str,
-    request_owner: str,
-    settings: Settings,
-) -> bool:
-    if not settings.require_session_owner and not request_owner:
-        return True
-    return session_owner_id == request_owner
 
 
 def resolve_owner_filter(*, settings: Settings, request_owner: str) -> str | None:
@@ -46,13 +39,24 @@ def list_history_sessions(
     *,
     repository: SessionRepository,
     settings: Settings,
-    request_owner: str,
+    auth_context: AuthorizationContext,
 ) -> HistorySessionListResponse:
     """Return persisted session metadata rows for the history sidebar."""
-    owner_filter = resolve_owner_filter(settings=settings, request_owner=request_owner)
+    owner_filter = resolve_owner_filter(
+        settings=settings,
+        request_owner=auth_context.legacy_owner_id,
+    )
     sessions = [
         _session_summary_as_dict(session)
-        for session in repository.list_sessions(owner_filter=owner_filter)
+        for session in repository.list_sessions(
+            owner_filter=owner_filter,
+            tenant_filter=auth_context.tenant_id.value,
+        )
+        if authorize_session_read(
+            ctx=auth_context,
+            session=session,
+            require_owner_header=settings.require_session_owner,
+        ).allowed
     ]
     return HistorySessionListResponse.model_validate({"sessions": sessions})
 
@@ -61,11 +65,17 @@ def delete_all_history_sessions(
     *,
     repository: SessionRepository,
     settings: Settings,
-    request_owner: str,
+    auth_context: AuthorizationContext,
 ) -> None:
     """Delete sessions scoped to one owner when filtering is enabled."""
-    owner_filter = resolve_owner_filter(settings=settings, request_owner=request_owner)
-    repository.delete_all_sessions(owner_filter=owner_filter)
+    owner_filter = resolve_owner_filter(
+        settings=settings,
+        request_owner=auth_context.legacy_owner_id,
+    )
+    repository.delete_all_sessions(
+        owner_filter=owner_filter,
+        tenant_filter=auth_context.tenant_id.value,
+    )
 
 
 def delete_history_session(
@@ -73,14 +83,16 @@ def delete_history_session(
     repository: SessionRepository,
     session_id: str,
     settings: Settings,
-    request_owner: str,
+    auth_context: AuthorizationContext,
+    request_id: str,
 ) -> None:
     """Delete one session, enforcing owner visibility rules."""
     get_history_session_detail(
         repository=repository,
         session_id=session_id,
         settings=settings,
-        request_owner=request_owner,
+        auth_context=auth_context,
+        request_id=request_id,
     )
     repository.delete_session(session_id)
 
@@ -90,17 +102,27 @@ def get_history_session_detail(
     repository: SessionRepository,
     session_id: str,
     settings: Settings,
-    request_owner: str,
+    auth_context: AuthorizationContext,
+    request_id: str,
 ) -> HistorySessionDetailResponse:
     """Return one full persisted session including all messages."""
     session = repository.get_session(session_id)
     if session is None:
         raise HistorySessionNotFoundError("Session not found")
-    if not _session_visible_to_request_owner(
-        session_owner_id=session.owner_id,
-        request_owner=request_owner,
-        settings=settings,
-    ):
+
+    decision = authorize_session_read(
+        ctx=auth_context,
+        session=session,
+        require_owner_header=settings.require_session_owner,
+    )
+    emit_authorization_audit(
+        ctx=auth_context,
+        action="history.session.read",
+        resource=ResourceRef(resource_type="session", resource_id=session_id),
+        decision=decision,
+        request_id=request_id,
+    )
+    if not decision.allowed:
         raise HistorySessionNotFoundError("Session not found")
 
     response_body = _session_summary_as_dict(session)

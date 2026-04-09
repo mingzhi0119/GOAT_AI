@@ -12,7 +12,7 @@ from backend.services.session_message_codec import decode_session_payload
 from goat_ai.ollama_client import LLMClient
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class SessionSummaryRecord:
     """Typed session summary returned by the history repository."""
 
@@ -23,9 +23,11 @@ class SessionSummaryRecord:
     created_at: str
     updated_at: str
     owner_id: str
+    tenant_id: str = "tenant:default"
+    principal_id: str = ""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class SessionDetailRecord(SessionSummaryRecord):
     """Typed session detail returned by the history repository."""
 
@@ -36,7 +38,7 @@ class SessionDetailRecord(SessionSummaryRecord):
     chart_data_source: str | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class SessionUpsertPayload:
     """Payload required to persist a chat session snapshot."""
 
@@ -48,6 +50,8 @@ class SessionUpsertPayload:
     created_at: str
     updated_at: str
     owner_id: str = ""
+    tenant_id: str = "tenant:default"
+    principal_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -68,7 +72,10 @@ class SessionRepository(Protocol):
     """Persistence boundary for stored session snapshots."""
 
     def list_sessions(
-        self, owner_filter: str | None = None
+        self,
+        owner_filter: str | None = None,
+        *,
+        tenant_filter: str | None = None,
     ) -> list[SessionSummaryRecord]: ...
 
     def get_session(self, session_id: str) -> SessionDetailRecord | None: ...
@@ -77,7 +84,12 @@ class SessionRepository(Protocol):
 
     def delete_session(self, session_id: str) -> None: ...
 
-    def delete_all_sessions(self, owner_filter: str | None = None) -> None: ...
+    def delete_all_sessions(
+        self,
+        owner_filter: str | None = None,
+        *,
+        tenant_filter: str | None = None,
+    ) -> None: ...
 
     def create_chat_artifact(self, record: PersistedArtifactRecord) -> None: ...
 
@@ -109,10 +121,15 @@ class SQLiteSessionRepository:
         self._db_path = db_path
 
     def list_sessions(
-        self, owner_filter: str | None = None
+        self,
+        owner_filter: str | None = None,
+        *,
+        tenant_filter: str | None = None,
     ) -> list[SessionSummaryRecord]:
         rows = log_service.list_sessions(
-            db_path=self._db_path, owner_filter=owner_filter
+            db_path=self._db_path,
+            owner_filter=owner_filter,
+            tenant_filter=tenant_filter,
         )
         return [
             SessionSummaryRecord(
@@ -123,6 +140,8 @@ class SQLiteSessionRepository:
                 created_at=str(row["created_at"]),
                 updated_at=str(row["updated_at"]),
                 owner_id=str(row.get("owner_id", "")),
+                tenant_id=str(row.get("tenant_id", "tenant:default")),
+                principal_id=str(row.get("principal_id", "")),
             )
             for row in rows
         ]
@@ -140,6 +159,8 @@ class SQLiteSessionRepository:
             created_at=str(row["created_at"]),
             updated_at=str(row["updated_at"]),
             owner_id=str(row.get("owner_id", "")),
+            tenant_id=str(row.get("tenant_id", "tenant:default")),
+            principal_id=str(row.get("principal_id", "")),
             messages=decoded.messages,
             chart_spec=decoded.chart_spec,
             file_context_prompt=decoded.file_context_prompt,
@@ -158,14 +179,23 @@ class SQLiteSessionRepository:
             created_at=payload.created_at,
             updated_at=payload.updated_at,
             owner_id=payload.owner_id,
+            tenant_id=payload.tenant_id,
+            principal_id=payload.principal_id,
         )
 
     def delete_session(self, session_id: str) -> None:
         log_service.delete_session(db_path=self._db_path, session_id=session_id)
 
-    def delete_all_sessions(self, owner_filter: str | None = None) -> None:
+    def delete_all_sessions(
+        self,
+        owner_filter: str | None = None,
+        *,
+        tenant_filter: str | None = None,
+    ) -> None:
         log_service.delete_all_sessions(
-            db_path=self._db_path, owner_filter=owner_filter
+            db_path=self._db_path,
+            owner_filter=owner_filter,
+            tenant_filter=tenant_filter,
         )
 
     def create_chat_artifact(self, record: PersistedArtifactRecord) -> None:
@@ -174,6 +204,8 @@ class SQLiteSessionRepository:
             artifact_id=record.id,
             session_id=record.session_id,
             owner_id=record.owner_id,
+            tenant_id=record.tenant_id,
+            principal_id=record.principal_id,
             filename=record.filename,
             mime_type=record.mime_type,
             byte_size=record.byte_size,
@@ -192,6 +224,8 @@ class SQLiteSessionRepository:
             id=str(row["id"]),
             session_id=str(row["session_id"]),
             owner_id=str(row.get("owner_id", "")),
+            tenant_id=str(row.get("tenant_id", "tenant:default")),
+            principal_id=str(row.get("principal_id", "")),
             filename=str(row["filename"]),
             mime_type=str(row["mime_type"]),
             byte_size=int(row["byte_size"]),

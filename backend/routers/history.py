@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from backend.api_errors import AUTH_SESSION_OWNER_REQUIRED, build_error_body
+from backend.application.authz_types import AuthorizationContext
 from backend.application.exceptions import (
     HistoryOwnerRequiredError,
     HistorySessionNotFoundError,
@@ -17,7 +18,7 @@ from backend.application.history import (
 )
 from backend.application.ports import SessionRepository, Settings
 from backend.config import get_settings
-from backend.dependencies import get_session_repository
+from backend.dependencies import get_authorization_context, get_session_repository
 from backend.models.common import ErrorResponse
 from backend.models.history import (
     HistorySessionDetailResponse,
@@ -25,12 +26,6 @@ from backend.models.history import (
 )
 
 router = APIRouter()
-
-
-def _owner_header_value(request: Request) -> str:
-    return (request.headers.get("x-goat-owner-id") or "").strip()
-
-
 def _raise_owner_required(exc: HistoryOwnerRequiredError) -> None:
     raise HTTPException(
         status_code=403,
@@ -53,17 +48,16 @@ def _raise_owner_required(exc: HistoryOwnerRequiredError) -> None:
     },
 )
 def list_history(
-    request: Request,
     session_repository: SessionRepository = Depends(get_session_repository),
     settings: Settings = Depends(get_settings),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
 ) -> HistorySessionListResponse:
     """Return session metadata rows for the history sidebar."""
-    owner = _owner_header_value(request)
     try:
         return list_history_sessions(
             repository=session_repository,
             settings=settings,
-            request_owner=owner,
+            auth_context=auth_context,
         )
     except HistoryOwnerRequiredError as exc:
         _raise_owner_required(exc)
@@ -80,17 +74,16 @@ def list_history(
     },
 )
 def delete_all_history(
-    request: Request,
     session_repository: SessionRepository = Depends(get_session_repository),
     settings: Settings = Depends(get_settings),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
 ) -> Response:
     """Delete all persisted sessions and related conversation rows."""
-    owner = _owner_header_value(request)
     try:
         delete_all_history_sessions(
             repository=session_repository,
             settings=settings,
-            request_owner=owner,
+            auth_context=auth_context,
         )
     except HistoryOwnerRequiredError as exc:
         _raise_owner_required(exc)
@@ -113,15 +106,16 @@ def get_history_session(
     request: Request,
     session_repository: SessionRepository = Depends(get_session_repository),
     settings: Settings = Depends(get_settings),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
 ) -> HistorySessionDetailResponse:
     """Return one full persisted session including all messages."""
-    request_owner = _owner_header_value(request)
     try:
         return get_history_session_detail(
             repository=session_repository,
             session_id=session_id,
             settings=settings,
-            request_owner=request_owner,
+            auth_context=auth_context,
+            request_id=getattr(request.state, "request_id", ""),
         )
     except HistoryOwnerRequiredError as exc:
         _raise_owner_required(exc)
@@ -145,15 +139,16 @@ def delete_history_session(
     request: Request,
     session_repository: SessionRepository = Depends(get_session_repository),
     settings: Settings = Depends(get_settings),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
 ) -> Response:
     """Delete one persisted session."""
-    request_owner = _owner_header_value(request)
     try:
         delete_history_session_use_case(
             repository=session_repository,
             session_id=session_id,
             settings=settings,
-            request_owner=request_owner,
+            auth_context=auth_context,
+            request_id=getattr(request.state, "request_id", ""),
         )
     except HistoryOwnerRequiredError as exc:
         _raise_owner_required(exc)

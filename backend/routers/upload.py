@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, Header, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from backend.application.exceptions import (
     UploadIdempotencyConflictError,
     UploadIdempotencyInProgressError,
 )
+from backend.application.authz_types import AuthorizationContext
 from backend.application.upload import (
     analyze_upload_json,
     ingest_upload,
@@ -18,7 +19,7 @@ from backend.application.upload import (
 )
 from backend.application.ports import KnowledgeValidationError, Settings
 from backend.config import get_settings
-from backend.dependencies import get_llm_client
+from backend.dependencies import get_authorization_context, get_llm_client
 from backend.models.common import ErrorResponse
 from backend.models.upload import UploadAnalysisResponse
 
@@ -43,8 +44,10 @@ _SSE_HEADERS = {
     },
 )
 async def upload_and_parse(
+    request: Request,
     file: UploadFile,
     settings: Settings = Depends(get_settings),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
     llm=Depends(get_llm_client),
 ) -> StreamingResponse:
     """Accept a supported file, ingest it into knowledge storage, and stream readiness metadata."""
@@ -55,6 +58,7 @@ async def upload_and_parse(
                 content=content,
                 filename=file.filename or "",
                 settings=settings,
+                auth_context=auth_context,
                 llm=llm,
             ),
             media_type="text/event-stream",
@@ -75,8 +79,10 @@ async def upload_and_parse(
     },
 )
 async def analyze_upload_json_route(
+    request: Request,
     file: UploadFile,
     settings: Settings = Depends(get_settings),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
     llm=Depends(get_llm_client),
     idempotency_key_header: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> UploadAnalysisResponse:
@@ -87,6 +93,7 @@ async def analyze_upload_json_route(
             content=content,
             filename=file.filename or "",
             settings=settings,
+            auth_context=auth_context,
             idempotency_key=idempotency_key_header,
             llm=llm,
             ingest_upload_fn=ingest_upload,

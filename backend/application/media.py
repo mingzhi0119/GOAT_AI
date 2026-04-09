@@ -2,15 +2,25 @@
 
 from __future__ import annotations
 
+from backend.application.authz_types import AuthorizationContext
 from backend.application.ports import Settings
 from backend.models.media import MediaUploadResponse
 from backend.services.media_service import create_media_upload_from_bytes
 
 
 def create_media_upload(
-    *, content: bytes, filename: str, settings: Settings
+    *,
+    content: bytes,
+    filename: str,
+    settings: Settings,
+    auth_context: AuthorizationContext,
+    request_id: str = "",
 ) -> MediaUploadResponse:
     """Persist and normalize one vision image upload."""
     return create_media_upload_from_bytes(
-        content=content, filename=filename, settings=settings
+        content=content,
+        filename=filename,
+        settings=settings,
+        auth_context=auth_context,
+        request_id=request_id,
     )

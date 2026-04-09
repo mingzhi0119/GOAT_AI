@@ -82,6 +82,8 @@ def persist_chat_session(
     chart_data_source: ChartDataSource = "none",
     title_override: str | None = None,
     owner_id: str = "",
+    tenant_id: str = "tenant:default",
+    principal_id: str = "",
     clock: Clock | None = None,
 ) -> None:
     """Persist the latest session snapshot, including optional chart state."""
@@ -127,5 +129,7 @@ def persist_chat_session(
             created_at=created_at,
             updated_at=now_iso,
             owner_id=owner_id,
+            tenant_id=tenant_id,
+            principal_id=principal_id,
         )
     )

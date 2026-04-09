@@ -5,10 +5,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse
 
+from backend.application.authz_types import AuthorizationContext
 from backend.application.artifacts import download_artifact_response
 from backend.application.ports import SessionRepository, Settings
 from backend.config import get_settings
-from backend.dependencies import get_session_repository
+from backend.dependencies import get_authorization_context, get_session_repository
 from backend.models.common import ErrorResponse
 
 router = APIRouter()
@@ -28,12 +29,13 @@ def get_artifact_download(
     request: Request,
     repository: SessionRepository = Depends(get_session_repository),
     settings: Settings = Depends(get_settings),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
 ) -> FileResponse:
     """Serve one persisted artifact file."""
-    request_owner = (request.headers.get("x-goat-owner-id") or "").strip()
     return download_artifact_response(
         artifact_id=artifact_id,
         repository=repository,
         settings=settings,
-        request_owner=request_owner,
+        auth_context=auth_context,
+        request_id=getattr(request.state, "request_id", ""),
     )

@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Generator
 from typing import Callable
 
+from backend.application.authz_types import AuthorizationContext
 from backend.application.ports import KnowledgeValidationError, Settings, LLMClient
 from backend.application.exceptions import (
     UploadIdempotencyConflictError,
@@ -39,12 +40,17 @@ def stream_upload_analysis(
     content: bytes,
     filename: str,
     settings: Settings,
+    auth_context: AuthorizationContext,
     llm: LLMClient | None = None,
 ) -> Generator[str, None, None]:
     """Validate upload input and stream readiness metadata from the knowledge pipeline."""
     _validate_upload_input(filename=filename, content=content)
     return _stream_upload_analysis_sse(
-        content=content, filename=filename, settings=settings, llm=llm
+        content=content,
+        filename=filename,
+        settings=settings,
+        auth_context=auth_context,
+        llm=llm,
     )
 
 
@@ -53,11 +59,16 @@ def ingest_upload(
     content: bytes,
     filename: str,
     settings: Settings,
+    auth_context: AuthorizationContext,
     llm: LLMClient | None = None,
 ) -> UploadAnalysisResponse:
     """Compatibility wrapper for the underlying upload ingestion use case."""
     return _ingest_upload(
-        content=content, filename=filename, settings=settings, llm=llm
+        content=content,
+        filename=filename,
+        settings=settings,
+        auth_context=auth_context,
+        llm=llm,
     )
 
 
@@ -66,6 +77,7 @@ def analyze_upload_json(
     content: bytes,
     filename: str,
     settings: Settings,
+    auth_context: AuthorizationContext,
     idempotency_key: str | None = None,
     llm: LLMClient | None = None,
     ingest_upload_fn: Callable[..., UploadAnalysisResponse] = ingest_upload,
@@ -102,6 +114,7 @@ def analyze_upload_json(
             content=content,
             filename=filename,
             settings=settings,
+            auth_context=auth_context,
             llm=llm,
         )
     except KnowledgeValidationError:

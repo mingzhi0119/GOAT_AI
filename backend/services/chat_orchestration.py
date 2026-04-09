@@ -173,6 +173,8 @@ class SessionPersistenceService:
         first_token_ms: float | None = None,
         title_override: str | None = None,
         session_owner_id: str = "",
+        tenant_id: str = "tenant:default",
+        principal_id: str = "",
     ) -> None:
         _persist_and_log_chat_result(
             model=model,
@@ -194,6 +196,8 @@ class SessionPersistenceService:
             first_token_ms=first_token_ms,
             title_override=title_override,
             session_owner_id=session_owner_id,
+            tenant_id=tenant_id,
+            principal_id=principal_id,
             clock=self._clock,
         )
 
@@ -213,6 +217,8 @@ class SessionPersistenceService:
         title_generator: TitleGenerator | None,
         started_at: float,
         session_owner_id: str = "",
+        tenant_id: str = "tenant:default",
+        principal_id: str = "",
     ) -> Generator[str, None, None]:
         yield from _yield_blocked_response(
             assessment=assessment,
@@ -229,6 +235,8 @@ class SessionPersistenceService:
             started_at=started_at,
             persistence=self,
             session_owner_id=session_owner_id,
+            tenant_id=tenant_id,
+            principal_id=principal_id,
         )
 
 
@@ -253,6 +261,8 @@ def _persist_and_log_chat_result(
     first_token_ms: float | None = None,
     title_override: str | None = None,
     session_owner_id: str = "",
+    tenant_id: str = "tenant:default",
+    principal_id: str = "",
     clock: Clock | None = None,
 ) -> None:
     """Finalize telemetry, audit log, and optional session persistence."""
@@ -287,6 +297,8 @@ def _persist_and_log_chat_result(
             chart_data_source=chart_data_source,
             title_override=title_override,
             owner_id=session_owner_id,
+            tenant_id=tenant_id,
+            principal_id=principal_id,
             clock=clock,
         )
 
@@ -307,6 +319,8 @@ def _yield_blocked_response(
     started_at: float,
     persistence: SessionPersistenceService | None = None,
     session_owner_id: str = "",
+    tenant_id: str = "tenant:default",
+    principal_id: str = "",
 ) -> Generator[str, None, None]:
     """Emit a policy refusal and finalize logging/persistence."""
     refusal = assessment.refusal_message
@@ -330,6 +344,8 @@ def _yield_blocked_response(
             started_at=started_at,
             title_override=SAFEGUARD_BLOCKED_TITLE,
             session_owner_id=session_owner_id,
+            tenant_id=tenant_id,
+            principal_id=principal_id,
         )
         return
 
@@ -350,4 +366,6 @@ def _yield_blocked_response(
         chart_data_source="none",
         title_override=SAFEGUARD_BLOCKED_TITLE,
         session_owner_id=session_owner_id,
+        tenant_id=tenant_id,
+        principal_id=principal_id,
     )

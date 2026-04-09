@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, UploadFile
+from fastapi import APIRouter, Depends, Request, UploadFile
 
+from backend.application.authz_types import AuthorizationContext
 from backend.application.knowledge import (
     answer,
     create_upload,
@@ -16,6 +17,7 @@ from backend.application.ports import (
     Settings,
 )
 from backend.config import get_settings
+from backend.dependencies import get_authorization_context
 from backend.models.common import ErrorResponse
 from backend.models.knowledge import (
     KnowledgeAnswerRequest,
@@ -54,11 +56,18 @@ def _raise_bad_request(exc: KnowledgeValidationError) -> None:
 )
 def post_knowledge_upload(
     file: UploadFile,
+    request: Request,
     settings: Settings = Depends(get_settings),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
 ) -> KnowledgeUploadResponse:
     """Persist a knowledge upload and register document metadata."""
     try:
-        return create_upload(file=file, settings=settings)
+        return create_upload(
+            file=file,
+            settings=settings,
+            auth_context=auth_context,
+            request_id=getattr(request.state, "request_id", ""),
+        )
     except KnowledgeValidationError as exc:
         _raise_bad_request(exc)
 
@@ -75,11 +84,18 @@ def post_knowledge_upload(
 )
 def get_knowledge_upload_status(
     document_id: str,
+    request: Request,
     settings: Settings = Depends(get_settings),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
 ) -> KnowledgeUploadStatusResponse:
     """Return metadata for one persisted knowledge upload."""
     try:
-        return get_upload_status(document_id=document_id, settings=settings)
+        return get_upload_status(
+            document_id=document_id,
+            settings=settings,
+            auth_context=auth_context,
+            request_id=getattr(request.state, "request_id", ""),
+        )
     except KnowledgeDocumentNotFound as exc:
         _raise_not_found(exc)
 
@@ -97,11 +113,18 @@ def get_knowledge_upload_status(
 )
 def post_knowledge_ingestion(
     request: KnowledgeIngestionRequest,
+    http_request: Request,
     settings: Settings = Depends(get_settings),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
 ) -> KnowledgeIngestionResponse:
     """Start a knowledge ingestion job for one uploaded document."""
     try:
-        return start_ingestion(request=request, settings=settings)
+        return start_ingestion(
+            request=request,
+            settings=settings,
+            auth_context=auth_context,
+            request_id=getattr(http_request.state, "request_id", ""),
+        )
     except KnowledgeDocumentNotFound as exc:
         _raise_not_found(exc)
     except KnowledgeValidationError as exc:
@@ -120,11 +143,18 @@ def post_knowledge_ingestion(
 )
 def get_knowledge_ingestion(
     ingestion_id: str,
+    request: Request,
     settings: Settings = Depends(get_settings),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
 ) -> KnowledgeIngestionStatusResponse:
     """Return status for one ingestion attempt."""
     try:
-        return get_ingestion_status(ingestion_id=ingestion_id, settings=settings)
+        return get_ingestion_status(
+            ingestion_id=ingestion_id,
+            settings=settings,
+            auth_context=auth_context,
+            request_id=getattr(request.state, "request_id", ""),
+        )
     except KnowledgeDocumentNotFound as exc:
         _raise_not_found(exc)
 
@@ -137,11 +167,18 @@ def get_knowledge_ingestion(
 )
 def post_knowledge_search(
     request: KnowledgeSearchRequest,
+    http_request: Request,
     settings: Settings = Depends(get_settings),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
 ) -> KnowledgeSearchResponse:
     """Run pure retrieval against indexed knowledge chunks."""
     try:
-        return search(request=request, settings=settings)
+        return search(
+            request=request,
+            settings=settings,
+            auth_context=auth_context,
+            request_id=getattr(http_request.state, "request_id", ""),
+        )
     except KnowledgeValidationError as exc:
         _raise_bad_request(exc)
 
@@ -154,10 +191,17 @@ def post_knowledge_search(
 )
 def post_knowledge_answer(
     request: KnowledgeAnswerRequest,
+    http_request: Request,
     settings: Settings = Depends(get_settings),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
 ) -> KnowledgeAnswerResponse:
     """Return a retrieval-backed answer with citations."""
     try:
-        return answer(request=request, settings=settings)
+        return answer(
+            request=request,
+            settings=settings,
+            auth_context=auth_context,
+            request_id=getattr(http_request.state, "request_id", ""),
+        )
     except KnowledgeValidationError as exc:
         _raise_bad_request(exc)

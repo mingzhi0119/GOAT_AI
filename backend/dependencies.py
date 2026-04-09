@@ -5,8 +5,11 @@ Import these in routers; never instantiate services directly in route handlers.
 
 from __future__ import annotations
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException, Request
 
+from backend.application.authz_types import AuthorizationContext
+from backend.application.credential_registry import build_local_authorization_context
+from backend.api_errors import AUTH_INVALID_API_KEY, build_error_body
 from backend.config import get_settings
 from backend.services.chat_runtime import (
     ConversationLogger,
@@ -49,6 +52,25 @@ def get_session_repository(
 ) -> SessionRepository:
     """Return the session repository bound to current settings."""
     return SQLiteSessionRepository(settings.log_db_path)
+
+
+def get_authorization_context(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> AuthorizationContext:
+    ctx = getattr(request.state, "authorization_context", None)
+    if isinstance(ctx, AuthorizationContext):
+        return ctx
+    if not settings.api_key:
+        return build_local_authorization_context()
+    raise HTTPException(
+        status_code=401,
+        detail=build_error_body(
+            detail="Invalid or missing API key.",
+            code=AUTH_INVALID_API_KEY,
+            status_code=401,
+        ),
+    )
 
 
 def get_title_generator(llm: LLMClient = Depends(get_llm_client)) -> TitleGenerator:

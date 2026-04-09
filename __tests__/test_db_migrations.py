@@ -38,6 +38,8 @@ class DbMigrationsTests(unittest.TestCase):
                         "008_session_messages",
                         "009_sessions_owner_id",
                         "010_chat_artifacts",
+                        "011_authorization_tenancy",
+                        "012_knowledge_media_authorization",
                     ],
                 )
                 cols = [
@@ -51,6 +53,8 @@ class DbMigrationsTests(unittest.TestCase):
                 ]
                 self.assertIn("schema_version", session_cols)
                 self.assertIn("owner_id", session_cols)
+                self.assertIn("tenant_id", session_cols)
+                self.assertIn("principal_id", session_cols)
                 knowledge_cols = [
                     r[1]
                     for r in conn.execute(
@@ -58,6 +62,9 @@ class DbMigrationsTests(unittest.TestCase):
                     ).fetchall()
                 ]
                 self.assertIn("storage_path", knowledge_cols)
+                self.assertIn("owner_id", knowledge_cols)
+                self.assertIn("tenant_id", knowledge_cols)
+                self.assertIn("principal_id", knowledge_cols)
                 ingestion_cols = [
                     r[1]
                     for r in conn.execute(
@@ -86,6 +93,16 @@ class DbMigrationsTests(unittest.TestCase):
                     ).fetchall()
                 ]
                 self.assertIn("storage_path", artifact_cols)
+                self.assertIn("tenant_id", artifact_cols)
+                self.assertIn("principal_id", artifact_cols)
+                media_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(media_uploads)"
+                    ).fetchall()
+                ]
+                self.assertIn("tenant_id", media_cols)
+                self.assertIn("principal_id", media_cols)
             finally:
                 conn.close()
 
@@ -125,7 +142,7 @@ class DbMigrationsTests(unittest.TestCase):
             conn = sqlite3.connect(db_path)
             try:
                 n = conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]
-                self.assertEqual(n, 10)
+                self.assertEqual(n, 12)
                 cols = [
                     r[1]
                     for r in conn.execute("PRAGMA table_info(conversations)").fetchall()
@@ -137,6 +154,8 @@ class DbMigrationsTests(unittest.TestCase):
                 ]
                 self.assertIn("schema_version", session_cols)
                 self.assertIn("owner_id", session_cols)
+                self.assertIn("tenant_id", session_cols)
+                self.assertIn("principal_id", session_cols)
                 knowledge_cols = [
                     r[1]
                     for r in conn.execute(
@@ -144,6 +163,9 @@ class DbMigrationsTests(unittest.TestCase):
                     ).fetchall()
                 ]
                 self.assertIn("storage_path", knowledge_cols)
+                self.assertIn("owner_id", knowledge_cols)
+                self.assertIn("tenant_id", knowledge_cols)
+                self.assertIn("principal_id", knowledge_cols)
                 artifact_cols = [
                     r[1]
                     for r in conn.execute(
@@ -151,6 +173,16 @@ class DbMigrationsTests(unittest.TestCase):
                     ).fetchall()
                 ]
                 self.assertIn("storage_path", artifact_cols)
+                self.assertIn("tenant_id", artifact_cols)
+                self.assertIn("principal_id", artifact_cols)
+                media_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(media_uploads)"
+                    ).fetchall()
+                ]
+                self.assertIn("tenant_id", media_cols)
+                self.assertIn("principal_id", media_cols)
             finally:
                 conn.close()
 

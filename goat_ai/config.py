@@ -92,6 +92,7 @@ class Settings:
     data_dir: Path = APP_ROOT / "data"
     api_key: str = ""
     api_key_write: str = ""
+    api_credentials_json: str = ""
     require_session_owner: bool = False
     rate_limit_window_sec: int = 60
     rate_limit_max_requests: int = 60
@@ -210,6 +211,7 @@ def load_settings() -> Settings:
         )
     _api_key = os.environ.get("GOAT_API_KEY", "").strip()
     _api_key_write = os.environ.get("GOAT_API_KEY_WRITE", "").strip()
+    _api_credentials_json = os.environ.get("GOAT_API_CREDENTIALS_JSON", "").strip()
     if _api_key_write and not _api_key:
         raise ValueError(
             "GOAT_API_KEY_WRITE requires GOAT_API_KEY (read key) to be set."
@@ -228,6 +230,7 @@ def load_settings() -> Settings:
         data_dir=Path(os.environ.get("GOAT_DATA_DIR", _default_data_dir)),
         api_key=_api_key,
         api_key_write=_api_key_write,
+        api_credentials_json=_api_credentials_json,
         require_session_owner=_env_bool("GOAT_REQUIRE_SESSION_OWNER", "false"),
         rate_limit_window_sec=_rate_limit_window_sec,
         rate_limit_max_requests=_rate_limit_max_requests,

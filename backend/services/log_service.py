@@ -65,6 +65,16 @@ def _sessions_has_owner_id_column(conn: sqlite3.Connection) -> bool:
     return "owner_id" in cols
 
 
+def _sessions_has_tenant_columns(conn: sqlite3.Connection) -> bool:
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()]
+    return "tenant_id" in cols and "principal_id" in cols
+
+
+def _chat_artifacts_has_tenant_columns(conn: sqlite3.Connection) -> bool:
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(chat_artifacts)").fetchall()]
+    return "tenant_id" in cols and "principal_id" in cols
+
+
 def _replace_session_messages(
     conn: sqlite3.Connection,
     *,
@@ -239,6 +249,8 @@ def upsert_session(
     created_at: str,
     updated_at: str,
     owner_id: str = "",
+    tenant_id: str = "tenant:default",
+    principal_id: str = "",
 ) -> None:
     """Insert or update a persisted chat session with full message history."""
     try:
@@ -247,29 +259,58 @@ def upsert_session(
             try:
                 conn.execute("BEGIN IMMEDIATE")
                 if _sessions_has_owner_id_column(conn):
-                    conn.execute(
-                        """
-                        INSERT INTO sessions (id, title, model, schema_version, created_at, updated_at, messages, owner_id)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                        ON CONFLICT(id) DO UPDATE SET
-                            title=excluded.title,
-                            model=excluded.model,
-                            schema_version=excluded.schema_version,
-                            updated_at=excluded.updated_at,
-                            messages=excluded.messages,
-                            owner_id=excluded.owner_id
-                        """,
-                        (
-                            session_id,
-                            title,
-                            model,
-                            int(schema_version),
-                            created_at,
-                            updated_at,
-                            encoded_payload,
-                            owner_id,
-                        ),
-                    )
+                    if _sessions_has_tenant_columns(conn):
+                        conn.execute(
+                            """
+                            INSERT INTO sessions (id, title, model, schema_version, created_at, updated_at, messages, owner_id, tenant_id, principal_id)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            ON CONFLICT(id) DO UPDATE SET
+                                title=excluded.title,
+                                model=excluded.model,
+                                schema_version=excluded.schema_version,
+                                updated_at=excluded.updated_at,
+                                messages=excluded.messages,
+                                owner_id=excluded.owner_id,
+                                tenant_id=excluded.tenant_id,
+                                principal_id=excluded.principal_id
+                            """,
+                            (
+                                session_id,
+                                title,
+                                model,
+                                int(schema_version),
+                                created_at,
+                                updated_at,
+                                encoded_payload,
+                                owner_id,
+                                tenant_id,
+                                principal_id,
+                            ),
+                        )
+                    else:
+                        conn.execute(
+                            """
+                            INSERT INTO sessions (id, title, model, schema_version, created_at, updated_at, messages, owner_id)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            ON CONFLICT(id) DO UPDATE SET
+                                title=excluded.title,
+                                model=excluded.model,
+                                schema_version=excluded.schema_version,
+                                updated_at=excluded.updated_at,
+                                messages=excluded.messages,
+                                owner_id=excluded.owner_id
+                            """,
+                            (
+                                session_id,
+                                title,
+                                model,
+                                int(schema_version),
+                                created_at,
+                                updated_at,
+                                encoded_payload,
+                                owner_id,
+                            ),
+                        )
                 else:
                     conn.execute(
                         """
@@ -316,35 +357,42 @@ def upsert_session(
 
 
 def list_sessions(
-    *, db_path: Path, owner_filter: str | None = None
+    *,
+    db_path: Path,
+    owner_filter: str | None = None,
+    tenant_filter: str | None = None,
 ) -> list[dict[str, Any]]:
     """Return lightweight session metadata for sidebar listing."""
     try:
         with sqlite3.connect(db_path) as conn:
             conn.row_factory = sqlite3.Row
-            if owner_filter is not None and _sessions_has_owner_id_column(conn):
-                rows = conn.execute(
-                    """
-                    SELECT id, title, model, schema_version, created_at, updated_at, owner_id
-                    FROM sessions
-                    WHERE owner_id = ?
-                    ORDER BY updated_at DESC
-                    """,
-                    (owner_filter,),
-                ).fetchall()
-            else:
-                sel = (
+            sel = (
+                "id, title, model, schema_version, created_at, updated_at, owner_id, tenant_id, principal_id"
+                if _sessions_has_tenant_columns(conn)
+                else (
                     "id, title, model, schema_version, created_at, updated_at, owner_id"
                     if _sessions_has_owner_id_column(conn)
                     else "id, title, model, schema_version, created_at, updated_at"
                 )
-                rows = conn.execute(
-                    f"""
-                    SELECT {sel}
-                    FROM sessions
-                    ORDER BY updated_at DESC
-                    """
-                ).fetchall()
+            )
+            clauses: list[str] = []
+            params: list[str] = []
+            if owner_filter is not None and _sessions_has_owner_id_column(conn):
+                clauses.append("owner_id = ?")
+                params.append(owner_filter)
+            if tenant_filter is not None and _sessions_has_tenant_columns(conn):
+                clauses.append("tenant_id = ?")
+                params.append(tenant_filter)
+            where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+            rows = conn.execute(
+                f"""
+                SELECT {sel}
+                FROM sessions
+                {where_sql}
+                ORDER BY updated_at DESC
+                """,
+                tuple(params),
+            ).fetchall()
         return [dict(r) for r in rows]
     except Exception:
         logger.exception("Failed to list sessions from %s", db_path)
@@ -357,9 +405,13 @@ def get_session(*, db_path: Path, session_id: str) -> dict[str, Any] | None:
         with sqlite3.connect(db_path) as conn:
             conn.row_factory = sqlite3.Row
             sel_msg = (
-                "id, title, model, schema_version, created_at, updated_at, messages, owner_id"
-                if _sessions_has_owner_id_column(conn)
-                else "id, title, model, schema_version, created_at, updated_at, messages"
+                "id, title, model, schema_version, created_at, updated_at, messages, owner_id, tenant_id, principal_id"
+                if _sessions_has_tenant_columns(conn)
+                else (
+                    "id, title, model, schema_version, created_at, updated_at, messages, owner_id"
+                    if _sessions_has_owner_id_column(conn)
+                    else "id, title, model, schema_version, created_at, updated_at, messages"
+                )
             )
             row = conn.execute(
                 f"""
@@ -422,16 +474,32 @@ def delete_session(*, db_path: Path, session_id: str) -> None:
         )
 
 
-def delete_all_sessions(*, db_path: Path, owner_filter: str | None = None) -> None:
+def delete_all_sessions(
+    *,
+    db_path: Path,
+    owner_filter: str | None = None,
+    tenant_filter: str | None = None,
+) -> None:
     """Remove rows from ``sessions`` (and ``session_messages``); ``conversations`` audit rows remain."""
     try:
         with sqlite3.connect(db_path) as conn:
-            if owner_filter is not None and _sessions_has_owner_id_column(conn):
+            if (
+                owner_filter is not None or tenant_filter is not None
+            ) and _sessions_has_owner_id_column(conn):
+                clauses: list[str] = []
+                params: list[str] = []
+                if owner_filter is not None:
+                    clauses.append("owner_id = ?")
+                    params.append(owner_filter)
+                if tenant_filter is not None and _sessions_has_tenant_columns(conn):
+                    clauses.append("tenant_id = ?")
+                    params.append(tenant_filter)
+                where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
                 ids = [
                     str(r[0])
                     for r in conn.execute(
-                        "SELECT id FROM sessions WHERE owner_id = ?",
-                        (owner_filter,),
+                        f"SELECT id FROM sessions {where_sql}",
+                        tuple(params),
                     ).fetchall()
                 ]
                 if _session_messages_table_exists(conn):
@@ -440,10 +508,18 @@ def delete_all_sessions(*, db_path: Path, owner_filter: str | None = None) -> No
                             "DELETE FROM session_messages WHERE session_id = ?", (sid,)
                         )
                 if _chat_artifacts_table_exists(conn):
-                    conn.execute(
-                        "DELETE FROM chat_artifacts WHERE owner_id = ?", (owner_filter,)
+                    artifact_clauses = list(clauses)
+                    artifact_params = list(params)
+                    artifact_where = (
+                        f"WHERE {' AND '.join(artifact_clauses)}"
+                        if artifact_clauses
+                        else ""
                     )
-                conn.execute("DELETE FROM sessions WHERE owner_id = ?", (owner_filter,))
+                    conn.execute(
+                        f"DELETE FROM chat_artifacts {artifact_where}",
+                        tuple(artifact_params),
+                    )
+                conn.execute(f"DELETE FROM sessions {where_sql}", tuple(params))
             else:
                 if _session_messages_table_exists(conn):
                     conn.execute("DELETE FROM session_messages")
@@ -473,6 +549,8 @@ def create_chat_artifact(
     artifact_id: str,
     session_id: str,
     owner_id: str,
+    tenant_id: str,
+    principal_id: str,
     filename: str,
     mime_type: str,
     byte_size: int,
@@ -483,24 +561,46 @@ def create_chat_artifact(
     """Persist one generated chat artifact."""
     try:
         with sqlite3.connect(db_path) as conn:
-            conn.execute(
-                """
-                INSERT INTO chat_artifacts
-                    (id, session_id, owner_id, filename, mime_type, byte_size, storage_path, source_message_index, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    artifact_id,
-                    session_id,
-                    owner_id,
-                    filename,
-                    mime_type,
-                    int(byte_size),
-                    storage_path,
-                    int(source_message_index),
-                    created_at,
-                ),
-            )
+            if _chat_artifacts_has_tenant_columns(conn):
+                conn.execute(
+                    """
+                    INSERT INTO chat_artifacts
+                        (id, session_id, owner_id, tenant_id, principal_id, filename, mime_type, byte_size, storage_path, source_message_index, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        artifact_id,
+                        session_id,
+                        owner_id,
+                        tenant_id,
+                        principal_id,
+                        filename,
+                        mime_type,
+                        int(byte_size),
+                        storage_path,
+                        int(source_message_index),
+                        created_at,
+                    ),
+                )
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO chat_artifacts
+                        (id, session_id, owner_id, filename, mime_type, byte_size, storage_path, source_message_index, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        artifact_id,
+                        session_id,
+                        owner_id,
+                        filename,
+                        mime_type,
+                        int(byte_size),
+                        storage_path,
+                        int(source_message_index),
+                        created_at,
+                    ),
+                )
     except Exception:
         inc_sqlite_log_write_failure(
             operation="chat_artifact_create", code=_SQLITE_WRITE_METRIC_CODE
@@ -525,8 +625,8 @@ def get_chat_artifact(*, db_path: Path, artifact_id: str) -> dict[str, Any] | No
         with sqlite3.connect(db_path) as conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute(
-                """
-                SELECT id, session_id, owner_id, filename, mime_type, byte_size, storage_path, source_message_index, created_at
+                f"""
+                SELECT {'id, session_id, owner_id, tenant_id, principal_id, filename, mime_type, byte_size, storage_path, source_message_index, created_at' if _chat_artifacts_has_tenant_columns(conn) else 'id, session_id, owner_id, filename, mime_type, byte_size, storage_path, source_message_index, created_at'}
                 FROM chat_artifacts
                 WHERE id = ?
                 """,

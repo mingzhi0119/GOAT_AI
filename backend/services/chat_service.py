@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from collections.abc import Generator
 
+from backend.application.authz_types import AuthorizationContext
 from backend.models.chat import ChatMessage
 from backend.services.chat_orchestration import SessionPersistenceService
 from backend.services.chat_runtime import (
@@ -48,6 +49,8 @@ def stream_chat_sse(
     knowledge_document_ids: list[str] | None = None,
     vision_last_user_images_base64: list[str] | None = None,
     session_owner_id: str = "",
+    auth_context: AuthorizationContext | None = None,
+    request_id: str = "",
     clock: Clock | None = None,
 ) -> Generator[str, None, None]:
     """Yield SSE-formatted events for a chat completion."""
@@ -71,6 +74,8 @@ def stream_chat_sse(
             knowledge_document_ids=knowledge_document_ids,
             llm=llm,
             session_owner_id=session_owner_id,
+            auth_context=auth_context,
+            request_id=request_id,
             clock=clock,
         )
         return
@@ -94,6 +99,10 @@ def stream_chat_sse(
         vision_last_user_images_base64=vision_last_user_images_base64,
         settings=settings,
         session_owner_id=session_owner_id,
+        tenant_id=auth_context.tenant_id.value if auth_context is not None else "tenant:default",
+        principal_id=auth_context.principal_id.value if auth_context is not None else "",
+        auth_context=auth_context,
+        request_id=request_id,
     )
 
 
@@ -117,6 +126,8 @@ def _stream_knowledge_chat_sse(
     settings: Settings,
     knowledge_document_ids: list[str],
     session_owner_id: str = "",
+    auth_context: AuthorizationContext | None = None,
+    request_id: str = "",
     clock: Clock | None = None,
 ) -> Generator[str, None, None]:
     """Serve a retrieval-backed chat answer using the main chat streaming stack."""
@@ -150,12 +161,16 @@ def _stream_knowledge_chat_sse(
         documents = resolve_knowledge_documents(
             document_ids=knowledge_document_ids,
             settings=settings,
+            auth_context=auth_context,
+            request_id=request_id,
         )
         context = build_chat_knowledge_context(
             query=last_user_message(messages),
             document_ids=knowledge_document_ids,
             top_k=5,
             settings=settings,
+            auth_context=auth_context,
+            request_id=request_id,
         )
     except KnowledgeDocumentNotFound:
         yield sse_error_event("Knowledge document not found.")
@@ -197,6 +212,10 @@ def _stream_knowledge_chat_sse(
             for document in documents
         ],
         session_owner_id=session_owner_id,
+        tenant_id=auth_context.tenant_id.value if auth_context is not None else "tenant:default",
+        principal_id=auth_context.principal_id.value if auth_context is not None else "",
+        auth_context=auth_context,
+        request_id=request_id,
     )
 
 

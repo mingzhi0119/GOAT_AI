@@ -10,6 +10,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 
+from backend.application.authz_types import AuthorizationContext
 from backend.models.chat import ChatMessage
 from backend.models.artifact import ChatArtifact
 from backend.prometheus_metrics import inc_chat_stream_completed
@@ -152,6 +153,10 @@ class ChatStreamService:
         settings: Settings | None = None,
         knowledge_documents: list[dict[str, str]] | None = None,
         session_owner_id: str = "",
+        tenant_id: str = "tenant:default",
+        principal_id: str = "",
+        auth_context: AuthorizationContext | None = None,
+        request_id: str = "",
     ) -> Generator[str, None, None]:
         """Yield SSE-formatted events for a chat completion."""
         run = self._phase_prepare_runtime(
@@ -174,6 +179,10 @@ class ChatStreamService:
             settings=settings,
             knowledge_documents=knowledge_documents,
             session_owner_id=session_owner_id,
+            tenant_id=tenant_id,
+            principal_id=principal_id,
+            auth_context=auth_context,
+            request_id=request_id,
         )
         yield from self._phase_input_guard(run)
         error_message: str | None = None
@@ -212,6 +221,10 @@ class ChatStreamService:
         settings: Settings | None,
         knowledge_documents: list[dict[str, str]] | None,
         session_owner_id: str,
+        tenant_id: str,
+        principal_id: str,
+        auth_context: AuthorizationContext | None,
+        request_id: str,
     ) -> SimpleNamespace:
         """Assemble collaborators, derived turns, and mutable stream state."""
         prompt_composer = PromptComposer()
@@ -284,6 +297,10 @@ class ChatStreamService:
             knowledge_documents=knowledge_documents,
             emitted_artifacts=[],
             session_owner_id=session_owner_id,
+            tenant_id=tenant_id,
+            principal_id=principal_id,
+            auth_context=auth_context,
+            request_id=request_id,
         )
 
     def _phase_input_guard(self, run: SimpleNamespace) -> Generator[str, None, None]:
@@ -311,6 +328,8 @@ class ChatStreamService:
             title_generator=run.title_generator,
             started_at=run.started_at,
             session_owner_id=run.session_owner_id,
+            tenant_id=run.tenant_id,
+            principal_id=run.principal_id,
         )
 
     def _phase_llm_token_stream(
@@ -473,6 +492,8 @@ class ChatStreamService:
                 started_at=run.started_at,
                 first_token_ms=first_token_ms,
                 session_owner_id=run.session_owner_id,
+                tenant_id=run.tenant_id,
+                principal_id=run.principal_id,
             )
         else:
             yield from run.persistence.yield_blocked_response(
@@ -489,6 +510,8 @@ class ChatStreamService:
                 title_generator=run.title_generator,
                 started_at=run.started_at,
                 session_owner_id=run.session_owner_id,
+                tenant_id=run.tenant_id,
+                principal_id=run.principal_id,
             )
 
     def _emit_artifacts(
@@ -507,6 +530,8 @@ class ChatStreamService:
             settings=run.settings,
             session_id=run.session_id,
             owner_id=run.session_owner_id,
+            tenant_id=run.tenant_id,
+            principal_id=run.principal_id,
             source_message_index=assistant_index,
             register_artifact=run.session_repository.create_chat_artifact,
         )

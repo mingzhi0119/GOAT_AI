@@ -1,6 +1,6 @@
 # GOAT AI Roadmap
 
-> Last updated: 2026-04-09 - **v1.0.0** tags Phase **11-12**; **main** additionally ships **Phase 13**, **Phase 14** (through **14.7**), and **all of Phase 15** through **15.11**. **Next:** choose and sequence Phase 16 decision-log items before implementation.
+> Last updated: 2026-04-09 - **v1.0.0** tags Phase **11-12**; **main** additionally ships **Phase 13**, **Phase 14** (through **14.7**), and **all of Phase 15** through **15.11**. **Next:** execute Phase **16C** before **16A** and **16B**.
 > Current release tag: **v1.0.0**
 > Compact snapshot: [PROJECT_STATUS.md](PROJECT_STATUS.md) - Engineering standards: [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md)
 
@@ -112,19 +112,38 @@ These slices address deferred items from 15.2 and 15.3 and extend the domain and
 
 | Order | Focus | Notes |
 |-------|--------|--------|
-| **0** | **Phase 16A: production-safe capability gates** | Decide whether code sandboxing is a near-term product need; requires Decision Log plus explicit isolation contract |
-| **1** | **Phase 16B: storage evolution** | Decide whether SQLite limits justify Postgres and migration complexity yet |
-| **2** | **Phase 16C: identity and tenancy** | Decide whether shared-key + owner header is still enough, or whether real AuthN/AuthZ is now warranted |
+| **0** | **Phase 16C: credential-backed authorization context and tenancy envelope** | Stabilize `principal / tenant / scope / authorization decision` on top of shared API keys before any broader Phase 16 work |
+| **1** | **Phase 16A: production-safe capability gates** | Build future capability gates on top of the 16C authz context rather than a raw shared key |
+| **2** | **Phase 16B: storage evolution** | Revisit datastore changes only after authz and resource boundaries are explicit |
 
 > **Known semantic divergence (tracked):** `POST /api/knowledge/answers` still returns a raw snippet-dump (`"Relevant retrieved context:\n" + bullets`, `snippet[:220]`) with no LLM in the loop. The chat path (`POST /api/chat` with `knowledge_document_ids`) sends the same retrieved context to the model with an explicit "synthesize rather than dumping snippets" instruction. These two endpoints now have different answer semantics for the same underlying retrieval. The 15.10 integration tests will make this divergence explicit; resolution (whether to add LLM synthesis to `/answers` or document the difference as intentional) is a product decision to be made at that point.
+
+### Phase 16C decision log and execution checklist
+
+**Decision:** Phase 16C introduces credential-backed authorization and tenancy boundaries, not end-user identity.
+
+**Status:** complete  
+**Sequence:** `16C -> 16A -> 16B`
+
+- [x] Re-sequence Phase 16 so authz context lands before capability gates and datastore expansion.
+- [x] Keep `GOAT_API_KEY`, `GOAT_API_KEY_WRITE`, and `X-GOAT-Owner-Id` ingress compatibility.
+- [x] Introduce typed `PrincipalId`, `TenantId`, `Scope`, `AuthorizationDecision`, and `AuthorizationContext`.
+- [x] Add a minimal credential registry with env fallback for existing shared-key deployments.
+- [x] Bind `AuthorizationContext` in HTTP middleware and expose it through a dependency.
+- [x] Start moving resource-level authorization into application-layer authorizers instead of routers/middleware.
+- [x] Add structured allow/deny authz audit events with stable identifiers only.
+- [x] Add `tenant_id` / `principal_id` columns for sessions and chat artifacts using additive migrations.
+- [x] Extend the same tenancy envelope to knowledge documents and media uploads.
+- [x] Close out docs and operations guidance for multi-credential configuration and rollout.
+- [x] Mark Phase 16C complete only after the broader resource adoption and regression matrix are green.
 
 ### Near-term execution order (project-calibrated)
 
 | Horizon | Focus |
 |---------|--------|
 | **v1.0.x** | Ops hardening carry-overs: SQLite backup thresholds, security audit as exposure grows |
-| **v1.1.x** | Phase 16 decision logs and the first selected implementation slice |
-| **v1.2+** | Phase 16 — capability gates (code sandbox), optional Postgres, minimal multi-tenant AuthN; each is a Decision Log item before any code lands |
+| **v1.1.x** | Phase 16C implementation slices: authz context, tenancy envelope, and resource adoption |
+| **v1.2+** | Phase 16A capability gates, then Phase 16B storage evolution; each remains a Decision Log item before any code lands |
 
 ---
 
@@ -138,7 +157,7 @@ This section records **constraints that match today's shipped architecture** and
 |----------------|------------------|---------------------|
 | Protection is **`GOAT_API_KEY` + `X-GOAT-API-Key`** when set; optional **`GOAT_API_KEY_WRITE`** splits read vs write HTTP methods; optional **`X-GOAT-Owner-Id`** + **`GOAT_REQUIRE_SESSION_OWNER`** scopes sessions (not end-user AuthN). | Document threat model, rotation, and blast radius; keep rate limits and health exceptions as today. | [SECURITY.md](SECURITY.md), [OPERATIONS.md](OPERATIONS.md); Phase **15.5** enforcement complete. |
 | Feature gates expose **`policy_allowed: null`** until richer AuthZ exists; runtime gating (503) is separate from policy (403). | Scoped keys + owner header are opt-in via env; **not** full IAM until product requires it. | [test_api_authz.py](../__tests__/test_api_authz.py); [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) Section 15. |
-| Per-user sessions in SQLite are **not** authenticated identities; `owner_id` is a **convenience partition**, not proof of principal. | Stricter identity requires a Decision Log + product commitment. | [SESSION_MESSAGES_MIGRATION.md](SESSION_MESSAGES_MIGRATION.md); Decision Log 2026-04-08. |
+| Per-user sessions in SQLite are **not** authenticated identities; `owner_id` is a **convenience partition**, not proof of principal. | Phase **16C** adds credential-backed authorization and tenancy boundaries without claiming end-user identity. | [SESSION_MESSAGES_MIGRATION.md](SESSION_MESSAGES_MIGRATION.md); Decision Log 2026-04-08 and 2026-04-09. |
 
 **Priority:** Docs + operational discipline **first**; code changes for multi-key **only** when exposure grows.
 
