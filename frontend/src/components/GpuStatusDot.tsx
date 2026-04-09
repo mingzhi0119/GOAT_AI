@@ -49,9 +49,12 @@ const GpuStatusDot: FC<Props> = ({ gpuStatus, gpuError, inferenceLatency }) => {
   const [open, setOpen] = useState(false)
   const tipId = useId()
   const available = Boolean(gpuStatus?.available)
+  const active = Boolean(gpuStatus?.active)
   const util = gpuStatus?.utilization_gpu ?? null
   const fill = utilizationTierColor(util, available && !gpuError)
   const lines = buildTooltipLines(gpuStatus, gpuError, inferenceLatency)
+  const isVisible = Boolean(gpuError) || (available && active)
+  const isSubtle = !gpuError && available && !active
   const label =
     gpuError != null && gpuError !== ''
       ? `GPU error: ${gpuError}`
@@ -60,19 +63,25 @@ const GpuStatusDot: FC<Props> = ({ gpuStatus, gpuError, inferenceLatency }) => {
         : 'GPU telemetry unavailable'
 
   return (
-    <div className="relative flex-shrink-0 self-center">
+    <div className="relative flex h-10 w-10 flex-shrink-0 items-center justify-center self-center">
       <button
         type="button"
-        className="rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--bg-chat)] focus:ring-yellow-500"
+        className="rounded-full transition-opacity duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--bg-chat)] focus:ring-yellow-500"
         aria-label={label}
         aria-describedby={open ? tipId : undefined}
+        aria-hidden={!isVisible && !isSubtle}
+        tabIndex={isVisible || isSubtle ? 0 : -1}
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
+        style={{
+          opacity: isVisible ? 0.92 : isSubtle ? 0.3 : 0,
+          pointerEvents: isVisible || isSubtle ? 'auto' : 'none',
+        }}
       >
         <span
-          className="gpu-status-breathe block w-3 h-3 rounded-full border border-white/30 shadow-sm"
+          className={`${isVisible ? 'gpu-status-breathe' : ''} block h-2.5 w-2.5 rounded-full border border-white/25 shadow-sm`}
           style={
             {
               backgroundColor: fill,

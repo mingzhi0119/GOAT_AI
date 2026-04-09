@@ -70,11 +70,44 @@ const CloseIcon = () => (
   </svg>
 )
 
+const SendArrowIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <path
+      d="M8 12.75V4.5M8 4.5l-3.25 3.25M8 4.5l3.25 3.25"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
+const StopIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+    <rect x="3.25" y="3.25" width="7.5" height="7.5" rx="1.5" fill="currentColor" />
+  </svg>
+)
+
 function getAttachmentKind(file: File, supportsVision: boolean): 'image' | 'knowledge' | 'unsupported' {
   const ext = getFileExtension(file.name)
   if (KNOWLEDGE_FILE_EXTENSIONS.has(ext)) return 'knowledge'
   if (supportsVision && IMAGE_FILE_EXTENSIONS.has(ext)) return 'image'
   return 'unsupported'
+}
+
+function supportedAttachmentLabel(supportsVision: boolean): string {
+  return supportsVision
+    ? 'PNG, JPG, WEBP, CSV, XLSX, PDF, DOCX, MD, or TXT'
+    : 'CSV, XLSX, PDF, DOCX, MD, or TXT'
+}
+
+function formatAttachmentErrorMessage(error: unknown, supportsVision: boolean): string {
+  const fallback = 'Attachment upload failed'
+  const message = error instanceof Error ? error.message : fallback
+  if (message.startsWith('Unsupported file type:')) {
+    return `Unsupported file type. Please upload a ${supportedAttachmentLabel(supportsVision)} file.`
+  }
+  return message
 }
 
 const ChatWindow: FC<Props> = ({
@@ -199,7 +232,7 @@ const ChatWindow: FC<Props> = ({
       }
     } catch (err) {
       setAttachmentStatus(null)
-      setAttachmentUploadError(err instanceof Error ? err.message : 'Attachment upload failed')
+      setAttachmentUploadError(formatAttachmentErrorMessage(err, supportsVision))
     } finally {
       setAttachmentUploading(false)
     }
@@ -323,24 +356,34 @@ const ChatWindow: FC<Props> = ({
             <div className="flex flex-wrap items-center gap-2 px-1">
               {fileContext && (
                 <div
-                  className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs"
+                  className="inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 text-xs"
                   style={{
-                    borderColor: 'rgba(255,205,0,0.4)',
-                    background: 'rgba(255,205,0,0.08)',
+                    borderColor: 'rgba(255,255,255,0.12)',
+                    background: 'rgba(255,255,255,0.05)',
                     color: 'var(--text-main)',
                   }}
                 >
                   <span className="max-w-[220px] truncate">{fileContext.filename}</span>
-                  <div className="inline-flex items-center rounded-full border overflow-hidden">
+                  <div
+                    className="inline-flex items-center overflow-hidden rounded-full border"
+                    style={{
+                      borderColor: 'rgba(255,255,255,0.12)',
+                      background: 'rgba(255,255,255,0.03)',
+                    }}
+                  >
                     <button
                       type="button"
                       onClick={() => onSetFileContextMode('single')}
-                      className="px-2 py-0.5"
+                      className="px-2.5 py-1 text-[11px] transition-colors"
                       style={{
                         background:
                           fileContext.bindingMode === 'single'
-                            ? 'rgba(255,205,0,0.24)'
+                            ? 'rgba(255,255,255,0.12)'
                             : 'transparent',
+                        color:
+                          fileContext.bindingMode === 'single'
+                            ? 'var(--text-main)'
+                            : 'var(--text-muted)',
                       }}
                       title="Use this document for the next message only"
                     >
@@ -349,13 +392,17 @@ const ChatWindow: FC<Props> = ({
                     <button
                       type="button"
                       onClick={() => onSetFileContextMode('persistent')}
-                      className="border-l px-2 py-0.5"
+                      className="border-l px-2.5 py-1 text-[11px] transition-colors"
                       style={{
-                        borderColor: 'rgba(255,205,0,0.24)',
+                        borderColor: 'rgba(255,255,255,0.12)',
                         background:
                           fileContext.bindingMode === 'persistent'
-                            ? 'rgba(255,205,0,0.24)'
+                            ? 'rgba(255,255,255,0.12)'
                             : 'transparent',
+                        color:
+                          fileContext.bindingMode === 'persistent'
+                            ? 'var(--text-main)'
+                            : 'var(--text-muted)',
                       }}
                       title="Keep using this document until cleared"
                     >
@@ -364,13 +411,17 @@ const ChatWindow: FC<Props> = ({
                     <button
                       type="button"
                       onClick={() => onSetFileContextMode('idle')}
-                      className="border-l px-2 py-0.5"
+                      className="border-l px-2.5 py-1 text-[11px] transition-colors"
                       style={{
-                        borderColor: 'rgba(255,205,0,0.24)',
+                        borderColor: 'rgba(255,255,255,0.12)',
                         background:
                           fileContext.bindingMode === 'idle'
-                            ? 'rgba(255,205,0,0.18)'
+                            ? 'rgba(255,255,255,0.1)'
                             : 'transparent',
+                        color:
+                          fileContext.bindingMode === 'idle'
+                            ? 'var(--text-main)'
+                            : 'var(--text-muted)',
                       }}
                       title="Keep the document available but do not attach it automatically"
                     >
@@ -393,10 +444,10 @@ const ChatWindow: FC<Props> = ({
                   key={`${id}-${index}`}
                   type="button"
                   onClick={() => setPendingImageIds(prev => prev.filter((_, i) => i !== index))}
-                  className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs"
+                  className="inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 text-xs"
                   style={{
-                    borderColor: 'var(--border-color)',
-                    background: 'var(--bg-asst-bubble)',
+                    borderColor: 'rgba(255,255,255,0.12)',
+                    background: 'rgba(255,255,255,0.05)',
                     color: 'var(--text-muted)',
                   }}
                   title="Remove image attachment"
@@ -407,7 +458,7 @@ const ChatWindow: FC<Props> = ({
               ))}
               {attachmentStatus && (
                 <div
-                  className="rounded-full border px-3 py-1 text-xs"
+                  className="rounded-2xl border px-3 py-1.5 text-xs"
                   style={{
                     borderColor: 'rgba(255,255,255,0.14)',
                     background: 'rgba(255,255,255,0.05)',
@@ -421,14 +472,14 @@ const ChatWindow: FC<Props> = ({
           )}
 
           <div
-            className="rounded-[26px] border px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.18)]"
+            className="rounded-[26px] border px-4 py-2.5 shadow-[0_18px_40px_rgba(0,0,0,0.18)]"
             style={{
               borderColor: 'rgba(255,255,255,0.09)',
               background:
                 'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%)',
             }}
           >
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2.5">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -458,12 +509,12 @@ const ChatWindow: FC<Props> = ({
               </div>
 
               <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 flex-1 items-center gap-3">
+                <div className="flex min-w-0 flex-1 items-center">
                   <button
                     type="button"
                     disabled={isStreaming || attachmentUploading}
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl transition-all disabled:opacity-40 hover:opacity-80"
+                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full transition-all disabled:opacity-40 hover:opacity-80"
                     style={{
                       border: '1px solid rgba(255,255,255,0.14)',
                       color: 'var(--text-main)',
@@ -476,56 +527,51 @@ const ChatWindow: FC<Props> = ({
                   >
                     <PlusIcon />
                   </button>
-
-                  <span
-                    className="truncate text-[11px]"
-                    style={{ color: 'color-mix(in srgb, var(--text-muted) 82%, transparent)' }}
-                  >
-                    {supportsVision
-                      ? 'Attach PNG, JPG, WEBP, CSV, XLSX, PDF, DOCX, MD, or TXT'
-                      : 'Attach CSV, XLSX, PDF, DOCX, MD, or TXT'}
-                  </span>
                 </div>
 
-                <div className="flex flex-shrink-0 items-center gap-3">
+                <div className="flex flex-shrink-0 items-center gap-2">
                   <GpuStatusDot
                     gpuStatus={gpuStatus}
                     gpuError={gpuError}
                     inferenceLatency={inferenceLatency}
                   />
-                  <span
-                    className="whitespace-nowrap text-[11px]"
-                    style={{ color: 'color-mix(in srgb, var(--text-muted) 82%, transparent)' }}
+                  <button
+                    type="button"
+                    onClick={isStreaming ? onStop : handleSubmit}
+                    disabled={!isStreaming && !canSend}
+                    aria-label={isStreaming ? 'Stop generating' : 'Send message'}
+                    className="flex h-10 w-10 items-center justify-center rounded-full transition-all disabled:cursor-not-allowed"
+                    style={{
+                      background: isStreaming
+                        ? '#111111'
+                        : canSend
+                          ? '#111111'
+                          : 'rgba(255,255,255,0.16)',
+                      color: isStreaming || canSend ? '#ffffff' : 'rgba(255,255,255,0.5)',
+                    }}
+                    title={isStreaming ? 'Stop generating' : 'Send message'}
                   >
-                    Enter to Send
-                  </span>
-                <button
-                  type="button"
-                  onClick={isStreaming ? onStop : handleSubmit}
-                  disabled={!isStreaming && !canSend}
-                  className="self-center rounded-2xl px-5 py-2.5 text-sm font-semibold transition-all disabled:opacity-40"
-                  style={{
-                    background: isStreaming
-                      ? '#dc2626'
-                      : canSend
-                        ? 'linear-gradient(135deg, #0f2b56 0%, #1c4b8c 100%)'
-                        : 'rgba(255,255,255,0.08)',
-                    color: isStreaming || canSend ? '#fff' : 'var(--text-muted)',
-                  }}
-                >
-                  {isStreaming ? 'Stop' : 'Send'}
-                </button>
+                    {isStreaming ? <StopIcon /> : <SendArrowIcon />}
+                  </button>
                 </div>
               </div>
             </div>
           </div>
 
           {attachmentUploadError && (
-            <p className="mt-1 text-center text-xs text-red-600">{attachmentUploadError}</p>
+            <div
+              role="status"
+              aria-live="polite"
+              className="mt-2 rounded-2xl border px-3 py-2 text-sm"
+              style={{
+                borderColor: 'rgba(239,68,68,0.28)',
+                background: 'rgba(239,68,68,0.08)',
+                color: '#fca5a5',
+              }}
+            >
+              {attachmentUploadError}
+            </div>
           )}
-          <p className="mt-1.5 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
-            AI may make mistakes. Verify important information.
-          </p>
         </div>
       </div>
     </div>
