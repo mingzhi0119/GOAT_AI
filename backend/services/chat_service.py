@@ -99,8 +99,12 @@ def stream_chat_sse(
         vision_last_user_images_base64=vision_last_user_images_base64,
         settings=settings,
         session_owner_id=session_owner_id,
-        tenant_id=auth_context.tenant_id.value if auth_context is not None else "tenant:default",
-        principal_id=auth_context.principal_id.value if auth_context is not None else "",
+        tenant_id=auth_context.tenant_id.value
+        if auth_context is not None
+        else "tenant:default",
+        principal_id=auth_context.principal_id.value
+        if auth_context is not None
+        else "",
         auth_context=auth_context,
         request_id=request_id,
     )
@@ -212,8 +216,12 @@ def _stream_knowledge_chat_sse(
             for document in documents
         ],
         session_owner_id=session_owner_id,
-        tenant_id=auth_context.tenant_id.value if auth_context is not None else "tenant:default",
-        principal_id=auth_context.principal_id.value if auth_context is not None else "",
+        tenant_id=auth_context.tenant_id.value
+        if auth_context is not None
+        else "tenant:default",
+        principal_id=auth_context.principal_id.value
+        if auth_context is not None
+        else "",
         auth_context=auth_context,
         request_id=request_id,
     )

@@ -63,7 +63,9 @@ class RateLimitPolicy:
         )
         return hashlib.sha256(encoded).hexdigest()
 
-    def decide(self, observed_timestamps: list[float], *, now: float) -> RateLimitDecision:
+    def decide(
+        self, observed_timestamps: list[float], *, now: float
+    ) -> RateLimitDecision:
         """Return whether a request is allowed and the retry delay when blocked."""
         windowed = sorted(
             float(timestamp)

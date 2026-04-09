@@ -97,9 +97,7 @@ class DbMigrationsTests(unittest.TestCase):
                 self.assertIn("principal_id", artifact_cols)
                 media_cols = [
                     r[1]
-                    for r in conn.execute(
-                        "PRAGMA table_info(media_uploads)"
-                    ).fetchall()
+                    for r in conn.execute("PRAGMA table_info(media_uploads)").fetchall()
                 ]
                 self.assertIn("tenant_id", media_cols)
                 self.assertIn("principal_id", media_cols)
@@ -177,9 +175,7 @@ class DbMigrationsTests(unittest.TestCase):
                 self.assertIn("principal_id", artifact_cols)
                 media_cols = [
                     r[1]
-                    for r in conn.execute(
-                        "PRAGMA table_info(media_uploads)"
-                    ).fetchall()
+                    for r in conn.execute("PRAGMA table_info(media_uploads)").fetchall()
                 ]
                 self.assertIn("tenant_id", media_cols)
                 self.assertIn("principal_id", media_cols)

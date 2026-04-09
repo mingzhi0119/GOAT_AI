@@ -26,6 +26,8 @@ from backend.models.history import (
 )
 
 router = APIRouter()
+
+
 def _raise_owner_required(exc: HistoryOwnerRequiredError) -> None:
     raise HTTPException(
         status_code=403,

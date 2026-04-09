@@ -30,7 +30,7 @@ goat_ai/                  ← innermost shared lib (LLM client, uploads, tools);
 
 **Direction:** `routers → application → services → domain → models → goat_ai`
 
-Run `lint-imports` (configured in `pyproject.toml`) before pytest — CI does the same.
+Run `lint-imports` (configured in `pyproject.toml`) before pytest — CI does the same. Before every merge or hand-off, run the full **CI parity** block under [Testing](#testing) so local results match `.github/workflows/ci.yml`.
 
 Key contract face: `backend.application.ports` exports `Settings`, `LLMClient`, `SessionRepository`, `ConversationLogger`, `TitleGenerator`, `SafeguardService`, `TabularContextExtractor`, and stable shared exceptions. Routers and application modules import from here, not from `backend.services.*` directly.
 
@@ -59,8 +59,32 @@ bash deploy.sh          # Linux
 
 ## Testing
 
+### CI parity (run before every code delivery)
+
+These commands mirror the `backend` and `frontend` jobs in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Use **Python 3.14** and `pip install -r requirements-ci.txt` (or equivalent) so `lint-imports`, `tools.check_api_contract_sync`, and OpenAPI artifacts stay aligned with CI.
+
+**Backend (repository root):**
+
 ```bash
-# Canonical (matches CI)
+ruff check backend goat_ai scripts tools __tests__
+ruff format --check backend goat_ai scripts tools __tests__
+pip-audit -r requirements-ci.txt
+lint-imports
+python -m tools.run_rag_eval
+python -m tools.check_api_contract_sync
+python -m pytest __tests__/ -v --tb=short
+```
+
+**Frontend** (when `frontend/` changed; Node **24.14.x** per workflow):
+
+```bash
+cd frontend && npm ci && npm test -- --run && npm run build
+```
+
+### Focused runs
+
+```bash
+# Canonical pytest (subset of CI parity)
 python -m pytest __tests__/ -v --tb=short
 
 # Integration tier only (requires no live Ollama)
@@ -72,7 +96,7 @@ python -m pytest __tests__/test_api_blackbox_contract.py -v
 # RAG eval gate (must stay green)
 python -m tools.run_rag_eval
 
-# Frontend
+# Frontend tests + build only (if deps already installed)
 cd frontend && npm test -- --run && npm run build
 ```
 

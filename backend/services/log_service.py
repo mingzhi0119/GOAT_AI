@@ -626,7 +626,7 @@ def get_chat_artifact(*, db_path: Path, artifact_id: str) -> dict[str, Any] | No
             conn.row_factory = sqlite3.Row
             row = conn.execute(
                 f"""
-                SELECT {'id, session_id, owner_id, tenant_id, principal_id, filename, mime_type, byte_size, storage_path, source_message_index, created_at' if _chat_artifacts_has_tenant_columns(conn) else 'id, session_id, owner_id, filename, mime_type, byte_size, storage_path, source_message_index, created_at'}
+                SELECT {"id, session_id, owner_id, tenant_id, principal_id, filename, mime_type, byte_size, storage_path, source_message_index, created_at" if _chat_artifacts_has_tenant_columns(conn) else "id, session_id, owner_id, filename, mime_type, byte_size, storage_path, source_message_index, created_at"}
                 FROM chat_artifacts
                 WHERE id = ?
                 """,

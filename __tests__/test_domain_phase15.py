@@ -191,7 +191,9 @@ class DomainSessionSchemaErrorTests(unittest.TestCase):
                 "not-a-dict",
             ],
             "chart_data_source": "bad-value",
-            "knowledge_documents": [{"document_id": "", "filename": "", "mime_type": ""}],
+            "knowledge_documents": [
+                {"document_id": "", "filename": "", "mime_type": ""}
+            ],
         }
         result = decode_session_payload(malformed_payload)
         self.assertEqual([], result.messages)

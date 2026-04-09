@@ -6,7 +6,7 @@ Short durable index for coding agents and contributors. Canonical engineering ru
 
 - [`docs/ENGINEERING_STANDARDS.md`](docs/ENGINEERING_STANDARDS.md) - full rules for Python, TypeScript, testing, API design, cross-env behavior, production host constraints, documentation workflow, API artifacts, and recovery. Section 15 covers capability-based feature gates for optional high-risk features such as a future code sandbox.
 - [`docs/DOMAIN.md`](docs/DOMAIN.md) - ubiquitous domain language (Phase 15.1); update when user-visible chat, chart, or safeguard semantics change.
-- Editor rules under `.cursor/rules/` must mirror the same principles; keep them aligned whenever either file changes.
+- Editor rules under `.cursor/rules/` must mirror the same principles; keep them aligned whenever either file changes (including the **Before delivering code** checklist in `core-principles.mdc` and `testing.mdc`).
 
 ## Documentation language
 
@@ -22,6 +22,34 @@ Short durable index for coding agents and contributors. Canonical engineering ru
 3. Portable by default: Windows dev and Ubuntu prod without source edits.
 4. Type everything at function boundaries.
 5. Test the boundary, mock the world.
+
+## Before delivering code (CI parity)
+
+Run the same checks GitHub Actions runs (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)). Use **Python 3.14** and dependencies from `requirements-ci.txt` so results match CI (especially `docs/openapi.json` / API contract sync).
+
+**Backend (repository root)** — required for any Python/backend change:
+
+```bash
+ruff check backend goat_ai scripts tools __tests__
+ruff format --check backend goat_ai scripts tools __tests__
+pip-audit -r requirements-ci.txt
+lint-imports
+python -m tools.run_rag_eval
+python -m tools.check_api_contract_sync
+python -m pytest __tests__/ -v --tb=short
+```
+
+On pull requests, CI runs `ruff format --check` only on changed `.py` files; running the paths above locally is a safe full-tree gate.
+
+**Frontend** — required when `frontend/` changes:
+
+```bash
+cd frontend && npm ci && npm test -- --run && npm run build
+```
+
+(Node **24.14.x** matches CI; see `frontend/package.json` / workflow.)
+
+The `secrets-scan` job (Gitleaks) is informational in CI; no local equivalent required for routine delivery.
 
 ## Where to look first (API work)
 

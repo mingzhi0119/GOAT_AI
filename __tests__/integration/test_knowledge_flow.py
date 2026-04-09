@@ -117,7 +117,9 @@ def test_search_after_ingest_returns_hits(app_client: object) -> None:
     from fastapi.testclient import TestClient
 
     assert isinstance(app_client, TestClient)
-    upload = _upload(app_client, b"Strategic planning improves organizational outcomes.")
+    upload = _upload(
+        app_client, b"Strategic planning improves organizational outcomes."
+    )
     doc_id = upload["document_id"]
     _ingest(app_client, doc_id)
 

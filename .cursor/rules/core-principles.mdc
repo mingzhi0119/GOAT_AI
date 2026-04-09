@@ -36,6 +36,10 @@ Canonical engineering rules: `docs/ENGINEERING_STANDARDS.md`. Repo root `AGENTS.
 - Secrets: `.env` gitignored; `.env.example` committed; never in scripts or source.
 - Startup: validate env/config at import or app factory time with `pydantic_settings.BaseSettings` for new services, or the existing `goat_ai/config.py` `@dataclass` + `load_settings()`. Crash with a clear message at startup, never lazily on first request.
 
+## Before delivering code (CI parity)
+
+Before every merge or hand-off, run the same checks as `.github/workflows/ci.yml` (see repo root `AGENTS.md` for the full command list). At minimum: **ruff** (check + format on touched trees), **pip-audit**, **lint-imports**, **tools.run_rag_eval**, **tools.check_api_contract_sync**, **pytest** on `__tests__/`; any `frontend/` change also needs **`npm ci && npm test -- --run && npm run build`** under `frontend/`. Use Python **3.14** and `requirements-ci.txt` to match CI.
+
 ## Documentation language
 
 - `docs/` and `README.md`: committed prose must be English only.

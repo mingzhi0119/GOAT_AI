@@ -57,21 +57,21 @@ class RateLimitDecisionLike(Protocol):
 
 
 class RateLimitStoreLike(Protocol):
-    def get_timestamps(self, key: str, *, now: float, window_sec: int) -> list[float]:
-        ...
+    def get_timestamps(
+        self, key: str, *, now: float, window_sec: int
+    ) -> list[float]: ...
 
-    def replace_timestamps(self, key: str, timestamps: list[float]) -> None:
-        ...
+    def replace_timestamps(self, key: str, timestamps: list[float]) -> None: ...
 
 
 class RateLimitPolicyLike(Protocol):
     window_sec: int
 
-    def key_for(self, subject: object) -> str:
-        ...
+    def key_for(self, subject: object) -> str: ...
 
-    def decide(self, observed_timestamps: list[float], *, now: float) -> RateLimitDecisionLike:
-        ...
+    def decide(
+        self, observed_timestamps: list[float], *, now: float
+    ) -> RateLimitDecisionLike: ...
 
 
 def _resolve_settings(app: FastAPI) -> Settings:
@@ -148,7 +148,9 @@ def _has_any_write_scope(scopes: object) -> bool:
     return bool(_WRITE_SCOPES & scopes)
 
 
-def _build_rate_limit_subject(request: Request, provided_api_key: str) -> dict[str, str]:
+def _build_rate_limit_subject(
+    request: Request, provided_api_key: str
+) -> dict[str, str]:
     return {
         "api_key_fingerprint": _fingerprint_api_key(provided_api_key),
         "method_class": _method_class(request.method),
@@ -217,10 +219,14 @@ def register_http_security(
                 decision = rate_limit_policy.decide(timestamps, now=now)
                 if not decision.allowed:
                     status_code = 429
-                    return _build_rate_limited_response(request_id, decision.retry_after)
+                    return _build_rate_limited_response(
+                        request_id, decision.retry_after
+                    )
                 rate_limit_store.replace_timestamps(rate_limit_key, [*timestamps, now])
             else:
-                request.state.authorization_context = build_local_authorization_context()
+                request.state.authorization_context = (
+                    build_local_authorization_context()
+                )
 
             response = await call_next(request)
             status_code = response.status_code

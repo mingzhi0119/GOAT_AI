@@ -82,12 +82,17 @@ class SafeguardPolicy(Protocol):
 def _matches_explicit_generation(text: str) -> bool:
     return bool(
         _GENERATION_VERBS.search(text)
-        and (_EXPLICIT_SEXUAL_TERMS.search(text) or _EXPLICIT_SEXUAL_COMPOUND.search(text))
+        and (
+            _EXPLICIT_SEXUAL_TERMS.search(text)
+            or _EXPLICIT_SEXUAL_COMPOUND.search(text)
+        )
     )
 
 
 def _contains_explicit_sexual_content(text: str) -> bool:
-    return bool(_EXPLICIT_SEXUAL_TERMS.search(text) or _EXPLICIT_SEXUAL_COMPOUND.search(text))
+    return bool(
+        _EXPLICIT_SEXUAL_TERMS.search(text) or _EXPLICIT_SEXUAL_COMPOUND.search(text)
+    )
 
 
 class RuleBasedSafeguardPolicy:

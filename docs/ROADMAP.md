@@ -1,4 +1,4 @@
-﻿# GOAT AI Roadmap
+# GOAT AI Roadmap
 
 > Last updated: 2026-04-09 - **v1.0.0** tags Phase **11-12**; **main** additionally ships **Phase 13**, **Phase 14** (through **14.7**), and **all of Phase 15** through **15.11**. **Next:** execute Phase **16C** before **16A** and **16B**.
 > Current release tag: **v1.0.0**

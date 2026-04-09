@@ -118,7 +118,9 @@ class SQLiteKnowledgeRepository:
             ).fetchall()
         return [KnowledgeDocumentRecord(**dict(row)) for row in rows]
 
-    def list_documents_for_tenant(self, tenant_id: str) -> list[KnowledgeDocumentRecord]:
+    def list_documents_for_tenant(
+        self, tenant_id: str
+    ) -> list[KnowledgeDocumentRecord]:
         with sqlite3.connect(self._db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(

@@ -136,10 +136,13 @@ def create_knowledge_upload_from_bytes(
     emit_authorization_audit(
         ctx=auth_context,
         action="knowledge.document.create",
-        resource=ResourceRef(resource_type="knowledge_document", resource_id=document_id),
+        resource=ResourceRef(
+            resource_type="knowledge_document", resource_id=document_id
+        ),
         decision=authorize_knowledge_document_write(
             ctx=auth_context,
-            document=repository.get_document(document_id) or KnowledgeDocumentRecord(
+            document=repository.get_document(document_id)
+            or KnowledgeDocumentRecord(
                 id=document_id,
                 source_type="upload",
                 original_filename=stored.filename,
@@ -189,7 +192,9 @@ def get_knowledge_upload(
     emit_authorization_audit(
         ctx=auth_context,
         action="knowledge.document.read",
-        resource=ResourceRef(resource_type="knowledge_document", resource_id=document_id),
+        resource=ResourceRef(
+            resource_type="knowledge_document", resource_id=document_id
+        ),
         decision=decision,
         request_id=request_id,
     )
@@ -344,7 +349,9 @@ def get_knowledge_ingestion_status(
     emit_authorization_audit(
         ctx=auth_context,
         action="knowledge.ingestion.read",
-        resource=ResourceRef(resource_type="knowledge_ingestion", resource_id=ingestion_id),
+        resource=ResourceRef(
+            resource_type="knowledge_ingestion", resource_id=ingestion_id
+        ),
         decision=decision,
         request_id=request_id,
     )
@@ -546,7 +553,9 @@ def resolve_knowledge_documents(
         emit_authorization_audit(
             ctx=auth_context,
             action="knowledge.document.resolve",
-            resource=ResourceRef(resource_type="knowledge_document", resource_id=document.id),
+            resource=ResourceRef(
+                resource_type="knowledge_document", resource_id=document.id
+            ),
             decision=decision,
             request_id=request_id,
         )
@@ -617,7 +626,9 @@ def _authorized_document_ids_for_request(
 ) -> list[str]:
     repository = SQLiteKnowledgeRepository(settings.log_db_path)
     if requested_document_ids:
-        documents = repository.list_documents(list(dict.fromkeys(requested_document_ids)))
+        documents = repository.list_documents(
+            list(dict.fromkeys(requested_document_ids))
+        )
     else:
         documents = repository.list_documents_for_tenant(auth_context.tenant_id.value)
     allowed_ids: list[str] = []
@@ -630,7 +641,9 @@ def _authorized_document_ids_for_request(
         emit_authorization_audit(
             ctx=auth_context,
             action=action,
-            resource=ResourceRef(resource_type="knowledge_document", resource_id=document.id),
+            resource=ResourceRef(
+                resource_type="knowledge_document", resource_id=document.id
+            ),
             decision=decision,
             request_id=request_id,
         )
