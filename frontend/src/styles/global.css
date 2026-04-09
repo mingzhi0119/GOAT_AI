@@ -4,45 +4,77 @@
 
 /* ─── Simon Business School Brand Variables ─────────────────────────────── */
 :root {
-  --navy: #003a70;
-  --gold: #ffcd00;
+  --navy: #111827;
+  --gold: #9ca3af;
 
   /* Light theme */
-  --bg-main: #f0f4f8;
-  --bg-sidebar: #003a70;
-  --bg-chat: #ffffff;
-  --bg-user-bubble: #003a70;
-  --bg-asst-bubble: #f0f4f8;
-  --text-main: #1a202c;
-  --text-muted: #718096;
-  --text-sidebar: #e2e8f0;
+  --bg-main: #f4f4f5;
+  --bg-sidebar: #eff1f4;
+  --bg-chat: #f7f7f8;
+  --bg-user-bubble: #111214;
+  --bg-asst-bubble: #ffffff;
+  --text-main: #171717;
+  --text-muted: #71717a;
+  --text-sidebar: #18181b;
   --text-user-bubble: #ffffff;
-  --text-asst-bubble: #1a202c;
-  --border-color: #e2e8f0;
-  --input-bg: #ffffff;
-  --input-border: #cbd5e0;
-  --scrollbar-thumb: #cbd5e0;
+  --text-asst-bubble: #18181b;
+  --border-color: rgba(17, 24, 39, 0.08);
+  --input-bg: rgba(255, 255, 255, 0.92);
+  --input-border: rgba(17, 24, 39, 0.08);
+  --scrollbar-thumb: #d4d4d8;
   --scrollbar-track: transparent;
-  --sidebar-hover: rgba(255, 205, 0, 0.12);
+  --sidebar-hover: rgba(17, 24, 39, 0.05);
+  --sidebar-surface: rgba(255, 255, 255, 0.86);
+  --sidebar-surface-muted: rgba(255, 255, 255, 0.74);
+  --sidebar-border: rgba(17, 24, 39, 0.08);
+  --sidebar-muted: #6b7280;
+  --sidebar-danger: #b91c1c;
+  --sidebar-danger-bg: rgba(185, 28, 28, 0.08);
+  --composer-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.9) 100%);
+  --composer-menu-bg: rgba(255, 255, 255, 0.98);
+  --composer-menu-bg-strong: rgba(255, 255, 255, 0.985);
+  --composer-muted-surface: rgba(15, 23, 42, 0.02);
+  --composer-selected-surface: rgba(15, 23, 42, 0.08);
+  --composer-chip-border: rgba(0, 0, 0, 0.12);
+  --composer-danger-text: #b91c1c;
+  --composer-danger-border: rgba(239, 68, 68, 0.28);
+  --composer-danger-bg: rgba(239, 68, 68, 0.08);
+  --composer-danger-fg: #fca5a5;
 }
 
 .dark {
-  --bg-main: #0f172a;
-  --bg-sidebar: #001e3c;
-  --bg-chat: #1e293b;
-  --bg-user-bubble: #1e3a5f;
-  --bg-asst-bubble: #2d3748;
-  --text-main: #f1f5f9;
-  --text-muted: #94a3b8;
-  --text-sidebar: #e2e8f0;
+  --bg-main: #0f1115;
+  --bg-sidebar: #09090b;
+  --bg-chat: #111317;
+  --bg-user-bubble: #262a31;
+  --bg-asst-bubble: #17191d;
+  --text-main: #f5f5f5;
+  --text-muted: #a1a1aa;
+  --text-sidebar: #e5e7eb;
   --text-user-bubble: #ffffff;
-  --text-asst-bubble: #f1f5f9;
-  --border-color: #334155;
-  --input-bg: #1e293b;
-  --input-border: #475569;
-  --scrollbar-thumb: #475569;
+  --text-asst-bubble: #f5f5f5;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --input-bg: rgba(23, 25, 29, 0.94);
+  --input-border: rgba(255, 255, 255, 0.08);
+  --scrollbar-thumb: #3f3f46;
   --scrollbar-track: transparent;
-  --sidebar-hover: rgba(255, 205, 0, 0.08);
+  --sidebar-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-surface: rgba(255, 255, 255, 0.08);
+  --sidebar-surface-muted: rgba(255, 255, 255, 0.06);
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-muted: rgba(255, 255, 255, 0.52);
+  --sidebar-danger: #fca5a5;
+  --sidebar-danger-bg: rgba(248, 113, 113, 0.12);
+  --composer-surface: linear-gradient(180deg, rgba(22, 24, 29, 0.96) 0%, rgba(18, 20, 24, 0.92) 100%);
+  --composer-menu-bg: rgba(23, 25, 29, 0.98);
+  --composer-menu-bg-strong: rgba(23, 25, 29, 0.985);
+  --composer-muted-surface: rgba(255, 255, 255, 0.05);
+  --composer-selected-surface: rgba(255, 255, 255, 0.1);
+  --composer-chip-border: rgba(255, 255, 255, 0.14);
+  --composer-danger-text: #fca5a5;
+  --composer-danger-border: rgba(248, 113, 113, 0.28);
+  --composer-danger-bg: rgba(248, 113, 113, 0.1);
+  --composer-danger-fg: #fecaca;
 }
 
 /* ─── Base ───────────────────────────────────────────────────────────────── */
@@ -60,7 +92,36 @@
 body {
   background-color: var(--bg-main);
   color: var(--text-main);
+  font-family:
+    'Inter',
+    'Noto Sans SC',
+    'PingFang SC',
+    'Hiragino Sans GB',
+    'Microsoft YaHei UI',
+    'Segoe UI',
+    system-ui,
+    sans-serif;
+  font-feature-settings: 'cv11', 'ss01';
   transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+#root {
+  font-family: inherit;
+}
+
+.chat-shell :not(input):not(textarea) {
+  caret-color: transparent;
+}
+
+.chat-shell .ui-static {
+  cursor: default;
+}
+
+.chat-shell button,
+.chat-shell [role='button'],
+.chat-shell [role='switch'],
+.chat-shell a {
+  cursor: default;
 }
 
 /* ─── GPU status dot (breathing) ───────────────────────────────────────── */
@@ -98,8 +159,10 @@ body {
 
 /* ─── Markdown prose (assistant messages) ───────────────────────────────── */
 .prose-msg {
-  line-height: 1.65;
-  font-size: 0.9rem;
+  font-family: inherit;
+  line-height: 1.68;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
 }
 .prose-msg p          { margin-bottom: 0.6rem; }
 .prose-msg p:last-child { margin-bottom: 0; }
@@ -138,7 +201,7 @@ body {
 .prose-msg h3 { font-size: 1.05em; font-weight: 600; margin: 0.7rem 0 0.3rem; }
 
 .prose-msg blockquote {
-  border-left: 3px solid var(--gold);
+  border-left: 3px solid rgba(17, 24, 39, 0.18);
   padding-left: 0.85rem;
   margin: 0.6rem 0;
   color: var(--text-muted);

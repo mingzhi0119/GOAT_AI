@@ -1,18 +1,19 @@
 # GOAT AI Roadmap
 
-> Last updated: 2026-04-09 - **v1.0.0** tags Phase **11-12**; **main** additionally ships **Phase 13**, **Phase 14** (through **14.7**), and **all of Phase 15** through **15.11**. **Next:** execute Phase **16C** before **16A** and **16B**.
-> Current release tag: **v1.0.0**
+> Last updated: 2026-04-09 - **v1.2.0** now captures the project after **all of Phases 11-15** plus the completed frontend control-surface polish on `main`. **Next:** execute Phase **16C** before **16A** and **16B**.
+> Current release tag: **v1.2.0**
 > Compact snapshot: [PROJECT_STATUS.md](PROJECT_STATUS.md) - Engineering standards: [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md)
 
 ---
 
-## Shipped (v1.0.0)
+## Shipped (v1.2.0)
 
 | Phase | Content |
 |-------|---------|
 | 0–10 | Environment setup, FastAPI backend, React frontend, production deploy, product polish, reliability/UX, conversation history, quality/observability, charting/telemetry, access/security, native chart-tool path |
 | 11 | **Industrialization and decoupling:** `ChatStreamService` owns SSE/tool/safeguard streaming; `chat_orchestration.py` holds `PromptComposer` / `ChartToolOrchestrator` / `SessionPersistenceService`; `chat_service.py` is a thin entry; injectable `TabularContextExtractor` + `LLMClient`; `log_service` import confined to adapters; wire markers centralized; `test_architecture_boundaries` added |
 | 12 | **Hardening and scale-readiness:** explicit chart data-source policy, architecture guardrails, latency p50/p95 with model buckets, expanded `/api/chat` black-box matrix, deploy post-check script, API contract CI sync gate, model capability TTL cache |
+| Frontend polish | Composer menus, upload management panel, Plan badge, dark-mode-safe chat surfaces, unified options callout, and quieter history/message presentation are landed on `main` |
 
 ---
 
@@ -141,9 +142,25 @@ These slices address deferred items from 15.2 and 15.3 and extend the domain and
 
 | Horizon | Focus |
 |---------|--------|
-| **v1.0.x** | Ops hardening carry-overs: SQLite backup thresholds, security audit as exposure grows |
-| **v1.1.x** | Phase 16C implementation slices: authz context, tenancy envelope, and resource adoption |
-| **v1.2+** | Phase 16A capability gates, then Phase 16B storage evolution; each remains a Decision Log item before any code lands |
+| **v1.2.x** | Phase 16C implementation slices: authz context, tenancy envelope, and resource adoption |
+| **v1.3+** | Phase 16A capability gates, then Phase 16B storage evolution; each remains a Decision Log item before any code lands |
+
+### Near-term frontend backlog
+
+- Plan Mode follow-through: current composer and popover UI expose a frontend feature flag only; actual planning workflow/runtime integration remains incomplete and should be implemented separately.
+- Modern workspace options: add real `Search / Browse mode` only once the frontend and backend can execute grounded web retrieval rather than mock it.
+- Deep Research: add a multi-step research mode with task planning, longer-running execution, and source-backed synthesis when runtime orchestration exists.
+- Canvas / artifact workspace: add a dedicated workspace entry for iterative document, chart, or artifact editing instead of overloading the main chat surface.
+- Project-scoped knowledge / memory: support project-level context, reusable knowledge sets, and persistent workspace memory beyond the current single-chat file flow.
+- Connected apps / external sources: expose integrations for external drives, docs, or business systems only after connector auth and data-boundary contracts are implemented.
+
+### Archived: Frontend control-surface polish (complete)
+
+- Composer control-surface parity is complete: model switching moved into the composer beside upload and send controls.
+- Frontend reasoning-level control is complete as a UI placeholder: `Low / Medium / High` renders in the composer, while backend/runtime effect remains intentionally deferred.
+- Upload management and Plan Mode entry are complete at the UI layer: `+` now opens a multi-action panel with upload, manage uploads, and Plan Mode controls.
+- Unified options callout is complete: the old header settings dropdown was replaced with a grouped options panel for instructions, generation, conversation export, and appearance.
+- Dark-mode-safe chat surfaces and simplified history/message presentation are complete: avatars removed, bubbles unified, sidebar history rows simplified, and composer/menu surfaces tokenized for theme support.
 
 ---
 
@@ -275,3 +292,6 @@ Current behavior:
 | 2026-04-08 | Developer CLI: `python -m tools.*` | `tools/` is a package (`tools/__init__.py`); run modules from repo root. CI uses `python -m tools.run_rag_eval` and `python -m tools.check_api_contract_sync`. |
 | 2026-04-09 | Phase 15.8, 15.10, and 15.11 closed on main | 15.8: `Clock` now reaches rate-limit and title/session-persist flows. 15.10: integration coverage includes retrieval-backed chat in addition to history and knowledge-pipeline flows. 15.11: domain rate-limit policy/store split is landed and future-version session payloads now raise `SessionSchemaError` on read. |
 | 2026-04-09 | Phase 15.9 closed; Phase 15 fully complete on main | Router/application boundaries audited across history, knowledge, upload, chat, system, models, media, artifacts, and code-sandbox routes; `lint-imports` kept green; dependency graph docs updated. |
+| 2026-04-09 | Composer control-surface parity introduced frontend placeholders for reasoning level and Plan Mode | UI work moves model selection into the composer and adds frontend-only reasoning / planning controls ahead of backend/runtime support. |
+| 2026-04-09 | Options refactor ships only working controls; modern AI workspace modes stay roadmap-only until real support exists | Avoids fake Search / Research / Canvas / connectors UI while still aligning the product direction with current Chat AI patterns. |
+| 2026-04-09 | Release v1.2.0 aligns docs to shipped Phase 11-15 scope plus completed frontend UI polish | Version bump reflects the current project state and archives finished frontend control-surface work out of the active backlog. |

@@ -44,7 +44,7 @@ interface Props {
   inferenceLatency: InferenceLatency | null
 }
 
-/** Compact GPU status: colored dot; details only in hover/focus tooltip. */
+/** Compact GPU status: hover-only dot; not clickable. */
 const GpuStatusDot: FC<Props> = ({ gpuStatus, gpuError, inferenceLatency }) => {
   const [open, setOpen] = useState(false)
   const tipId = useId()
@@ -64,20 +64,18 @@ const GpuStatusDot: FC<Props> = ({ gpuStatus, gpuError, inferenceLatency }) => {
 
   return (
     <div className="relative flex h-10 w-10 flex-shrink-0 items-center justify-center self-center">
-      <button
-        type="button"
-        className="rounded-full transition-opacity duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--bg-chat)] focus:ring-yellow-500"
+      <div
+        className="rounded-full transition-opacity duration-200"
+        role="img"
         aria-label={label}
         aria-describedby={open ? tipId : undefined}
         aria-hidden={!isVisible && !isSubtle}
-        tabIndex={isVisible || isSubtle ? 0 : -1}
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
         style={{
           opacity: isVisible ? 0.92 : isSubtle ? 0.3 : 0,
           pointerEvents: isVisible || isSubtle ? 'auto' : 'none',
+          cursor: 'default',
         }}
       >
         <span
@@ -89,7 +87,7 @@ const GpuStatusDot: FC<Props> = ({ gpuStatus, gpuError, inferenceLatency }) => {
             } as CSSProperties
           }
         />
-      </button>
+      </div>
       {open && (
         <div
           id={tipId}

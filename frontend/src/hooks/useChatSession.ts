@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { ChartSpec, OllamaOptionsPayload } from '../api/types'
 import { useChat } from './useChat'
-import { useFileContext } from './useFileContext'
+import { useFileContext, type FileBindingMode, type FileContextItem } from './useFileContext'
 import { useHistory } from './useHistory'
-import { historyKnowledgeAttachment } from '../utils/sessionHistory'
+import { historyKnowledgeAttachments } from '../utils/sessionHistory'
 
 interface UseChatSessionArgs {
   selectedModel: string
@@ -18,7 +18,8 @@ export interface UseChatSessionReturn {
   sessionId: string | null
   sessionTitle: string | null
   chartSpec: ChartSpec | null
-  fileContext: ReturnType<typeof useFileContext>['fileContext']
+  fileContexts: FileContextItem[]
+  activeFileContext: FileContextItem | null
   historySessions: ReturnType<typeof useHistory>['sessions']
   isLoadingHistory: boolean
   historyError: string | null
@@ -29,16 +30,19 @@ export interface UseChatSessionReturn {
   deleteHistorySession: (sessionId: string) => Promise<void>
   deleteAllHistory: () => Promise<void>
   refreshHistory: () => Promise<void>
-  setFileContext: (ctx: {
+  upsertFileContext: (ctx: {
+    id?: string
     filename: string
     documentId?: string
     ingestionId?: string
     retrievalMode?: string
     suffixPrompt?: string
     templatePrompt?: string
-    bindingMode?: 'idle' | 'single' | 'persistent'
-  }) => void
-  setFileContextBindingMode: (mode: 'idle' | 'single' | 'persistent') => void
+    bindingMode?: FileBindingMode
+    status?: 'processing' | 'ready'
+  }) => FileContextItem
+  setFileContextBindingMode: (id: string, mode: FileBindingMode) => void
+  removeFileContext: (id: string) => void
   clearFileContextSession: () => void
 }
 
@@ -50,7 +54,15 @@ export function useChatSession({
 }: UseChatSessionArgs): UseChatSessionReturn {
   const chat = useChat()
   const history = useHistory()
-  const { fileContext, setFileContext, clearFileContext } = useFileContext()
+  const {
+    fileContexts,
+    activeFileContext,
+    upsertFileContext,
+    setFileContextMode,
+    removeFileContext,
+    replaceFileContexts,
+    clearFileContext,
+  } = useFileContext()
   const [chartSpec, setChartSpec] = useState<ChartSpec | null>(null)
 
   const sessionTitle = useMemo(() => {
@@ -83,11 +95,10 @@ export function useChatSession({
   }, [chat, clearFileContext])
 
   const setFileContextBindingMode = useCallback(
-    (mode: 'idle' | 'single' | 'persistent') => {
-      if (!fileContext) return
-      setFileContext({ ...fileContext, bindingMode: mode })
+    (id: string, mode: FileBindingMode) => {
+      setFileContextMode(id, mode)
     },
-    [fileContext, setFileContext],
+    [setFileContextMode],
   )
 
   const loadHistorySession = useCallback(
@@ -95,41 +106,42 @@ export function useChatSession({
       const session = await history.loadSession(sessionId)
       setChartSpec(session.chart_spec)
       chat.loadSession(session)
-      const attachment = historyKnowledgeAttachment(session)
-      if (attachment) setFileContext(attachment)
+      const attachments = historyKnowledgeAttachments(session)
+      if (attachments.length > 0) replaceFileContexts(attachments)
       else clearFileContext()
     },
-    [chat, clearFileContext, history, setFileContext],
+    [chat, clearFileContext, history, replaceFileContexts],
   )
 
   const sendMessage = useCallback(
     async (content: string, imageAttachmentIds?: string[]) => {
-      const shouldAttachKnowledge =
-        !!fileContext?.documentId &&
-        !imageAttachmentIds?.length &&
-        fileContext.bindingMode !== 'idle'
+      const knowledgeDocumentIds = fileContexts
+        .filter(item => item.documentId && item.bindingMode !== 'idle')
+        .map(item => item.documentId!)
+
+      const shouldAttachKnowledge = knowledgeDocumentIds.length > 0 && !imageAttachmentIds?.length
       await chat.sendMessage(
         content,
         selectedModel,
         userName,
-        shouldAttachKnowledge && fileContext?.documentId ? [fileContext.documentId] : undefined,
+        shouldAttachKnowledge ? knowledgeDocumentIds : undefined,
         systemInstruction,
         ollamaOptions,
         setChartSpec,
         imageAttachmentIds,
       )
-      if (fileContext?.bindingMode === 'single') {
-        setFileContext({ ...fileContext, bindingMode: 'idle' })
-      }
+      fileContexts
+        .filter(item => item.bindingMode === 'single')
+        .forEach(item => setFileContextMode(item.id, 'idle'))
       await history.refresh()
     },
     [
       chat,
-      fileContext,
+      fileContexts,
       history,
       ollamaOptions,
       selectedModel,
-      setFileContext,
+      setFileContextMode,
       systemInstruction,
       userName,
     ],
@@ -141,7 +153,8 @@ export function useChatSession({
     sessionId: chat.sessionId,
     sessionTitle,
     chartSpec,
-    fileContext,
+    fileContexts,
+    activeFileContext,
     historySessions: history.sessions,
     isLoadingHistory: history.isLoading,
     historyError: history.error,
@@ -152,8 +165,9 @@ export function useChatSession({
     deleteHistorySession: history.deleteSession,
     deleteAllHistory: history.deleteAll,
     refreshHistory: history.refresh,
-    setFileContext,
+    upsertFileContext,
     setFileContextBindingMode,
+    removeFileContext,
     clearFileContextSession,
   }
 }

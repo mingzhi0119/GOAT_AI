@@ -41,7 +41,7 @@ def create_app() -> FastAPI:
     """Build and return the configured FastAPI application."""
     app = FastAPI(
         title="GOAT AI",
-        version="1.0.0",
+        version="1.2.0",
         description="Simon Business School Strategic Intelligence API",
         openapi_tags=[
             {"name": "system", "description": "Health and server telemetry endpoints."},
@@ -120,7 +120,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/health", tags=["system"], summary="Read service liveness")
     def health() -> dict[str, str]:
-        return {"status": "ok", "version": "1.0.0"}
+        return {"status": "ok", "version": "1.2.0"}
 
     if DIST.is_dir():
         logger.info("Serving React SPA from %s", DIST)

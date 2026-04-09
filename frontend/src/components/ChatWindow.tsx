@@ -1,9 +1,20 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState, type FC, type KeyboardEvent } from 'react'
+import {
+  Suspense,
+  lazy,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  type FC,
+  type KeyboardEvent,
+} from 'react'
 import { uploadMediaImage } from '../api/media'
 import { streamUpload, type UploadStreamEvent } from '../api/upload'
 import type { GPUStatus, InferenceLatency } from '../api/system'
 import type { ChartSpec, Message } from '../api/types'
-import type { FileContext } from '../hooks/useFileContext'
+import type { FileBindingMode, FileContextItem } from '../hooks/useFileContext'
 import {
   getFileExtension,
   getSuffixPrompt,
@@ -24,28 +35,43 @@ const BASE_PROMPTS = [
 const KNOWLEDGE_FILE_EXTENSIONS = new Set(['csv', 'xlsx', 'pdf', 'docx', 'md', 'txt'])
 const IMAGE_FILE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp'])
 const TEXTAREA_MAX_HEIGHT_PX = 144
-const TEXTAREA_MIN_HEIGHT_PX = 44
+const TEXTAREA_MIN_HEIGHT_PX = 28
 
 type PromptItem =
   | { text: string; kind: 'base' }
   | { text: string; kind: 'suffix' }
   | { text: string; kind: 'template' }
 
+interface PendingImageAttachment {
+  id: string
+  filename: string
+}
+
+type ComposerPanel = 'plus' | 'manage-uploads' | 'model' | 'reasoning' | null
+type ComposerIndicatorKey = 'plan'
+
 interface Props {
   messages: Message[]
   chartSpec: ChartSpec | null
   isStreaming: boolean
+  models: string[]
   selectedModel: string
+  onModelChange: (model: string) => void
   supportsVision?: boolean
-  fileContext: FileContext | null
+  fileContexts: FileContextItem[]
+  activeFileContext: FileContextItem | null
   onUploadEvent: (event: UploadStreamEvent) => void
   onSendMessage: (content: string, imageAttachmentIds?: string[]) => void
-  onSetFileContextMode: (mode: 'idle' | 'single' | 'persistent') => void
+  onSetFileContextMode: (id: string, mode: FileBindingMode) => void
+  onRemoveFileContext: (id: string) => void
   onStop: () => void
-  onClearFileContext: () => void
   gpuStatus: GPUStatus | null
   gpuError: string | null
   inferenceLatency: InferenceLatency | null
+  planModeEnabled: boolean
+  onPlanModeChange: (enabled: boolean) => void
+  reasoningLevel: 'low' | 'medium' | 'high'
+  onReasoningLevelChange: (level: 'low' | 'medium' | 'high') => void
 }
 
 const PlusIcon = () => (
@@ -71,11 +97,11 @@ const CloseIcon = () => (
 )
 
 const SendArrowIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+  <svg width="24" height="24" viewBox="0 0 20 20" fill="none" aria-hidden="true">
     <path
-      d="M8 12.75V4.5M8 4.5l-3.25 3.25M8 4.5l3.25 3.25"
+      d="M10 15.25V4.75M10 4.75 5.9 8.85M10 4.75l4.1 4.1"
       stroke="currentColor"
-      strokeWidth="1.7"
+      strokeWidth="2.15"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
@@ -83,9 +109,114 @@ const SendArrowIcon = () => (
 )
 
 const StopIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-    <rect x="3.25" y="3.25" width="7.5" height="7.5" rx="1.5" fill="currentColor" />
+  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+    <rect x="4" y="4" width="10" height="10" rx="2" fill="currentColor" />
   </svg>
+)
+
+const UploadIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <path
+      d="M8 10.75V3.75M8 3.75 5.5 6.25M8 3.75l2.5 2.5M3.75 10.5v1.25c0 .28.22.5.5.5h7.5c.28 0 .5-.22.5-.5V10.5"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
+const ManageIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <path
+      d="M3 4.25h10M3 8h10M3 11.75h6"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
+const PlanModeIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <path
+      d="M4 3.75h8M4 8h5.5M4 12.25h6.5"
+      stroke="currentColor"
+      strokeWidth="1.45"
+      strokeLinecap="round"
+    />
+    <circle cx="11.75" cy="8" r="1.25" fill="currentColor" />
+  </svg>
+)
+
+const ChevronRightIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+    <path
+      d="M5.25 3.5 8.75 7l-3.5 3.5"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
+const ChevronDownIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+    <path
+      d="M3 4.5 6 7.5l3-3"
+      stroke="currentColor"
+      strokeWidth="1.35"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
+const CheckIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+    <path
+      d="M3.5 7.3 5.8 9.6l4.7-4.9"
+      stroke="currentColor"
+      strokeWidth="1.45"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
+const DocumentIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <path
+      d="M5 2.75h4.5L12.25 5.5V12.25a1 1 0 0 1-1 1h-6.5a1 1 0 0 1-1-1v-8.5a1 1 0 0 1 1-1Z"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinejoin="round"
+    />
+    <path d="M9.5 2.75V5.5h2.75" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+  </svg>
+)
+
+const ImageIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <rect x="2.5" y="3" width="11" height="10" rx="2" stroke="currentColor" strokeWidth="1.3" />
+    <circle cx="6" cy="6.5" r="1" fill="currentColor" />
+    <path
+      d="M4 11l2.5-2.5 1.75 1.75L10.5 8 12 9.5"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
+const ProcessingDot = () => (
+  <span className="inline-flex h-2 w-2 rounded-full bg-amber-400/80" aria-hidden="true" />
+)
+
+const ReadyDot = () => (
+  <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400/80" aria-hidden="true" />
 )
 
 function getAttachmentKind(file: File, supportsVision: boolean): 'image' | 'knowledge' | 'unsupported' {
@@ -110,46 +241,97 @@ function formatAttachmentErrorMessage(error: unknown, supportsVision: boolean): 
   return message
 }
 
+function modeLabel(mode: FileBindingMode): string {
+  if (mode === 'single') return 'Next'
+  if (mode === 'persistent') return 'Sticky'
+  return 'Off'
+}
+
+function reasoningLabel(level: 'low' | 'medium' | 'high'): string {
+  if (level === 'low') return 'Low'
+  if (level === 'high') return 'High'
+  return 'Medium'
+}
+
+function getComposerIndicators(planModeEnabled: boolean): Array<{
+  key: ComposerIndicatorKey
+  label: string
+  icon: ReactNode
+}> {
+  const orderedIndicators: Array<{
+    key: ComposerIndicatorKey
+    visible: boolean
+    label: string
+    icon: ReactNode
+  }> = [
+    {
+      key: 'plan',
+      visible: planModeEnabled,
+      label: 'Plan',
+      icon: <PlanModeIcon />,
+    },
+  ]
+
+  return orderedIndicators
+    .filter(indicator => indicator.visible)
+    .map(({ key, label, icon }) => ({ key, label, icon }))
+}
+
 const ChatWindow: FC<Props> = ({
   messages,
   chartSpec,
   isStreaming,
+  models,
   selectedModel,
+  onModelChange,
   supportsVision = false,
-  fileContext,
+  fileContexts,
+  activeFileContext,
   onUploadEvent,
   onSendMessage,
   onSetFileContextMode,
+  onRemoveFileContext,
   onStop,
-  onClearFileContext,
   gpuStatus,
   gpuError,
   inferenceLatency,
+  planModeEnabled,
+  onPlanModeChange,
+  reasoningLevel,
+  onReasoningLevelChange,
 }) => {
   const [input, setInput] = useState('')
-  const [pendingImageIds, setPendingImageIds] = useState<string[]>([])
+  const [pendingImages, setPendingImages] = useState<PendingImageAttachment[]>([])
   const [attachmentUploadError, setAttachmentUploadError] = useState<string | null>(null)
   const [attachmentUploading, setAttachmentUploading] = useState(false)
-  const [attachmentStatus, setAttachmentStatus] = useState<string | null>(null)
+  const [activePanel, setActivePanel] = useState<ComposerPanel>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const composerRef = useRef<HTMLDivElement>(null)
 
   const starterPrompts = useMemo<PromptItem[]>(() => {
-    if (!fileContext) {
+    if (!activeFileContext) {
       return BASE_PROMPTS.map((text: string): PromptItem => ({ text, kind: 'base' }))
     }
-    const filename = fileContext.filename
+    const filename = activeFileContext.filename
     return [
       { text: BASE_PROMPTS[0]!, kind: 'base' },
       { text: BASE_PROMPTS[1]!, kind: 'base' },
-      { text: fileContext.suffixPrompt ?? getSuffixPrompt(filename), kind: 'suffix' },
-      { text: fileContext.templatePrompt ?? getTemplateFallbackPrompt(filename), kind: 'template' },
+      { text: activeFileContext.suffixPrompt ?? getSuffixPrompt(filename), kind: 'suffix' },
+      {
+        text: activeFileContext.templatePrompt ?? getTemplateFallbackPrompt(filename),
+        kind: 'template',
+      },
     ]
-  }, [fileContext])
+  }, [activeFileContext])
 
   const visibleMessages = useMemo(() => messages.filter(message => !message.hidden), [messages])
-  const sessionHasFileContext = fileContext !== null || messages.some(message => message.hidden)
+  const sessionHasFileContext = fileContexts.length > 0 || messages.some(message => message.hidden)
+  const uploadedKnowledgeFiles = useMemo(
+    () => fileContexts.filter(item => item.documentId || item.status === 'processing'),
+    [fileContexts],
+  )
   const attachmentAccept = supportsVision
     ? 'image/png,image/jpeg,image/jpg,image/webp,.csv,.xlsx,.pdf,.docx,.md,.txt'
     : '.csv,.xlsx,.pdf,.docx,.md,.txt'
@@ -157,6 +339,17 @@ const ChatWindow: FC<Props> = ({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!composerRef.current?.contains(event.target as Node)) {
+        setActivePanel(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [])
 
   useEffect(() => {
     const textarea = textareaRef.current
@@ -172,17 +365,17 @@ const ChatWindow: FC<Props> = ({
 
   const handleSubmit = () => {
     const trimmed = input.trim()
+    const pendingImageIds = pendingImages.map(item => item.id)
     if ((!trimmed && !pendingImageIds.length) || isStreaming || attachmentUploading) return
     const text = trimmed || (pendingImageIds.length > 0 ? 'What do you see in this image?' : '')
     onSendMessage(text, pendingImageIds.length > 0 ? pendingImageIds : undefined)
     setInput('')
-    setPendingImageIds([])
+    setPendingImages([])
     setAttachmentUploadError(null)
-    setAttachmentStatus(null)
+    setActivePanel(null)
   }
 
   const uploadKnowledgeFile = async (file: File) => {
-    setAttachmentStatus(`Analyzing ${file.name}...`)
     for await (const event of streamUpload(file)) {
       if (event.type === 'file_prompt' || event.type === 'knowledge_ready') {
         onUploadEvent(event)
@@ -190,7 +383,6 @@ const ChatWindow: FC<Props> = ({
         throw new Error(event.message)
       }
     }
-    setAttachmentStatus(`${file.name} ready`)
   }
 
   const handleAttachmentPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -200,6 +392,7 @@ const ChatWindow: FC<Props> = ({
 
     setAttachmentUploadError(null)
     setAttachmentUploading(true)
+    setActivePanel(null)
     try {
       const knowledgeFiles = files.filter(
         file => getAttachmentKind(file, supportsVision) === 'knowledge',
@@ -217,21 +410,15 @@ const ChatWindow: FC<Props> = ({
       }
 
       for (const imageFile of imageFiles) {
-        setAttachmentStatus(`Uploading ${imageFile.name}...`)
         const result = await uploadMediaImage(imageFile)
-        setPendingImageIds(prev => [...prev, result.attachment_id])
+        setPendingImages(prev => [...prev, { id: result.attachment_id, filename: imageFile.name }])
       }
 
       const knowledgeFile = knowledgeFiles[0]
       if (knowledgeFile) {
         await uploadKnowledgeFile(knowledgeFile)
-      } else if (imageFiles.length > 0) {
-        setAttachmentStatus(`${imageFiles.length} image attachment${imageFiles.length > 1 ? 's' : ''} ready`)
-      } else {
-        setAttachmentStatus(null)
       }
     } catch (err) {
-      setAttachmentStatus(null)
       setAttachmentUploadError(formatAttachmentErrorMessage(err, supportsVision))
     } finally {
       setAttachmentUploading(false)
@@ -246,14 +433,32 @@ const ChatWindow: FC<Props> = ({
   }
 
   const canSend =
-    (input.trim().length > 0 || pendingImageIds.length > 0) && !isStreaming && !attachmentUploading
+    (input.trim().length > 0 || pendingImages.length > 0) && !isStreaming && !attachmentUploading
+  const hasVisibleAttachments = uploadedKnowledgeFiles.length > 0 || pendingImages.length > 0
+  const plusMenuOpen = activePanel === 'plus'
+  const manageUploadsOpen = activePanel === 'manage-uploads'
+  const modelMenuOpen = activePanel === 'model'
+  const reasoningMenuOpen = activePanel === 'reasoning'
+  const composerIndicators = useMemo(() => getComposerIndicators(planModeEnabled), [planModeEnabled])
+  const controlPillStyle = (isOpen: boolean) =>
+    ({
+      color: 'var(--text-muted)',
+      background: isOpen ? 'rgba(17,24,39,0.08)' : 'transparent',
+      boxShadow: isOpen ? '0 6px 14px rgba(15,23,42,0.08)' : 'none',
+    }) satisfies CSSProperties
+  const composerMenuStyle = {
+    borderColor: 'var(--input-border)',
+    background: 'var(--composer-menu-bg)',
+    backdropFilter: 'blur(14px)',
+    boxShadow: '0 10px 20px rgba(15,23,42,0.08)',
+  } satisfies CSSProperties
 
   return (
     <div
-      className="flex h-full min-h-0 min-w-0 flex-1 flex-col"
+      className="chat-shell flex h-full min-h-0 min-w-0 flex-1 flex-col"
       style={{ background: 'var(--bg-chat)' }}
     >
-      <div className="flex-1 space-y-4 overflow-y-auto px-4 py-6">
+      <div className="ui-static flex-1 space-y-4 overflow-y-auto px-5 py-6">
         {chartSpec && visibleMessages.length > 0 && (
           <Suspense
             fallback={
@@ -347,139 +552,384 @@ const ChatWindow: FC<Props> = ({
         <div ref={bottomRef} />
       </div>
 
-      <div
-        className="flex-shrink-0 border-t px-4 py-3"
-        style={{ borderColor: 'var(--border-color)', background: 'var(--bg-chat)' }}
-      >
+      <div className="flex-shrink-0 px-4 pb-4 pt-3" style={{ background: 'var(--bg-chat)' }}>
         <div className="mx-auto max-w-4xl space-y-2">
-          {(fileContext || pendingImageIds.length > 0 || attachmentStatus) && (
-            <div className="flex flex-wrap items-center gap-2 px-1">
-              {fileContext && (
-                <div
-                  className="inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 text-xs"
-                  style={{
-                    borderColor: 'rgba(255,255,255,0.12)',
-                    background: 'rgba(255,255,255,0.05)',
-                    color: 'var(--text-main)',
-                  }}
+          <div
+            ref={composerRef}
+            className="relative rounded-[28px] border px-3 py-2.5 shadow-[0_20px_48px_rgba(15,23,42,0.08)]"
+            style={{
+              borderColor: 'var(--input-border)',
+              background: 'var(--composer-surface)',
+            }}
+          >
+            {plusMenuOpen && (
+              <div
+                className="absolute bottom-14 left-0 z-30 w-[332px] rounded-2xl border p-1.5 shadow-[0_10px_20px_rgba(15,23,42,0.08)]"
+                style={composerMenuStyle}
+              >
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-slate-900/[0.04]"
+                  style={{ color: 'var(--text-main)' }}
                 >
-                  <span className="max-w-[220px] truncate">{fileContext.filename}</span>
-                  <div
-                    className="inline-flex items-center overflow-hidden rounded-full border"
+                  <span className="inline-flex items-center gap-2.5">
+                    <span className="inline-flex h-4 w-4 items-center justify-center">
+                      <UploadIcon />
+                    </span>
+                    <span>
+                      <span className="block font-medium leading-none">Upload Files</span>
+                      <span className="block text-xs" style={{ color: 'var(--text-muted)' }}>
+                        Add images or knowledge files
+                      </span>
+                    </span>
+                  </span>
+                  <ChevronRightIcon />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActivePanel('manage-uploads')
+                  }}
+                  className="mt-0.5 flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-slate-900/[0.04]"
+                  style={{ color: 'var(--text-main)' }}
+                >
+                  <span className="inline-flex items-center gap-2.5">
+                    <span className="inline-flex h-4 w-4 items-center justify-center">
+                      <ManageIcon />
+                    </span>
+                    <span>
+                      <span className="block font-medium leading-none">Manage Uploads</span>
+                      <span className="block text-xs" style={{ color: 'var(--text-muted)' }}>
+                        Review files and inclusion modes
+                      </span>
+                    </span>
+                  </span>
+                  <ChevronRightIcon />
+                </button>
+
+                <div
+                  className="mt-0.5 flex items-center justify-between rounded-xl px-2.5 py-2"
+                  style={{ color: 'var(--text-main)' }}
+                >
+                  <span className="inline-flex items-center gap-2.5">
+                    <span className="inline-flex h-4 w-4 items-center justify-center">
+                      <PlanModeIcon />
+                    </span>
+                    <span>
+                      <span className="block text-[13px] font-medium leading-none">Plan Mode</span>
+                      <span className="block text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                        Frontend feature flag for planning flows
+                      </span>
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={planModeEnabled}
+                    onClick={() => onPlanModeChange(!planModeEnabled)}
+                    className="relative inline-flex h-5 w-[34px] items-center rounded-full transition-colors"
                     style={{
-                      borderColor: 'rgba(255,255,255,0.12)',
-                      background: 'rgba(255,255,255,0.03)',
+                      background: planModeEnabled ? '#3b82f6' : 'rgba(15,23,42,0.12)',
+                      cursor: 'default',
                     }}
                   >
-                    <button
-                      type="button"
-                      onClick={() => onSetFileContextMode('single')}
-                      className="px-2.5 py-1 text-[11px] transition-colors"
+                    <span
+                      className="inline-flex h-3.5 w-3.5 rounded-full bg-white transition-transform"
                       style={{
-                        background:
-                          fileContext.bindingMode === 'single'
-                            ? 'rgba(255,255,255,0.12)'
-                            : 'transparent',
-                        color:
-                          fileContext.bindingMode === 'single'
-                            ? 'var(--text-main)'
-                            : 'var(--text-muted)',
+                        transform: planModeEnabled ? 'translateX(17px)' : 'translateX(3px)',
                       }}
-                      title="Use this document for the next message only"
-                    >
-                      Next Turn
-                    </button>
+                    />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {modelMenuOpen && (
+              <div
+                className="absolute bottom-14 left-10 z-30 min-w-[180px] rounded-2xl border p-1.5"
+                style={composerMenuStyle}
+                role="menu"
+                aria-label="Model menu"
+              >
+                {models.map(model => {
+                  const isSelected = model === selectedModel
+                  return (
                     <button
+                      key={model}
                       type="button"
-                      onClick={() => onSetFileContextMode('persistent')}
-                      className="border-l px-2.5 py-1 text-[11px] transition-colors"
-                      style={{
-                        borderColor: 'rgba(255,255,255,0.12)',
-                        background:
-                          fileContext.bindingMode === 'persistent'
-                            ? 'rgba(255,255,255,0.12)'
-                            : 'transparent',
-                        color:
-                          fileContext.bindingMode === 'persistent'
-                            ? 'var(--text-main)'
-                            : 'var(--text-muted)',
+                      role="menuitemradio"
+                      aria-checked={isSelected}
+                      onClick={() => {
+                        onModelChange(model)
+                        setActivePanel(null)
                       }}
-                      title="Keep using this document until cleared"
+                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[13px] transition-colors hover:bg-slate-900/[0.04]"
+                      style={{ color: 'var(--text-main)' }}
                     >
-                      Sticky
+                      <span className="truncate font-medium">{model}</span>
+                      <span
+                        className="ml-3 inline-flex h-4 w-4 items-center justify-center"
+                        style={{ color: isSelected ? 'var(--text-main)' : 'transparent' }}
+                      >
+                        <CheckIcon />
+                      </span>
                     </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {reasoningMenuOpen && (
+              <div
+                className="absolute bottom-14 left-[152px] z-30 min-w-[148px] rounded-2xl border p-1.5"
+                style={composerMenuStyle}
+                role="menu"
+                aria-label="Reasoning menu"
+              >
+                {(['low', 'medium', 'high'] as const).map(level => {
+                  const isSelected = level === reasoningLevel
+                  return (
                     <button
+                      key={level}
                       type="button"
-                      onClick={() => onSetFileContextMode('idle')}
-                      className="border-l px-2.5 py-1 text-[11px] transition-colors"
-                      style={{
-                        borderColor: 'rgba(255,255,255,0.12)',
-                        background:
-                          fileContext.bindingMode === 'idle'
-                            ? 'rgba(255,255,255,0.1)'
-                            : 'transparent',
-                        color:
-                          fileContext.bindingMode === 'idle'
-                            ? 'var(--text-main)'
-                            : 'var(--text-muted)',
+                      role="menuitemradio"
+                      aria-checked={isSelected}
+                      onClick={() => {
+                        onReasoningLevelChange(level)
+                        setActivePanel(null)
                       }}
-                      title="Keep the document available but do not attach it automatically"
+                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[13px] transition-colors hover:bg-slate-900/[0.04]"
+                      style={{ color: 'var(--text-main)' }}
                     >
-                      Inactive
+                      <span className="font-medium">{reasoningLabel(level)}</span>
+                      <span
+                        className="ml-3 inline-flex h-4 w-4 items-center justify-center"
+                        style={{ color: isSelected ? 'var(--text-main)' : 'transparent' }}
+                      >
+                        <CheckIcon />
+                      </span>
                     </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {manageUploadsOpen && (
+              <div
+                className="absolute bottom-14 left-0 z-30 w-[min(560px,calc(100vw-3rem))] rounded-3xl border p-4 shadow-[0_12px_24px_rgba(15,23,42,0.08)]"
+                style={{
+                  borderColor: 'var(--input-border)',
+                  background: 'var(--composer-menu-bg-strong)',
+                  backdropFilter: 'blur(18px)',
+                }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+                      Manage Uploads
+                    </h3>
+                    <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                      Control which uploaded knowledge files flow into future turns.
+                    </p>
                   </div>
                   <button
                     type="button"
-                    onClick={onClearFileContext}
-                    className="flex h-4 w-4 items-center justify-center rounded-full"
+                    onClick={() => setActivePanel(null)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-slate-900/[0.04]"
                     style={{ color: 'var(--text-muted)' }}
-                    title="Clear file context"
+                    title="Close upload manager"
                   >
                     <CloseIcon />
                   </button>
                 </div>
-              )}
-              {pendingImageIds.map((id, index) => (
-                <button
-                  key={`${id}-${index}`}
-                  type="button"
-                  onClick={() => setPendingImageIds(prev => prev.filter((_, i) => i !== index))}
-                  className="inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 text-xs"
-                  style={{
-                    borderColor: 'rgba(255,255,255,0.12)',
-                    background: 'rgba(255,255,255,0.05)',
-                    color: 'var(--text-muted)',
-                  }}
-                  title="Remove image attachment"
-                >
-                  <span>Image {index + 1}</span>
-                  <CloseIcon />
-                </button>
-              ))}
-              {attachmentStatus && (
-                <div
-                  className="rounded-2xl border px-3 py-1.5 text-xs"
-                  style={{
-                    borderColor: 'rgba(255,255,255,0.14)',
-                    background: 'rgba(255,255,255,0.05)',
-                    color: 'var(--text-muted)',
-                  }}
-                >
-                  {attachmentStatus}
-                </div>
-              )}
-            </div>
-          )}
 
-          <div
-            className="rounded-[26px] border px-4 py-2.5 shadow-[0_18px_40px_rgba(0,0,0,0.18)]"
-            style={{
-              borderColor: 'rgba(255,255,255,0.09)',
-              background:
-                'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%)',
-            }}
-          >
-            <div className="flex flex-col gap-2.5">
+                <div className="mt-4 max-h-[320px] space-y-3 overflow-y-auto pr-1">
+                  {uploadedKnowledgeFiles.length === 0 && pendingImages.length === 0 ? (
+                    <div
+                      className="rounded-2xl border px-4 py-6 text-center text-sm"
+                      style={{
+                        borderColor: 'var(--input-border)',
+                        background: 'var(--composer-muted-surface)',
+                        color: 'var(--text-muted)',
+                      }}
+                    >
+                      No uploaded files yet.
+                    </div>
+                  ) : (
+                    <>
+                      {uploadedKnowledgeFiles.map(file => (
+                        <div
+                          key={file.id}
+                          className="rounded-2xl border px-4 py-3"
+                          style={{
+                            borderColor: 'var(--input-border)',
+                            background: 'var(--composer-menu-bg)',
+                          }}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div
+                                className="inline-flex items-center gap-2 text-sm font-medium"
+                                style={{ color: 'var(--text-main)' }}
+                              >
+                                <DocumentIcon />
+                                <span className="truncate">{file.filename}</span>
+                              </div>
+                              <div
+                                className="mt-1 inline-flex items-center gap-2 text-xs"
+                                style={{ color: 'var(--text-muted)' }}
+                              >
+                                {file.status === 'ready' ? <ReadyDot /> : <ProcessingDot />}
+                                <span>
+                                  {file.status === 'ready'
+                                    ? `Mode: ${modeLabel(file.bindingMode)}`
+                                    : 'Processing upload'}
+                                </span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => onRemoveFileContext(file.id)}
+                              className="rounded-full px-2.5 py-1 text-xs transition-colors hover:bg-slate-900/[0.04]"
+                              style={{ color: 'var(--composer-danger-text)' }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+
+                          <div
+                            className="mt-3 inline-flex overflow-hidden rounded-full border"
+                            style={{
+                              borderColor: 'var(--input-border)',
+                              background: 'var(--composer-muted-surface)',
+                            }}
+                          >
+                            {([
+                              ['single', 'Next Turn'],
+                              ['persistent', 'Sticky'],
+                              ['idle', 'Inactive'],
+                            ] as Array<[FileBindingMode, string]>).map(([mode, label]) => (
+                              <button
+                                key={mode}
+                                type="button"
+                                disabled={file.status !== 'ready'}
+                                onClick={() => onSetFileContextMode(file.id, mode)}
+                                className="border-l px-3 py-1.5 text-[11px] font-medium transition-colors first:border-l-0 disabled:cursor-not-allowed disabled:opacity-50"
+                                style={{
+                                  borderColor: 'rgba(15,23,42,0.08)',
+                                  background:
+                                    file.bindingMode === mode
+                                      ? 'var(--composer-selected-surface)'
+                                      : 'transparent',
+                                  color:
+                                    file.bindingMode === mode
+                                      ? 'var(--text-main)'
+                                      : 'var(--text-muted)',
+                                }}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      {pendingImages.length > 0 && (
+                        <div className="space-y-3">
+                          <p
+                            className="px-1 text-[11px] font-medium uppercase tracking-[0.08em]"
+                            style={{ color: 'var(--text-muted)' }}
+                          >
+                            Current Turn Images
+                          </p>
+                          {pendingImages.map(image => (
+                            <div
+                              key={image.id}
+                              className="rounded-2xl border px-4 py-3"
+                              style={{
+                                borderColor: 'var(--input-border)',
+                                background: 'var(--composer-menu-bg)',
+                              }}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div
+                                    className="inline-flex items-center gap-2 text-sm font-medium"
+                                    style={{ color: 'var(--text-main)' }}
+                                  >
+                                    <ImageIcon />
+                                    <span className="truncate">{image.filename}</span>
+                                  </div>
+                                  <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                                    Vision attachments stay on the next send only.
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setPendingImages(prev => prev.filter(item => item.id !== image.id))
+                                  }
+                                  className="rounded-full px-2.5 py-1 text-xs transition-colors hover:bg-slate-900/[0.04]"
+                                  style={{ color: 'var(--composer-danger-text)' }}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                              <div
+                                className="mt-3 inline-flex overflow-hidden rounded-full border"
+                                style={{
+                                  borderColor: 'var(--input-border)',
+                                  background: 'var(--composer-muted-surface)',
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  className="px-3 py-1.5 text-[11px] font-medium"
+                                  style={{
+                                    background: 'var(--composer-selected-surface)',
+                                    color: 'var(--text-main)',
+                                  }}
+                                >
+                                  Next Turn
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="border-l px-3 py-1.5 text-[11px] font-medium opacity-50"
+                                  style={{
+                                    borderColor: 'rgba(15,23,42,0.08)',
+                                    color: 'var(--text-muted)',
+                                  }}
+                                  title="Sticky mode is not available for image attachments yet"
+                                >
+                                  Sticky
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setPendingImages(prev => prev.filter(item => item.id !== image.id))
+                                  }
+                                  className="border-l px-3 py-1.5 text-[11px] font-medium transition-colors"
+                                  style={{
+                                    borderColor: 'rgba(15,23,42,0.08)',
+                                    color: 'var(--text-muted)',
+                                  }}
+                                >
+                                  Inactive
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -489,7 +939,51 @@ const ChatWindow: FC<Props> = ({
                 onChange={handleAttachmentPick}
               />
 
-              <div className="min-w-0">
+              {hasVisibleAttachments && (
+                <div
+                  className="ui-static flex flex-wrap items-center gap-2 px-1 pt-1"
+                  style={{ userSelect: 'none' }}
+                >
+                  {uploadedKnowledgeFiles.map(file => (
+                    <div
+                      key={file.id}
+                      className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium"
+                      style={{
+                        borderColor: 'var(--composer-chip-border)',
+                        background: 'transparent',
+                        color: file.status === 'ready' ? 'var(--text-main)' : 'var(--text-muted)',
+                      }}
+                    >
+                      {file.status === 'ready' ? <DocumentIcon /> : <ProcessingDot />}
+                      <span className="max-w-[180px] truncate">{file.filename}</span>
+                    </div>
+                  ))}
+                  {pendingImages.map(image => (
+                    <div
+                      key={image.id}
+                      className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium"
+                      style={{
+                        borderColor: 'var(--composer-chip-border)',
+                        background: 'transparent',
+                        color: 'var(--text-main)',
+                      }}
+                    >
+                      <ImageIcon />
+                      <span className="max-w-[180px] truncate">{image.filename}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div
+                className="ui-static min-w-0 px-1 py-0.5"
+                style={{ userSelect: 'none', caretColor: 'transparent' }}
+                onMouseDown={event => {
+                  if (event.target !== textareaRef.current) {
+                    event.preventDefault()
+                  }
+                }}
+              >
                 <textarea
                   ref={textareaRef}
                   value={input}
@@ -498,35 +992,90 @@ const ChatWindow: FC<Props> = ({
                   placeholder="Message GOAT AI"
                   rows={1}
                   disabled={isStreaming}
-                  className="w-full resize-none bg-transparent px-0 py-0 text-sm focus:outline-none"
+                  className="w-full resize-none bg-transparent px-0 py-0 text-[15px] placeholder:text-zinc-400 focus:outline-none"
                   style={{
                     color: 'var(--text-main)',
+                    fontWeight: 450,
+                    letterSpacing: '-0.01em',
                     lineHeight: '22px',
                     minHeight: `${TEXTAREA_MIN_HEIGHT_PX}px`,
                     maxHeight: `${TEXTAREA_MAX_HEIGHT_PX}px`,
+                    caretColor: 'var(--text-main)',
+                    userSelect: 'text',
                   }}
                 />
               </div>
 
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 flex-1 items-center">
+              <div className="ui-static flex items-center justify-between gap-3 px-0.5">
+                <div className="-ml-1 flex min-w-0 flex-1 items-center gap-1.5">
                   <button
                     type="button"
                     disabled={isStreaming || attachmentUploading}
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full transition-all disabled:opacity-40 hover:opacity-80"
-                    style={{
-                      border: '1px solid rgba(255,255,255,0.14)',
-                      color: 'var(--text-main)',
-                      background:
-                        'linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.04) 100%)',
+                    onClick={() => {
+                      setActivePanel(prev => (prev === 'plus' ? null : 'plus'))
                     }}
-                    title={
-                      supportsVision ? 'Attach images or knowledge files' : 'Attach a knowledge file'
-                    }
+                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full transition-all disabled:opacity-40"
+                    style={{ border: 'none', ...controlPillStyle(plusMenuOpen), color: 'rgba(17,24,39,0.42)' }}
+                    title={plusMenuOpen ? 'Close actions' : 'Open upload and planning actions'}
+                    onMouseEnter={e => {
+                      if (!plusMenuOpen) e.currentTarget.style.background = 'rgba(17,24,39,0.08)'
+                    }}
+                    onMouseLeave={e => {
+                      if (!plusMenuOpen) e.currentTarget.style.background = 'transparent'
+                    }}
                   >
                     <PlusIcon />
                   </button>
+
+                  <div className="flex min-w-0 items-center gap-3">
+                    <button
+                      type="button"
+                      aria-label="Open model menu"
+                      aria-expanded={modelMenuOpen}
+                      onClick={() => setActivePanel(prev => (prev === 'model' ? null : 'model'))}
+                      className="inline-flex max-w-[180px] items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[13px] font-medium transition-all"
+                      style={controlPillStyle(modelMenuOpen)}
+                    >
+                      <span className="truncate">{selectedModel}</span>
+                      <span className="inline-flex flex-shrink-0 items-center justify-center">
+                        <ChevronDownIcon />
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      aria-label="Open reasoning menu"
+                      aria-expanded={reasoningMenuOpen}
+                      onClick={() =>
+                        setActivePanel(prev => (prev === 'reasoning' ? null : 'reasoning'))
+                      }
+                      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[13px] font-medium transition-all"
+                      style={controlPillStyle(reasoningMenuOpen)}
+                    >
+                      <span>{reasoningLabel(reasoningLevel)}</span>
+                      <span className="inline-flex flex-shrink-0 items-center justify-center">
+                        <ChevronDownIcon />
+                      </span>
+                    </button>
+
+                    {composerIndicators.length > 0 && (
+                      <div className="ml-1 flex min-w-0 items-center gap-2">
+                        {composerIndicators.map(indicator => (
+                          <div
+                            key={indicator.key}
+                            className="inline-flex items-center gap-1.5 text-[13px] font-medium"
+                            style={{ color: '#3b82f6' }}
+                            aria-label={`${indicator.label} enabled`}
+                          >
+                            <span className="inline-flex h-4 w-4 items-center justify-center">
+                              {indicator.icon}
+                            </span>
+                            <span>{indicator.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex flex-shrink-0 items-center gap-2">
@@ -540,14 +1089,13 @@ const ChatWindow: FC<Props> = ({
                     onClick={isStreaming ? onStop : handleSubmit}
                     disabled={!isStreaming && !canSend}
                     aria-label={isStreaming ? 'Stop generating' : 'Send message'}
-                    className="flex h-10 w-10 items-center justify-center rounded-full transition-all disabled:cursor-not-allowed"
+                    className="flex h-10 w-10 items-center justify-center rounded-full transition-all"
                     style={{
-                      background: isStreaming
-                        ? '#111111'
-                        : canSend
-                          ? '#111111'
-                          : 'rgba(255,255,255,0.16)',
-                      color: isStreaming || canSend ? '#ffffff' : 'rgba(255,255,255,0.5)',
+                      background: isStreaming ? '#111111' : canSend ? '#111111' : '#9ca3af',
+                      color: '#ffffff',
+                      boxShadow:
+                        canSend || isStreaming ? 'none' : 'inset 0 0 0 1px rgba(0,0,0,0.04)',
+                      cursor: 'default',
                     }}
                     title={isStreaming ? 'Stop generating' : 'Send message'}
                   >
@@ -564,9 +1112,9 @@ const ChatWindow: FC<Props> = ({
               aria-live="polite"
               className="mt-2 rounded-2xl border px-3 py-2 text-sm"
               style={{
-                borderColor: 'rgba(239,68,68,0.28)',
-                background: 'rgba(239,68,68,0.08)',
-                color: '#fca5a5',
+                borderColor: 'var(--composer-danger-border)',
+                background: 'var(--composer-danger-bg)',
+                color: 'var(--composer-danger-fg)',
               }}
             >
               {attachmentUploadError}

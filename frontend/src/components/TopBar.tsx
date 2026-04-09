@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState, type FC } from 'react'
 
 interface Props {
-  /** Current conversation title from server (or derived); null shows placeholder. */
   sessionTitle: string | null
   theme: 'light' | 'dark'
   onToggleTheme: () => void
-  /** Optional text merged into the server system prompt (persisted in localStorage by caller). */
   systemInstruction: string
   onSystemInstructionChange: (value: string) => void
   onExportMarkdown: () => void
@@ -20,7 +18,6 @@ interface Props {
   onResetAdvanced: () => void
 }
 
-/** Header for the chat column only (not above sidebar): session title + settings. Uses chat surface colors for light/dark contrast. */
 const MAX_INSTRUCTION_LEN = 8000
 
 const TopBar: FC<Props> = ({
@@ -51,22 +48,26 @@ const TopBar: FC<Props> = ({
     return () => document.removeEventListener('click', close)
   }, [])
 
-  /** Editable fields keep I-beam; static menu text uses default arrow + no accidental selection. */
   const fieldCls =
-    'w-full rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-navy/40 cursor-text select-text'
+    'w-full rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/35 cursor-text select-text'
+  const sectionCls = 'rounded-2xl border px-4 py-3'
+  const sectionStyle = {
+    borderColor: 'var(--border-color)',
+    background: 'var(--composer-muted-surface)',
+  }
 
   return (
     <header
-      className="flex-shrink-0 flex items-center h-12 px-3 border-b z-20"
+      className="z-20 flex h-12 flex-shrink-0 items-center border-b px-3"
       style={{
         borderColor: 'var(--border-color)',
         background: 'var(--bg-chat)',
       }}
     >
-      <div className="flex-1 min-w-0" aria-hidden="true" />
-      <div className="flex-[2] flex justify-center min-w-0 px-2">
+      <div className="min-w-0 flex-1" aria-hidden="true" />
+      <div className="flex min-w-0 flex-[2] justify-center px-2">
         <h1
-          className="text-sm font-medium truncate text-center max-w-full"
+          className="max-w-full truncate text-center text-sm font-medium"
           style={{
             color: sessionTitle ? 'var(--text-main)' : 'var(--text-muted)',
           }}
@@ -75,133 +76,115 @@ const TopBar: FC<Props> = ({
           {sessionTitle ?? 'New conversation'}
         </h1>
       </div>
-      <div className="flex-1 flex justify-end min-w-0" ref={wrapRef}>
+      <div className="flex min-w-0 flex-1 justify-end" ref={wrapRef}>
         <div className="relative">
           <button
             type="button"
-            className="p-2 rounded-lg transition-colors hover:opacity-80 cursor-pointer"
-            style={{ color: 'var(--text-main)' }}
-            aria-label="Settings"
+            className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-all hover:opacity-90"
+            style={{
+              color: 'var(--text-main)',
+              background: 'var(--composer-muted-surface)',
+            }}
+            aria-label="Options"
             aria-expanded={menuOpen}
-            aria-haspopup="true"
+            aria-haspopup="dialog"
             onClick={e => {
               e.stopPropagation()
               setMenuOpen(o => !o)
             }}
           >
-            <SettingsGearIcon />
+            <OptionsIcon />
+            <span>Options</span>
           </button>
+
           {menuOpen && (
             <div
-              className="absolute right-0 mt-1 py-2 rounded-lg shadow-lg w-[min(92vw,21rem)] max-h-[min(85vh,32rem)] overflow-y-auto border text-sm z-50 cursor-default"
+              className="absolute right-0 mt-2 w-[min(92vw,26rem)] max-h-[min(85vh,38rem)] overflow-y-auto rounded-[24px] border p-3 shadow-[0_16px_36px_rgba(15,23,42,0.12)] z-50"
               style={{
-                background: 'var(--bg-asst-bubble)',
-                borderColor: 'var(--border-color)',
+                background: 'var(--composer-menu-bg-strong)',
+                borderColor: 'var(--input-border)',
                 color: 'var(--text-main)',
+                backdropFilter: 'blur(18px)',
               }}
-              role="menu"
+              role="dialog"
+              aria-label="Options"
               onClick={e => e.stopPropagation()}
             >
-              <p
-                className="px-3 pb-2 text-[11px] leading-snug border-b select-none cursor-default"
-                style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
-              >
-                Enter sends the message. Shift+Enter inserts a new line.
-              </p>
-
-              <div className="px-3 pt-2 pb-2 border-b" style={{ borderColor: 'var(--border-color)' }}>
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <label
-                    htmlFor="goat-system-instruction"
-                    className="block text-xs font-medium select-none cursor-default"
+              <div className="space-y-3">
+                <section className={sectionCls} style={sectionStyle}>
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>
+                        Instructions
+                      </p>
+                      <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                        Guide tone, format, and constraints for the assistant.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-full border px-2.5 py-1 text-[11px]"
+                      style={{
+                        borderColor: 'var(--border-color)',
+                        color: 'var(--text-muted)',
+                      }}
+                      onClick={() => onSystemInstructionChange('')}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <textarea
+                    id="goat-system-instruction"
+                    rows={4}
+                    maxLength={MAX_INSTRUCTION_LEN}
+                    value={systemInstruction}
+                    onChange={e => onSystemInstructionChange(e.target.value)}
+                    placeholder="Optional: tone, format, or constraints for the model"
+                    className={`${fieldCls} min-h-[5.25rem] resize-y`}
+                    style={{
+                      background: 'var(--input-bg)',
+                      border: '1px solid var(--input-border)',
+                      color: 'var(--text-main)',
+                    }}
+                  />
+                  <p
+                    className="mt-1 text-right text-[10px]"
                     style={{ color: 'var(--text-muted)' }}
                   >
-                    System instruction
-                  </label>
-                  <button
-                    type="button"
-                    className="text-[10px] px-1.5 py-0.5 rounded border cursor-pointer"
-                    style={{
-                      borderColor: 'var(--border-color)',
-                      color: 'var(--text-muted)',
-                    }}
-                    onClick={() => onSystemInstructionChange('')}
-                  >
-                    Clear
-                  </button>
-                </div>
-                <textarea
-                  id="goat-system-instruction"
-                  rows={4}
-                  maxLength={MAX_INSTRUCTION_LEN}
-                  value={systemInstruction}
-                  onChange={e => onSystemInstructionChange(e.target.value)}
-                  placeholder="Optional: tone, format, or constraints for the model…"
-                  className={`${fieldCls} resize-y min-h-[4.5rem]`}
-                  style={{
-                    background: 'var(--input-bg)',
-                    border: '1px solid var(--input-border)',
-                    color: 'var(--text-main)',
-                  }}
-                />
-                <p
-                  className="text-[10px] mt-1 text-right select-none cursor-default"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  {systemInstruction.length}/{MAX_INSTRUCTION_LEN}
-                </p>
-              </div>
+                    {systemInstruction.length}/{MAX_INSTRUCTION_LEN}
+                  </p>
+                </section>
 
-              <div className="px-3 py-1 border-b" style={{ borderColor: 'var(--border-color)' }}>
-                <button
-                  type="button"
-                  className="w-full text-left px-2 py-2 rounded-md text-xs hover:opacity-90 cursor-pointer select-none"
-                  style={{ background: 'var(--input-bg)', color: 'var(--text-main)' }}
-                  onClick={() => {
-                    onExportMarkdown()
-                    setMenuOpen(false)
-                  }}
-                >
-                  Export conversation as Markdown
-                </button>
-              </div>
-
-              <div className="px-3 pt-2 pb-1 border-b" style={{ borderColor: 'var(--border-color)' }}>
-                <div className="flex items-center gap-2 mb-1">
-                  <button
-                    type="button"
-                    className="flex-1 min-w-0 flex items-center justify-between text-left text-xs font-medium py-1 cursor-pointer select-none"
-                    style={{ color: 'var(--text-main)' }}
-                    aria-expanded={advancedOpen}
-                    onClick={() => onAdvancedOpenChange(!advancedOpen)}
-                  >
-                    <span>Advanced settings</span>
-                    <span className="text-[10px] shrink-0 ml-1" aria-hidden="true">
-                      {advancedOpen ? '▼' : '▶'}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="text-[10px] px-1.5 py-0.5 rounded border shrink-0 cursor-pointer select-none"
-                    style={{
-                      borderColor: 'var(--border-color)',
-                      color: 'var(--text-muted)',
-                    }}
-                    aria-label="Reset advanced settings to defaults"
-                    title="Reset temperature, max tokens, and top P to defaults"
-                    onClick={e => {
-                      e.stopPropagation()
-                      onResetAdvanced()
-                    }}
-                  >
-                    Reset
-                  </button>
-                </div>
-                {advancedOpen && (
-                  <div className="space-y-2 pt-1 pb-2">
+                <section className={sectionCls} style={sectionStyle}>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>
+                        Generation
+                      </p>
+                      <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                        Tune the generation profile for the current chat session.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-full border px-2.5 py-1 text-[11px]"
+                      style={{
+                        borderColor: 'var(--border-color)',
+                        color: 'var(--text-muted)',
+                      }}
+                      aria-label="Reset generation settings to defaults"
+                      onClick={() => {
+                        onResetAdvanced()
+                        onAdvancedOpenChange(true)
+                      }}
+                    >
+                      Reset
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                     <div>
                       <label
-                        className="block text-[10px] mb-0.5 select-none cursor-default"
+                        className="mb-1 block text-[11px] font-medium"
                         style={{ color: 'var(--text-muted)' }}
                       >
                         Temperature
@@ -226,7 +209,7 @@ const TopBar: FC<Props> = ({
                     </div>
                     <div>
                       <label
-                        className="block text-[10px] mb-0.5 select-none cursor-default"
+                        className="mb-1 block text-[11px] font-medium"
                         style={{ color: 'var(--text-muted)' }}
                       >
                         Max tokens
@@ -251,7 +234,7 @@ const TopBar: FC<Props> = ({
                     </div>
                     <div>
                       <label
-                        className="block text-[10px] mb-0.5 select-none cursor-default"
+                        className="mb-1 block text-[11px] font-medium"
                         style={{ color: 'var(--text-muted)' }}
                       >
                         Top P
@@ -275,22 +258,60 @@ const TopBar: FC<Props> = ({
                       />
                     </div>
                   </div>
-                )}
-              </div>
+                </section>
 
-              <button
-                type="button"
-                className="w-full text-left px-3 py-2 mt-1 hover:opacity-90 flex items-center gap-2 cursor-pointer select-none"
-                style={{ background: 'transparent' }}
-                role="menuitem"
-                onClick={() => {
-                  onToggleTheme()
-                  setMenuOpen(false)
-                }}
-              >
-                {theme === 'light' ? <MoonIcon /> : <SunIcon />}
-                <span>{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>
-              </button>
+                <section className={sectionCls} style={sectionStyle}>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>
+                    Conversation
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-2 flex w-full items-center justify-between rounded-2xl px-3 py-2 text-left text-sm transition-colors hover:bg-slate-900/[0.04]"
+                    style={{
+                      background: 'var(--input-bg)',
+                      color: 'var(--text-main)',
+                    }}
+                    onClick={() => {
+                      onExportMarkdown()
+                      setMenuOpen(false)
+                    }}
+                  >
+                    <span>
+                      <span className="block font-medium">Export Markdown</span>
+                      <span className="mt-0.5 block text-xs" style={{ color: 'var(--text-muted)' }}>
+                        Save the current conversation as a Markdown file.
+                      </span>
+                    </span>
+                    <ChevronRightIcon />
+                  </button>
+                </section>
+
+                <section className={sectionCls} style={sectionStyle}>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>
+                    Appearance
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-2 flex w-full items-center justify-between rounded-2xl px-3 py-2 text-left text-sm transition-colors hover:bg-slate-900/[0.04]"
+                    style={{
+                      background: 'var(--input-bg)',
+                      color: 'var(--text-main)',
+                    }}
+                    onClick={() => {
+                      onToggleTheme()
+                      setMenuOpen(false)
+                    }}
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      {theme === 'light' ? <MoonIcon /> : <SunIcon />}
+                      <span>{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>
+                    </span>
+                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      {theme === 'light' ? 'Switch to dark' : 'Switch to light'}
+                    </span>
+                  </button>
+                </section>
+              </div>
             </div>
           )}
         </div>
@@ -299,23 +320,26 @@ const TopBar: FC<Props> = ({
   )
 }
 
-const SettingsGearIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="20"
-    height="20"
-    fill="none"
-    viewBox="0 0 24 24"
-    strokeWidth={1.5}
-    stroke="currentColor"
-    aria-hidden="true"
-  >
+const OptionsIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
     <path
+      d="M3.25 4.5h9.5M3.25 8h9.5M3.25 11.5h9.5"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
+const ChevronRightIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+    <path
+      d="M5.25 3.5 8.75 7l-3.5 3.5"
+      stroke="currentColor"
+      strokeWidth="1.4"
       strokeLinecap="round"
       strokeLinejoin="round"
-      d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.37.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.37-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.217.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"
     />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
   </svg>
 )
 

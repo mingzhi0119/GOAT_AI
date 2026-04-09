@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAdvancedSettings } from './hooks/useAdvancedSettings'
 import { useChatSession } from './hooks/useChatSession'
 import { useGpuStatus } from './hooks/useGpuStatus'
@@ -15,6 +15,8 @@ import type { UploadStreamEvent } from './api/upload'
 
 /** Root application: compose stateful controllers and render the shell UI. */
 export default function App() {
+  const [planModeEnabled, setPlanModeEnabled] = useState(false)
+  const [reasoningLevel, setReasoningLevel] = useState<'low' | 'medium' | 'high'>('medium')
   const { theme, toggleTheme } = useTheme()
   const models = useModels()
   const { userName, setUserName } = useUserName()
@@ -56,20 +58,22 @@ export default function App() {
 
   const handleUploadEvent = (event: UploadStreamEvent) => {
     if (event.type === 'file_prompt') {
-      session.setFileContext({
+      session.upsertFileContext({
         filename: event.filename,
         suffixPrompt: event.suffix_prompt,
+        status: 'processing',
       })
       return
     }
     if (event.type === 'knowledge_ready') {
-      session.setFileContext({
+      session.upsertFileContext({
         filename: event.filename,
         documentId: event.document_id,
         ingestionId: event.ingestion_id,
         retrievalMode: event.retrieval_mode,
         suffixPrompt: event.suffix_prompt,
         templatePrompt: event.template_prompt,
+        status: 'ready',
       })
     }
   }
@@ -77,16 +81,7 @@ export default function App() {
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar
-        models={models.models}
-        selectedModel={models.selectedModel}
-        onModelChange={models.setSelectedModel}
-        onRefreshModels={models.refresh}
         onClearChat={session.clearChatSession}
-        isLoadingModels={models.isLoading}
-        isLoadingModelCapabilities={models.isLoadingCapabilities}
-        modelsError={models.error}
-        modelCapabilities={models.capabilities}
-        modelCapabilitiesError={models.capabilitiesError}
         userName={userName}
         onUserNameChange={setUserName}
         historySessions={session.historySessions}
@@ -129,19 +124,26 @@ export default function App() {
             messages={session.messages}
             chartSpec={session.chartSpec}
             isStreaming={session.isStreaming}
+            models={models.models}
             selectedModel={models.selectedModel}
+            onModelChange={models.setSelectedModel}
             supportsVision={models.capabilities?.supports_vision ?? false}
-            fileContext={session.fileContext}
+            fileContexts={session.fileContexts}
+            activeFileContext={session.activeFileContext}
             onUploadEvent={handleUploadEvent}
             onSendMessage={(content, imageIds) => {
               void session.sendMessage(content, imageIds)
             }}
             onSetFileContextMode={session.setFileContextBindingMode}
+            onRemoveFileContext={session.removeFileContext}
             onStop={session.stopStreaming}
-            onClearFileContext={session.clearFileContextSession}
             gpuStatus={gpu.status}
             gpuError={gpu.error}
             inferenceLatency={gpu.inference}
+            planModeEnabled={planModeEnabled}
+            onPlanModeChange={setPlanModeEnabled}
+            reasoningLevel={reasoningLevel}
+            onReasoningLevelChange={setReasoningLevel}
           />
         </ErrorBoundary>
       </div>

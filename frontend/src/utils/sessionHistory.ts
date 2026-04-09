@@ -1,6 +1,6 @@
 import type { HistorySessionDetail } from '../api/history'
 import type { Message } from '../api/types'
-import type { FileContext } from '../hooks/useFileContext'
+import type { FileContextItem } from '../hooks/useFileContext'
 
 export const FILE_CONTEXT_REPLY = 'I have loaded the file context.'
 
@@ -39,15 +39,13 @@ export function hydrateHistorySession(session: HistorySessionDetail): Message[] 
   return mapped
 }
 
-export function historyKnowledgeAttachment(session: HistorySessionDetail): FileContext | null {
-  const firstKnowledgeDocument = session.knowledge_documents[0]
-  if (!firstKnowledgeDocument) {
-    return null
-  }
-  return {
-    filename: firstKnowledgeDocument.filename,
-    documentId: firstKnowledgeDocument.document_id,
+export function historyKnowledgeAttachments(session: HistorySessionDetail): FileContextItem[] {
+  return session.knowledge_documents.map(document => ({
+    id: crypto.randomUUID(),
+    filename: document.filename,
+    documentId: document.document_id,
     retrievalMode: 'knowledge_rag',
     bindingMode: 'idle',
-  }
+    status: 'ready',
+  }))
 }

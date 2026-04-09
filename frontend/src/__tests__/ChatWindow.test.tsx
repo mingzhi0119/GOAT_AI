@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ChatWindow from '../components/ChatWindow'
 import type { GPUStatus, InferenceLatency } from '../api/system'
@@ -39,25 +40,39 @@ const baseLatency: InferenceLatency = {
   model_buckets: {},
 }
 
-function renderChatWindow() {
-  return render(
+function renderChatWindow(overrides: Partial<ComponentProps<typeof ChatWindow>> = {}) {
+  const onModelChange = vi.fn()
+  const onReasoningLevelChange = vi.fn()
+  const onPlanModeChange = vi.fn()
+
+  const view = render(
     <ChatWindow
       messages={[]}
       chartSpec={null}
       isStreaming={false}
+      models={['test-model', 'backup-model']}
       selectedModel="test-model"
+      onModelChange={onModelChange}
       supportsVision
-      fileContext={null}
+      fileContexts={[]}
+      activeFileContext={null}
       onUploadEvent={vi.fn()}
       onSendMessage={vi.fn()}
       onSetFileContextMode={vi.fn()}
+      onRemoveFileContext={vi.fn()}
       onStop={vi.fn()}
-      onClearFileContext={vi.fn()}
       gpuStatus={baseGpuStatus}
       gpuError={null}
       inferenceLatency={baseLatency}
+      planModeEnabled={false}
+      onPlanModeChange={onPlanModeChange}
+      reasoningLevel="medium"
+      onReasoningLevelChange={onReasoningLevelChange}
+      {...overrides}
     />,
   )
+
+  return { ...view, onModelChange, onReasoningLevelChange, onPlanModeChange }
 }
 
 describe('ChatWindow composer', () => {
@@ -81,6 +96,76 @@ describe('ChatWindow composer', () => {
     })
 
     expect(sendButton).toBeEnabled()
+  })
+
+  it('renders composer model and reasoning menu triggers', () => {
+    renderChatWindow()
+
+    expect(screen.getByRole('button', { name: /open model menu/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /open reasoning menu/i })).toBeInTheDocument()
+  })
+
+  it('opens model and reasoning menus and applies the selected options', () => {
+    const { onModelChange, onReasoningLevelChange } = renderChatWindow()
+
+    fireEvent.click(screen.getByRole('button', { name: /open model menu/i }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'backup-model' }))
+    expect(onModelChange).toHaveBeenCalledWith('backup-model')
+
+    fireEvent.click(screen.getByRole('button', { name: /open reasoning menu/i }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'High' }))
+    expect(onReasoningLevelChange).toHaveBeenCalledWith('high')
+  })
+
+  it('keeps upload, manage uploads, and plan mode inside the plus popover', () => {
+    renderChatWindow()
+
+    fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
+
+    expect(screen.getByText('Upload Files')).toBeInTheDocument()
+    expect(screen.getByText('Manage Uploads')).toBeInTheDocument()
+    expect(screen.getByText('Plan Mode')).toBeInTheDocument()
+  })
+
+  it('shows a compact blue plan indicator beside reasoning only when plan mode is enabled', () => {
+    renderChatWindow()
+    expect(screen.queryByLabelText(/plan enabled/i)).not.toBeInTheDocument()
+
+    renderChatWindow({ planModeEnabled: true })
+    expect(screen.getByLabelText(/plan enabled/i)).toBeInTheDocument()
+    expect(screen.getByText('Plan')).toBeInTheDocument()
+  })
+
+  it('keeps plan mode switch wired while the blue indicator order is stable', () => {
+    const { onPlanModeChange } = renderChatWindow({ planModeEnabled: true })
+
+    fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
+    fireEvent.click(screen.getByRole('switch'))
+
+    expect(onPlanModeChange).toHaveBeenCalledWith(false)
+
+    const indicatorLabels = screen.getAllByText('Plan')
+    expect(indicatorLabels[0]).toBeInTheDocument()
+  })
+
+  it('keeps composer popovers mutually exclusive', () => {
+    renderChatWindow()
+
+    fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
+    expect(screen.getByText('Upload Files')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /open model menu/i }))
+    expect(screen.queryByText('Upload Files')).not.toBeInTheDocument()
+    expect(screen.getByRole('menu', { name: /model menu/i })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /open reasoning menu/i }))
+    expect(screen.queryByRole('menu', { name: /model menu/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('menu', { name: /reasoning menu/i })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
+    fireEvent.click(screen.getByText('Manage Uploads'))
+    expect(screen.queryByText('Upload Files')).not.toBeInTheDocument()
+    expect(screen.getByText('No uploaded files yet.')).toBeInTheDocument()
   })
 
   it('shows a product-style validation message only after unsupported upload', async () => {

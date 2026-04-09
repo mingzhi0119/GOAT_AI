@@ -6,7 +6,7 @@ This document is a **durable narrative and checklist** for presenting GOAT AI on
 - **Shared, no-root host** - deployable where you do not own the machine.
 - **SQLite-first** - honest data posture for the current scale and ops model.
 - **Ollama-backed** - local inference boundary, not a thin wrapper around a hosted API only.
-- **Ten-axis industrial bar toward ~9/10 *for this codebase*** - as defined in [ROADMAP.md](ROADMAP.md) Phases 13-15 (Phase 13 operations hardening, Phase 14 RAG-first expansion, Phase 15 semantics-before-structure).
+- **Ten-axis industrial bar toward ~9/10 *for this codebase*** - as defined in [ROADMAP.md](ROADMAP.md) Phases 13-15 (Phase 13 operations hardening, Phase 14 RAG-first expansion, Phase 15 semantics-before-structure), with the current `v1.2.0` release also carrying the completed frontend control-surface polish that makes the product read like a maintained app instead of an internal prototype.
 
 **Homepage signal:** you are not claiming "I called an LLM." You are claiming **you can run an AI product as an engineering system under real constraints**.
 
@@ -14,12 +14,12 @@ This document is a **durable narrative and checklist** for presenting GOAT AI on
 
 ## 1. What to record *now* (so the story stays honest later)
 
-Keep these artifacts **current** as Phase 13 items land. They become your "before -> after" evidence.
+Keep these artifacts **current** as release-quality work lands. They become your "before -> after" evidence.
 
 | Record | Why it matters for a portfolio |
 |--------|----------------------------------|
 | **Dated snapshots of constraints** | Example: shared host, no `sudo`, reverse proxy + single port, sub-path deployment-proves the design fits **real** constraints, not only a greenfield stack. |
-| **Phase 13 exit criteria -> evidence** | Each checkbox in Phase 13 should map to a **PR, doc section, or runbook command** - not "we improved logging" in the abstract. |
+| **Phase / release exit criteria -> evidence** | Each completed phase or release slice should map to a **PR, doc section, or runbook command** - not "we improved logging" in the abstract. |
 | **Before/after bullets** | Short list: what was true *before* Wave A (e.g. text logs only, no `/ready`, silent persistence failures) vs *after*. |
 | **Trade-off log** | Link to [ROADMAP.md](ROADMAP.md) Decision Log; add 1-2 sentences per major choice (Postgres deferred, error model before big split, policies before directory migration). |
 | **Quantified quality** | Test counts, black-box coverage areas, CI gates (`lint-imports`, contract sync), latency percentiles you actually expose - **numbers you can defend**. |
@@ -79,7 +79,7 @@ These are worth a **"Trade-offs"** subsection on a homepage. Align wording with 
 
 ## 5. Verifiable outcomes (what visitors can check)
 
-When Phase 13 is **substantially landed**, your homepage or README should point to **concrete hooks**:
+Now that Phases 13-15 are complete and `v1.2.0` aligns the shipped docs, your homepage or README should point to **concrete hooks**:
 
 | Area | Example of verifiable claim |
 |------|------------------------------|
@@ -102,7 +102,7 @@ Wave B evidence anchors in this repo:
 
 ---
 
-## 6. "Homepage-ready" bar (not tied to v1.5/v1.6)
+## 6. "Homepage-ready" bar (not tied to marketing-only version bumps)
 
 Treat the project as **homepage-worthy** when **most** of the following are true -grounded in **Phase 13/14/15 exit criteria**, not a version string:
 
@@ -137,7 +137,20 @@ The differentiator is not the stack list; it is **the documented path from demo-
 
 ---
 
-*Last updated: 2026-04-08 - created to anchor portfolio narrative to **industrial outcomes**, not version marketing.*
+### 8. Current portfolio posture at v1.2.0
+
+`v1.2.0` is a sensible portfolio checkpoint because the codebase now combines:
+
+- completed backend industrialization and hardening across Phases 11-15
+- a real retrieval and media path rather than a chat-only shell
+- frontend control-surface polish that makes upload management, model controls, options, and dark-mode presentation look like a maintained product
+- supporting docs that explain not just what shipped, but why the sequencing and trade-offs were chosen
+
+That does **not** mean the story is "finished." The next senior-visible chapter is still Phase 16: authorization context, capability gates, and the storage decisions that follow from them.
+
+---
+
+*Last updated: 2026-04-09 - aligned with **v1.2.0** to keep the portfolio narrative tied to shipped engineering outcomes, not version marketing.*
 
 
 

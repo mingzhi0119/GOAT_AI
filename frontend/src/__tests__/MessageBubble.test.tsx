@@ -8,6 +8,7 @@ describe('MessageBubble', () => {
       <MessageBubble message={{ id: 'm1', role: 'user', content: 'Hello from user' }} />,
     )
     expect(screen.getByText('Hello from user')).toBeInTheDocument()
+    expect(screen.queryByLabelText('GOAT AI')).not.toBeInTheDocument()
   })
 
   it('renders artifact download card and resolves matching markdown links', () => {
