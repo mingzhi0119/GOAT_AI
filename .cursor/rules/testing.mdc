@@ -46,5 +46,5 @@ const { result } = renderHook(() => useChat());
 
 ## CI reference
 
-- Python 3.12 (match backend target).
+- Python 3.14 for parity with the CI backend job and `docs/openapi.json` regeneration (see `ENGINEERING_STANDARDS.md`).
 - Node 24 (match server and CI).

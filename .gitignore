@@ -43,6 +43,7 @@ dist-ssr
 .env.test.local
 .env.production.local
 .venv/
+.venv314/
 
 # Local runtime artifacts
 # Default GOAT_DATA_DIR — uploads, vector index, media (do not commit)

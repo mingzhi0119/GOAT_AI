@@ -26,10 +26,8 @@ def main() -> int:
     # Deep equality: avoids false failures when Python versions emit different dict key order in dumps.
     if generated_openapi != committed_openapi:
         print("Contract check failed: docs/openapi.json is out of sync.")
-        print(
-            'Run: python -c "import json; from backend.main import app; from pathlib import Path; '
-            "Path('docs/openapi.json').write_text(json.dumps(app.openapi(), ensure_ascii=False, indent=2)+'\\n', encoding='utf-8')\""
-        )
+        print("Run: python -m tools.regenerate_openapi_json")
+        print("Then: python -m tools.generate_llm_api_yaml")
         return 1
 
     openapi_obj = committed_openapi

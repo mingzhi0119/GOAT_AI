@@ -1,4 +1,4 @@
-# GOAT AI Roadmap
+﻿# GOAT AI Roadmap
 
 > Last updated: 2026-04-09 - **v1.3.0** tags Phase **11-12**; **main** additionally ships **Phase 13** (full closeout) and **Phase 14** through **14.6 RAG-3**. **Phase 15.2-15.7** slices through **15.6** are complete on main (session store normalization, AuthZ keys + owner header, optional OTel). **Next:** further **Phase 15** structural work as listed below Section 15.7; keep the **Section 14.7** RAG eval gate green as retrieval evolves. **Constraints vs roadmap:** see [Current reality and improvement map](#current-reality-and-improvement-map).
 > Current release tag: **v1.3.0**
@@ -297,7 +297,8 @@ This replaces the retired long-form `docs/RAG_ARCHITECTURE.md` (historical draft
 | Process mgmt | `nohup` + PID file default on no-root hosts (required fallback); **not** platform-orchestrated (K8s-style) | Try `systemd --user` when D-Bus/session is available; **always** retain nohup/watchdog path for SSH/JupyterHub hosts where user systemd fails; see [Section 6](#6-deployment--shared-host-not-a-platform-runtime) in [Current reality and improvement map](#current-reality-and-improvement-map) |
 | Log files | `logs/fastapi.log` + user-space rotation script | same |
 | Node version | 24.14.1 (`.nvmrc`) | 24.x |
-| Python | 3.12.6 | 3.12.x |
+| Python (reference prod) | 3.12.6 | 3.12.x until host upgrade |
+| Python (CI + dev for OpenAPI parity) | 3.14.x | 3.14.x (keep in sync with `.github/workflows/ci.yml`) |
 
 ---
 
@@ -315,6 +316,7 @@ This replaces the retired long-form `docs/RAG_ARCHITECTURE.md` (historical draft
 | 2026-04-07 | Phases 13-14 split from prior monolithic Phase 13 | **13** = priority 1; **14** = priority 2 (semantics before package reshuffle). |
 | 2026-04-07 | Phase 13 sequencing tightened | **Section 13.0** = migrations-as-artifacts + error model/registry **before** Wave A. **Wave A** = only four ops items (structured logs+`request_id`, metrics, **liveness**/**readiness**, persistence signals). **Ollama retry/circuit breaker** deferred to **Wave B** after Wave A. **Phase 15** = policy objects + invariants **before** `application/`/`domain/` split; **consumes** Section 13.0 error model, **does not redefine** it. |
 | 2026-04-08 | Phase 13.5 closed | `pip-audit` added to CI, `ruff check` added to CI, changed-file `ruff format` gate added, `docs/SECURITY.md` published, and known vulnerable dependency pins updated (`requests`, `python-multipart`). |
+| 2026-04-09 | CI / dev Python 3.14 for OpenAPI parity | Backend CI uses Python **3.14**; regenerate `docs/openapi.json` with the same interpreter as CI. Reference production may stay on **3.12.x** until upgraded. |
 | 2026-04-08 | Phase 13.6-13.8 closed | Graceful shutdown is now documented and implemented in deploy scripts; rollback has an explicit ref-aware runbook; Phase 13 risk triggers are documented in OPERATIONS. |
 | 2026-04-08 | RAG classified as a future subsystem, not current baseline capability | Current `/api/upload` remains file-context parsing for prompt injection; roadmap now distinguishes that from true RAG requirements such as chunking, embeddings, vector retrieval, reranking, and retrieval contracts. |
 | 2026-04-08 | RAG elevated ahead of multimodal expansion; original Phase 14 moved to Phase 15 | Priority order is now **Phase 13 closeout -> RAG-0 -> RAG-1 -> RAG-2 -> Vision MVP -> RAG-3**. Video implementation was removed from the roadmap because target model support is too inconsistent for the near-term plan. |

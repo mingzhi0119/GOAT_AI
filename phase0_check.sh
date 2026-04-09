@@ -21,7 +21,7 @@ echo ""
 
 # ── 1. Python & pip ──────────────────────────────────────────────────────────
 info "Step 1: Python runtime"
-python3 --version | grep -q "3\.12" && ok "Python 3.12 found" || fail "Need Python 3.12"
+python3 --version | grep -qE "Python 3\.(12|14)" && ok "Python 3.12+ / 3.14 found" || fail "Need Python 3.12 or 3.14"
 pip3 --version > /dev/null 2>&1 && ok "pip available" || fail "pip not found"
 
 # ── 2. Install FastAPI ───────────────────────────────────────────────────────

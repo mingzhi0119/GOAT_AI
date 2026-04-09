@@ -14,7 +14,7 @@ Runtime target resolution now follows a single-port policy: always `GOAT_SERVER_
 Backend:
 
 ```bash
-python3 -m venv .venv
+python3.14 -m venv .venv   # use Python 3.14 when available (matches CI; see `.github/workflows/ci.yml`)
 source .venv/bin/activate
 pip install -r requirements-ci.txt
 cp .env.example .env
@@ -24,7 +24,7 @@ python3 -m uvicorn server:app --host 0.0.0.0 --port 62606 --reload
 
 `lint-imports` enforces backend package layering (`pyproject.toml`); run it after dependency or router/service refactors.
 
-**Repository tools:** run CLI modules from the **repository root** with `python -m tools.<module>` (for example `python -m tools.run_rag_eval`, `python -m tools.check_api_contract_sync`). This avoids setting `PYTHONPATH` manually; `.env` is for app runtime, not your shell.
+**Repository tools:** run CLI modules from the **repository root** with `python -m tools.<module>` (for example `python -m tools.run_rag_eval`, `python -m tools.check_api_contract_sync`). This avoids setting `PYTHONPATH` manually; `.env` is for app runtime, not your shell. For **`python -m tools.check_api_contract_sync`**, use the **same Python minor as CI (3.14)** so `docs/openapi.json` matches `app.openapi()`. On Windows, **pandas** may not yet ship wheels for 3.14; use WSL to refresh artifacts: `bash scripts/wsl_api_contract_refresh.sh` (requires `uv` in WSL; installs a transient 3.14 env via `uv run`).
 
 ### SQLite schema migrations (Phase 13 Section 13.0)
 

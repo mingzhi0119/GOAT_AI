@@ -16,7 +16,7 @@ Use this when changing deploy scripts, process management, host-only docs, or ru
 - App: FastAPI backend plus React SPA.
 - Default port: `62606` (`GOAT_SERVER_PORT`).
 - Frontend: Vite; Node 24 on server and CI.
-- Backend: Python 3.12.
+- Backend: Python 3.14 for CI and recommended local dev (OpenAPI parity); production may still be 3.12.x on some hosts.
 
 ## Production server constraints
 

@@ -371,7 +371,7 @@ jobs:
 | **Ports** | Env var with safe dev/prod defaults | `GOAT_SERVER_PORT=62606` for dev/prod parity behind the current single-port runtime-target policy |
 | **Base URLs** | Env var, never `localhost` hardcoded | `OLLAMA_BASE_URL=http://127.0.0.1:11434` |
 | **Node version** | Pin in `.nvmrc` and CI matrix | `24.14.1` |
-| **Python version** | Keep runtime/docs/CI aligned | Production target `3.12.x`; CI uses `3.14` so `docs/openapi.json` matches `app.openapi()` from dev machines |
+| **Python version** | Keep runtime/docs/CI aligned | **CI backend uses Python `3.14`**. Regenerate `docs/openapi.json` with the **same** interpreter as CI (`python -m tools.regenerate_openapi_json`). Reference production venvs may remain `3.12.x` until operators upgrade; mismatched interpreters can make `app.openapi()` differ from the committed file. |
 | **Dependencies** | Exact pins in `requirements.txt` | `fastapi==0.135.2` |
 | **npm packages** | `package-lock.json` committed | `npm ci` in CI/deploy, never `npm install` |
 | **File encoding** | Always `encoding="utf-8"` on `open()` | `open(path, encoding="utf-8")` |
@@ -511,7 +511,7 @@ Before every commit ask:
 | Default bind port | `62606` (`GOAT_SERVER_PORT`; override per environment) |
 | Frontend build | Vite |
 | Frontend runtime (server/CI) | Node 24 (see `.nvmrc`) |
-| Backend runtime | Python 3.12 |
+| Backend runtime | Python **3.14** in CI and recommended local venv for contract checks; **3.12.x** still typical on some production hosts |
 
 ---
 

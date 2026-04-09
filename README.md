@@ -34,7 +34,7 @@ Until such a feature ships, this table documents the **intended** model: **high-
 
 | Layer | Technology |
 |-------|------------|
-| Backend | FastAPI, Uvicorn, Python 3.12+ (CI uses 3.14 for contract tests) |
+| Backend | FastAPI, Uvicorn; **Python 3.14** recommended for local dev and API artifact parity; CI backend job uses **3.14**; production hosts may still run **3.12.x** until upgraded |
 | Frontend | React 19, TypeScript, Vite 8 |
 | LLM runtime | Ollama |
 | Data parsing | pandas, openpyxl, python-docx, pypdf |
@@ -96,12 +96,14 @@ Core API surface:
 Development:
 
 ```bash
-python3 -m venv .venv
+python3.14 -m venv .venv   # or any `python3` that matches CI (see `.github/workflows/ci.yml`)
 source .venv/bin/activate
 pip install -r requirements-ci.txt
 cp .env.example .env
 python3 -m uvicorn server:app --host 0.0.0.0 --port 62606 --reload
 ```
+
+Use **Python 3.14** for the venv when you can so `python -m tools.check_api_contract_sync` matches the CI backend job.
 
 Frontend dev server:
 
