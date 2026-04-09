@@ -3,6 +3,7 @@ import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ChatWindow from '../components/ChatWindow'
 import type { GPUStatus, InferenceLatency } from '../api/system'
+import { getChatLayoutDecisions } from '../utils/chatLayout'
 
 const uploadMediaImageMock = vi.fn()
 const streamUploadMock = vi.fn()
@@ -50,6 +51,7 @@ function renderChatWindow(overrides: Partial<ComponentProps<typeof ChatWindow>> 
       messages={[]}
       chartSpec={null}
       isStreaming={false}
+      layoutDecisions={getChatLayoutDecisions('wide')}
       models={['test-model', 'backup-model']}
       selectedModel="test-model"
       onModelChange={onModelChange}
@@ -132,7 +134,7 @@ describe('ChatWindow composer', () => {
     expect(screen.queryByLabelText(/plan enabled/i)).not.toBeInTheDocument()
 
     renderChatWindow({ planModeEnabled: true })
-    expect(screen.getByLabelText(/plan enabled/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /plan enabled/i })).toBeInTheDocument()
     expect(screen.getByText('Plan')).toBeInTheDocument()
   })
 
@@ -166,6 +168,52 @@ describe('ChatWindow composer', () => {
     fireEvent.click(screen.getByText('Manage Uploads'))
     expect(screen.queryByText('Upload Files')).not.toBeInTheDocument()
     expect(screen.getByText('No uploaded files yet.')).toBeInTheDocument()
+  })
+
+  it('keeps the narrow composer footer on one row', () => {
+    renderChatWindow({ layoutDecisions: getChatLayoutDecisions('narrow') })
+
+    const controlRow = screen.getByTestId('composer-control-row')
+    expect(controlRow.className).toContain('flex')
+    expect(controlRow.className).not.toContain('flex-col')
+    expect(screen.getByTestId('composer-left-controls')).toBeInTheDocument()
+    expect(screen.getByTestId('composer-right-controls')).toBeInTheDocument()
+  })
+
+  it('closes open narrow popovers when clicking the textarea area', () => {
+    renderChatWindow({ layoutDecisions: getChatLayoutDecisions('narrow') })
+
+    fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
+    expect(screen.getByText('Upload Files')).toBeInTheDocument()
+
+    fireEvent.mouseDown(screen.getByTestId('composer-text-surface'))
+    expect(screen.queryByText('Upload Files')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /open model menu/i }))
+    expect(screen.getByRole('menu', { name: /model menu/i })).toBeInTheDocument()
+
+    fireEvent.mouseDown(screen.getByTestId('composer-text-surface'))
+    expect(screen.queryByRole('menu', { name: /model menu/i })).not.toBeInTheDocument()
+  })
+
+  it('focuses the textarea when clicking the text surface outside the current text node', () => {
+    renderChatWindow()
+
+    const textarea = screen.getByPlaceholderText('Message GOAT AI')
+    fireEvent.mouseDown(screen.getByTestId('composer-text-surface'))
+
+    expect(document.activeElement).toBe(textarea)
+  })
+
+  it('shows a tooltip for the plan indicator and lets it disable plan mode', () => {
+    const { onPlanModeChange } = renderChatWindow({ planModeEnabled: true })
+
+    const planButton = screen.getByRole('button', { name: /plan enabled/i })
+    fireEvent.mouseEnter(planButton)
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Planning mode is enabled.')
+
+    fireEvent.click(planButton)
+    expect(onPlanModeChange).toHaveBeenCalledWith(false)
   })
 
   it('shows a product-style validation message only after unsupported upload', async () => {

@@ -53,7 +53,7 @@ describe('TopBar options callout', () => {
 
     expect(screen.getByRole('dialog', { name: /options/i })).toBeInTheDocument()
     expect(screen.queryByText(/Enter sends the message/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/Advanced settings/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/^Generation$/)).toBeInTheDocument()
   })
 
   it('keeps system instruction editing and clear actions wired', () => {

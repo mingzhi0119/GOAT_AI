@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState, type FC } from 'react'
+import type { ChatLayoutMode } from '../utils/chatLayout'
 
 interface Props {
   sessionTitle: string | null
   theme: 'light' | 'dark'
+  layoutMode?: ChatLayoutMode
+  onSidebarToggle?: () => void
   onToggleTheme: () => void
   systemInstruction: string
   onSystemInstructionChange: (value: string) => void
@@ -18,11 +21,13 @@ interface Props {
   onResetAdvanced: () => void
 }
 
-const MAX_INSTRUCTION_LEN = 8000
+const MAX_INSTRUCTION_LEN = 1000
 
 const TopBar: FC<Props> = ({
   sessionTitle,
   theme,
+  layoutMode = 'wide',
+  onSidebarToggle,
   onToggleTheme,
   systemInstruction,
   onSystemInstructionChange,
@@ -39,6 +44,7 @@ const TopBar: FC<Props> = ({
 }) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const isNarrow = layoutMode === 'narrow'
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -50,24 +56,32 @@ const TopBar: FC<Props> = ({
 
   const fieldCls =
     'w-full rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/35 cursor-text select-text'
-  const sectionCls = 'rounded-2xl border px-4 py-3'
-  const sectionStyle = {
-    borderColor: 'var(--border-color)',
-    background: 'var(--composer-muted-surface)',
-  }
-
   return (
     <header
-      className="z-20 flex h-12 flex-shrink-0 items-center border-b px-3"
+      className={`z-20 flex h-12 flex-shrink-0 items-center ${isNarrow ? 'gap-2 px-2.5' : 'px-3'}`}
       style={{
-        borderColor: 'var(--border-color)',
         background: 'var(--bg-chat)',
       }}
     >
-      <div className="min-w-0 flex-1" aria-hidden="true" />
-      <div className="flex min-w-0 flex-[2] justify-center px-2">
+      {isNarrow ? (
+        <button
+          type="button"
+          aria-label="Open sidebar"
+          className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full transition-all hover:opacity-90"
+          style={{
+            color: 'var(--text-main)',
+            background: 'var(--composer-muted-surface)',
+          }}
+          onClick={onSidebarToggle}
+        >
+          <SidebarToggleIcon />
+        </button>
+      ) : (
+        <div className="min-w-0 flex-1" aria-hidden="true" />
+      )}
+      <div className={`flex min-w-0 ${isNarrow ? 'flex-1 justify-start' : 'flex-[2] justify-center px-2'}`}>
         <h1
-          className="max-w-full truncate text-center text-sm font-medium"
+          className={`max-w-full truncate ${isNarrow ? 'text-left text-[13px]' : 'text-center text-sm'} font-medium`}
           style={{
             color: sessionTitle ? 'var(--text-main)' : 'var(--text-muted)',
           }}
@@ -76,11 +90,11 @@ const TopBar: FC<Props> = ({
           {sessionTitle ?? 'New conversation'}
         </h1>
       </div>
-      <div className="flex min-w-0 flex-1 justify-end" ref={wrapRef}>
+      <div className={`flex min-w-0 ${isNarrow ? 'flex-shrink-0 justify-end' : 'flex-1 justify-end'}`} ref={wrapRef}>
         <div className="relative">
           <button
             type="button"
-            className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-all hover:opacity-90"
+            className={`inline-flex items-center gap-2 rounded-full font-medium transition-all hover:opacity-90 ${isNarrow ? 'px-2.5 py-1.5 text-[13px]' : 'px-3 py-1.5 text-sm'}`}
             style={{
               color: 'var(--text-main)',
               background: 'var(--composer-muted-surface)',
@@ -99,7 +113,7 @@ const TopBar: FC<Props> = ({
 
           {menuOpen && (
             <div
-              className="absolute right-0 mt-2 w-[min(92vw,26rem)] max-h-[min(85vh,38rem)] overflow-y-auto rounded-[24px] border p-3 shadow-[0_16px_36px_rgba(15,23,42,0.12)] z-50"
+              className={`absolute right-0 z-50 mt-2 max-h-[min(85vh,38rem)] overflow-y-auto rounded-[24px] border px-4 py-3 shadow-[0_16px_36px_rgba(15,23,42,0.12)] ${isNarrow ? 'w-[min(96vw,22rem)]' : 'w-[min(92vw,26rem)]'}`}
               style={{
                 background: 'var(--composer-menu-bg-strong)',
                 borderColor: 'var(--input-border)',
@@ -111,14 +125,11 @@ const TopBar: FC<Props> = ({
               onClick={e => e.stopPropagation()}
             >
               <div className="space-y-3">
-                <section className={sectionCls} style={sectionStyle}>
-                  <div className="mb-2 flex items-center justify-between gap-3">
+                <section className="space-y-2">
+                  <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>
                         Instructions
-                      </p>
-                      <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-                        Guide tone, format, and constraints for the assistant.
                       </p>
                     </div>
                     <button
@@ -135,12 +146,12 @@ const TopBar: FC<Props> = ({
                   </div>
                   <textarea
                     id="goat-system-instruction"
-                    rows={4}
+                    rows={3}
                     maxLength={MAX_INSTRUCTION_LEN}
                     value={systemInstruction}
                     onChange={e => onSystemInstructionChange(e.target.value)}
                     placeholder="Optional: tone, format, or constraints for the model"
-                    className={`${fieldCls} min-h-[5.25rem] resize-y`}
+                    className={`${fieldCls} min-h-[4.5rem] resize-y`}
                     style={{
                       background: 'var(--input-bg)',
                       border: '1px solid var(--input-border)',
@@ -155,14 +166,17 @@ const TopBar: FC<Props> = ({
                   </p>
                 </section>
 
-                <section className={sectionCls} style={sectionStyle}>
-                  <div className="mb-3 flex items-center justify-between gap-3">
+                <section
+                  className="border-t pt-3"
+                  style={{ borderColor: 'var(--border-color)' }}
+                >
+                  <div className="mb-2 flex items-center justify-between gap-3">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>
                         Generation
                       </p>
                       <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-                        Tune the generation profile for the current chat session.
+                        Tune generation behavior for this chat.
                       </p>
                     </div>
                     <button
@@ -181,7 +195,7 @@ const TopBar: FC<Props> = ({
                       Reset
                     </button>
                   </div>
-                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                     <div>
                       <label
                         className="mb-1 block text-[11px] font-medium"
@@ -260,15 +274,17 @@ const TopBar: FC<Props> = ({
                   </div>
                 </section>
 
-                <section className={sectionCls} style={sectionStyle}>
+                <section
+                  className="border-t pt-3"
+                  style={{ borderColor: 'var(--border-color)' }}
+                >
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>
                     Conversation
                   </p>
                   <button
                     type="button"
-                    className="mt-2 flex w-full items-center justify-between rounded-2xl px-3 py-2 text-left text-sm transition-colors hover:bg-slate-900/[0.04]"
+                    className="mt-1.5 flex w-full items-center justify-between rounded-2xl px-2 py-1.5 text-left text-sm transition-colors hover:bg-slate-900/[0.04]"
                     style={{
-                      background: 'var(--input-bg)',
                       color: 'var(--text-main)',
                     }}
                     onClick={() => {
@@ -286,15 +302,17 @@ const TopBar: FC<Props> = ({
                   </button>
                 </section>
 
-                <section className={sectionCls} style={sectionStyle}>
+                <section
+                  className="border-t pt-3"
+                  style={{ borderColor: 'var(--border-color)' }}
+                >
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>
                     Appearance
                   </p>
                   <button
                     type="button"
-                    className="mt-2 flex w-full items-center justify-between rounded-2xl px-3 py-2 text-left text-sm transition-colors hover:bg-slate-900/[0.04]"
+                    className="mt-1.5 flex w-full items-center justify-between rounded-2xl px-2 py-1.5 text-left text-sm transition-colors hover:bg-slate-900/[0.04]"
                     style={{
-                      background: 'var(--input-bg)',
                       color: 'var(--text-main)',
                     }}
                     onClick={() => {
@@ -319,6 +337,17 @@ const TopBar: FC<Props> = ({
     </header>
   )
 }
+
+const SidebarToggleIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <path
+      d="M3.25 4.5h9.5M3.25 8h9.5M3.25 11.5h6.25"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+    />
+  </svg>
+)
 
 const OptionsIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">

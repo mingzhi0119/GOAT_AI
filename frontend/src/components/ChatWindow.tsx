@@ -20,6 +20,7 @@ import {
   getSuffixPrompt,
   getTemplateFallbackPrompt,
 } from '../utils/uploadPrompts'
+import type { ChatLayoutDecisions } from '../utils/chatLayout'
 import GpuStatusDot from './GpuStatusDot'
 import MessageBubble from './MessageBubble'
 
@@ -50,10 +51,20 @@ interface PendingImageAttachment {
 type ComposerPanel = 'plus' | 'manage-uploads' | 'model' | 'reasoning' | null
 type ComposerIndicatorKey = 'plan'
 
+interface ComposerIndicatorDescriptor {
+  key: ComposerIndicatorKey
+  visible: boolean
+  label: string
+  icon: ReactNode
+  tooltip: string
+  onClick?: () => void
+}
+
 interface Props {
   messages: Message[]
   chartSpec: ChartSpec | null
   isStreaming: boolean
+  layoutDecisions: ChatLayoutDecisions
   models: string[]
   selectedModel: string
   onModelChange: (model: string) => void
@@ -253,34 +264,43 @@ function reasoningLabel(level: 'low' | 'medium' | 'high'): string {
   return 'Medium'
 }
 
-function getComposerIndicators(planModeEnabled: boolean): Array<{
-  key: ComposerIndicatorKey
-  label: string
-  icon: ReactNode
-}> {
-  const orderedIndicators: Array<{
-    key: ComposerIndicatorKey
-    visible: boolean
-    label: string
-    icon: ReactNode
-  }> = [
+function getComposerIndicators(
+  planModeEnabled: boolean,
+  onPlanModeChange: (enabled: boolean) => void,
+): Array<Omit<ComposerIndicatorDescriptor, 'visible'>> {
+  const orderedIndicators: ComposerIndicatorDescriptor[] = [
     {
       key: 'plan',
       visible: planModeEnabled,
       label: 'Plan',
       icon: <PlanModeIcon />,
+      tooltip: 'Planning mode is enabled.',
+      onClick: () => onPlanModeChange(false),
     },
   ]
 
   return orderedIndicators
     .filter(indicator => indicator.visible)
-    .map(({ key, label, icon }) => ({ key, label, icon }))
+    .map(({ key, label, icon, tooltip, onClick }) => ({ key, label, icon, tooltip, onClick }))
+}
+
+function handleComposerTextAreaPointerDown(
+  event: React.MouseEvent<HTMLDivElement>,
+  textarea: HTMLTextAreaElement | null,
+  closePanel: () => void,
+): void {
+  closePanel()
+  if (event.target !== textarea && textarea) {
+    event.preventDefault()
+    textarea.focus()
+  }
 }
 
 const ChatWindow: FC<Props> = ({
   messages,
   chartSpec,
   isStreaming,
+  layoutDecisions,
   models,
   selectedModel,
   onModelChange,
@@ -305,10 +325,12 @@ const ChatWindow: FC<Props> = ({
   const [attachmentUploadError, setAttachmentUploadError] = useState<string | null>(null)
   const [attachmentUploading, setAttachmentUploading] = useState(false)
   const [activePanel, setActivePanel] = useState<ComposerPanel>(null)
+  const [hoveredIndicator, setHoveredIndicator] = useState<ComposerIndicatorKey | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const composerRef = useRef<HTMLDivElement>(null)
+  const panelBoundaryRef = useRef<HTMLDivElement>(null)
 
   const starterPrompts = useMemo<PromptItem[]>(() => {
     if (!activeFileContext) {
@@ -341,15 +363,16 @@ const ChatWindow: FC<Props> = ({
   }, [messages])
 
   useEffect(() => {
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!composerRef.current?.contains(event.target as Node)) {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!activePanel) return
+      if (!panelBoundaryRef.current?.contains(event.target as Node)) {
         setActivePanel(null)
       }
     }
 
-    document.addEventListener('mousedown', handlePointerDown)
-    return () => document.removeEventListener('mousedown', handlePointerDown)
-  }, [])
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [activePanel])
 
   useEffect(() => {
     const textarea = textareaRef.current
@@ -439,7 +462,11 @@ const ChatWindow: FC<Props> = ({
   const manageUploadsOpen = activePanel === 'manage-uploads'
   const modelMenuOpen = activePanel === 'model'
   const reasoningMenuOpen = activePanel === 'reasoning'
-  const composerIndicators = useMemo(() => getComposerIndicators(planModeEnabled), [planModeEnabled])
+  const isNarrow = layoutDecisions.layoutMode === 'narrow'
+  const composerIndicators = useMemo(
+    () => getComposerIndicators(planModeEnabled, onPlanModeChange),
+    [onPlanModeChange, planModeEnabled],
+  )
   const controlPillStyle = (isOpen: boolean) =>
     ({
       color: 'var(--text-muted)',
@@ -458,7 +485,17 @@ const ChatWindow: FC<Props> = ({
       className="chat-shell flex h-full min-h-0 min-w-0 flex-1 flex-col"
       style={{ background: 'var(--bg-chat)' }}
     >
-      <div className="ui-static flex-1 space-y-4 overflow-y-auto px-5 py-6">
+      <div className="relative min-h-0 flex-1">
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 z-10 h-10"
+          style={{
+            background:
+              'linear-gradient(180deg, var(--bg-chat) 0%, color-mix(in srgb, var(--bg-chat) 0%, transparent) 100%)',
+          }}
+        />
+        <div
+          className={`ui-static flex h-full flex-col overflow-y-auto ${layoutDecisions.compactSpacing ? 'space-y-3 px-3 py-4' : 'space-y-4 px-5 py-6'}`}
+        >
         {chartSpec && visibleMessages.length > 0 && (
           <Suspense
             fallback={
@@ -478,7 +515,7 @@ const ChatWindow: FC<Props> = ({
           </Suspense>
         )}
         {visibleMessages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-5 px-4 text-center">
+          <div className={`flex h-full flex-col items-center justify-center text-center ${layoutDecisions.compactSpacing ? 'gap-4 px-3' : 'gap-5 px-4'}`}>
             <div
               className="h-20 w-20 overflow-hidden rounded-2xl"
               style={{
@@ -510,7 +547,9 @@ const ChatWindow: FC<Props> = ({
                 </p>
               )}
             </div>
-            <div className="mt-2 grid w-full max-w-md grid-cols-2 gap-2">
+            <div
+              className={`mt-2 grid w-full max-w-md gap-2 ${layoutDecisions.singleColumnPrompts ? 'grid-cols-1' : 'grid-cols-2'}`}
+            >
               {starterPrompts.map((item, index) => {
                 const isFilePrompt = item.kind !== 'base'
                 return (
@@ -546,25 +585,31 @@ const ChatWindow: FC<Props> = ({
               key={message.id}
               message={message}
               hasFileContext={sessionHasFileContext}
+              layoutMode={layoutDecisions.layoutMode}
             />
           ))
         )}
         <div ref={bottomRef} />
       </div>
+      </div>
 
-      <div className="flex-shrink-0 px-4 pb-4 pt-3" style={{ background: 'var(--bg-chat)' }}>
-        <div className="mx-auto max-w-4xl space-y-2">
+      <div
+        className={`flex-shrink-0 ${layoutDecisions.compactComposer ? 'px-2.5 pb-2.5 pt-2' : 'px-4 pb-4 pt-3'}`}
+        style={{ background: 'var(--bg-chat)' }}
+      >
+        <div className={`mx-auto space-y-2 ${layoutDecisions.compactComposer ? 'max-w-none' : 'max-w-4xl'}`}>
           <div
             ref={composerRef}
-            className="relative rounded-[28px] border px-3 py-2.5 shadow-[0_20px_48px_rgba(15,23,42,0.08)]"
+            className={`relative border shadow-[0_20px_48px_rgba(15,23,42,0.08)] ${layoutDecisions.compactComposer ? 'rounded-[24px] px-2.5 py-2' : 'rounded-[28px] px-3 py-2.5'}`}
             style={{
               borderColor: 'var(--input-border)',
               background: 'var(--composer-surface)',
             }}
           >
+            <div ref={panelBoundaryRef} className="relative">
             {plusMenuOpen && (
               <div
-                className="absolute bottom-14 left-0 z-30 w-[332px] rounded-2xl border p-1.5 shadow-[0_10px_20px_rgba(15,23,42,0.08)]"
+                className={`absolute bottom-14 left-0 z-30 rounded-2xl border p-1.5 shadow-[0_10px_20px_rgba(15,23,42,0.08)] ${isNarrow ? 'w-[min(92vw,20rem)]' : 'w-[332px]'}`}
                 style={composerMenuStyle}
               >
                 <button
@@ -648,7 +693,7 @@ const ChatWindow: FC<Props> = ({
 
             {modelMenuOpen && (
               <div
-                className="absolute bottom-14 left-10 z-30 min-w-[180px] rounded-2xl border p-1.5"
+                className={`absolute bottom-14 z-30 min-w-[180px] rounded-2xl border p-1.5 ${isNarrow ? 'left-9 w-[min(56vw,12rem)]' : 'left-10'}`}
                 style={composerMenuStyle}
                 role="menu"
                 aria-label="Model menu"
@@ -683,7 +728,7 @@ const ChatWindow: FC<Props> = ({
 
             {reasoningMenuOpen && (
               <div
-                className="absolute bottom-14 left-[152px] z-30 min-w-[148px] rounded-2xl border p-1.5"
+                className={`absolute bottom-14 z-30 min-w-[148px] rounded-2xl border p-1.5 ${isNarrow ? 'left-[7.25rem] w-[min(44vw,10rem)]' : 'left-[152px]'}`}
                 style={composerMenuStyle}
                 role="menu"
                 aria-label="Reasoning menu"
@@ -928,7 +973,6 @@ const ChatWindow: FC<Props> = ({
                 </div>
               </div>
             )}
-
             <div className="flex flex-col gap-2">
               <input
                 ref={fileInputRef}
@@ -976,13 +1020,14 @@ const ChatWindow: FC<Props> = ({
               )}
 
               <div
+                data-testid="composer-text-surface"
                 className="ui-static min-w-0 px-1 py-0.5"
                 style={{ userSelect: 'none', caretColor: 'transparent' }}
-                onMouseDown={event => {
-                  if (event.target !== textareaRef.current) {
-                    event.preventDefault()
-                  }
-                }}
+                onMouseDown={event =>
+                  handleComposerTextAreaPointerDown(event, textareaRef.current, () =>
+                    setActivePanel(null),
+                  )
+                }
               >
                 <textarea
                   ref={textareaRef}
@@ -1006,15 +1051,25 @@ const ChatWindow: FC<Props> = ({
                 />
               </div>
 
-              <div className="ui-static flex items-center justify-between gap-3 px-0.5">
-                <div className="-ml-1 flex min-w-0 flex-1 items-center gap-1.5">
+              <div
+                data-testid="composer-control-row"
+                className="ui-static flex items-center justify-between gap-2 px-0.5"
+              >
+                <div
+                  data-testid="composer-left-controls"
+                  className={`-ml-1 flex min-w-0 flex-1 items-center ${layoutDecisions.compactComposer ? 'gap-1.5 overflow-x-auto pr-2' : 'gap-1.5'}`}
+                  style={{
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none',
+                  }}
+                >
                   <button
                     type="button"
                     disabled={isStreaming || attachmentUploading}
                     onClick={() => {
                       setActivePanel(prev => (prev === 'plus' ? null : 'plus'))
                     }}
-                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full transition-all disabled:opacity-40"
+                    className={`${layoutDecisions.compactComposer ? 'h-9 w-9' : 'h-10 w-10'} flex flex-shrink-0 items-center justify-center rounded-full transition-all disabled:opacity-40`}
                     style={{ border: 'none', ...controlPillStyle(plusMenuOpen), color: 'rgba(17,24,39,0.42)' }}
                     title={plusMenuOpen ? 'Close actions' : 'Open upload and planning actions'}
                     onMouseEnter={e => {
@@ -1027,13 +1082,13 @@ const ChatWindow: FC<Props> = ({
                     <PlusIcon />
                   </button>
 
-                  <div className="flex min-w-0 items-center gap-3">
+                  <div className={`flex min-w-0 flex-shrink-0 items-center ${layoutDecisions.compactComposer ? 'gap-1.5' : 'gap-3'}`}>
                     <button
                       type="button"
                       aria-label="Open model menu"
                       aria-expanded={modelMenuOpen}
                       onClick={() => setActivePanel(prev => (prev === 'model' ? null : 'model'))}
-                      className="inline-flex max-w-[180px] items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[13px] font-medium transition-all"
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[13px] font-medium transition-all ${layoutDecisions.compactComposer ? 'max-w-[104px]' : 'max-w-[180px]'}`}
                       style={controlPillStyle(modelMenuOpen)}
                     >
                       <span className="truncate">{selectedModel}</span>
@@ -1049,36 +1104,62 @@ const ChatWindow: FC<Props> = ({
                       onClick={() =>
                         setActivePanel(prev => (prev === 'reasoning' ? null : 'reasoning'))
                       }
-                      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[13px] font-medium transition-all"
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[13px] font-medium transition-all ${layoutDecisions.compactComposer ? 'max-w-[78px] flex-shrink-0' : ''}`}
                       style={controlPillStyle(reasoningMenuOpen)}
                     >
-                      <span>{reasoningLabel(reasoningLevel)}</span>
+                      <span className="truncate">{reasoningLabel(reasoningLevel)}</span>
                       <span className="inline-flex flex-shrink-0 items-center justify-center">
                         <ChevronDownIcon />
                       </span>
                     </button>
 
                     {composerIndicators.length > 0 && (
-                      <div className="ml-1 flex min-w-0 items-center gap-2">
-                        {composerIndicators.map(indicator => (
-                          <div
-                            key={indicator.key}
-                            className="inline-flex items-center gap-1.5 text-[13px] font-medium"
-                            style={{ color: '#3b82f6' }}
-                            aria-label={`${indicator.label} enabled`}
-                          >
-                            <span className="inline-flex h-4 w-4 items-center justify-center">
-                              {indicator.icon}
-                            </span>
-                            <span>{indicator.label}</span>
-                          </div>
-                        ))}
+                      <div className={`flex min-w-0 flex-shrink-0 items-center gap-2 ${layoutDecisions.compactComposer ? '' : 'ml-1'}`}>
+                        {composerIndicators.map(indicator => {
+                          const showTooltip = hoveredIndicator === indicator.key
+                          return (
+                            <button
+                              key={indicator.key}
+                              type="button"
+                              className="relative inline-flex items-center gap-1.5 text-[13px] font-medium"
+                              style={{ color: '#3b82f6' }}
+                              aria-label={`${indicator.label} enabled`}
+                              title={indicator.tooltip}
+                              onClick={() => indicator.onClick?.()}
+                              onMouseEnter={() => setHoveredIndicator(indicator.key)}
+                              onMouseLeave={() => setHoveredIndicator(null)}
+                              onFocus={() => setHoveredIndicator(indicator.key)}
+                              onBlur={() => setHoveredIndicator(null)}
+                            >
+                              <span className="inline-flex h-4 w-4 items-center justify-center">
+                                {indicator.icon}
+                              </span>
+                              <span>{indicator.label}</span>
+                              {showTooltip && (
+                                <span
+                                  role="tooltip"
+                                  className="pointer-events-none absolute bottom-[calc(100%+0.45rem)] left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-medium shadow-[0_10px_20px_rgba(15,23,42,0.14)]"
+                                  style={{
+                                    background: 'var(--composer-menu-bg-strong)',
+                                    color: 'var(--text-main)',
+                                    border: '1px solid var(--input-border)',
+                                  }}
+                                >
+                                  {indicator.tooltip}
+                                </span>
+                              )}
+                            </button>
+                          )
+                        })}
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div className="flex flex-shrink-0 items-center gap-2">
+                <div
+                  data-testid="composer-right-controls"
+                  className="flex flex-shrink-0 items-center gap-2"
+                >
                   <GpuStatusDot
                     gpuStatus={gpuStatus}
                     gpuError={gpuError}
@@ -1103,6 +1184,7 @@ const ChatWindow: FC<Props> = ({
                   </button>
                 </div>
               </div>
+            </div>
             </div>
           </div>
 

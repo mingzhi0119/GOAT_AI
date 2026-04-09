@@ -1,6 +1,7 @@
 import { type FC, type MouseEvent } from 'react'
-import GoatIcon from './GoatIcon'
 import type { HistorySessionItem } from '../api/history'
+import type { ChatLayoutMode } from '../utils/chatLayout'
+import GoatIcon from './GoatIcon'
 import {
   sidebarFooterAttributionClass,
   sidebarFooterHighlightClass,
@@ -14,6 +15,9 @@ interface Props {
   onClearChat: () => void
   userName: string
   onUserNameChange: (name: string) => void
+  layoutMode?: ChatLayoutMode
+  open?: boolean
+  onClose?: () => void
   historySessions: HistorySessionItem[]
   isLoadingHistory: boolean
   historyError: string | null
@@ -49,6 +53,9 @@ const Sidebar: FC<Props> = ({
   onClearChat,
   userName: _userName,
   onUserNameChange: _onUserNameChange,
+  layoutMode = 'wide',
+  open = true,
+  onClose,
   historySessions,
   isLoadingHistory,
   historyError,
@@ -57,22 +64,46 @@ const Sidebar: FC<Props> = ({
   onRefreshHistory,
   onDeleteAllHistory,
 }) => {
+  const isNarrow = layoutMode === 'narrow'
+  const isOpen = isNarrow ? open : true
+
+  const closeOverlay = () => {
+    if (isNarrow) onClose?.()
+  }
+
   return (
     <aside
-      className="flex h-screen w-64 flex-shrink-0 min-h-0 flex-col overflow-x-hidden"
+      className={[
+        'flex min-h-0 flex-col overflow-x-hidden transition-transform duration-200 ease-out',
+        isNarrow
+          ? 'fixed inset-y-0 left-0 z-40 h-[100dvh] w-[min(16rem,calc(100vw-1.25rem))] max-w-[16rem] shadow-[0_20px_48px_rgba(15,23,42,0.16)]'
+          : 'h-screen w-64 flex-shrink-0',
+        isNarrow && !isOpen ? '-translate-x-full' : 'translate-x-0',
+      ].join(' ')}
       style={{ background: 'var(--bg-sidebar)' }}
+      aria-hidden={isNarrow ? !isOpen : undefined}
     >
-      <div
-        className="flex h-12 flex-shrink-0 items-center gap-2.5 border-b px-4"
-        style={{ borderColor: 'var(--sidebar-border)' }}
-      >
-        <GoatIcon size={28} />
-        <h1
-          className="cursor-default select-none text-[15px] font-semibold leading-none tracking-[-0.02em]"
-          style={{ color: 'var(--text-sidebar)' }}
-        >
-          GOAT AI
-        </h1>
+      <div className="flex h-12 flex-shrink-0 items-center justify-between gap-2.5 px-4">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <GoatIcon size={28} />
+          <h1
+            className="cursor-default select-none text-[15px] font-semibold leading-none tracking-[-0.02em]"
+            style={{ color: 'var(--text-sidebar)' }}
+          >
+            GOAT AI
+          </h1>
+        </div>
+        {isNarrow && (
+          <button
+            type="button"
+            onClick={closeOverlay}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-sm"
+            style={{ color: 'var(--sidebar-muted)' }}
+            aria-label="Close sidebar"
+          >
+            x
+          </button>
+        )}
       </div>
 
       <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4">
@@ -83,7 +114,10 @@ const Sidebar: FC<Props> = ({
 
           <button
             type="button"
-            onClick={onClearChat}
+            onClick={() => {
+              onClearChat()
+              closeOverlay()
+            }}
             className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all"
             style={{ color: 'var(--text-sidebar)', background: 'transparent' }}
             {...hoverHandlers('var(--sidebar-hover)')}
@@ -141,7 +175,10 @@ const Sidebar: FC<Props> = ({
             <div key={item.id} className="group/history flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => onLoadHistorySession(item.id)}
+                onClick={() => {
+                  onLoadHistorySession(item.id)
+                  closeOverlay()
+                }}
                 title={item.title || 'New Chat'}
                 className="min-w-0 flex-1 rounded-lg px-2.5 py-2 text-left text-xs transition-all"
                 style={{ color: 'var(--text-sidebar)', background: 'var(--sidebar-surface-muted)' }}
@@ -163,10 +200,7 @@ const Sidebar: FC<Props> = ({
         </section>
       </div>
 
-      <div
-        className="flex-shrink-0 space-y-3 px-5 py-4"
-        style={{ borderTop: '1px solid var(--sidebar-border)' }}
-      >
+      <div className="flex-shrink-0 space-y-3 px-5 py-4">
         <img
           src="./simon_logo.svg"
           alt="Simon Business School - University of Rochester"

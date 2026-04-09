@@ -2,11 +2,13 @@ import { useState, type FC } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { ChatArtifact, Message } from '../api/types'
+import type { ChatLayoutMode } from '../utils/chatLayout'
 
 interface Props {
   message: Message
   /** When true, strip :::chart blocks emitted by the structured-output protocol. */
   hasFileContext?: boolean
+  layoutMode?: ChatLayoutMode
 }
 
 async function copyToClipboard(text: string): Promise<void> {
@@ -54,9 +56,10 @@ function formatArtifactSize(byteSize: number): string {
   return `${(byteSize / (1024 * 1024)).toFixed(1)} MB`
 }
 
-const MessageBubble: FC<Props> = ({ message, hasFileContext = false }) => {
+const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode = 'wide' }) => {
   const isUser = message.role === 'user'
   const isError = message.isError === true
+  const isNarrow = layoutMode === 'narrow'
   const [copied, setCopied] = useState(false)
   const artifactByFilename = new Map(
     (message.artifacts ?? []).map(artifact => [artifact.filename, artifact]),
@@ -69,7 +72,9 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false }) => {
 
   return (
     <div className={`ui-static flex group ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div className={`flex max-w-[78%] flex-col gap-1 ${isUser ? 'items-end' : 'items-start'}`}>
+      <div
+        className={`flex ${isNarrow ? 'max-w-[94%]' : 'max-w-[78%]'} flex-col gap-1 ${isUser ? 'items-end' : 'items-start'}`}
+      >
         <div
           className={[
             'w-full rounded-[18px] px-4 py-3',

@@ -13,7 +13,7 @@
 | 0–10 | Environment setup, FastAPI backend, React frontend, production deploy, product polish, reliability/UX, conversation history, quality/observability, charting/telemetry, access/security, native chart-tool path |
 | 11 | **Industrialization and decoupling:** `ChatStreamService` owns SSE/tool/safeguard streaming; `chat_orchestration.py` holds `PromptComposer` / `ChartToolOrchestrator` / `SessionPersistenceService`; `chat_service.py` is a thin entry; injectable `TabularContextExtractor` + `LLMClient`; `log_service` import confined to adapters; wire markers centralized; `test_architecture_boundaries` added |
 | 12 | **Hardening and scale-readiness:** explicit chart data-source policy, architecture guardrails, latency p50/p95 with model buckets, expanded `/api/chat` black-box matrix, deploy post-check script, API contract CI sync gate, model capability TTL cache |
-| Frontend polish | Composer menus, upload management panel, Plan badge, dark-mode-safe chat surfaces, unified options callout, and quieter history/message presentation are landed on `main` |
+| Frontend polish | Composer menus, upload management panel, Plan badge, responsive `wide/narrow` chat-shell baseline, dark-mode-safe chat surfaces, unified options callout, and quieter history/message presentation are landed on `main` |
 
 ---
 
@@ -143,7 +143,7 @@ These slices address deferred items from 15.2 and 15.3 and extend the domain and
 | Horizon | Focus |
 |---------|--------|
 | **v1.2.x** | Phase 16C implementation slices: authz context, tenancy envelope, and resource adoption |
-| **v1.3+** | Phase 16A capability gates, then Phase 16B storage evolution; each remains a Decision Log item before any code lands |
+| **v1.2.x** | Phase 16A capability gates, then Phase 16B storage evolution; each remains a Decision Log item before any code lands |
 
 ### Near-term frontend backlog
 

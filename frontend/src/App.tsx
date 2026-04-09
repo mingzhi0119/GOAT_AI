@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAdvancedSettings } from './hooks/useAdvancedSettings'
+import { useChatLayoutMode } from './hooks/useChatLayoutMode'
 import { useChatSession } from './hooks/useChatSession'
 import { useGpuStatus } from './hooks/useGpuStatus'
 import { useModels } from './hooks/useModels'
 import { useSystemInstruction } from './hooks/useSystemInstruction'
 import { useTheme } from './hooks/useTheme'
 import { useUserName } from './hooks/useUserName'
+import { getChatLayoutDecisions } from './utils/chatLayout'
 import { downloadChatAsMarkdown } from './utils/exportChatMarkdown'
 import ChatWindow from './components/ChatWindow'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -17,8 +19,11 @@ import type { UploadStreamEvent } from './api/upload'
 export default function App() {
   const [planModeEnabled, setPlanModeEnabled] = useState(false)
   const [reasoningLevel, setReasoningLevel] = useState<'low' | 'medium' | 'high'>('medium')
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const { theme, toggleTheme } = useTheme()
   const models = useModels()
+  const { layoutMode } = useChatLayoutMode()
+  const chatLayout = useMemo(() => getChatLayoutDecisions(layoutMode), [layoutMode])
   const { userName, setUserName } = useUserName()
   const { systemInstruction, setSystemInstruction } = useSystemInstruction()
   const advanced = useAdvancedSettings()
@@ -31,6 +36,10 @@ export default function App() {
   const gpu = useGpuStatus(session.isStreaming)
   const { refreshNow } = gpu
   const wasStreamingRef = useRef(session.isStreaming)
+
+  useEffect(() => {
+    setSidebarOpen(chatLayout.sidebarBehavior === 'docked')
+  }, [chatLayout.sidebarBehavior])
 
   useEffect(() => {
     const wasStreaming = wasStreamingRef.current
@@ -79,11 +88,22 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="relative flex h-screen overflow-hidden" style={{ background: 'var(--bg-main)' }}>
+      {chatLayout.sidebarBehavior === 'overlay' && sidebarOpen && (
+        <button
+          type="button"
+          aria-label="Close sidebar overlay"
+          className="absolute inset-0 z-30 bg-black/20 backdrop-blur-[1px]"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
       <Sidebar
         onClearChat={session.clearChatSession}
         userName={userName}
         onUserNameChange={setUserName}
+        layoutMode={layoutMode}
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
         historySessions={session.historySessions}
         isLoadingHistory={session.isLoadingHistory}
         historyError={session.historyError}
@@ -100,6 +120,8 @@ export default function App() {
         <TopBar
           sessionTitle={session.sessionTitle}
           theme={theme}
+          layoutMode={layoutMode}
+          onSidebarToggle={() => setSidebarOpen(open => !open)}
           onToggleTheme={toggleTheme}
           systemInstruction={systemInstruction}
           onSystemInstructionChange={setSystemInstruction}
@@ -124,6 +146,7 @@ export default function App() {
             messages={session.messages}
             chartSpec={session.chartSpec}
             isStreaming={session.isStreaming}
+            layoutDecisions={chatLayout}
             models={models.models}
             selectedModel={models.selectedModel}
             onModelChange={models.setSelectedModel}

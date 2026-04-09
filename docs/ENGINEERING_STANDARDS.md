@@ -2,7 +2,7 @@
 
 > **Single source of truth for engineering rules in this repo.**  
 > Repo root [`AGENTS.md`](../AGENTS.md) is a short durable index for automation; it must stay aligned with this file.  
-> Last updated: 2026-04-08
+> Last updated: 2026-04-09
 
 ---
 
@@ -359,6 +359,32 @@ jobs:
       - run: cd frontend && npm ci && npm test -- --run && npm run build
 ```
 
+### 3.4 Frontend manual UI verification (required for layout-affecting changes)
+
+For frontend UI or layout changes, do not stop at `npm test` / `npm run build`. Run the integrated manual verification loop against the FastAPI-served SPA path on the configured app port rather than the Vite dev server.
+
+- Prefer the configured app port via `GOAT_SERVER_PORT` (default `62606`) as the default integrated prod-parity local target.
+- Wait until the app is reachable at `http://127.0.0.1:<configured-port>`.
+- Verify stable UI states rather than inventing route coverage for this SPA:
+  - empty/default chat shell
+  - populated conversation after sending a sample prompt
+  - options/model/history panel state if present in the current UI
+  - any extra transient state only if modified by the change
+- Inspect at two widths:
+  - desktop baseline around `1440px`
+  - narrow/mobile baseline around `390px`
+- Capture screenshots for each inspected state/width pair.
+- Check at minimum:
+  - top navigation alignment
+  - card/list spacing consistency
+  - primary button styling against the current design system
+  - form/composer overflow on narrow/mobile widths
+- If issues are found, fix the code, reopen the integrated app, and rerun the same inspection loop before delivery.
+- Report all three in the final hand-off:
+  - files changed
+  - issues found by state
+  - final post-fix verification result
+
 ---
 
 ## 4. Cross-Environment Compatibility
@@ -561,6 +587,7 @@ When behavior changes, update:
 - `docs/PROJECT_STATUS.md` - current shipped state
 - `docs/ROADMAP.md` - phase completion and future work
 - Optional / capability-gated features - follow **Section 15**; update **`.env.example`** and **`docs/OPERATIONS.md`** for new `GOAT_*` flags
+- Frontend verification rules / editor-agent guidance - keep **`AGENTS.md`** as a short pointer only and update any relevant **`.cursor/rules/*.mdc`** files when the canonical rule in this document changes
 
 ---
 
@@ -622,4 +649,3 @@ Routes must **translate** the service’s gate decision into the HTTP semantics 
 ### 15.5 Documentation and operations
 
 - Document each **`GOAT_*` flag in **`.env.example`** and **`docs/OPERATIONS.md`**, including whether it is **runtime vs policy** when that distinction matters.
-
