@@ -15,6 +15,7 @@ router = APIRouter()
 
 @router.post(
     "/workbench/tasks",
+    status_code=501,
     summary="Start a workbench task (scaffold)",
     responses={
         401: {"model": ErrorResponse},
@@ -23,6 +24,7 @@ router = APIRouter()
             "model": ErrorResponse,
             "description": "Workbench runtime is not available on this deployment.",
         },
+        501: {"description": "Workbench task execution is not implemented."},
     },
 )
 def post_workbench_task(

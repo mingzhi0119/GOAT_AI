@@ -68,13 +68,14 @@ Core API surface:
 - `GET /api/artifacts/{artifact_id}`
 - `GET /api/history`
 - `GET /api/history/{session_id}`
+- `PATCH /api/history/{session_id}`
 - `DELETE /api/history`
 - `DELETE /api/history/{session_id}`
 - `GET /api/system/gpu`
 - `GET /api/system/inference`
 - `GET /api/system/runtime-target`
 - `GET /api/system/features` (capability-gated features: config + host probe)
-- `POST /api/code-sandbox/exec` (scaffold; 403 when disabled, 501 when enabled but not implemented)
+- `POST /api/code-sandbox/exec` (scaffold; policy-gated `403 FEATURE_DISABLED`, runtime-gated `503 FEATURE_UNAVAILABLE`, `501` when enabled but not implemented)
 - `POST /api/workbench/tasks` (scaffold for future Plan/Browse/Research/Canvas task entry; 503 when runtime gate is closed, 501 when enabled but not implemented)
 
 ## Current behavior

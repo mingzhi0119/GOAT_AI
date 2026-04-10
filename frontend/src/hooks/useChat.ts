@@ -14,6 +14,10 @@ const MESSAGES_KEY = 'goat-ai-messages'
 const SESSION_KEY = 'goat-ai-session-id'
 const MAX_STORED = 100
 
+function shouldShowThinking(think: OllamaOptionsPayload['think'] | undefined): boolean {
+  return think === true || typeof think === 'string'
+}
+
 function loadMessages(): Message[] {
   try {
     const raw = localStorage.getItem(MESSAGES_KEY)
@@ -254,7 +258,7 @@ export function useChat(): UseChatReturn {
           ),
           [...messagesRef.current, userMsg],
           onChartSpec,
-          ollamaOptions?.think === true,
+          shouldShowThinking(ollamaOptions?.think),
         )
       } finally {
         abortControllerRef.current = null

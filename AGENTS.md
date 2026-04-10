@@ -20,10 +20,11 @@ Short index for coding agents. Canonical rules live in the docs below.
 
 ## Before delivering code
 
-- Follow the same checks as GitHub Actions in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+- Follow the relevant checks from GitHub Actions in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) when practical.
 - Use Python 3.14 and `requirements-ci.txt` for backend work.
 - For frontend changes, run `cd frontend && npm ci && npm test -- --run`.
-- Do not run frontend build or manual visual verification unless the user asks.
+- CI also runs `cd frontend && npm run build`; run the local build when the task changes build tooling, packaging, or a failure would otherwise be invisible to tests.
+- Do not run manual visual verification unless the user asks.
 
 ## Quick pointers
 
@@ -32,66 +33,52 @@ Short index for coding agents. Canonical rules live in the docs below.
 - Keep `.cursor/rules/` aligned with these standards
 - Directory ownership lives in [`.github/CODEOWNERS`](.github/CODEOWNERS)
 
-## Agent Threads
+## Lead Agent Model
 
-Use four long-lived Codex owner threads for parallel work. Each owner thread should keep a dedicated branch and worktree. Keep scopes narrow, avoid overlapping edits, and route final decisions through the lead thread.
+The current thread is the Lead Agent unless explicitly reassigned. The Lead Agent coordinates subagents, consolidates findings, and performs the final repo edits.
 
-### 1. Lead / Platform Owner
+### Current Subagent Bindings
 
-**Mission**
+- Frontend Owner -> `Galileo`
+- Backend Owner -> `Rawls`
+- Docs / Assets Owner -> `Helmholtz`
 
-- Own task intake, decomposition, repository governance, and final merge readiness.
-- Translate user goals into explicit sub-tasks for the frontend, backend, and docs/assets owner threads.
-- Arbitrate shared-boundary work, release gating, and project direction when owners disagree.
+### Lead-only operating rules
 
-**Primary responsibilities**
+- Use subagents as analysts, reviewers, and auditors by default.
+- Subagents are read-only unless write access is explicitly delegated for a narrow task.
+- Subagents must not create commits, make unilateral implementation decisions, or open new worktrees.
+- If a new worktree is needed, the user will create or manage it directly.
+- The Lead Agent is the sole writing agent by default and owns final code changes, patch integration, and PR-ready cleanup.
 
-- Write the implementation or review plan before parallel work starts.
-- Assign one clear owner per shared-boundary task.
-- Review specialist outputs, merge order, and final readiness.
-- Own CI and governance changes under `.github/**` unless a boundary is explicitly shared.
-- Give the final merge recommendation after required owner reviews and checks pass.
-- Run read-only audit or PR-review passes directly, or assign them as temporary tasks instead of keeping separate long-lived owner threads.
+### Lead responsibilities
 
-### 2. Frontend Owner
+1. Restate the main goal and decompose it into bounded investigations.
+2. Assign each subagent a clear scope with strict file and domain boundaries.
+3. Require structured findings instead of code edits.
+4. Merge duplicate findings, rank them by severity, and resolve conflicts.
+5. Produce a concise implementation plan.
+6. Apply the final code changes.
+7. Run or recommend the relevant checks.
+8. Summarize changes, validation, residual risks, and follow-up items.
 
-**Mission**
+### Default subagent scopes
 
-- Own React, TypeScript, hooks, components, client request shaping, and frontend tests.
+- `Galileo`: frontend ownership, UI/state flow, request shaping, accessibility, frontend regressions
+- `Rawls`: backend ownership, API/contract tracing, persistence semantics, router/service layering
+- `Helmholtz`: docs, assets, config/governance drift, artifact sync
 
-**Primary responsibilities**
+### Required subagent output
 
-- Work inside the paths assigned to the frontend lane in `.github/CODEOWNERS`.
-- Keep request payloads, client types, and disclosure UI aligned with backend contracts.
-- Preserve existing UX unless the task explicitly changes it.
-- Add or update frontend tests for changed behavior.
+Each subagent should return:
 
-### 3. Backend Owner
-
-**Mission**
-
-- Own FastAPI routers, services, persistence logic, validation, contract correctness, and backend tests.
-
-**Primary responsibilities**
-
-- Work inside the paths assigned to the backend lane in `.github/CODEOWNERS`.
-- Keep logic out of route handlers; move non-trivial behavior into services.
-- Fail fast on invalid input and return accurate HTTP semantics.
-- Prevent false-success responses for writes, renames, deletes, and updates.
-- Add or update backend tests around boundary behavior.
-
-### 4. Docs / Assets Owner
-
-**Mission**
-
-- Maintain project-facing artifacts that explain, package, and operationalize the change.
-
-**Primary responsibilities**
-
-- Work inside the docs/assets lane in `.github/CODEOWNERS`.
-- Update docs, changelogs, prompts, rules, and helper assets when behavior changes.
-- Keep `AGENTS.md`, `.cursor/rules/`, API docs, and user-facing notes aligned.
-- Draft release notes or operator notes for workflow-affecting changes.
+1. Finding
+2. Why it is a problem
+3. Minimal fix proposal
+4. Likely affected files
+5. Risks if left unchanged
+6. Suggested tests or validations
+7. Confidence or uncertainty
 
 ## Collaboration Rules
 
@@ -101,14 +88,14 @@ Use four long-lived Codex owner threads for parallel work. Each owner thread sho
 2. **Treat shared-boundary files as explicit assignments.**
 - Files such as `frontend/src/api/types.ts`, `docs/openapi.json`, `docs/api.llm.yaml`, `backend/application/ports.py`, and cross-layer tests must have a named owner for that task.
 
-3. **Do not overlap edits** unless the Lead / Platform Owner explicitly assigns a shared boundary.
+3. **Do not overlap edits** unless the Lead Agent explicitly assigns a shared boundary.
 
 4. **Escalate contract drift immediately.**
-- If frontend payloads, backend schemas, persistence behavior, and docs disagree, stop local optimization and report to the Lead / Platform Owner.
+- If frontend payloads, backend schemas, persistence behavior, and docs disagree, stop local optimization and report to the Lead Agent.
 
-5. **Keep outputs structured.** Each owner thread should report:
+5. **Keep outputs structured.** Each assigned subagent should report:
 - Scope worked on
-- Files changed or reviewed
+- Files reviewed or likely affected
 - Tests run or required
 - Risks or follow-ups
 
@@ -119,16 +106,15 @@ Use four long-lived Codex owner threads for parallel work. Each owner thread sho
 - `main` is responsible for rebasing onto `origin/main`.
 - Owner branches should rebase onto `main`.
 - Do not default to `git merge origin/main` inside owner threads.
-- When opening a new thread or worktree, start from the latest clean `main`.
 
 8. **Gate merges through GitHub reviews and CI.**
 - Required checks should block merges to `main`.
 - Code owner review should be enabled for owned paths.
-- The Lead / Platform Owner gives the final merge recommendation and release gate decision.
+- The Lead Agent gives the final merge recommendation and release gate decision.
 
 ## Recommended Routing
 
 - UI bug, hook bug, or settings issue -> **Frontend Owner**
 - API validation, rename semantics, persistence bug, or contract semantics -> **Backend Owner**
 - Docs, standards, release notes, prompts, or agent rules -> **Docs / Assets Owner**
-- CI, ownership conflicts, shared-boundary arbitration, or final merge readiness -> **Lead / Platform Owner**
+- CI, ownership conflicts, shared-boundary arbitration, regression audit, or final merge readiness -> **Lead Agent**

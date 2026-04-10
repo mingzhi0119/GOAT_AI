@@ -22,6 +22,10 @@ class HistorySessionNotFoundError(LookupError):
     """Raised when a history session cannot be found or is not visible to the caller."""
 
 
+class HistoryValidationError(ValueError):
+    """Raised when a history request violates application-level input rules."""
+
+
 class UploadIdempotencyConflictError(ValueError):
     """Raised when an upload idempotency key is reused with a different payload."""
 
@@ -55,6 +59,7 @@ __all__ = [
     "FeatureNotAvailable",
     "HistoryOwnerRequiredError",
     "HistorySessionNotFoundError",
+    "HistoryValidationError",
     "InferenceBackendUnavailable",
     "KnowledgeDocumentNotFound",
     "KnowledgeValidationError",

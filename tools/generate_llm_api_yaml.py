@@ -193,6 +193,33 @@ def _response_schema(operation: dict[str, Any], status_code: str) -> Any:
                     {"error_frame": {"type": "error", "message": "string"}},
                 ],
             }
+        if "upload" in path:
+            return {
+                "content_type": "text/event-stream",
+                "stream": [
+                    {
+                        "file_prompt": {
+                            "type": "file_prompt",
+                            "filename": "string",
+                            "suffix_prompt": "string",
+                        }
+                    },
+                    {
+                        "knowledge_ready": {
+                            "type": "knowledge_ready",
+                            "filename": "string",
+                            "suffix_prompt": "string",
+                            "document_id": "string",
+                            "ingestion_id": "string",
+                            "status": "string",
+                            "retrieval_mode": "string",
+                            "template_prompt": "string",
+                        }
+                    },
+                    {"done": {"type": "done"}},
+                    {"error_frame": {"type": "error", "message": "string"}},
+                ],
+            }
         return {
             "content_type": "text/event-stream",
             "stream": [
@@ -317,8 +344,7 @@ def _build_compact_spec(openapi: dict[str, Any]) -> dict[str, Any]:
             error_codes: list[int] = []
             for status_code in operation.get("responses", {}):
                 if status_code.isdigit() and int(status_code) >= 400:
-                    if status_code != "422":
-                        error_codes.append(int(status_code))
+                    error_codes.append(int(status_code))
                     continue
                 response_value = _response_schema(operation, status_code)
                 if response_value is not None:

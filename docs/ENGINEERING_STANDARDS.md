@@ -70,9 +70,10 @@ Single source of truth for repo-wide engineering rules. Keep [`AGENTS.md`](../AG
 - Mock external services in unit tests.
 - Python tests use `pytest`.
 - Frontend tests use `Vitest` and `React Testing Library`.
-- Run the same checks CI runs when touching backend code.
+- Run the relevant CI-equivalent checks for the layer you changed.
 - For frontend changes, run `cd frontend && npm ci && npm test -- --run`.
-- Do not run frontend build or manual visual verification unless the user asks.
+- CI also runs `cd frontend && npm run build`; run that locally when the task changes build tooling, packaging, or likely build-only failure paths.
+- Do not run manual visual verification unless the user asks.
 
 ## 4. Cross-Environment Compatibility
 

@@ -16,6 +16,7 @@ router = APIRouter()
 
 @router.post(
     "/code-sandbox/exec",
+    status_code=501,
     summary="Execute code in sandbox (not implemented)",
     responses={
         401: {"model": ErrorResponse},

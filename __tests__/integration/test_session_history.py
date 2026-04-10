@@ -11,7 +11,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend.api_errors import INTERNAL_ERROR
+from backend.api_errors import INTERNAL_ERROR, REQUEST_VALIDATION_ERROR
 from backend.services.exceptions import PersistenceWriteError
 
 pytestmark = pytest.mark.integration
@@ -153,6 +153,30 @@ def test_rename_history_session_updates_title(app_client: object) -> None:
     detail = app_client.get("/api/history/sess-rename-1")
     assert detail.status_code == 200
     assert detail.json()["title"] == "Renamed Title"
+
+
+def test_rename_history_session_rejects_whitespace_only_title(app_client: object) -> None:
+    from fastapi.testclient import TestClient
+    from backend.config import get_settings
+
+    assert isinstance(app_client, TestClient)
+    settings = get_settings()
+    db = settings.log_db_path
+
+    from backend.services import log_service
+
+    log_service.init_db(db)
+    _seed_session(db, "sess-rename-empty", "Original Title")
+
+    response = app_client.patch(
+        "/api/history/sess-rename-empty",
+        json={"title": "   "},
+    )
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["detail"] == "Title cannot be empty"
+    assert body["code"] == REQUEST_VALIDATION_ERROR
 
 
 def test_rename_history_session_returns_500_on_persistence_failure(

@@ -92,7 +92,7 @@ export function useAdvancedSettings(): UseAdvancedSettingsReturn {
       temperature,
       max_tokens: maxTokens,
       top_p: topP,
-      ...(typeof think === 'boolean' ? { think } : {}),
+      ...(typeof think === 'boolean' || typeof think === 'string' ? { think } : {}),
     }
   }, [temperature, maxTokens, topP])
 

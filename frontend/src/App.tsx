@@ -78,6 +78,19 @@ export default function App() {
     })
   }
 
+  const handleRefreshHistory = () => {
+    void session.refreshHistory()
+  }
+
+  const handleDeleteAllHistory = () => {
+    if (!window.confirm('Delete all saved conversations? This cannot be undone.')) {
+      return
+    }
+    void session.deleteAllHistory().then(() => {
+      session.clearChatSession()
+    })
+  }
+
   const handleRenameConversation = () => {
     if (!session.sessionId) return
     const currentTitle = session.sessionTitle ?? 'New conversation'
@@ -138,6 +151,8 @@ export default function App() {
         onDeleteHistorySession={sessionId => {
           void session.deleteHistorySession(sessionId)
         }}
+        onRefreshHistory={handleRefreshHistory}
+        onDeleteAllHistory={handleDeleteAllHistory}
       />
       <div className="flex flex-col flex-1 min-w-0 min-h-0">
         <TopBar

@@ -9,6 +9,7 @@ from backend.domain.authz_types import AuthorizationContext
 from backend.application.exceptions import (
     HistoryOwnerRequiredError,
     HistorySessionNotFoundError,
+    HistoryValidationError,
 )
 from backend.application.history import (
     delete_all_history_sessions,
@@ -37,6 +38,26 @@ def _raise_owner_required(exc: HistoryOwnerRequiredError) -> None:
             detail=str(exc),
             code=AUTH_SESSION_OWNER_REQUIRED,
             status_code=403,
+        ),
+    ) from exc
+
+
+def _raise_not_found(exc: HistorySessionNotFoundError) -> None:
+    raise HTTPException(
+        status_code=404,
+        detail=build_error_body(
+            detail=str(exc),
+            status_code=404,
+        ),
+    ) from exc
+
+
+def _raise_validation_error(exc: HistoryValidationError) -> None:
+    raise HTTPException(
+        status_code=422,
+        detail=build_error_body(
+            detail=str(exc),
+            status_code=422,
         ),
     ) from exc
 
@@ -118,22 +139,21 @@ def rename_history_session_route(
     auth_context: AuthorizationContext = Depends(get_authorization_context),
 ) -> Response:
     """Rename one persisted session."""
-    title = payload.title.strip()
-    if not title:
-        raise HTTPException(status_code=422, detail="Title cannot be empty")
     try:
         rename_history_session(
             repository=session_repository,
             session_id=session_id,
-            title=title,
+            title=payload.title,
             settings=settings,
             auth_context=auth_context,
             request_id=getattr(request.state, "request_id", ""),
         )
     except HistoryOwnerRequiredError as exc:
         _raise_owner_required(exc)
+    except HistoryValidationError as exc:
+        _raise_validation_error(exc)
     except HistorySessionNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        _raise_not_found(exc)
     return Response(status_code=204)
 
 
@@ -168,7 +188,7 @@ def get_history_session(
     except HistoryOwnerRequiredError as exc:
         _raise_owner_required(exc)
     except HistorySessionNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        _raise_not_found(exc)
 
 
 @router.delete(
@@ -202,5 +222,5 @@ def delete_history_session(
     except HistoryOwnerRequiredError as exc:
         _raise_owner_required(exc)
     except HistorySessionNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        _raise_not_found(exc)
     return Response(status_code=204)

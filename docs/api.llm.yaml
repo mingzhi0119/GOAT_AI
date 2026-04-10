@@ -468,6 +468,7 @@ endpoints:
       200: ModelCapabilitiesResponse
       errors:
         - 401
+        - 422
         - 429
         - 503
   - op: chat_stream
@@ -498,6 +499,7 @@ endpoints:
               message: string
       errors:
         - 401
+        - 422
         - 429
   - op: upload_and_parse
     method: POST
@@ -511,12 +513,19 @@ endpoints:
       200:
         content_type: text/event-stream
         stream:
-          - file_context:
-              type: object
-              properties:
-                type: file_context
-                filename: string
-                prompt: string
+          - file_prompt:
+              type: file_prompt
+              filename: string
+              suffix_prompt: string
+          - knowledge_ready:
+              type: knowledge_ready
+              filename: string
+              suffix_prompt: string
+              document_id: string
+              ingestion_id: string
+              status: string
+              retrieval_mode: string
+              template_prompt: string
           - done:
               type: done
           - error_frame:
@@ -525,6 +534,7 @@ endpoints:
       errors:
         - 400
         - 401
+        - 422
         - 429
   - op: analyze_upload_json_route
     method: POST
@@ -539,6 +549,7 @@ endpoints:
       errors:
         - 400
         - 401
+        - 422
         - 429
   - op: list_history
     method: GET
@@ -573,6 +584,7 @@ endpoints:
         - 401
         - 403
         - 404
+        - 422
         - 429
         - 500
   - op: get_history_session
@@ -586,6 +598,7 @@ endpoints:
         - 401
         - 403
         - 404
+        - 422
         - 429
         - 500
   - op: delete_history_session
@@ -599,6 +612,7 @@ endpoints:
         - 401
         - 403
         - 404
+        - 422
         - 429
         - 500
   - op: post_knowledge_upload
@@ -614,6 +628,7 @@ endpoints:
       errors:
         - 400
         - 401
+        - 422
         - 429
   - op: get_knowledge_upload_status
     method: GET
@@ -625,6 +640,7 @@ endpoints:
       errors:
         - 401
         - 404
+        - 422
         - 429
   - op: post_knowledge_ingestion
     method: POST
@@ -637,6 +653,7 @@ endpoints:
         - 400
         - 401
         - 404
+        - 422
         - 429
   - op: get_knowledge_ingestion
     method: GET
@@ -648,6 +665,7 @@ endpoints:
       errors:
         - 401
         - 404
+        - 422
         - 429
   - op: post_knowledge_search
     method: POST
@@ -658,6 +676,7 @@ endpoints:
       200: KnowledgeSearchResponse
       errors:
         - 401
+        - 422
         - 429
   - op: post_knowledge_answer
     method: POST
@@ -668,6 +687,7 @@ endpoints:
       200: KnowledgeAnswerResponse
       errors:
         - 401
+        - 422
         - 429
   - op: post_media_upload
     method: POST
@@ -683,6 +703,7 @@ endpoints:
         - 400
         - 401
         - 404
+        - 422
         - 429
   - op: get_artifact_download
     method: GET
@@ -694,6 +715,7 @@ endpoints:
       errors:
         - 401
         - 404
+        - 422
         - 429
   - op: get_gpu_status
     method: GET
@@ -745,7 +767,6 @@ endpoints:
     method: POST
     path: /code-sandbox/exec
     response:
-      200: map[string,string]
       errors:
         - 401
         - 403
@@ -758,10 +779,11 @@ endpoints:
     body: WorkbenchTaskRequest
     content_type: application/json
     response:
-      200: map[string,string]
       errors:
         - 401
+        - 422
         - 429
+        - 501
         - 503
   - op: health
     method: GET

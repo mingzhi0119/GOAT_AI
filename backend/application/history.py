@@ -10,6 +10,7 @@ from backend.services.authorizer import authorize_session_read, authorize_sessio
 from backend.application.exceptions import (
     HistoryOwnerRequiredError,
     HistorySessionNotFoundError,
+    HistoryValidationError,
 )
 from backend.application.ports import SessionNotFoundError, SessionRepository, Settings
 from backend.domain.authorization import ResourceRef
@@ -24,6 +25,14 @@ from backend.services.authz_audit import emit_authorization_audit
 
 def _session_summary_as_dict(session: Any) -> dict[str, object]:
     return asdict(session)
+
+
+def _normalize_history_title(raw_title: str) -> str:
+    """Apply shared history-title validation at the application boundary."""
+    normalized = raw_title.strip()
+    if not normalized:
+        raise HistoryValidationError("Title cannot be empty")
+    return normalized
 
 
 def resolve_owner_filter(*, settings: Settings, request_owner: str) -> str | None:
@@ -110,6 +119,7 @@ def rename_history_session(
     request_id: str,
 ) -> None:
     """Rename one session, enforcing owner visibility rules."""
+    normalized_title = _normalize_history_title(title)
     session = repository.get_session(session_id)
     if session is None:
         raise HistorySessionNotFoundError("Session not found")
@@ -130,7 +140,7 @@ def rename_history_session(
         raise HistorySessionNotFoundError("Session not found")
 
     try:
-        repository.rename_session(session_id, title)
+        repository.rename_session(session_id, normalized_title)
     except SessionNotFoundError as exc:
         raise HistorySessionNotFoundError("Session not found") from exc
 

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { HistorySessionItem } from '../api/history'
 import Sidebar from '../components/Sidebar'
@@ -27,6 +27,8 @@ function buildProps(themeStyle: 'classic' | 'urochester' | 'thu' = 'classic') {
     historyError: null,
     onLoadHistorySession: vi.fn(),
     onDeleteHistorySession: vi.fn(),
+    onRefreshHistory: vi.fn(),
+    onDeleteAllHistory: vi.fn(),
   }
 }
 
@@ -50,6 +52,8 @@ describe('Sidebar', () => {
     expect(screen.queryByText('Actions')).not.toBeInTheDocument()
     expect(screen.getByText('Chats')).toBeInTheDocument()
     expect(screen.getByText('New Chat')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete All' })).toBeInTheDocument()
   })
 
   it('renders history rows without timestamps', () => {
@@ -63,10 +67,24 @@ describe('Sidebar', () => {
   it('keeps delete buttons mounted but visually hidden by default', () => {
     renderSidebar()
 
-    const deleteButton = screen.getByTitle('Delete conversation')
+    const deleteButton = screen.getByRole('button', {
+      name: 'Delete conversation Strategy review',
+    })
     expect(deleteButton).toBeInTheDocument()
     expect(deleteButton.className).toContain('opacity-0')
     expect(deleteButton.className).toContain('group-hover/history:opacity-100')
+  })
+
+  it('fires refresh and delete-all callbacks from the history header', () => {
+    const props = buildProps('classic')
+
+    render(<Sidebar {...props} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete All' }))
+
+    expect(props.onRefreshHistory).toHaveBeenCalledTimes(1)
+    expect(props.onDeleteAllHistory).toHaveBeenCalledTimes(1)
   })
 
   it('only marks the active history session with aria-current', () => {

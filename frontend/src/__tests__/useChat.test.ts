@@ -1,8 +1,18 @@
 import { act, renderHook } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { streamChat } from '../api/chat'
 import { useChat } from '../hooks/useChat'
 
+vi.mock('../api/chat', () => ({
+  streamChat: vi.fn(),
+}))
+
 describe('useChat', () => {
+  beforeEach(() => {
+    vi.mocked(streamChat).mockReset()
+    localStorage.clear()
+  })
+
   it('exposes streaming controls and message list', () => {
     const { result } = renderHook(() => useChat())
     expect(Array.isArray(result.current.messages)).toBe(true)
@@ -42,5 +52,30 @@ describe('useChat', () => {
         download_url: '/api/artifacts/art-1',
       },
     ])
+  })
+
+  it('shows thinking disclosure when reasoning level is a string', async () => {
+    vi.mocked(streamChat).mockImplementation(async function* () {
+      yield { type: 'thinking' as const, token: 'Reasoning trace' }
+      yield { type: 'done' as const }
+    })
+
+    const { result } = renderHook(() => useChat())
+
+    await act(async () => {
+      await result.current.sendMessage(
+        'Hello',
+        'test-model',
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { temperature: 0.8, max_tokens: 64, top_p: 0.9, think: 'medium' },
+      )
+    })
+
+    expect(result.current.messages).toHaveLength(2)
+    expect(result.current.messages[1]?.showThinking).toBe(true)
+    expect(result.current.messages[1]?.thinkingContent).toBe('Reasoning trace')
   })
 })

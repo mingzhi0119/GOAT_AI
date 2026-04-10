@@ -27,6 +27,8 @@ interface Props {
   historyError: string | null
   onLoadHistorySession: (sessionId: string) => void
   onDeleteHistorySession: (sessionId: string) => void
+  onRefreshHistory: () => void
+  onDeleteAllHistory: () => void
 }
 
 function hoverHandlers(hoverBg: string, defaultBg = 'transparent') {
@@ -54,6 +56,8 @@ const Sidebar: FC<Props> = ({
   historyError,
   onLoadHistorySession,
   onDeleteHistorySession,
+  onRefreshHistory,
+  onDeleteAllHistory,
 }) => {
   const isNarrow = layoutMode === 'narrow'
   const isOpen = isNarrow ? open : true
@@ -134,13 +138,31 @@ const Sidebar: FC<Props> = ({
         </div>
 
         <section className="space-y-1">
-          <div className="mb-2 flex min-w-0 items-center gap-1.5">
+          <div className="mb-2 flex min-w-0 items-center gap-2">
             <p
               className={`${sidebarSectionLabelRowClass} min-w-0 flex-1 truncate`}
               style={{ color: 'var(--sidebar-muted)' }}
             >
               Chats
             </p>
+            <button
+              type="button"
+              onClick={onRefreshHistory}
+              className="rounded-md px-2 py-1 text-xs transition-colors"
+              style={{ color: 'var(--sidebar-muted)', background: 'transparent' }}
+              {...hoverHandlers('var(--sidebar-hover)')}
+            >
+              Refresh
+            </button>
+            <button
+              type="button"
+              onClick={onDeleteAllHistory}
+              className="rounded-md px-2 py-1 text-xs transition-colors"
+              style={{ color: 'var(--sidebar-danger)', background: 'transparent' }}
+              {...hoverHandlers('var(--sidebar-hover)')}
+            >
+              Delete All
+            </button>
           </div>
 
           {historyError && (
@@ -204,6 +226,7 @@ const Sidebar: FC<Props> = ({
                   className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-xs opacity-0 transition-opacity group-hover/history:opacity-100 focus-visible:opacity-100"
                   style={{ color: 'var(--sidebar-danger)', background: fadeBg }}
                   title="Delete conversation"
+                  aria-label={`Delete conversation ${item.title || 'New Chat'}`}
                 >
                   <TrashIcon />
                 </button>

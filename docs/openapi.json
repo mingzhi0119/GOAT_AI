@@ -1576,8 +1576,8 @@
         "description": "Scaffold: enforces the feature gate; returns 501 when the gate passes and execution is not built yet.",
         "operationId": "post_code_sandbox_exec_api_code_sandbox_exec_post",
         "responses": {
-          "200": {
-            "description": "Successful Response",
+          "501": {
+            "description": "Execution engine not implemented",
             "content": {
               "application/json": {
                 "schema": {
@@ -1629,9 +1629,6 @@
                 }
               }
             }
-          },
-          "501": {
-            "description": "Execution engine not implemented"
           }
         }
       }
@@ -1655,8 +1652,8 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "Successful Response",
+          "501": {
+            "description": "Workbench task execution is not implemented.",
             "content": {
               "application/json": {
                 "schema": {
