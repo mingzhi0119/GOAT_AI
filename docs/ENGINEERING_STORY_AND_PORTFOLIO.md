@@ -133,7 +133,7 @@ The differentiator is not the stack list; it is **the documented path from demo-
 - [ROADMAP.md](ROADMAP.md) -Phase 13 (Section 13.0, Wave A/B), Phase 14 RAG-first sequencing, and Phase 15 structural semantics.
 - [OPERATIONS.md](OPERATIONS.md) -deploy, env, host constraints (keep aligned with claims on your homepage).
 - [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) - canonical engineering contract.
-- [AGENTS.md](../AGENTS.md) - short index; full rules in ENGINEERING_STANDARDS.
+- [AGENTS.md](../AGENTS.md) - agent memory and collaboration guide; canonical engineering rules stay in ENGINEERING_STANDARDS.
 
 ---
 
@@ -151,7 +151,6 @@ That does **not** mean the story is "finished." The next senior-visible chapter 
 ---
 
 *Last updated: 2026-04-09 - aligned with **v1.2.0** to keep the portfolio narrative tied to shipped engineering outcomes, not version marketing.*
-
 
 
 

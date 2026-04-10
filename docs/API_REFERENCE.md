@@ -5,6 +5,8 @@ Base path: `/api`
 ## Global behavior
 
 - If `GOAT_API_KEY` is configured, every endpoint except `GET /api/health` and `GET /api/ready` requires `X-GOAT-API-Key`
+- If `GOAT_API_KEY_WRITE` is configured, mutating routes (`POST`, `PATCH`, `DELETE`) require the write key or an equivalent write-scoped credential; otherwise the API returns `403` with `code = AUTH_WRITE_KEY_REQUIRED`
+- If `GOAT_REQUIRE_SESSION_OWNER` is enabled, chat and history routes require `X-GOAT-Owner-Id`; owner-mismatched protected reads resolve as `404` to avoid leaking resource existence
 - Responses include `X-Request-ID`
 - Rate-limited requests return `429` with `Retry-After`
 - Standard error shape:
@@ -39,6 +41,7 @@ Base path: `/api`
 | `GET` | `/api/artifacts/{artifact_id}` | Download one generated chat artifact |
 | `GET` | `/api/history` | List saved sessions |
 | `GET` | `/api/history/{session_id}` | Read one session |
+| `PATCH` | `/api/history/{session_id}` | Rename one session |
 | `DELETE` | `/api/history` | Delete all sessions |
 | `DELETE` | `/api/history/{session_id}` | Delete one session |
 | `GET` | `/api/system/gpu` | GPU telemetry |
@@ -89,11 +92,16 @@ Returns:
 ```json
 {
   "model": "qwen3",
-  "capabilities": ["completion", "tools"],
+  "capabilities": ["completion", "tools", "vision"],
   "supports_tool_calling": true,
-  "supports_chart_tools": true
+  "supports_chart_tools": true,
+  "supports_vision": true,
+  "supports_thinking": false,
+  "context_length": 32768
 }
 ```
+
+`supports_chart_tools` tracks native tool support, while `supports_vision`, `supports_thinking`, and `context_length` expose additional Ollama capability metadata when discoverable.
 
 ## `POST /api/chat`
 
@@ -118,13 +126,16 @@ Request body:
   "temperature": 0.3,
   "max_tokens": 512,
   "top_p": 0.9,
-  "think": false
+  "think": "medium",
+  "plan_mode": false
 }
 ```
 
 Optional `knowledge_document_ids` binds the turn to already indexed knowledge documents and switches chat to retrieval-backed generation for those documents. Legacy `file_context: true` messages remain readable for old sessions but are no longer the primary upload path.
 
-Optional boolean **`think`** toggles Ollama thinking mode when the model supports it (`true` = thinking trace, `false` = quick path). Omit to use model defaults.
+Optional **`think`** accepts `true`, `false`, or `"low" | "medium" | "high"` when the model supports Ollama thinking mode. Omit it to use model defaults.
+
+Optional boolean **`plan_mode`** asks the system prompt to plan before answering.
 
 SSE event types:
 
@@ -387,6 +398,22 @@ Notes:
 - `chart_data_source` indicates where chart data came from: `uploaded`, `demo`, or `none`
 - Legacy stored sessions are still readable; compatibility decode lives in the backend storage codec, not the API contract
 
+## `PATCH /api/history/{session_id}`
+
+Request body:
+
+```json
+{
+  "title": "Renamed Title"
+}
+```
+
+Current behavior:
+
+- Returns `204 No Content` after the title is updated
+- Empty titles are rejected with `422`
+- When owner scoping is active, rename follows the same visibility rules as history reads and deletes
+
 ## `DELETE /api/history`
 
 Returns `204 No Content`.
@@ -483,3 +510,4 @@ For machine-readable contract details, prefer:
 - [openapi.json](openapi.json)
 - [api.llm.yaml](api.llm.yaml)
 - `__tests__/test_api_blackbox_contract.py`
+- `__tests__/test_api_authz.py`

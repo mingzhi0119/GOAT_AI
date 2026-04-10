@@ -27,7 +27,7 @@ Update docs when behavior changes:
 | Current shipped state | `docs/PROJECT_STATUS.md` |
 | Phase completion / future work | `docs/ROADMAP.md` |
 
-- Canonical workflow or verification rules belong in `docs/ENGINEERING_STANDARDS.md`; `AGENTS.md` should only carry a short pointer.
+- Canonical workflow or verification rules belong in `docs/ENGINEERING_STANDARDS.md`; `AGENTS.md` may carry agent memory and current collaboration guidance, but it should stay aligned with the canonical standards.
 - If the canonical standards change, keep relevant `.cursor/rules/*.mdc` files aligned in the same change.
 
 ## Commit hygiene
