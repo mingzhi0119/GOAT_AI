@@ -19,11 +19,14 @@ import type { UploadStreamEvent } from './api/upload'
 export default function App() {
   const [planModeEnabled, setPlanModeEnabled] = useState(false)
   const [reasoningLevel, setReasoningLevel] = useState<'low' | 'medium' | 'high'>('medium')
+  const [thinkingEnabled, setThinkingEnabled] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const { theme, toggleTheme } = useTheme()
   const models = useModels()
   const { layoutMode } = useChatLayoutMode()
   const chatLayout = useMemo(() => getChatLayoutDecisions(layoutMode), [layoutMode])
+  const supportsThinking = models.capabilities?.supports_thinking ?? false
+  const effectiveThinkingEnabled = supportsThinking && thinkingEnabled
   const { userName, setUserName } = useUserName()
   const { systemInstruction, setSystemInstruction } = useSystemInstruction()
   const advanced = useAdvancedSettings()
@@ -31,7 +34,7 @@ export default function App() {
     selectedModel: models.selectedModel,
     userName,
     systemInstruction,
-    ollamaOptions: advanced.getOptionsForRequest(),
+    ollamaOptions: advanced.getOptionsForRequest(effectiveThinkingEnabled),
   })
   const gpu = useGpuStatus(session.isStreaming)
   const { refreshNow } = gpu
@@ -119,6 +122,7 @@ export default function App() {
       <div className="flex flex-col flex-1 min-w-0 min-h-0">
         <TopBar
           sessionTitle={session.sessionTitle}
+          modelCapabilities={models.capabilities?.capabilities ?? null}
           theme={theme}
           layoutMode={layoutMode}
           onSidebarToggle={() => setSidebarOpen(open => !open)}
@@ -151,6 +155,7 @@ export default function App() {
             selectedModel={models.selectedModel}
             onModelChange={models.setSelectedModel}
             supportsVision={models.capabilities?.supports_vision ?? false}
+            supportsThinking={supportsThinking}
             fileContexts={session.fileContexts}
             activeFileContext={session.activeFileContext}
             onUploadEvent={handleUploadEvent}
@@ -167,6 +172,8 @@ export default function App() {
             onPlanModeChange={setPlanModeEnabled}
             reasoningLevel={reasoningLevel}
             onReasoningLevelChange={setReasoningLevel}
+            thinkingEnabled={effectiveThinkingEnabled}
+            onThinkingEnabledChange={setThinkingEnabled}
           />
         </ErrorBoundary>
       </div>

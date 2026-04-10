@@ -77,7 +77,7 @@ Core API surface:
 
 ## Current behavior
 
-- Chat streams typed SSE event objects: `token`, `chart_spec`, `artifact`, `error`, `done`
+- Chat streams typed SSE event objects: `thinking` (collapsed reasoning in the UI), `token` (answer text), `chart_spec`, `artifact`, `error`, `done`
 - Upload SSE ingests supported files into the knowledge pipeline and emits `knowledge_ready`, `error`, `done`
 - Charts are created only from native Ollama tool calls during chat
 - Session history is persisted in SQLite and can restore chart state plus attached knowledge documents
@@ -170,6 +170,7 @@ npm run build
 - [docs/ROLLBACK.md](docs/ROLLBACK.md): rollback procedure for shared-host deploys
 - [docs/SECURITY.md](docs/SECURITY.md): upload/API threat notes and CI security posture
 - [docs/ROADMAP.md](docs/ROADMAP.md): shipped phases and refactor roadmap
+- [docs/ROADMAP_ARCHIVE.md](docs/ROADMAP_ARCHIVE.md): historical roadmap content and phase closeouts
 - [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md): coding and process standards (single source of truth)
 
 Capacity/load validation:
@@ -177,4 +178,3 @@ Capacity/load validation:
 ```bash
 python -m tools.load_chat_smoke --base-url http://127.0.0.1:62606 --model gemma4:26b --runs 20 --show-system-inference
 ```
-

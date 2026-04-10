@@ -5,8 +5,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
-  type ReactNode,
   type FC,
   type KeyboardEvent,
 } from 'react'
@@ -15,14 +13,26 @@ import { streamUpload, type UploadStreamEvent } from '../api/upload'
 import type { GPUStatus, InferenceLatency } from '../api/system'
 import type { ChartSpec, Message } from '../api/types'
 import type { FileBindingMode, FileContextItem } from '../hooks/useFileContext'
+import ComposerControls from './ComposerControls'
+import EmptyChatState, { type EmptyChatPrompt } from './EmptyChatState'
+import ManageUploadsPanel from './ManageUploadsPanel'
+import ModelMenu from './ModelMenu'
+import PlusMenu from './PlusMenu'
+import ReasoningMenu from './ReasoningMenu'
 import {
   getFileExtension,
   getSuffixPrompt,
   getTemplateFallbackPrompt,
 } from '../utils/uploadPrompts'
 import type { ChatLayoutDecisions } from '../utils/chatLayout'
-import GpuStatusDot from './GpuStatusDot'
 import MessageBubble from './MessageBubble'
+import type { ReasoningLevel } from './chatComposerPrimitives'
+import {
+  DocumentIcon,
+  ImageIcon,
+  ProcessingDot,
+  ReadyDot,
+} from './chatComposerPrimitives'
 
 const LazyChartCard = lazy(() => import('./ChartCard'))
 
@@ -38,27 +48,12 @@ const IMAGE_FILE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp'])
 const TEXTAREA_MAX_HEIGHT_PX = 144
 const TEXTAREA_MIN_HEIGHT_PX = 28
 
-type PromptItem =
-  | { text: string; kind: 'base' }
-  | { text: string; kind: 'suffix' }
-  | { text: string; kind: 'template' }
-
 interface PendingImageAttachment {
   id: string
   filename: string
 }
 
 type ComposerPanel = 'plus' | 'manage-uploads' | 'model' | 'reasoning' | null
-type ComposerIndicatorKey = 'plan'
-
-interface ComposerIndicatorDescriptor {
-  key: ComposerIndicatorKey
-  visible: boolean
-  label: string
-  icon: ReactNode
-  tooltip: string
-  onClick?: () => void
-}
 
 interface Props {
   messages: Message[]
@@ -69,6 +64,7 @@ interface Props {
   selectedModel: string
   onModelChange: (model: string) => void
   supportsVision?: boolean
+  supportsThinking?: boolean
   fileContexts: FileContextItem[]
   activeFileContext: FileContextItem | null
   onUploadEvent: (event: UploadStreamEvent) => void
@@ -81,154 +77,11 @@ interface Props {
   inferenceLatency: InferenceLatency | null
   planModeEnabled: boolean
   onPlanModeChange: (enabled: boolean) => void
-  reasoningLevel: 'low' | 'medium' | 'high'
-  onReasoningLevelChange: (level: 'low' | 'medium' | 'high') => void
+  reasoningLevel: ReasoningLevel
+  onReasoningLevelChange: (level: ReasoningLevel) => void
+  thinkingEnabled: boolean
+  onThinkingEnabledChange: (enabled: boolean) => void
 }
-
-const PlusIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-    <path
-      d="M8 3.25v9.5M3.25 8h9.5"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-    />
-  </svg>
-)
-
-const CloseIcon = () => (
-  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-    <path
-      d="M3 3l6 6M9 3 3 9"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-    />
-  </svg>
-)
-
-const SendArrowIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-    <path
-      d="M10 15.25V4.75M10 4.75 5.9 8.85M10 4.75l4.1 4.1"
-      stroke="currentColor"
-      strokeWidth="2.15"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-)
-
-const StopIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-    <rect x="4" y="4" width="10" height="10" rx="2" fill="currentColor" />
-  </svg>
-)
-
-const UploadIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-    <path
-      d="M8 10.75V3.75M8 3.75 5.5 6.25M8 3.75l2.5 2.5M3.75 10.5v1.25c0 .28.22.5.5.5h7.5c.28 0 .5-.22.5-.5V10.5"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-)
-
-const ManageIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-    <path
-      d="M3 4.25h10M3 8h10M3 11.75h6"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-    />
-  </svg>
-)
-
-const PlanModeIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-    <path
-      d="M4 3.75h8M4 8h5.5M4 12.25h6.5"
-      stroke="currentColor"
-      strokeWidth="1.45"
-      strokeLinecap="round"
-    />
-    <circle cx="11.75" cy="8" r="1.25" fill="currentColor" />
-  </svg>
-)
-
-const ChevronRightIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-    <path
-      d="M5.25 3.5 8.75 7l-3.5 3.5"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-)
-
-const ChevronDownIcon = () => (
-  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-    <path
-      d="M3 4.5 6 7.5l3-3"
-      stroke="currentColor"
-      strokeWidth="1.35"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-)
-
-const CheckIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-    <path
-      d="M3.5 7.3 5.8 9.6l4.7-4.9"
-      stroke="currentColor"
-      strokeWidth="1.45"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-)
-
-const DocumentIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-    <path
-      d="M5 2.75h4.5L12.25 5.5V12.25a1 1 0 0 1-1 1h-6.5a1 1 0 0 1-1-1v-8.5a1 1 0 0 1 1-1Z"
-      stroke="currentColor"
-      strokeWidth="1.3"
-      strokeLinejoin="round"
-    />
-    <path d="M9.5 2.75V5.5h2.75" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-  </svg>
-)
-
-const ImageIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-    <rect x="2.5" y="3" width="11" height="10" rx="2" stroke="currentColor" strokeWidth="1.3" />
-    <circle cx="6" cy="6.5" r="1" fill="currentColor" />
-    <path
-      d="M4 11l2.5-2.5 1.75 1.75L10.5 8 12 9.5"
-      stroke="currentColor"
-      strokeWidth="1.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-)
-
-const ProcessingDot = () => (
-  <span className="inline-flex h-2 w-2 rounded-full bg-amber-400/80" aria-hidden="true" />
-)
-
-const ReadyDot = () => (
-  <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400/80" aria-hidden="true" />
-)
 
 function getAttachmentKind(file: File, supportsVision: boolean): 'image' | 'knowledge' | 'unsupported' {
   const ext = getFileExtension(file.name)
@@ -252,38 +105,6 @@ function formatAttachmentErrorMessage(error: unknown, supportsVision: boolean): 
   return message
 }
 
-function modeLabel(mode: FileBindingMode): string {
-  if (mode === 'single') return 'Next'
-  if (mode === 'persistent') return 'Sticky'
-  return 'Off'
-}
-
-function reasoningLabel(level: 'low' | 'medium' | 'high'): string {
-  if (level === 'low') return 'Low'
-  if (level === 'high') return 'High'
-  return 'Medium'
-}
-
-function getComposerIndicators(
-  planModeEnabled: boolean,
-  onPlanModeChange: (enabled: boolean) => void,
-): Array<Omit<ComposerIndicatorDescriptor, 'visible'>> {
-  const orderedIndicators: ComposerIndicatorDescriptor[] = [
-    {
-      key: 'plan',
-      visible: planModeEnabled,
-      label: 'Plan',
-      icon: <PlanModeIcon />,
-      tooltip: 'Planning mode is enabled.',
-      onClick: () => onPlanModeChange(false),
-    },
-  ]
-
-  return orderedIndicators
-    .filter(indicator => indicator.visible)
-    .map(({ key, label, icon, tooltip, onClick }) => ({ key, label, icon, tooltip, onClick }))
-}
-
 function handleComposerTextAreaPointerDown(
   event: React.MouseEvent<HTMLDivElement>,
   textarea: HTMLTextAreaElement | null,
@@ -305,6 +126,7 @@ const ChatWindow: FC<Props> = ({
   selectedModel,
   onModelChange,
   supportsVision = false,
+  supportsThinking = false,
   fileContexts,
   activeFileContext,
   onUploadEvent,
@@ -319,22 +141,23 @@ const ChatWindow: FC<Props> = ({
   onPlanModeChange,
   reasoningLevel,
   onReasoningLevelChange,
+  thinkingEnabled,
+  onThinkingEnabledChange,
 }) => {
   const [input, setInput] = useState('')
   const [pendingImages, setPendingImages] = useState<PendingImageAttachment[]>([])
   const [attachmentUploadError, setAttachmentUploadError] = useState<string | null>(null)
   const [attachmentUploading, setAttachmentUploading] = useState(false)
   const [activePanel, setActivePanel] = useState<ComposerPanel>(null)
-  const [hoveredIndicator, setHoveredIndicator] = useState<ComposerIndicatorKey | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const composerRef = useRef<HTMLDivElement>(null)
   const panelBoundaryRef = useRef<HTMLDivElement>(null)
 
-  const starterPrompts = useMemo<PromptItem[]>(() => {
+  const starterPrompts = useMemo<EmptyChatPrompt[]>(() => {
     if (!activeFileContext) {
-      return BASE_PROMPTS.map((text: string): PromptItem => ({ text, kind: 'base' }))
+      return BASE_PROMPTS.map((text: string): EmptyChatPrompt => ({ text, kind: 'base' }))
     }
     const filename = activeFileContext.filename
     return [
@@ -463,22 +286,6 @@ const ChatWindow: FC<Props> = ({
   const modelMenuOpen = activePanel === 'model'
   const reasoningMenuOpen = activePanel === 'reasoning'
   const isNarrow = layoutDecisions.layoutMode === 'narrow'
-  const composerIndicators = useMemo(
-    () => getComposerIndicators(planModeEnabled, onPlanModeChange),
-    [onPlanModeChange, planModeEnabled],
-  )
-  const controlPillStyle = (isOpen: boolean) =>
-    ({
-      color: 'var(--text-muted)',
-      background: isOpen ? 'rgba(17,24,39,0.08)' : 'transparent',
-      boxShadow: isOpen ? '0 6px 14px rgba(15,23,42,0.08)' : 'none',
-    }) satisfies CSSProperties
-  const composerMenuStyle = {
-    borderColor: 'var(--input-border)',
-    background: 'var(--composer-menu-bg)',
-    backdropFilter: 'blur(14px)',
-    boxShadow: '0 10px 20px rgba(15,23,42,0.08)',
-  } satisfies CSSProperties
 
   return (
     <div
@@ -515,70 +322,13 @@ const ChatWindow: FC<Props> = ({
           </Suspense>
         )}
         {visibleMessages.length === 0 ? (
-          <div className={`flex h-full flex-col items-center justify-center text-center ${layoutDecisions.compactSpacing ? 'gap-4 px-3' : 'gap-5 px-4'}`}>
-            <div
-              className="h-20 w-20 overflow-hidden rounded-2xl"
-              style={{
-                border: '1.5px solid #FFCD00',
-                background: '#2b2b2b',
-              }}
-            >
-              <img
-                src="./golden_goat_icon.png"
-                alt="GOAT AI"
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            </div>
-            <div>
-              <h2 className="mb-1 text-xl font-bold" style={{ color: 'var(--text-main)' }}>
-                Welcome to GOAT AI
-              </h2>
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                Strategic Intelligence - Simon Business School
-              </p>
-              {selectedModel && (
-                <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Model: <span style={{ color: 'var(--gold)' }}>{selectedModel}</span>
-                  {supportsVision && (
-                    <span className="ml-2" title="This model reports vision support in Ollama">
-                      vision
-                    </span>
-                  )}
-                </p>
-              )}
-            </div>
-            <div
-              className={`mt-2 grid w-full max-w-md gap-2 ${layoutDecisions.singleColumnPrompts ? 'grid-cols-1' : 'grid-cols-2'}`}
-            >
-              {starterPrompts.map((item, index) => {
-                const isFilePrompt = item.kind !== 'base'
-                return (
-                  <button
-                    key={`${item.kind}-${index}-${item.text}`}
-                    onClick={() => onSendMessage(item.text, undefined)}
-                    className="rounded-xl px-3 py-2 text-left text-xs transition-colors hover:opacity-80"
-                    style={{
-                      border: isFilePrompt
-                        ? '1px solid var(--gold)'
-                        : '1px solid var(--border-color)',
-                      color: 'var(--text-main)',
-                      background: isFilePrompt ? 'rgba(255,205,0,0.08)' : 'var(--bg-asst-bubble)',
-                    }}
-                  >
-                    {isFilePrompt && (
-                      <span
-                        className="mb-0.5 block text-[10px] font-semibold leading-none"
-                        style={{ color: 'var(--gold)' }}
-                      >
-                        {item.kind === 'suffix' ? 'From your file' : 'Template suggestion'}
-                      </span>
-                    )}
-                    {item.text}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+          <EmptyChatState
+            starterPrompts={starterPrompts}
+            selectedModel={selectedModel}
+            supportsVision={supportsVision}
+            layoutDecisions={layoutDecisions}
+            onSendMessage={text => onSendMessage(text, undefined)}
+          />
         ) : (
           visibleMessages.map(message => (
             <MessageBubble
@@ -607,373 +357,45 @@ const ChatWindow: FC<Props> = ({
             }}
           >
             <div ref={panelBoundaryRef} className="relative">
-            {plusMenuOpen && (
-              <div
-                className={`absolute bottom-14 left-0 z-30 rounded-2xl border p-1.5 shadow-[0_10px_20px_rgba(15,23,42,0.08)] ${isNarrow ? 'w-[min(92vw,20rem)]' : 'w-[332px]'}`}
-                style={composerMenuStyle}
-              >
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-slate-900/[0.04]"
-                  style={{ color: 'var(--text-main)' }}
-                >
-                  <span className="inline-flex items-center gap-2.5">
-                    <span className="inline-flex h-4 w-4 items-center justify-center">
-                      <UploadIcon />
-                    </span>
-                    <span>
-                      <span className="block font-medium leading-none">Upload Files</span>
-                      <span className="block text-xs" style={{ color: 'var(--text-muted)' }}>
-                        Add images or knowledge files
-                      </span>
-                    </span>
-                  </span>
-                  <ChevronRightIcon />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActivePanel('manage-uploads')
-                  }}
-                  className="mt-0.5 flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-slate-900/[0.04]"
-                  style={{ color: 'var(--text-main)' }}
-                >
-                  <span className="inline-flex items-center gap-2.5">
-                    <span className="inline-flex h-4 w-4 items-center justify-center">
-                      <ManageIcon />
-                    </span>
-                    <span>
-                      <span className="block font-medium leading-none">Manage Uploads</span>
-                      <span className="block text-xs" style={{ color: 'var(--text-muted)' }}>
-                        Review files and inclusion modes
-                      </span>
-                    </span>
-                  </span>
-                  <ChevronRightIcon />
-                </button>
-
-                <div
-                  className="mt-0.5 flex items-center justify-between rounded-xl px-2.5 py-2"
-                  style={{ color: 'var(--text-main)' }}
-                >
-                  <span className="inline-flex items-center gap-2.5">
-                    <span className="inline-flex h-4 w-4 items-center justify-center">
-                      <PlanModeIcon />
-                    </span>
-                    <span>
-                      <span className="block text-[13px] font-medium leading-none">Plan Mode</span>
-                      <span className="block text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
-                        Frontend feature flag for planning flows
-                      </span>
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={planModeEnabled}
-                    onClick={() => onPlanModeChange(!planModeEnabled)}
-                    className="relative inline-flex h-5 w-[34px] items-center rounded-full transition-colors"
-                    style={{
-                      background: planModeEnabled ? '#3b82f6' : 'rgba(15,23,42,0.12)',
-                      cursor: 'default',
-                    }}
-                  >
-                    <span
-                      className="inline-flex h-3.5 w-3.5 rounded-full bg-white transition-transform"
-                      style={{
-                        transform: planModeEnabled ? 'translateX(17px)' : 'translateX(3px)',
-                      }}
-                    />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {modelMenuOpen && (
-              <div
-                className={`absolute bottom-14 z-30 min-w-[180px] rounded-2xl border p-1.5 ${isNarrow ? 'left-9 w-[min(56vw,12rem)]' : 'left-10'}`}
-                style={composerMenuStyle}
-                role="menu"
-                aria-label="Model menu"
-              >
-                {models.map(model => {
-                  const isSelected = model === selectedModel
-                  return (
-                    <button
-                      key={model}
-                      type="button"
-                      role="menuitemradio"
-                      aria-checked={isSelected}
-                      onClick={() => {
-                        onModelChange(model)
-                        setActivePanel(null)
-                      }}
-                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[13px] transition-colors hover:bg-slate-900/[0.04]"
-                      style={{ color: 'var(--text-main)' }}
-                    >
-                      <span className="truncate font-medium">{model}</span>
-                      <span
-                        className="ml-3 inline-flex h-4 w-4 items-center justify-center"
-                        style={{ color: isSelected ? 'var(--text-main)' : 'transparent' }}
-                      >
-                        <CheckIcon />
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-
-            {reasoningMenuOpen && (
-              <div
-                className={`absolute bottom-14 z-30 min-w-[148px] rounded-2xl border p-1.5 ${isNarrow ? 'left-[7.25rem] w-[min(44vw,10rem)]' : 'left-[152px]'}`}
-                style={composerMenuStyle}
-                role="menu"
-                aria-label="Reasoning menu"
-              >
-                {(['low', 'medium', 'high'] as const).map(level => {
-                  const isSelected = level === reasoningLevel
-                  return (
-                    <button
-                      key={level}
-                      type="button"
-                      role="menuitemradio"
-                      aria-checked={isSelected}
-                      onClick={() => {
-                        onReasoningLevelChange(level)
-                        setActivePanel(null)
-                      }}
-                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[13px] transition-colors hover:bg-slate-900/[0.04]"
-                      style={{ color: 'var(--text-main)' }}
-                    >
-                      <span className="font-medium">{reasoningLabel(level)}</span>
-                      <span
-                        className="ml-3 inline-flex h-4 w-4 items-center justify-center"
-                        style={{ color: isSelected ? 'var(--text-main)' : 'transparent' }}
-                      >
-                        <CheckIcon />
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-
-            {manageUploadsOpen && (
-              <div
-                className="absolute bottom-14 left-0 z-30 w-[min(560px,calc(100vw-3rem))] rounded-3xl border p-4 shadow-[0_12px_24px_rgba(15,23,42,0.08)]"
-                style={{
-                  borderColor: 'var(--input-border)',
-                  background: 'var(--composer-menu-bg-strong)',
-                  backdropFilter: 'blur(18px)',
+              <PlusMenu
+                isOpen={plusMenuOpen}
+                isNarrow={isNarrow}
+                planModeEnabled={planModeEnabled}
+                onUploadFiles={() => fileInputRef.current?.click()}
+                onOpenManageUploads={() => setActivePanel('manage-uploads')}
+                onTogglePlanMode={() => onPlanModeChange(!planModeEnabled)}
+              />
+              <ModelMenu
+                isOpen={modelMenuOpen}
+                isNarrow={isNarrow}
+                models={models}
+                selectedModel={selectedModel}
+                onSelectModel={model => {
+                  onModelChange(model)
+                  setActivePanel(null)
                 }}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
-                      Manage Uploads
-                    </h3>
-                    <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-                      Control which uploaded knowledge files flow into future turns.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setActivePanel(null)}
-                    className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-slate-900/[0.04]"
-                    style={{ color: 'var(--text-muted)' }}
-                    title="Close upload manager"
-                  >
-                    <CloseIcon />
-                  </button>
-                </div>
-
-                <div className="mt-4 max-h-[320px] space-y-3 overflow-y-auto pr-1">
-                  {uploadedKnowledgeFiles.length === 0 && pendingImages.length === 0 ? (
-                    <div
-                      className="rounded-2xl border px-4 py-6 text-center text-sm"
-                      style={{
-                        borderColor: 'var(--input-border)',
-                        background: 'var(--composer-muted-surface)',
-                        color: 'var(--text-muted)',
-                      }}
-                    >
-                      No uploaded files yet.
-                    </div>
-                  ) : (
-                    <>
-                      {uploadedKnowledgeFiles.map(file => (
-                        <div
-                          key={file.id}
-                          className="rounded-2xl border px-4 py-3"
-                          style={{
-                            borderColor: 'var(--input-border)',
-                            background: 'var(--composer-menu-bg)',
-                          }}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div
-                                className="inline-flex items-center gap-2 text-sm font-medium"
-                                style={{ color: 'var(--text-main)' }}
-                              >
-                                <DocumentIcon />
-                                <span className="truncate">{file.filename}</span>
-                              </div>
-                              <div
-                                className="mt-1 inline-flex items-center gap-2 text-xs"
-                                style={{ color: 'var(--text-muted)' }}
-                              >
-                                {file.status === 'ready' ? <ReadyDot /> : <ProcessingDot />}
-                                <span>
-                                  {file.status === 'ready'
-                                    ? `Mode: ${modeLabel(file.bindingMode)}`
-                                    : 'Processing upload'}
-                                </span>
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => onRemoveFileContext(file.id)}
-                              className="rounded-full px-2.5 py-1 text-xs transition-colors hover:bg-slate-900/[0.04]"
-                              style={{ color: 'var(--composer-danger-text)' }}
-                            >
-                              Delete
-                            </button>
-                          </div>
-
-                          <div
-                            className="mt-3 inline-flex overflow-hidden rounded-full border"
-                            style={{
-                              borderColor: 'var(--input-border)',
-                              background: 'var(--composer-muted-surface)',
-                            }}
-                          >
-                            {([
-                              ['single', 'Next Turn'],
-                              ['persistent', 'Sticky'],
-                              ['idle', 'Inactive'],
-                            ] as Array<[FileBindingMode, string]>).map(([mode, label]) => (
-                              <button
-                                key={mode}
-                                type="button"
-                                disabled={file.status !== 'ready'}
-                                onClick={() => onSetFileContextMode(file.id, mode)}
-                                className="border-l px-3 py-1.5 text-[11px] font-medium transition-colors first:border-l-0 disabled:cursor-not-allowed disabled:opacity-50"
-                                style={{
-                                  borderColor: 'rgba(15,23,42,0.08)',
-                                  background:
-                                    file.bindingMode === mode
-                                      ? 'var(--composer-selected-surface)'
-                                      : 'transparent',
-                                  color:
-                                    file.bindingMode === mode
-                                      ? 'var(--text-main)'
-                                      : 'var(--text-muted)',
-                                }}
-                              >
-                                {label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                      {pendingImages.length > 0 && (
-                        <div className="space-y-3">
-                          <p
-                            className="px-1 text-[11px] font-medium uppercase tracking-[0.08em]"
-                            style={{ color: 'var(--text-muted)' }}
-                          >
-                            Current Turn Images
-                          </p>
-                          {pendingImages.map(image => (
-                            <div
-                              key={image.id}
-                              className="rounded-2xl border px-4 py-3"
-                              style={{
-                                borderColor: 'var(--input-border)',
-                                background: 'var(--composer-menu-bg)',
-                              }}
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <div
-                                    className="inline-flex items-center gap-2 text-sm font-medium"
-                                    style={{ color: 'var(--text-main)' }}
-                                  >
-                                    <ImageIcon />
-                                    <span className="truncate">{image.filename}</span>
-                                  </div>
-                                  <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-                                    Vision attachments stay on the next send only.
-                                  </p>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setPendingImages(prev => prev.filter(item => item.id !== image.id))
-                                  }
-                                  className="rounded-full px-2.5 py-1 text-xs transition-colors hover:bg-slate-900/[0.04]"
-                                  style={{ color: 'var(--composer-danger-text)' }}
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                              <div
-                                className="mt-3 inline-flex overflow-hidden rounded-full border"
-                                style={{
-                                  borderColor: 'var(--input-border)',
-                                  background: 'var(--composer-muted-surface)',
-                                }}
-                              >
-                                <button
-                                  type="button"
-                                  className="px-3 py-1.5 text-[11px] font-medium"
-                                  style={{
-                                    background: 'var(--composer-selected-surface)',
-                                    color: 'var(--text-main)',
-                                  }}
-                                >
-                                  Next Turn
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled
-                                  className="border-l px-3 py-1.5 text-[11px] font-medium opacity-50"
-                                  style={{
-                                    borderColor: 'rgba(15,23,42,0.08)',
-                                    color: 'var(--text-muted)',
-                                  }}
-                                  title="Sticky mode is not available for image attachments yet"
-                                >
-                                  Sticky
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setPendingImages(prev => prev.filter(item => item.id !== image.id))
-                                  }
-                                  className="border-l px-3 py-1.5 text-[11px] font-medium transition-colors"
-                                  style={{
-                                    borderColor: 'rgba(15,23,42,0.08)',
-                                    color: 'var(--text-muted)',
-                                  }}
-                                >
-                                  Inactive
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-            <div className="flex flex-col gap-2">
+              />
+              <ReasoningMenu
+                isOpen={reasoningMenuOpen}
+                isNarrow={isNarrow}
+                reasoningLevel={reasoningLevel}
+                onSelectReasoningLevel={level => {
+                  onReasoningLevelChange(level)
+                  setActivePanel(null)
+                }}
+              />
+              <ManageUploadsPanel
+                isOpen={manageUploadsOpen}
+                uploadedKnowledgeFiles={uploadedKnowledgeFiles}
+                pendingImages={pendingImages}
+                onClose={() => setActivePanel(null)}
+                onRemoveFileContext={onRemoveFileContext}
+                onSetFileContextMode={onSetFileContextMode}
+                onRemovePendingImage={id =>
+                  setPendingImages(prev => prev.filter(item => item.id !== id))
+                }
+              />
+              <div className="flex flex-col gap-2">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -1050,142 +472,38 @@ const ChatWindow: FC<Props> = ({
                   }}
                 />
               </div>
-
-              <div
-                data-testid="composer-control-row"
-                className="ui-static flex items-center justify-between gap-2 px-0.5"
-              >
-                <div
-                  data-testid="composer-left-controls"
-                  className={`-ml-1 flex min-w-0 flex-1 items-center ${layoutDecisions.compactComposer ? 'gap-1.5 overflow-x-auto pr-2' : 'gap-1.5'}`}
-                  style={{
-                    scrollbarWidth: 'none',
-                    msOverflowStyle: 'none',
-                  }}
-                >
-                  <button
-                    type="button"
-                    disabled={isStreaming || attachmentUploading}
-                    onClick={() => {
-                      setActivePanel(prev => (prev === 'plus' ? null : 'plus'))
-                    }}
-                    className={`${layoutDecisions.compactComposer ? 'h-9 w-9' : 'h-10 w-10'} flex flex-shrink-0 items-center justify-center rounded-full transition-all disabled:opacity-40`}
-                    style={{ border: 'none', ...controlPillStyle(plusMenuOpen), color: 'rgba(17,24,39,0.42)' }}
-                    title={plusMenuOpen ? 'Close actions' : 'Open upload and planning actions'}
-                    onMouseEnter={e => {
-                      if (!plusMenuOpen) e.currentTarget.style.background = 'rgba(17,24,39,0.08)'
-                    }}
-                    onMouseLeave={e => {
-                      if (!plusMenuOpen) e.currentTarget.style.background = 'transparent'
-                    }}
-                  >
-                    <PlusIcon />
-                  </button>
-
-                  <div className={`flex min-w-0 flex-shrink-0 items-center ${layoutDecisions.compactComposer ? 'gap-1.5' : 'gap-3'}`}>
-                    <button
-                      type="button"
-                      aria-label="Open model menu"
-                      aria-expanded={modelMenuOpen}
-                      onClick={() => setActivePanel(prev => (prev === 'model' ? null : 'model'))}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[13px] font-medium transition-all ${layoutDecisions.compactComposer ? 'max-w-[104px]' : 'max-w-[180px]'}`}
-                      style={controlPillStyle(modelMenuOpen)}
-                    >
-                      <span className="truncate">{selectedModel}</span>
-                      <span className="inline-flex flex-shrink-0 items-center justify-center">
-                        <ChevronDownIcon />
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      aria-label="Open reasoning menu"
-                      aria-expanded={reasoningMenuOpen}
-                      onClick={() =>
-                        setActivePanel(prev => (prev === 'reasoning' ? null : 'reasoning'))
-                      }
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[13px] font-medium transition-all ${layoutDecisions.compactComposer ? 'max-w-[78px] flex-shrink-0' : ''}`}
-                      style={controlPillStyle(reasoningMenuOpen)}
-                    >
-                      <span className="truncate">{reasoningLabel(reasoningLevel)}</span>
-                      <span className="inline-flex flex-shrink-0 items-center justify-center">
-                        <ChevronDownIcon />
-                      </span>
-                    </button>
-
-                    {composerIndicators.length > 0 && (
-                      <div className={`flex min-w-0 flex-shrink-0 items-center gap-2 ${layoutDecisions.compactComposer ? '' : 'ml-1'}`}>
-                        {composerIndicators.map(indicator => {
-                          const showTooltip = hoveredIndicator === indicator.key
-                          return (
-                            <button
-                              key={indicator.key}
-                              type="button"
-                              className="relative inline-flex items-center gap-1.5 text-[13px] font-medium"
-                              style={{ color: '#3b82f6' }}
-                              aria-label={`${indicator.label} enabled`}
-                              title={indicator.tooltip}
-                              onClick={() => indicator.onClick?.()}
-                              onMouseEnter={() => setHoveredIndicator(indicator.key)}
-                              onMouseLeave={() => setHoveredIndicator(null)}
-                              onFocus={() => setHoveredIndicator(indicator.key)}
-                              onBlur={() => setHoveredIndicator(null)}
-                            >
-                              <span className="inline-flex h-4 w-4 items-center justify-center">
-                                {indicator.icon}
-                              </span>
-                              <span>{indicator.label}</span>
-                              {showTooltip && (
-                                <span
-                                  role="tooltip"
-                                  className="pointer-events-none absolute bottom-[calc(100%+0.45rem)] left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-medium shadow-[0_10px_20px_rgba(15,23,42,0.14)]"
-                                  style={{
-                                    background: 'var(--composer-menu-bg-strong)',
-                                    color: 'var(--text-main)',
-                                    border: '1px solid var(--input-border)',
-                                  }}
-                                >
-                                  {indicator.tooltip}
-                                </span>
-                              )}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div
-                  data-testid="composer-right-controls"
-                  className="flex flex-shrink-0 items-center gap-2"
-                >
-                  <GpuStatusDot
-                    gpuStatus={gpuStatus}
-                    gpuError={gpuError}
-                    inferenceLatency={inferenceLatency}
-                  />
-                  <button
-                    type="button"
-                    onClick={isStreaming ? onStop : handleSubmit}
-                    disabled={!isStreaming && !canSend}
-                    aria-label={isStreaming ? 'Stop generating' : 'Send message'}
-                    className="flex h-10 w-10 items-center justify-center rounded-full transition-all"
-                    style={{
-                      background: isStreaming ? '#111111' : canSend ? '#111111' : '#9ca3af',
-                      color: '#ffffff',
-                      boxShadow:
-                        canSend || isStreaming ? 'none' : 'inset 0 0 0 1px rgba(0,0,0,0.04)',
-                      cursor: 'default',
-                    }}
-                    title={isStreaming ? 'Stop generating' : 'Send message'}
-                  >
-                    {isStreaming ? <StopIcon /> : <SendArrowIcon />}
-                  </button>
-                </div>
-              </div>
+              <ComposerControls
+                layoutDecisions={layoutDecisions}
+                selectedModel={selectedModel}
+                reasoningLevel={reasoningLevel}
+                supportsThinking={supportsThinking}
+                thinkingEnabled={thinkingEnabled}
+                planModeEnabled={planModeEnabled}
+                onPlanModeChange={onPlanModeChange}
+                plusMenuOpen={plusMenuOpen}
+                modelMenuOpen={modelMenuOpen}
+                reasoningMenuOpen={reasoningMenuOpen}
+                isStreaming={isStreaming}
+                attachmentUploading={attachmentUploading}
+                canSend={canSend}
+                gpuStatus={gpuStatus}
+                gpuError={gpuError}
+                inferenceLatency={inferenceLatency}
+                onTogglePlusMenu={() => {
+                  setActivePanel(prev => (prev === 'plus' ? null : 'plus'))
+                }}
+                onToggleModelMenu={() => {
+                  setActivePanel(prev => (prev === 'model' ? null : 'model'))
+                }}
+                onToggleReasoningMenu={() => {
+                  setActivePanel(prev => (prev === 'reasoning' ? null : 'reasoning'))
+                }}
+                onToggleThinkingMode={() => onThinkingEnabledChange(!thinkingEnabled)}
+                onStop={onStop}
+                onSubmit={handleSubmit}
+              />
             </div>
-            </div>
+          </div>
           </div>
 
           {attachmentUploadError && (

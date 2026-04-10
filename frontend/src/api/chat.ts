@@ -19,6 +19,7 @@ function isChatStreamEvent(payload: unknown): payload is ChatStreamEvent {
     download_url?: unknown
   }
   if (event.type === 'token') return typeof event.token === 'string'
+  if (event.type === 'thinking') return typeof event.token === 'string'
   if (event.type === 'chart_spec') return !!event.chart && typeof event.chart === 'object'
   if (event.type === 'artifact') {
     return (

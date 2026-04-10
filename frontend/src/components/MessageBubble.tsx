@@ -73,11 +73,15 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode 
   return (
     <div className={`ui-static flex group ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`flex ${isNarrow ? 'max-w-[94%]' : 'max-w-[78%]'} flex-col gap-1 ${isUser ? 'items-end' : 'items-start'}`}
+        className={
+          isUser
+            ? `flex ${isNarrow ? 'max-w-[94%]' : 'max-w-[78%]'} flex-col gap-1 items-end`
+            : `flex w-full ${isNarrow ? 'max-w-[94%]' : 'max-w-[78%]'} flex-col gap-1 items-stretch min-w-0`
+        }
       >
         <div
           className={[
-            'w-full rounded-[18px] px-4 py-3',
+            'w-full min-w-0 rounded-[18px] px-4 py-3',
             !isUser && message.isStreaming ? 'streaming-cursor' : '',
           ]
             .filter(Boolean)
@@ -117,29 +121,65 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode 
               )}
             </>
           ) : (
-            <div className="prose-msg">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  a: ({ href, children }) => {
-                    const artifact = resolveArtifactLink(
-                      typeof href === 'string' ? href : '',
-                      artifactByFilename,
-                    )
-                    if (artifact) {
-                      return (
-                        <a href={artifact.download_url} download={artifact.filename}>
-                          {children}
-                        </a>
+            <>
+              {message.thinkingContent && message.thinkingContent.trim().length > 0 && (
+                <details
+                  className="thinking-disclosure mb-2 w-full min-w-0 rounded-xl border px-3 py-2 text-left text-xs"
+                  aria-label="Thinking"
+                  style={{
+                    borderColor: 'var(--border-color)',
+                    background: 'var(--bg-chat)',
+                  }}
+                >
+                  <summary
+                    className="flex w-full min-w-0 cursor-pointer list-none items-center gap-1.5 font-medium outline-none [&::-webkit-details-marker]:hidden"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    <svg
+                      className="thinking-chevron h-3.5 w-3.5 shrink-0 transition-transform duration-200"
+                      viewBox="0 0 16 16"
+                      fill="currentColor"
+                      aria-hidden
+                    >
+                      <path d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06L7.28 12.78a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z" />
+                    </svg>
+                    <span>Thinking</span>
+                  </summary>
+                  <div
+                    className="mt-2 max-h-80 w-full min-w-0 overflow-y-auto whitespace-pre-wrap break-words border-t pt-2 text-[13px] leading-relaxed"
+                    style={{
+                      borderColor: 'var(--border-color)',
+                      color: 'var(--text-asst-bubble)',
+                    }}
+                  >
+                    {message.thinkingContent}
+                  </div>
+                </details>
+              )}
+              <div className="prose-msg min-w-0 w-full">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    a: ({ href, children }) => {
+                      const artifact = resolveArtifactLink(
+                        typeof href === 'string' ? href : '',
+                        artifactByFilename,
                       )
-                    }
-                    return <a href={href}>{children}</a>
-                  },
-                }}
-              >
-                {displayContent || ' '}
-              </ReactMarkdown>
-            </div>
+                      if (artifact) {
+                        return (
+                          <a href={artifact.download_url} download={artifact.filename}>
+                            {children}
+                          </a>
+                        )
+                      }
+                      return <a href={href}>{children}</a>
+                    },
+                  }}
+                >
+                  {displayContent || ' '}
+                </ReactMarkdown>
+              </div>
+            </>
           )}
         </div>
 

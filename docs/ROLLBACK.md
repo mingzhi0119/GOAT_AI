@@ -79,7 +79,7 @@ Confirm at least:
 
 - `GET /api/health`
 - `GET /api/system/runtime-target`
-- `POST /api/chat` streams SSE events again
+- `POST /api/chat` streams SSE again with at least one `token` or `thinking` frame (same rule as `scripts/post_deploy_check.py`)
 
 ## 6) If data was affected
 

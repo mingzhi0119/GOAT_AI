@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend.services.gpu_service import _parse_gpu_row, read_gpu_status
+from backend.services.gpu_service import _normalize_gpu_name, _parse_gpu_row, read_gpu_status
 from goat_ai.config import Settings
 
 
@@ -31,9 +31,14 @@ class GPUServiceTests(unittest.TestCase):
         row = "NVIDIA A100-SXM4-80GB, GPU-abc, 42, 1000, 81920, 35, 80.5"
         parsed = _parse_gpu_row(row)
         self.assertTrue(parsed.available)
-        self.assertEqual("NVIDIA A100-SXM4-80GB", parsed.name)
+        self.assertEqual("A100", parsed.name)
+        self.assertEqual("A100: Active", parsed.message)
         self.assertEqual(42.0, parsed.utilization_gpu)
         self.assertEqual(1000.0, parsed.memory_used_mb)
+
+    def test_normalize_gpu_name_handles_rtx_models(self) -> None:
+        self.assertEqual("RTX5090", _normalize_gpu_name("NVIDIA GeForce RTX 5090"))
+        self.assertEqual("A100", _normalize_gpu_name("NVIDIA A100-SXM4-80GB"))
 
     def test_read_gpu_status_when_smi_missing(self) -> None:
         with patch(
@@ -72,8 +77,9 @@ class GPUServiceTests(unittest.TestCase):
             gpu_target_index=99,
         )
         with patch("backend.services.gpu_service.subprocess.run", side_effect=fake_run):
-            read_gpu_status(with_uuid)
+            status = read_gpu_status(with_uuid)
         self.assertEqual(captured["args"][1], "--id=GPU-test-uuid")
+        self.assertEqual("A100", status.name)
 
 
 if __name__ == "__main__":

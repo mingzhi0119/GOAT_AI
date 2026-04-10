@@ -211,3 +211,8 @@ body {
 .dark .prose-msg a { color: #60a5fa; }
 .prose-msg strong { font-weight: 600; }
 .prose-msg hr { border: none; border-top: 1px solid var(--border-color); margin: 0.8rem 0; }
+
+/* Collapsed model reasoning trace (MessageBubble <details>) */
+.thinking-disclosure[open] .thinking-chevron {
+  transform: rotate(90deg);
+}

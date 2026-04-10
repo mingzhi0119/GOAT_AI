@@ -70,6 +70,9 @@ function renderChatWindow(overrides: Partial<ComponentProps<typeof ChatWindow>> 
       onPlanModeChange={onPlanModeChange}
       reasoningLevel="medium"
       onReasoningLevelChange={onReasoningLevelChange}
+      supportsThinking
+      thinkingEnabled={false}
+      onThinkingEnabledChange={vi.fn()}
       {...overrides}
     />,
   )
@@ -105,6 +108,12 @@ describe('ChatWindow composer', () => {
 
     expect(screen.getByRole('button', { name: /open model menu/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /open reasoning menu/i })).toBeInTheDocument()
+  })
+
+  it('shows a quick/thinking toggle when the model supports thinking', () => {
+    renderChatWindow({ supportsThinking: true })
+
+    expect(screen.getByRole('button', { name: /set thinking mode/i })).toBeInTheDocument()
   })
 
   it('opens model and reasoning menus and applies the selected options', () => {

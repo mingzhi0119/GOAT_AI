@@ -27,6 +27,8 @@ export interface ChatRequest {
   temperature?: number
   max_tokens?: number
   top_p?: number
+  /** Quick = false, Thinking = true. Sent through to the model backend. */
+  think?: boolean
 }
 
 export interface ModelsResponse {
@@ -39,6 +41,7 @@ export interface ModelCapabilitiesResponse {
   supports_tool_calling: boolean
   supports_chart_tools: boolean
   supports_vision: boolean
+  supports_thinking: boolean
 }
 
 /** Ollama sampling options (Advanced settings); maps to backend ChatRequest fields. */
@@ -46,6 +49,7 @@ export interface OllamaOptionsPayload {
   temperature: number
   max_tokens: number
   top_p: number
+  think?: boolean
 }
 
 export interface ChartSeries {
@@ -86,6 +90,12 @@ export interface ChatTokenStreamEvent {
   token: string
 }
 
+/** Model reasoning trace (Ollama thinking); shown collapsed in the UI. */
+export interface ChatThinkingStreamEvent {
+  type: 'thinking'
+  token: string
+}
+
 export interface ChatChartStreamEvent {
   type: 'chart_spec'
   chart: ChartSpec
@@ -117,6 +127,7 @@ export interface ChatErrorStreamEvent {
 /** Union of events yielded by streamChat. */
 export type ChatStreamEvent =
   | ChatTokenStreamEvent
+  | ChatThinkingStreamEvent
   | ChatChartStreamEvent
   | ChatArtifactStreamEvent
   | ChatDoneStreamEvent
@@ -127,6 +138,8 @@ export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+  /** Accumulated model thinking / reasoning trace (not shown inline). */
+  thinkingContent?: string
   artifacts?: ChatArtifact[]
   /** Set when this user turn included vision image attachments (for UI hints). */
   image_attachment_ids?: string[]

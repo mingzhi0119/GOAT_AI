@@ -117,19 +117,29 @@ Request body:
   "system_instruction": "Answer in bullet points.",
   "temperature": 0.3,
   "max_tokens": 512,
-  "top_p": 0.9
+  "top_p": 0.9,
+  "think": false
 }
 ```
 
 Optional `knowledge_document_ids` binds the turn to already indexed knowledge documents and switches chat to retrieval-backed generation for those documents. Legacy `file_context: true` messages remain readable for old sessions but are no longer the primary upload path.
 
+Optional boolean **`think`** toggles Ollama thinking mode when the model supports it (`true` = thinking trace, `false` = quick path). Omit to use model defaults.
+
 SSE event types:
 
-- `token`
+- `thinking` (reasoning trace chunk; not merged into persisted assistant `content`)
+- `token` (answer text chunk)
 - `chart_spec`
 - `artifact`
 - `error`
 - `done`
+
+Thinking frame:
+
+```text
+data: {"type":"thinking","token":"..."}
+```
 
 Token frame:
 
@@ -163,6 +173,7 @@ data: {"type":"done"}
 
 Notes:
 
+- Thinking-capable models may emit `thinking` before or interleaved with `token`; the web UI shows thinking in a collapsed disclosure; only `token` content is moderated by output safeguards and persisted as the assistant message body
 - If the selected model does not support native tools, chat remains text-only
 - Retrieval-backed chat reuses the normal chat streaming path; knowledge search builds bounded context for the model instead of streaming raw snippet dumps
 - Unsafe prompts are converted into a safe refusal instead of passing through the raw request

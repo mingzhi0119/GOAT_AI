@@ -57,6 +57,10 @@ class ChatRequest(BaseModel):
         le=1.0,
         description="Ollama top_p nucleus sampling.",
     )
+    think: bool | None = Field(
+        default=None,
+        description="Ollama thinking mode toggle; true enables Thinking, false enables Quick.",
+    )
 
 
 class ModelsResponse(BaseModel):
@@ -73,3 +77,4 @@ class ModelCapabilitiesResponse(BaseModel):
     supports_tool_calling: bool
     supports_chart_tools: bool
     supports_vision: bool
+    supports_thinking: bool

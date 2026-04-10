@@ -23,12 +23,37 @@ def test_expect_runtime_target_accepts_server_port() -> None:
         assert _expect_runtime_target("http://127.0.0.1:62606") == 0
 
 
-def test_expect_chat_stream_contract_accepts_token_then_done() -> None:
-    response = Mock()
-    response.raise_for_status.return_value = None
-    response.iter_lines.return_value = [
-        'data: {"type":"token","token":"hello"}',
-        'data: {"type":"done"}',
-    ]
-    with patch("scripts.post_deploy_check.requests.post", return_value=response):
+def test_expect_chat_stream_contract_accepts_thinking_only_stream() -> None:
+    model_response = Mock()
+    model_response.raise_for_status.return_value = None
+    model_response.json.return_value = {"models": ["qwen3:latest"]}
+    chat_response = Mock()
+    chat_response.raise_for_status.return_value = None
+    chat_response.text = (
+        'data: {"type":"thinking","token":"reasoning…"}\n\n'
+        'data: {"type":"done"}\n\n'
+    )
+    with (
+        patch("scripts.post_deploy_check.requests.get", return_value=model_response),
+        patch("scripts.post_deploy_check.requests.post", return_value=chat_response),
+    ):
         assert _expect_chat_stream_contract("http://127.0.0.1:62606") == 0
+
+
+def test_expect_chat_stream_contract_accepts_token_then_done() -> None:
+    model_response = Mock()
+    model_response.raise_for_status.return_value = None
+    model_response.json.return_value = {"models": ["tinyllama:latest"]}
+    chat_response = Mock()
+    chat_response.raise_for_status.return_value = None
+    chat_response.text = 'data: {"type":"token","token":"hello"}\n\ndata: {"type":"done"}\n\n'
+    with (
+        patch("scripts.post_deploy_check.requests.get", return_value=model_response),
+        patch("scripts.post_deploy_check.requests.post", return_value=chat_response) as post,
+    ):
+        assert _expect_chat_stream_contract("http://127.0.0.1:62606") == 0
+    payload = post.call_args.kwargs["json"]
+    assert payload["model"] == "tinyllama:latest"
+    assert payload["think"] is False
+    assert payload["max_tokens"] == 16
+    assert payload["temperature"] == 0

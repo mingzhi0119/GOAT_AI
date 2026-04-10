@@ -15,6 +15,7 @@ function renderTopBar() {
   const view = render(
     <TopBar
       sessionTitle="Strategy Sync"
+      modelCapabilities={['completion', 'tools', 'vision']}
       theme="light"
       onToggleTheme={onToggleTheme}
       systemInstruction="Be concise."
@@ -46,6 +47,17 @@ function renderTopBar() {
 }
 
 describe('TopBar options callout', () => {
+  it('shows the session title on the left and model skills beside it', () => {
+    renderTopBar()
+
+    expect(screen.getByRole('heading', { name: 'Strategy Sync' })).toHaveStyle({
+      color: '#000000',
+    })
+    expect(screen.queryByText('Skills')).not.toBeInTheDocument()
+    expect(screen.getByText('Tools')).toBeInTheDocument()
+    expect(screen.getByText('Vision')).toBeInTheDocument()
+  })
+
   it('opens the options callout and no longer shows legacy helper copy', () => {
     renderTopBar()
 

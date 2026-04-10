@@ -10,7 +10,11 @@ export function buildMarkdownForExport(messages: Message[], title?: string | nul
   const lines: string[] = [`# ${header}`, '']
   for (const m of completed) {
     const label = m.role === 'user' ? 'User' : 'Assistant'
-    lines.push(`## ${label}`, '', m.content.trim(), '')
+    lines.push(`## ${label}`, '')
+    if (m.role === 'assistant' && m.thinkingContent?.trim()) {
+      lines.push('### Thinking (思考过程)', '', '```text', m.thinkingContent.trim(), '```', '')
+    }
+    lines.push(m.content.trim(), '')
   }
   return lines.join('\n')
 }

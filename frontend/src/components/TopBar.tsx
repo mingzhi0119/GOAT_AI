@@ -3,6 +3,7 @@ import type { ChatLayoutMode } from '../utils/chatLayout'
 
 interface Props {
   sessionTitle: string | null
+  modelCapabilities: string[] | null
   theme: 'light' | 'dark'
   layoutMode?: ChatLayoutMode
   onSidebarToggle?: () => void
@@ -23,8 +24,23 @@ interface Props {
 
 const MAX_INSTRUCTION_LEN = 1000
 
+function formatSkillLabel(capability: string): string | null {
+  const normalized = capability.trim().toLowerCase()
+  if (!normalized || normalized === 'completion') return null
+  if (normalized === 'tools' || normalized === 'tool_calling') return 'Tools'
+  if (normalized === 'vision') return 'Vision'
+  if (normalized === 'audio' || normalized === 'sound' || normalized === 'speech') return 'Sound'
+  if (normalized === 'images' || normalized === 'image') return 'Vision'
+  return normalized
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map(part => part[0]!.toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ')
+}
+
 const TopBar: FC<Props> = ({
   sessionTitle,
+  modelCapabilities,
   theme,
   layoutMode = 'wide',
   onSidebarToggle,
@@ -45,6 +61,9 @@ const TopBar: FC<Props> = ({
   const [menuOpen, setMenuOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const isNarrow = layoutMode === 'narrow'
+  const skillLabels = (modelCapabilities ?? []).map(formatSkillLabel).filter(
+    (label): label is string => Boolean(label),
+  )
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -77,20 +96,37 @@ const TopBar: FC<Props> = ({
           <SidebarToggleIcon />
         </button>
       ) : (
-        <div className="min-w-0 flex-1" aria-hidden="true" />
+        <div className="hidden" aria-hidden="true" />
       )}
-      <div className={`flex min-w-0 ${isNarrow ? 'flex-1 justify-start' : 'flex-[2] justify-center px-2'}`}>
+      <div className="flex min-w-0 flex-1 items-center gap-3 px-1 select-none cursor-default">
         <h1
-          className={`max-w-full truncate ${isNarrow ? 'text-left text-[13px]' : 'text-center text-sm'} font-medium`}
+          className="max-w-full truncate text-left text-sm font-medium select-none cursor-default"
           style={{
-            color: sessionTitle ? 'var(--text-main)' : 'var(--text-muted)',
+            color: '#000000',
           }}
           title={sessionTitle ?? undefined}
         >
           {sessionTitle ?? 'New conversation'}
         </h1>
+        {skillLabels.length > 0 && (
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 select-none cursor-default">
+            {skillLabels.map(label => (
+              <span
+                key={label}
+                className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium"
+                style={{
+                  borderColor: 'var(--border-color)',
+                  color: 'var(--text-main)',
+                  background: 'var(--composer-muted-surface)',
+                }}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
-      <div className={`flex min-w-0 ${isNarrow ? 'flex-shrink-0 justify-end' : 'flex-1 justify-end'}`} ref={wrapRef}>
+      <div className="flex min-w-0 flex-shrink-0 justify-end" ref={wrapRef}>
         <div className="relative">
           <button
             type="button"

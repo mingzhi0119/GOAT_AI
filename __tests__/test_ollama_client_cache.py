@@ -7,7 +7,7 @@ import requests
 
 from goat_ai.config import Settings
 from goat_ai.exceptions import OllamaUnavailable
-from goat_ai.ollama_client import OllamaService
+from goat_ai.ollama_client import OllamaService, _iter_stream_parts_from_chunk
 
 
 def _settings(*, ttl: int) -> Settings:
@@ -24,6 +24,31 @@ def _settings(*, ttl: int) -> Settings:
         log_db_path=Path("chat_logs.db"),
         model_cap_cache_ttl_sec=ttl,
     )
+
+
+def test_iter_stream_parts_message_thinking_when_content_empty() -> None:
+    chunk = {
+        "model": "qwen3",
+        "message": {"role": "assistant", "thinking": "step ", "content": ""},
+        "done": False,
+    }
+    parts = _iter_stream_parts_from_chunk(chunk)
+    assert [(p.kind, p.text) for p in parts] == [("thinking", "step ")]
+
+
+def test_iter_stream_parts_thinking_then_content_in_one_chunk() -> None:
+    chunk = {
+        "message": {"role": "assistant", "thinking": "a", "content": "b"},
+        "done": False,
+    }
+    parts = _iter_stream_parts_from_chunk(chunk)
+    assert [(p.kind, p.text) for p in parts] == [("thinking", "a"), ("content", "b")]
+
+
+def test_iter_stream_parts_generate_thinking_when_no_response() -> None:
+    chunk = {"thinking": "trace", "done": False}
+    parts = _iter_stream_parts_from_chunk(chunk)
+    assert [(p.kind, p.text) for p in parts] == [("thinking", "trace")]
 
 
 def test_stream_tokens_uses_chat_first_event_timeout() -> None:

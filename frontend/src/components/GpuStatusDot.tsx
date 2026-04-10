@@ -24,18 +24,24 @@ function buildTooltipLines(
   if (gpuError) return [`Error: ${gpuError}`]
   if (!status) return ['GPU telemetry unavailable']
   if (!status.available) return [status.message || 'GPU telemetry unavailable']
+
   const u = Math.round(status.utilization_gpu ?? 0)
   const engineState = status.active ? 'Active' : 'Idle'
-  const latLine =
-    inference && inference.chat_sample_count > 0
-      ? `Latency: avg ${Math.round(inference.chat_avg_ms)} ms (last ${inference.chat_sample_count})`
-      : 'Latency: —'
-  return [
+  const lines = [
     `Active(${u}% GPU)`,
-    latLine,
     formatVramGb(status.memory_used_mb, status.memory_total_mb),
-    `A100 Engine: ${engineState}`,
+    `${status.name || 'GPU'}: ${engineState}`,
   ]
+
+  if (inference && inference.chat_sample_count > 0) {
+    lines.splice(
+      1,
+      0,
+      `Latency: avg ${Math.round(inference.chat_avg_ms)} ms (last ${inference.chat_sample_count})`,
+    )
+  }
+
+  return lines
 }
 
 interface Props {
@@ -50,17 +56,14 @@ const GpuStatusDot: FC<Props> = ({ gpuStatus, gpuError, inferenceLatency }) => {
   const tipId = useId()
   const available = Boolean(gpuStatus?.available)
   const active = Boolean(gpuStatus?.active)
+
+  if (!available || gpuError) return null
+
   const util = gpuStatus?.utilization_gpu ?? null
-  const fill = utilizationTierColor(util, available && !gpuError)
-  const lines = buildTooltipLines(gpuStatus, gpuError, inferenceLatency)
-  const isVisible = Boolean(gpuError) || (available && active)
-  const isSubtle = !gpuError && available && !active
-  const label =
-    gpuError != null && gpuError !== ''
-      ? `GPU error: ${gpuError}`
-      : available
-        ? `GPU ${Math.round(util ?? 0)}% utilization`
-        : 'GPU telemetry unavailable'
+  const fill = utilizationTierColor(util, true)
+  const lines = buildTooltipLines(gpuStatus, null, inferenceLatency)
+  const isVisible = active
+  const label = `GPU ${Math.round(util ?? 0)}% utilization`
 
   return (
     <div className="relative flex h-10 w-10 flex-shrink-0 items-center justify-center self-center">
@@ -69,12 +72,12 @@ const GpuStatusDot: FC<Props> = ({ gpuStatus, gpuError, inferenceLatency }) => {
         role="img"
         aria-label={label}
         aria-describedby={open ? tipId : undefined}
-        aria-hidden={!isVisible && !isSubtle}
+        aria-hidden={!isVisible}
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
         style={{
-          opacity: isVisible ? 0.92 : isSubtle ? 0.3 : 0,
-          pointerEvents: isVisible || isSubtle ? 'auto' : 'none',
+          opacity: isVisible ? 0.92 : 0.3,
+          pointerEvents: 'auto',
           cursor: 'default',
         }}
       >
@@ -92,7 +95,7 @@ const GpuStatusDot: FC<Props> = ({ gpuStatus, gpuError, inferenceLatency }) => {
         <div
           id={tipId}
           role="tooltip"
-          className="absolute bottom-full left-0 mb-2 px-2.5 py-2 rounded-md text-xs text-left z-30 pointer-events-none shadow-lg border w-max max-w-[11rem] whitespace-normal leading-snug"
+          className="absolute bottom-full left-0 mb-2 w-max max-w-[11rem] rounded-md border px-2.5 py-2 text-left text-xs leading-snug shadow-lg pointer-events-none whitespace-normal z-30"
           style={{
             background: 'var(--bg-asst-bubble)',
             borderColor: 'var(--border-color)',

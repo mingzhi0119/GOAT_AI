@@ -51,17 +51,19 @@ class PreparedChatRequest:
     session_owner_id: str
     auth_context: AuthorizationContext
     vision_last_user_images_base64: list[str] | None
-    ollama_options: dict[str, float | int] | None
+    ollama_options: dict[str, float | int | bool] | None
 
 
-def _build_ollama_options(req: ChatRequest) -> dict[str, float | int] | None:
-    opts: dict[str, float | int] = {}
+def _build_ollama_options(req: ChatRequest) -> dict[str, float | int | bool] | None:
+    opts: dict[str, float | int | bool] = {}
     if req.temperature is not None:
         opts["temperature"] = req.temperature
     if req.max_tokens is not None:
         opts["num_predict"] = req.max_tokens
     if req.top_p is not None:
         opts["top_p"] = req.top_p
+    if req.think is not None:
+        opts["think"] = req.think
     return opts if opts else None
 
 

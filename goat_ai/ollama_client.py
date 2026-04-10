@@ -8,7 +8,7 @@ import random
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Generator, Protocol
+from typing import Any, Generator, Literal, Protocol
 
 import requests
 
@@ -26,10 +26,34 @@ from goat_ai.types import ChatTurn
 logger = logging.getLogger(__name__)
 
 
-def _stream_line_tokens(chunk: dict) -> str:  # type: ignore[type-arg]
-    if "message" in chunk and isinstance(chunk["message"], dict):
-        return chunk["message"].get("content") or ""
-    return chunk.get("response", "") or ""
+@dataclass(frozen=True)
+class StreamTextPart:
+    """One streamed segment from Ollama (thinking trace vs final answer)."""
+
+    kind: Literal["thinking", "content"]
+    text: str
+
+
+def _iter_stream_parts_from_chunk(chunk: dict) -> list[StreamTextPart]:  # type: ignore[type-arg]
+    """Split one Ollama NDJSON chunk into ordered thinking / content segments."""
+    message = chunk.get("message")
+    if isinstance(message, dict):
+        parts: list[StreamTextPart] = []
+        thinking = message.get("thinking")
+        if isinstance(thinking, str) and thinking:
+            parts.append(StreamTextPart("thinking", thinking))
+        content = message.get("content")
+        if isinstance(content, str) and content:
+            parts.append(StreamTextPart("content", content))
+        if parts:
+            return parts
+    response = chunk.get("response", "")
+    if isinstance(response, str) and response:
+        return [StreamTextPart("content", response)]
+    top_thinking = chunk.get("thinking")
+    if isinstance(top_thinking, str) and top_thinking:
+        return [StreamTextPart("thinking", top_thinking)]
+    return []
 
 
 @dataclass(frozen=True)
@@ -57,9 +81,9 @@ class LLMClient(Protocol):
         messages: list[ChatTurn],
         system_prompt: str,
         *,
-        ollama_options: dict[str, float | int] | None = None,
+        ollama_options: dict[str, float | int | bool] | None = None,
         last_user_images_base64: list[str] | None = None,
-    ) -> Generator[str, None, None]: ...
+    ) -> Generator[str | StreamTextPart, None, None]: ...
 
     def stream_tokens_with_tools(
         self,
@@ -68,8 +92,8 @@ class LLMClient(Protocol):
         system_prompt: str,
         *,
         tools: list[dict[str, Any]],
-        ollama_options: dict[str, float | int] | None = None,
-    ) -> Generator[str | ToolCallPlan, None, None]: ...
+        ollama_options: dict[str, float | int | bool] | None = None,
+    ) -> Generator[str | StreamTextPart | ToolCallPlan, None, None]: ...
 
     def plan_tool_call(
         self,
@@ -78,7 +102,7 @@ class LLMClient(Protocol):
         system_prompt: str,
         *,
         tools: list[dict[str, Any]],
-        ollama_options: dict[str, float | int] | None = None,
+        ollama_options: dict[str, float | int | bool] | None = None,
     ) -> ToolCallPlan | None: ...
 
     def stream_tool_followup(
@@ -87,15 +111,15 @@ class LLMClient(Protocol):
         followup_messages: list[dict[str, Any]],
         *,
         tools: list[dict[str, Any]],
-        ollama_options: dict[str, float | int] | None = None,
-    ) -> Generator[str, None, None]: ...
+        ollama_options: dict[str, float | int | bool] | None = None,
+    ) -> Generator[str | StreamTextPart, None, None]: ...
 
     def generate_completion(
         self,
         model: str,
         prompt: str,
         *,
-        ollama_options: dict[str, float | int] | None = None,
+        ollama_options: dict[str, float | int | bool] | None = None,
     ) -> str:
         """Non-streaming /api/generate response body (session titles, etc.)."""
         ...
@@ -328,9 +352,9 @@ class OllamaService:
         model: str,
         api_messages: list[dict[str, Any]],
         *,
-        ollama_options: dict[str, float | int] | None = None,
-    ) -> Generator[str, None, None]:
-        """Yield raw token strings from /api/chat (for SSE)."""
+        ollama_options: dict[str, float | int | bool] | None = None,
+    ) -> Generator[StreamTextPart, None, None]:
+        """Yield streamed text segments from /api/chat (thinking vs answer)."""
         payload: dict[str, Any] = {
             "model": model,
             "messages": api_messages,
@@ -346,18 +370,16 @@ class OllamaService:
         for line in res.iter_lines():
             if line:
                 chunk = json.loads(line.decode("utf-8"))
-                token = _stream_line_tokens(chunk)
-                if token:
-                    yield token
+                yield from _iter_stream_parts_from_chunk(chunk)
 
     def yield_generate_tokens(
         self,
         model: str,
         prompt: str,
         *,
-        ollama_options: dict[str, float | int] | None = None,
-    ) -> Generator[str, None, None]:
-        """Yield raw token strings from /api/generate (for SSE)."""
+        ollama_options: dict[str, float | int | bool] | None = None,
+    ) -> Generator[StreamTextPart, None, None]:
+        """Yield streamed text segments from /api/generate (thinking vs answer)."""
         payload: dict[str, Any] = {"model": model, "prompt": prompt, "stream": True}
         if ollama_options:
             payload["options"] = ollama_options
@@ -378,16 +400,14 @@ class OllamaService:
         for line in res.iter_lines():
             if line:
                 chunk = json.loads(line.decode("utf-8"))
-                token = chunk.get("response", "")
-                if token:
-                    yield token
+                yield from _iter_stream_parts_from_chunk(chunk)
 
     def generate_completion(
         self,
         model: str,
         prompt: str,
         *,
-        ollama_options: dict[str, float | int] | None = None,
+        ollama_options: dict[str, float | int | bool] | None = None,
     ) -> str:
         """Return a single non-streaming completion from /api/generate."""
         payload: dict[str, Any] = {"model": model, "prompt": prompt, "stream": False}
@@ -416,9 +436,9 @@ class OllamaService:
         messages: list[ChatTurn],
         system_prompt: str,
         *,
-        ollama_options: dict[str, float | int] | None = None,
+        ollama_options: dict[str, float | int | bool] | None = None,
         last_user_images_base64: list[str] | None = None,
-    ) -> Generator[str, None, None]:
+    ) -> Generator[str | StreamTextPart, None, None]:
         """Unified token stream for the FastAPI layer (satisfies LLMClient Protocol)."""
         if last_user_images_base64 and not self._s.use_chat_api:
             raise ValueError("Vision chat requires GOAT_USE_CHAT_API=true")
@@ -448,9 +468,9 @@ class OllamaService:
         system_prompt: str,
         *,
         tools: list[dict[str, Any]],
-        ollama_options: dict[str, float | int] | None = None,
-    ) -> Generator[str | ToolCallPlan, None, None]:
-        """Stream assistant tokens and surface native tool calls when they occur."""
+        ollama_options: dict[str, float | int | bool] | None = None,
+    ) -> Generator[str | StreamTextPart | ToolCallPlan, None, None]:
+        """Stream assistant segments and surface native tool calls when they occur."""
         payload: dict[str, Any] = {
             "model": model,
             "messages": messages_for_ollama(messages, system_prompt),
@@ -495,9 +515,7 @@ class OllamaService:
                                     arguments=arguments,
                                 )
 
-            token = _stream_line_tokens(chunk)
-            if token:
-                yield token
+            yield from _iter_stream_parts_from_chunk(chunk)
 
     def plan_tool_call(
         self,
@@ -506,7 +524,7 @@ class OllamaService:
         system_prompt: str,
         *,
         tools: list[dict[str, Any]],
-        ollama_options: dict[str, float | int] | None = None,
+        ollama_options: dict[str, float | int | bool] | None = None,
     ) -> ToolCallPlan | None:
         """Ask Ollama for a single native tool call plan without streaming."""
         payload: dict[str, Any] = {
@@ -556,8 +574,8 @@ class OllamaService:
         followup_messages: list[dict[str, Any]],
         *,
         tools: list[dict[str, Any]],
-        ollama_options: dict[str, float | int] | None = None,
-    ) -> Generator[str, None, None]:
+        ollama_options: dict[str, float | int | bool] | None = None,
+    ) -> Generator[str | StreamTextPart, None, None]:
         """Stream the model's final response after a tool result is appended."""
         payload: dict[str, Any] = {
             "model": model,
@@ -580,6 +598,4 @@ class OllamaService:
         for line in res.iter_lines():
             if line:
                 chunk = json.loads(line.decode("utf-8"))
-                token = _stream_line_tokens(chunk)
-                if token:
-                    yield token
+                yield from _iter_stream_parts_from_chunk(chunk)

@@ -44,7 +44,7 @@ Last updated: 2026-04-09
 - Model capability detection via `GET /api/models/capabilities`
 - Native chart-tool path: charts are emitted only from real Ollama tool calls, never pre-rendered before the LLM responds
 - Vision images: `POST /api/media/uploads` stores PNG/JPEG/WebP for use with `image_attachment_ids` on `POST /api/chat` when the selected model reports vision capability
-- Typed SSE protocol: `token`, `chart_spec`, `error`, `done`
+- Typed SSE protocol: `thinking`, `token`, `chart_spec`, `artifact`, `error`, `done`
 - Black-box API contract coverage through `__tests__/test_api_blackbox_contract.py`
 - Architecture guard suite (`__tests__/test_architecture_boundaries.py`) included in standard `unittest discover` runs
 - Lightweight safeguard layer for clearly unsafe sexual or violent misuse requests in chat
@@ -94,7 +94,7 @@ Last updated: 2026-04-09
 
 ## Important behavior notes
 
-- `/api/chat` streams typed JSON SSE objects, not legacy string sentinels
+- `/api/chat` streams typed JSON SSE objects, not legacy string sentinels (`thinking` and `token` are distinct streams for reasoning vs answer text)
 - `/api/upload` now emits `knowledge_ready` then `done`; it ingests the file into the knowledge subsystem instead of returning prompt-injection `file_context`
 - `/api/upload/analyze` now returns `document_id`, `ingestion_id`, `status`, and `retrieval_mode`; `chart: null` remains only for backward compatibility
 - `/api/chat` accepts `knowledge_document_ids` and uses retrieval-backed generation when indexed documents are attached

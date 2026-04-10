@@ -217,9 +217,11 @@ All API call functions live in `src/api/` - never `fetch()` directly inside a co
 
 ```typescript
 // src/api/chat.ts
-export async function* streamChat(req: ChatRequest): AsyncGenerator<string> {
-  const resp = await fetch("/api/chat", { method: "POST", body: JSON.stringify(req), ... });
-  // parse SSE ...
+import type { ChatRequest, ChatStreamEvent } from "./types";
+
+export async function* streamChat(req: ChatRequest): AsyncGenerator<ChatStreamEvent> {
+  const resp = await fetch("./api/chat", { method: "POST", body: JSON.stringify(req), ... });
+  // parse SSE lines into typed events (token, thinking, chart_spec, …)
 }
 ```
 
@@ -244,7 +246,25 @@ function ChatWindow() {
 - Every hook returns a stable, typed object - not a tuple (unless exactly 2 items like `useState`).
 - Hooks must not import from `src/components/` (no circular dependency).
 
-### 2.5 Module Structure (React frontend)
+### 2.5 UI Accessibility Baseline
+
+All new frontend work and material UI refreshes must target **WCAG 2.2 AA** as the default baseline.
+
+- Text must meet contrast minimums: `4.5:1` for normal text, `3:1` for large text.
+- Meaningful non-text visuals, including component boundaries, icons, and focus rings, must also meet `3:1` contrast.
+- Color must never be the only signal for state, validation, selection, or status.
+- Every interactive control must be keyboard operable, expose a visible focus indicator, and keep focus order logical.
+- Focus must never be hidden behind sticky chrome, drawers, dialogs, or other overlays.
+- Pointer targets should be at least `24 x 24 CSS px`; use `44 x 44 CSS px` for primary and icon-only actions when practical.
+- Layout must remain usable at narrow widths without horizontal overflow or clipped primary actions.
+- Inputs must have labels or instructions, and validation errors must be stated in text, not color alone.
+- Custom controls must expose correct accessible names, roles, states, and values.
+- Important async feedback such as save, send, loading, or failure states must be announced as status messages.
+- Keep type scales small and consistent, avoid very light weights for small text, and minimize truncation.
+- Use reusable design-system tokens for contrast, focus rings, target size, spacing, typography, and responsive behavior.
+- Keep a clear primary-action hierarchy on each surface; reserve prominent button styles for the highest-priority action and make destructive actions visually distinct.
+
+### 2.6 Module Structure (React frontend)
 
 ```
 frontend/src/
@@ -369,7 +389,7 @@ For frontend UI or layout changes, do not stop at `npm test` / `npm run build`. 
   - empty/default chat shell
   - populated conversation after sending a sample prompt
   - options/model/history panel state if present in the current UI
-  - any extra transient state only if modified by the change
+  - any transient state touched by the change
 - Inspect at two widths:
   - desktop baseline around `1440px`
   - narrow/mobile baseline around `390px`
@@ -377,8 +397,11 @@ For frontend UI or layout changes, do not stop at `npm test` / `npm run build`. 
 - Check at minimum:
   - top navigation alignment
   - card/list spacing consistency
-  - primary button styling against the current design system
+  - primary and secondary action hierarchy
+  - visible keyboard focus and unobscured focus targets
   - form/composer overflow on narrow/mobile widths
+  - text contrast, labels, and validation/error readability
+  - target size for icon buttons and close controls
 - If issues are found, fix the code, reopen the integrated app, and rerun the same inspection loop before delivery.
 - Report all three in the final hand-off:
   - files changed

@@ -42,7 +42,7 @@ from backend.types import Settings
 from goat_ai.clocks import Clock
 from goat_ai.echarts_tool import GENERATE_CHART_V2_SCHEMA
 from goat_ai.exceptions import OllamaUnavailable
-from goat_ai.ollama_client import LLMClient
+from goat_ai.ollama_client import LLMClient, StreamTextPart, ToolCallPlan
 from goat_ai.types import ChatTurn
 
 logger = logging.getLogger(__name__)
@@ -147,7 +147,7 @@ class ChatStreamService:
         title_generator: TitleGenerator | None = None,
         safeguard_service: SafeguardService | None = None,
         system_instruction: str = "",
-        ollama_options: dict[str, float | int] | None = None,
+        ollama_options: dict[str, float | int | bool] | None = None,
         tabular_extractor: TabularContextExtractor | None = None,
         vision_last_user_images_base64: list[str] | None = None,
         settings: Settings | None = None,
@@ -215,7 +215,7 @@ class ChatStreamService:
         title_generator: TitleGenerator | None,
         safeguard_service: SafeguardService | None,
         system_instruction: str,
-        ollama_options: dict[str, float | int] | None,
+        ollama_options: dict[str, float | int | bool] | None,
         tabular_extractor: TabularContextExtractor | None,
         vision_last_user_images_base64: list[str] | None,
         settings: Settings | None,
@@ -303,6 +303,34 @@ class ChatStreamService:
             request_id=request_id,
         )
 
+    def _emit_thinking_sse(self, text: str) -> Generator[str, None, None]:
+        if text:
+            yield sse_event({"type": "thinking", "token": text})
+
+    def _emit_content_through_buffer(
+        self, run: SimpleNamespace, text: str
+    ) -> Generator[str, None, None]:
+        if not text:
+            return
+        run.buffer.append(text)
+        for token_event in run.output_buffer.push(text):
+            if run.first_token_emitted_at is None:
+                run.first_token_emitted_at = time.monotonic()
+            yield token_event
+
+    def _consume_llm_stream_item(
+        self, run: SimpleNamespace, item: str | StreamTextPart
+    ) -> Generator[str, None, None]:
+        if isinstance(item, StreamTextPart):
+            if not item.text:
+                return
+            if item.kind == "thinking":
+                yield from self._emit_thinking_sse(item.text)
+                return
+            yield from self._emit_content_through_buffer(run, item.text)
+            return
+        yield from self._emit_content_through_buffer(run, item)
+
     def _phase_input_guard(self, run: SimpleNamespace) -> Generator[str, None, None]:
         """Block unsafe input before any LLM call."""
         if run.safeguard is None:
@@ -355,31 +383,26 @@ class ChatStreamService:
             tools=[GENERATE_CHART_V2_SCHEMA],
             ollama_options=run.ollama_options,
         ):
-            if isinstance(event, str):
-                run.buffer.append(event)
-                for token_event in run.output_buffer.push(event):
-                    if run.first_token_emitted_at is None:
-                        run.first_token_emitted_at = time.monotonic()
-                    yield token_event
-                if run.output_buffer.blocked:
-                    break
-                continue
+            if isinstance(event, ToolCallPlan):
+                chart_spec = run.chart_orchestrator.compile_tool_call(
+                    tool_plan=event,
+                    dataframe=run.chart_dataframe,
+                )
+                if chart_spec is None:
+                    continue
 
-            chart_spec = run.chart_orchestrator.compile_tool_call(
-                tool_plan=event,
-                dataframe=run.chart_dataframe,
-            )
-            if chart_spec is None:
-                continue
+                run.emitted_chart_spec = chart_spec
+                followup_messages = run.chart_orchestrator.build_followup_messages(
+                    turns=run.turns,
+                    effective_prompt=run.effective_prompt,
+                    tool_event=event,
+                    chart_spec=chart_spec,
+                )
+                break
 
-            run.emitted_chart_spec = chart_spec
-            followup_messages = run.chart_orchestrator.build_followup_messages(
-                turns=run.turns,
-                effective_prompt=run.effective_prompt,
-                tool_event=event,
-                chart_spec=chart_spec,
-            )
-            break
+            yield from self._consume_llm_stream_item(run, event)
+            if run.output_buffer.blocked:
+                break
 
         if followup_messages is not None:
             for token in run.llm.stream_tool_followup(
@@ -388,11 +411,7 @@ class ChatStreamService:
                 tools=[GENERATE_CHART_V2_SCHEMA],
                 ollama_options=run.ollama_options,
             ):
-                run.buffer.append(token)
-                for token_event in run.output_buffer.push(token):
-                    if run.first_token_emitted_at is None:
-                        run.first_token_emitted_at = time.monotonic()
-                    yield token_event
+                yield from self._consume_llm_stream_item(run, token)
                 if run.output_buffer.blocked:
                     break
         elif not run.buffer:
@@ -401,18 +420,14 @@ class ChatStreamService:
     def _stream_plain_completion(
         self, run: SimpleNamespace
     ) -> Generator[str, None, None]:
-        for token in run.llm.stream_tokens(
+        for item in run.llm.stream_tokens(
             run.model,
             run.turns,
             run.effective_prompt,
             ollama_options=run.ollama_options,
             last_user_images_base64=run.vision_last_user_images_base64,
         ):
-            run.buffer.append(token)
-            for token_event in run.output_buffer.push(token):
-                if run.first_token_emitted_at is None:
-                    run.first_token_emitted_at = time.monotonic()
-                yield token_event
+            yield from self._consume_llm_stream_item(run, item)
             if run.output_buffer.blocked:
                 break
 
@@ -432,6 +447,8 @@ class ChatStreamService:
         clean_text = _strip_chart_block(full_text)
         chart_spec = run.emitted_chart_spec
         if not run.buffer:
+            yield sse_error_event("The model produced no output.")
+            yield sse_done_event()
             return
 
         output_assessment = (

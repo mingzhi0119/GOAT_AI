@@ -62,6 +62,17 @@ function useStreamIntoMessage() {
             setMsgs(prev =>
               prev.map(m => (m.id === msgId ? { ...m, content: m.content + event.token } : m)),
             )
+          } else if (event.type === 'thinking') {
+            setMsgs(prev =>
+              prev.map(m =>
+                m.id === msgId
+                  ? {
+                      ...m,
+                      thinkingContent: (m.thinkingContent ?? '') + event.token,
+                    }
+                  : m,
+              ),
+            )
           } else if (event.type === 'artifact') {
             const { type: _type, ...artifact } = event
             setMsgs(prev =>
@@ -214,6 +225,9 @@ export function useChat(): UseChatReturn {
                     temperature: ollamaOptions.temperature,
                     max_tokens: ollamaOptions.max_tokens,
                     top_p: ollamaOptions.top_p,
+                    ...(typeof ollamaOptions.think === 'boolean'
+                      ? { think: ollamaOptions.think }
+                      : {}),
                   }
                 : {}),
             },

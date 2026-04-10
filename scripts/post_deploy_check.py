@@ -49,47 +49,66 @@ def _expect_runtime_target(base_url: str) -> int:
     return 0
 
 
+def _resolve_chat_check_model(base_url: str) -> str:
+    response = requests.get(f"{base_url}/api/models", timeout=10)
+    response.raise_for_status()
+    body = response.json()
+    models = body.get("models", [])
+    if not isinstance(models, list) or not models:
+        raise ValueError("models endpoint returned no available models")
+    normalized = [str(model) for model in models if str(model).strip()]
+    if not normalized:
+        raise ValueError("models endpoint returned no usable model names")
+    if "gemma4:26b" in normalized:
+        return "gemma4:26b"
+    return normalized[0]
+
+
 def _expect_chat_stream_contract(base_url: str) -> int:
     timeout_sec = _first_event_timeout_sec()
-    response: requests.Response | None = None
+    model = _resolve_chat_check_model(base_url)
     try:
         response = requests.post(
             f"{base_url}/api/chat",
             json={
-                "model": "gemma4:26b",
+                "model": model,
                 "messages": [
                     {"role": "user", "content": "Say hello in three short tokens."}
                 ],
+                # Quick mode avoids thinking-only streams that consume the whole
+                # budget before any answer tokens (thinking models + low max_tokens).
+                "think": False,
+                "max_tokens": 48,
+                "temperature": 0,
             },
-            stream=True,
             timeout=(5, timeout_sec),
         )
         response.raise_for_status()
-        for line in response.iter_lines(decode_unicode=True):
-            if not line or not line.startswith("data: "):
-                continue
-            event = json.loads(line[6:])
-            if not isinstance(event, dict):
-                return _fail("chat stream returned a non-object SSE payload")
-            event_type = str(event.get("type"))
-            if event_type == "error":
-                return _fail(
-                    f"chat stream first event was error: {event.get('message', '')}"
-                )
-            if event_type != "token":
-                return _fail(
-                    f"chat stream first event was {event_type!r} instead of token"
-                )
+        body = response.text
+        events = _parse_sse_events(body)
+        if not events:
+            return _fail("chat stream produced no SSE events")
+
+        first_event = events[0]
+        event_type = str(first_event.get("type"))
+        if event_type == "error":
+            return _fail(
+                f"chat stream first event was error: {first_event.get('message', '')}"
+            )
+
+        token_events = [e for e in events if str(e.get("type")) == "token"]
+        thinking_events = [e for e in events if str(e.get("type")) == "thinking"]
+        if token_events or thinking_events:
             return 0
+        return _fail(
+            f"chat stream produced no token or thinking events (first frame type was {event_type!r})"
+        )
     except requests.Timeout as exc:
         return _fail(
             f"chat stream produced no SSE events before first-token timeout: {exc}"
         )
-    finally:
-        close = getattr(response, "close", None) if response is not None else None
-        if callable(close):
-            close()
-    return _fail("chat stream produced no SSE events")
+    except json.JSONDecodeError as exc:
+        return _fail(f"chat stream returned malformed SSE JSON: {exc}")
 
 
 def main() -> int:

@@ -68,7 +68,7 @@ Important behavior:
 - `deploy.sh` and `deploy.ps1` now stop the current FastAPI process gracefully first, then force cleanup only if the drain window expires
 - Rollback uses an explicit ref: see [ROLLBACK.md](ROLLBACK.md)
 - Windows deploy reuses Ollama on `127.0.0.1:11434` when available unless `OLLAMA_BASE_URL` is explicitly set
-- Deploy now includes a post-deploy contract check (`scripts/post_deploy_check.py`) before success is reported
+- Deploy now includes a post-deploy contract check (`scripts/post_deploy_check.py`) before success is reported: it exercises `GET /api/health`, `GET /api/ready`, `GET /api/system/runtime-target`, and a short `POST /api/chat` stream. The chat step passes when the SSE body includes **at least one** `token` or **`thinking`** frame (so thinking-first models still validate), and fails on HTTP errors, empty SSE, or a first-frame `error`
 
 ## Deployment profiles
 

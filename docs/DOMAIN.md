@@ -17,6 +17,8 @@ This document names **user-visible and persistence concepts** shared across chat
 | **File context** | Tabular or upload-derived text injected for analysis; may be stored as `file_context_prompt` or legacy markers. |
 | **Knowledge attachment** | References to indexed documents (`knowledge_document_ids` / persisted `knowledge_documents`). |
 | **Vision attachment** | Image ids from `POST /api/media/uploads` (`image_attachment_ids`). |
+| **Thinking trace** | Optional streamed model reasoning: SSE type `thinking`. Not stored in session assistant `content`; the SPA accumulates it separately for a collapsed **Thinking** disclosure. |
+| **Assistant reply (visible)** | Answer text from SSE type `token`, after safeguards; this is what history persistence records as the assistant message body. |
 
 ## Charts (native tool path)
 

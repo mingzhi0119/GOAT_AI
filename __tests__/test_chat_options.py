@@ -14,11 +14,12 @@ class ChatOptionsTests(unittest.TestCase):
         self.assertIsNone(build_ollama_options())
 
     def test_build_maps_num_predict(self) -> None:
-        o = build_ollama_options(temperature=0.7, max_tokens=512, top_p=0.95)
+        o = build_ollama_options(temperature=0.7, max_tokens=512, top_p=0.95, think=True)
         assert o is not None
         self.assertEqual(0.7, o["temperature"])
         self.assertEqual(512, o["num_predict"])
         self.assertEqual(0.95, o["top_p"])
+        self.assertTrue(o["think"])
 
     def test_from_request(self) -> None:
         req = ChatRequest(
@@ -27,11 +28,13 @@ class ChatOptionsTests(unittest.TestCase):
             temperature=0.5,
             max_tokens=128,
             top_p=0.9,
+            think=False,
         )
         o = ollama_options_from_chat_request(req)
         assert o is not None
         self.assertEqual(0.5, o["temperature"])
         self.assertEqual(128, o["num_predict"])
+        self.assertFalse(o["think"])
 
 
 if __name__ == "__main__":
