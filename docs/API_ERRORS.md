@@ -46,5 +46,4 @@ JSON error responses use a **stable envelope** so logs, metrics, and clients sha
 ## Related
 
 - [ROADMAP.md](ROADMAP.md) Phase 13 Section 13.0  
-- [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) - [AGENTS.md](../AGENTS.md) (index)
-
+- [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) - [AGENTS.md](../AGENTS.md) (agent memory and collaboration guide)

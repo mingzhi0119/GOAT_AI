@@ -5,7 +5,7 @@ alwaysApply: true
 
 # GOAT AI - Core principles
 
-Canonical engineering rules: `docs/ENGINEERING_STANDARDS.md`. Repo root `AGENTS.md` is a short index; keep `.cursor/rules/` aligned when standards change.
+Canonical engineering rules: `docs/ENGINEERING_STANDARDS.md`. Repo root `AGENTS.md` carries agent memory and collaboration guidance; keep `.cursor/rules/` aligned when standards change.
 
 ## Purpose
 

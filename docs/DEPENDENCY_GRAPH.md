@@ -33,8 +33,9 @@ As of the Phase 15.9 closeout audit, `backend.application` owns all history, kno
 Wired routes:
 
 - `GET /api/history` and `DELETE /api/history` flow through `backend.application.history`.
-- `GET /api/history/{id}` flows through `backend.application.history.get_history_session_detail`.
-- `DELETE /api/history/{id}` flows through `backend.application.history.delete_history_session` (Phase 15.9: moved from router directly calling `session_repository.delete_session()`).
+- `GET /api/history/{session_id}` flows through `backend.application.history.get_history_session_detail`.
+- `PATCH /api/history/{session_id}` flows through `backend.application.history.rename_history_session`.
+- `DELETE /api/history/{session_id}` flows through `backend.application.history.delete_history_session` (Phase 15.9: moved from router directly calling `session_repository.delete_session()`).
 - `POST /api/knowledge/*` flows through `backend.application.knowledge`.
 - `POST /api/media/uploads` flows through `backend.application.media`.
 - `GET /api/models` and `GET /api/models/capabilities` flow through `backend.application.models`.

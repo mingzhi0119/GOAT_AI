@@ -39,7 +39,8 @@ Last updated: 2026-04-10
   - `GET /api/knowledge/ingestions/{ingestion_id}`
   - `POST /api/knowledge/search`
   - `POST /api/knowledge/answers`
-- Session history via `GET /api/history`, `GET /api/history/{id}`, `DELETE /api/history`, `DELETE /api/history/{id}`
+- Session history via `GET /api/history`, `GET /api/history/{session_id}`, `PATCH /api/history/{session_id}`, `DELETE /api/history`, and `DELETE /api/history/{session_id}`
+- Generated chat artifact download via `GET /api/artifacts/{artifact_id}`
 - GPU telemetry and rolling inference latency APIs, including first-token latency telemetry
 - Latency telemetry includes p50/p95 and model-scoped buckets for completion and first-token metrics
 - Model capability detection via `GET /api/models/capabilities`
@@ -84,8 +85,10 @@ Last updated: 2026-04-10
 | POST | `/api/knowledge/search` |
 | POST | `/api/knowledge/answers` |
 | POST | `/api/media/uploads` |
+| GET | `/api/artifacts/{artifact_id}` |
 | GET | `/api/history` |
 | GET | `/api/history/{session_id}` |
+| PATCH | `/api/history/{session_id}` |
 | DELETE | `/api/history` |
 | DELETE | `/api/history/{session_id}` |
 | GET | `/api/system/gpu` |
@@ -103,8 +106,9 @@ Last updated: 2026-04-10
 - Chat can emit persisted downloadable artifacts over SSE and serve them from `GET /api/artifacts/{artifact_id}`
 - `/api/knowledge/*` routes now support persisted upload, synchronous ingestion, retrieval, retrieval-backed answers, and attached-document fallback when lexical retrieval misses
 - `/api/health` is liveness only; `/api/ready` is the deploy/readiness probe and returns `503` when SQLite or the optional Ollama probe is not ready
-- History reads are normalized at the backend boundary: `/api/history/{id}` returns standard chat roles plus structured `chart_spec`, legacy `file_context`, and `knowledge_documents`, while legacy stored payloads remain readable through a dedicated compatibility codec
+- History reads are normalized at the backend boundary: `/api/history/{session_id}` returns standard chat roles plus structured `chart_spec`, legacy `file_context`, and `knowledge_documents`, while legacy stored payloads remain readable through a dedicated compatibility codec
 - When `GOAT_API_KEY` is configured, every API except `/api/health` and `/api/ready` requires `X-GOAT-API-Key`
+- When `GOAT_API_KEY_WRITE` is configured, mutating routes require the write credential or an equivalent write-scoped registry credential
 
 ## Operational notes
 
@@ -114,7 +118,7 @@ Last updated: 2026-04-10
 
 ## Recommended reference docs
 
-- [AGENTS.md](../AGENTS.md) (short index) - [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) (canonical rules)
+- [AGENTS.md](../AGENTS.md) (agent memory and collaboration guide) - [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) (canonical rules)
 - [OPERATIONS.md](OPERATIONS.md)
 - [API_REFERENCE.md](API_REFERENCE.md)
 - [API_ERRORS.md](API_ERRORS.md)
