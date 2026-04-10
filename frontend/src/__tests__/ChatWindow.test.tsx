@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import ChatWindow from '../components/ChatWindow'
 import type { GPUStatus, InferenceLatency } from '../api/system'
 import { getChatLayoutDecisions } from '../utils/chatLayout'
+import { brandingConfig } from '../config/branding'
 
 const uploadMediaImageMock = vi.fn()
 const streamUploadMock = vi.fn()
@@ -96,7 +97,7 @@ describe('ChatWindow composer', () => {
     const sendButton = screen.getByRole('button', { name: /send message/i })
     expect(sendButton).toBeDisabled()
 
-    fireEvent.change(screen.getByPlaceholderText('Message GOAT AI'), {
+    fireEvent.change(screen.getByPlaceholderText(`Message ${brandingConfig.displayName}`), {
       target: { value: 'Hello there' },
     })
 
@@ -218,7 +219,7 @@ describe('ChatWindow composer', () => {
   it('focuses the textarea when clicking the text surface outside the current text node', () => {
     renderChatWindow()
 
-    const textarea = screen.getByPlaceholderText('Message GOAT AI')
+    const textarea = screen.getByPlaceholderText(`Message ${brandingConfig.displayName}`)
     fireEvent.mouseDown(screen.getByTestId('composer-text-surface'))
 
     expect(document.activeElement).toBe(textarea)

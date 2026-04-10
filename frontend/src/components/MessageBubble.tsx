@@ -1,8 +1,12 @@
 import { useState, type CSSProperties, type FC } from 'react'
 import ReactMarkdown from 'react-markdown'
+import rehypeKatex from 'rehype-katex'
+import remarkMath from 'remark-math'
 import remarkGfm from 'remark-gfm'
 import type { ChatArtifact, Message } from '../api/types'
 import type { ChatLayoutMode } from '../utils/chatLayout'
+import { normalizeDisplayMathMarkdown, shouldRenderMathMarkdown } from '../utils/mathRendering'
+import { ChevronRightIcon, CopiedIcon, CopyIcon } from './uiIcons'
 
 interface Props {
   message: Message
@@ -56,11 +60,21 @@ function formatArtifactSize(byteSize: number): string {
   return `${(byteSize / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function formatConversationStamp(createdAt?: string): string | null {
+  if (!createdAt) return null
+  const date = new Date(createdAt)
+  if (Number.isNaN(date.getTime())) return null
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${month}:${day}`
+}
+
 const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode = 'wide' }) => {
   const isUser = message.role === 'user'
   const isError = message.isError === true
   const isNarrow = layoutMode === 'narrow'
   const [copied, setCopied] = useState(false)
+  const createdStamp = formatConversationStamp(message.createdAt)
   const artifactByFilename = new Map(
     (message.artifacts ?? []).map(artifact => [artifact.filename, artifact]),
   )
@@ -69,6 +83,10 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode 
     isUser || !hasFileContext
       ? message.content
       : stripChartBlock(message.content, message.isStreaming ?? false)
+  const renderMath = shouldRenderMathMarkdown(displayContent, message.isStreaming ?? false)
+  const markdownContent = renderMath
+    ? normalizeDisplayMathMarkdown(displayContent)
+    : displayContent
 
   const copyControl = (className: string, buttonStyle?: CSSProperties) => (
     <button
@@ -79,6 +97,7 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode 
           setTimeout(() => setCopied(false), 2000)
         })
       }
+      aria-label={copied ? 'Copied message' : 'Copy message'}
       title={copied ? 'Copied!' : 'Copy message'}
       className={className}
       style={
@@ -90,17 +109,12 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode 
     >
       {copied ? (
         <>
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-            <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z" />
-          </svg>
+          <CopiedIcon />
           Copied
         </>
       ) : (
         <>
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-            <path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z" />
-            <path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z" />
-          </svg>
+          <CopyIcon />
           Copy
         </>
       )}
@@ -164,13 +178,6 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode 
                   Writing...
                 </span>
               )}
-              {!message.isStreaming && displayContent && (
-                <div className="flex shrink-0 items-center">
-                  {copyControl('assistant-copy-hit flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs', {
-                    background: 'transparent',
-                  })}
-                </div>
-              )}
             </div>
 
             {message.showThinking &&
@@ -188,14 +195,7 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode 
                   className="flex w-full min-w-0 cursor-pointer list-none items-center gap-1.5 font-medium outline-none [&::-webkit-details-marker]:hidden"
                   style={{ color: 'var(--text-muted)' }}
                 >
-                  <svg
-                    className="thinking-chevron h-3.5 w-3.5 shrink-0 transition-transform duration-200"
-                    viewBox="0 0 16 16"
-                    fill="currentColor"
-                    aria-hidden
-                  >
-                    <path d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06L7.28 12.78a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z" />
-                  </svg>
+                  <ChevronRightIcon className="thinking-chevron h-3.5 w-3.5 shrink-0 transition-transform duration-200" />
                   <span>Thinking</span>
                 </summary>
                 <div
@@ -219,7 +219,8 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode 
                 .join(' ')}
             >
               <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
+                remarkPlugins={renderMath ? [remarkGfm, remarkMath] : [remarkGfm]}
+                rehypePlugins={renderMath ? [rehypeKatex] : []}
                 components={{
                   a: ({ href, children }) => {
                     const artifact = resolveArtifactLink(
@@ -237,9 +238,26 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode 
                   },
                 }}
               >
-                {displayContent || ' '}
+                {markdownContent || ' '}
               </ReactMarkdown>
             </div>
+
+            {!message.isStreaming && displayContent && (
+              <div className="assistant-copy-footer mt-2 flex h-0 items-center gap-2 overflow-hidden opacity-0 transition-all duration-150 group-hover:h-6 group-hover:opacity-100 group-focus-within:h-6 group-focus-within:opacity-100">
+                {copyControl('assistant-copy-hit flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs', {
+                  background: 'transparent',
+                })}
+                {createdStamp && (
+                  <time
+                    dateTime={message.createdAt}
+                    className="text-[10px] font-medium tracking-[0.08em]"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    {createdStamp}
+                  </time>
+                )}
+              </div>
+            )}
           </div>
         )}
 

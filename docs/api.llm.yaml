@@ -69,7 +69,8 @@ schemas:
       temperature: number|null
       max_tokens: integer|null
       top_p: number|null
-      think: boolean|null
+      think: boolean|low|medium|high|null
+      plan_mode: boolean
   CodeSandboxFeaturePayload:
     type: object
     required:
@@ -164,6 +165,12 @@ schemas:
       content: string
       image_attachment_ids: string[]
       artifacts: ChatArtifact[]
+  HistorySessionRenameRequest:
+    type: object
+    required:
+      - title
+    properties:
+      title: string
   HistorySessionSummary:
     type: object
     required:
@@ -507,6 +514,20 @@ endpoints:
       errors:
         - 401
         - 403
+        - 429
+  - op: rename_history_session_route
+    method: PATCH
+    path: /history/{session_id}
+    path_params:
+      session_id: string
+    body: HistorySessionRenameRequest
+    content_type: application/json
+    response:
+      204: no_content
+      errors:
+        - 401
+        - 403
+        - 404
         - 429
   - op: get_history_session
     method: GET

@@ -6,6 +6,7 @@ export const FILE_CONTEXT_REPLY = 'I have loaded the file context.'
 
 export function hydrateHistorySession(session: HistorySessionDetail): Message[] {
   const mapped: Message[] = []
+  const fallbackCreatedAt = session.updated_at || session.created_at
 
   const fileContextPrompt = session.file_context?.prompt?.trim()
   if (fileContextPrompt) {
@@ -13,6 +14,7 @@ export function hydrateHistorySession(session: HistorySessionDetail): Message[] 
       id: crypto.randomUUID(),
       role: 'user',
       content: fileContextPrompt,
+      createdAt: session.created_at,
       hidden: true,
       file_context: true,
     })
@@ -20,6 +22,7 @@ export function hydrateHistorySession(session: HistorySessionDetail): Message[] 
       id: crypto.randomUUID(),
       role: 'assistant',
       content: FILE_CONTEXT_REPLY,
+      createdAt: session.created_at,
       hidden: true,
     })
   }
@@ -31,6 +34,7 @@ export function hydrateHistorySession(session: HistorySessionDetail): Message[] 
       id: crypto.randomUUID(),
       role: message.role,
       content: message.content,
+      createdAt: fallbackCreatedAt,
       ...(message.artifacts && message.artifacts.length > 0 ? { artifacts: message.artifacts } : {}),
       ...(ids && ids.length > 0 ? { image_attachment_ids: ids } : {}),
     })

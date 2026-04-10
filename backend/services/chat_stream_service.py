@@ -147,7 +147,8 @@ class ChatStreamService:
         title_generator: TitleGenerator | None = None,
         safeguard_service: SafeguardService | None = None,
         system_instruction: str = "",
-        ollama_options: dict[str, float | int | bool] | None = None,
+        plan_mode: bool = False,
+        ollama_options: dict[str, float | int | bool | str] | None = None,
         tabular_extractor: TabularContextExtractor | None = None,
         vision_last_user_images_base64: list[str] | None = None,
         settings: Settings | None = None,
@@ -173,6 +174,7 @@ class ChatStreamService:
             title_generator=title_generator,
             safeguard_service=safeguard_service,
             system_instruction=system_instruction,
+            plan_mode=plan_mode,
             ollama_options=ollama_options,
             tabular_extractor=tabular_extractor,
             vision_last_user_images_base64=vision_last_user_images_base64,
@@ -215,7 +217,8 @@ class ChatStreamService:
         title_generator: TitleGenerator | None,
         safeguard_service: SafeguardService | None,
         system_instruction: str,
-        ollama_options: dict[str, float | int | bool] | None,
+        plan_mode: bool,
+        ollama_options: dict[str, float | int | bool | str] | None,
         tabular_extractor: TabularContextExtractor | None,
         vision_last_user_images_base64: list[str] | None,
         settings: Settings | None,
@@ -238,6 +241,7 @@ class ChatStreamService:
             base_prompt=system_prompt,
             user_name=user_name,
             system_instruction=system_instruction,
+            plan_mode=plan_mode,
         )
         holdback_tokens = (
             _STREAM_OUTPUT_HOLDBACK_TOKENS if safeguard_service is not None else 0

@@ -3,6 +3,7 @@ import {
   APPEARANCE_STORAGE_KEY,
   DEFAULT_APPEARANCE_CONFIG,
   applyAppearanceToRoot,
+  formatColorTokenDisplay,
   getComputedThemeTokens,
   loadStoredAppearance,
   sanitizeAppearanceConfig,
@@ -91,5 +92,13 @@ describe('appearance helpers', () => {
     expect(root.style.getPropertyValue('--theme-accent')).toBe('#9f4b1b')
     expect(root.style.getPropertyValue('--bg-main')).not.toBe('')
     expect(root.style.getPropertyValue('--composer-send-bg')).toBe('#9f4b1b')
+  })
+
+  it('formats appearance color readouts as hex with optional opacity', () => {
+    expect(formatColorTokenDisplay('rgba(255, 255, 255, 0.97)')).toBe('#FFFFFF, 97%')
+    expect(formatColorTokenDisplay('rgba(0, 30, 95, 0.08)')).toBe('#001E5F, 8%')
+    expect(formatColorTokenDisplay('rgba(255, 255, 255, 1)')).toBe('#FFFFFF')
+    expect(formatColorTokenDisplay('rgba(255, 255, 255, 0)')).toBe('#FFFFFF')
+    expect(formatColorTokenDisplay('#021d59')).toBe('#021D59')
   })
 })

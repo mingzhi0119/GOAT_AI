@@ -2,12 +2,13 @@ import { type FC, type MouseEvent } from 'react'
 import type { HistorySessionItem } from '../api/history'
 import type { ChatLayoutMode } from '../utils/chatLayout'
 import type { AppearanceStyleId } from '../utils/appearance'
+import { brandingConfig } from '../config/branding'
 import GoatIcon from './GoatIcon'
+import { NewChatIcon, TrashIcon, CloseIcon } from './uiIcons'
 import {
   sidebarFooterAttributionClass,
   sidebarFooterHighlightClass,
   sidebarHelperMutedClass,
-  sidebarSectionLabelClass,
   sidebarSectionLabelRowClass,
   sidebarStaticBaseClass,
 } from './sidebarStaticText'
@@ -26,8 +27,6 @@ interface Props {
   historyError: string | null
   onLoadHistorySession: (sessionId: string) => void
   onDeleteHistorySession: (sessionId: string) => void
-  onRefreshHistory: () => void
-  onDeleteAllHistory: () => void
 }
 
 function hoverHandlers(hoverBg: string, defaultBg = 'transparent') {
@@ -40,17 +39,6 @@ function hoverHandlers(hoverBg: string, defaultBg = 'transparent') {
     },
   }
 }
-
-const NewChatIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-    <path
-      d="M8 3.25v9.5M3.25 8h9.5"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-    />
-  </svg>
-)
 
 const Sidebar: FC<Props> = ({
   onClearChat,
@@ -66,8 +54,6 @@ const Sidebar: FC<Props> = ({
   historyError,
   onLoadHistorySession,
   onDeleteHistorySession,
-  onRefreshHistory,
-  onDeleteAllHistory,
 }) => {
   const isNarrow = layoutMode === 'narrow'
   const isOpen = isNarrow ? open : true
@@ -112,7 +98,7 @@ const Sidebar: FC<Props> = ({
             className="cursor-default select-none text-[15px] font-semibold leading-none tracking-[-0.02em]"
             style={{ color: 'var(--text-sidebar)' }}
           >
-            GOAT AI
+            {brandingConfig.displayName}
           </h1>
         </div>
         {isNarrow && (
@@ -123,17 +109,13 @@ const Sidebar: FC<Props> = ({
             style={{ color: 'var(--sidebar-muted)' }}
             aria-label="Close sidebar"
           >
-            x
+            <CloseIcon />
           </button>
         )}
       </div>
 
       <div className="flex-1 space-y-3.5 overflow-y-auto px-4 py-4">
-        <section className="space-y-1">
-          <p className={sidebarSectionLabelClass} style={{ color: 'var(--sidebar-muted)' }}>
-            Actions
-          </p>
-
+        <div className="mb-3">
           <button
             type="button"
             onClick={() => {
@@ -149,33 +131,16 @@ const Sidebar: FC<Props> = ({
             </span>
             <span className={sidebarStaticBaseClass}>New Chat</span>
           </button>
-        </section>
+        </div>
 
         <section className="space-y-1">
-          <div className="mb-1.5 flex min-w-0 items-center gap-1.5">
+          <div className="mb-2 flex min-w-0 items-center gap-1.5">
             <p
               className={`${sidebarSectionLabelRowClass} min-w-0 flex-1 truncate`}
               style={{ color: 'var(--sidebar-muted)' }}
             >
-              History
+              Chats
             </p>
-            <button
-              type="button"
-              onClick={onRefreshHistory}
-              className="flex-shrink-0 rounded-md px-2 py-0.5 text-xs transition-all"
-              style={{ color: 'var(--text-sidebar)', background: 'var(--sidebar-surface)' }}
-            >
-              Refresh
-            </button>
-            <button
-              type="button"
-              onClick={onDeleteAllHistory}
-              className="flex-shrink-0 rounded-md px-2 py-0.5 text-xs transition-all"
-              style={{ color: 'var(--sidebar-danger)', background: 'var(--sidebar-danger-bg)' }}
-              title="Delete all saved conversations"
-            >
-              Delete All
-            </button>
           </div>
 
           {historyError && (
@@ -220,7 +185,7 @@ const Sidebar: FC<Props> = ({
                   }}
                   title={item.title || 'New Chat'}
                   aria-current={isCurrent ? 'true' : undefined}
-                  className="block w-full min-w-0 rounded-[inherit] px-4 py-2.5 pr-12 text-left text-[15px] leading-5 transition-all"
+                  className="block w-full min-w-0 rounded-[inherit] px-4 py-1.5 pr-12 text-left text-[15px] leading-5 transition-all"
                   style={{ color: 'var(--text-sidebar)', background: rowBg }}
                   {...hoverHandlers(isCurrent ? rowBg : 'transparent', rowBg)}
                 >
@@ -240,7 +205,7 @@ const Sidebar: FC<Props> = ({
                   style={{ color: 'var(--sidebar-danger)', background: fadeBg }}
                   title="Delete conversation"
                 >
-                  x
+                  <TrashIcon />
                 </button>
               </div>
             )

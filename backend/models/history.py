@@ -66,3 +66,9 @@ class HistorySessionDetailResponse(HistorySessionSummary):
     chart_data_source: str | None = Field(
         default=None, pattern="^(uploaded|demo|none)$"
     )
+
+
+class HistorySessionRenameRequest(BaseModel):
+    """Body for PATCH /api/history/{session_id}."""
+
+    title: str = Field(..., min_length=1, max_length=120)

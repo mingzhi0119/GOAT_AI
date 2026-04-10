@@ -51,11 +51,12 @@ class PreparedChatRequest:
     session_owner_id: str
     auth_context: AuthorizationContext
     vision_last_user_images_base64: list[str] | None
-    ollama_options: dict[str, float | int | bool] | None
+    ollama_options: dict[str, float | int | bool | str] | None
+    plan_mode: bool
 
 
-def _build_ollama_options(req: ChatRequest) -> dict[str, float | int | bool] | None:
-    opts: dict[str, float | int | bool] = {}
+def _build_ollama_options(req: ChatRequest) -> dict[str, float | int | bool | str] | None:
+    opts: dict[str, float | int | bool | str] = {}
     if req.temperature is not None:
         opts["temperature"] = req.temperature
     if req.max_tokens is not None:
@@ -111,6 +112,7 @@ def prepare_chat_request(
         auth_context=auth_context,
         vision_last_user_images_base64=vision_b64,
         ollama_options=_build_ollama_options(req),
+        plan_mode=req.plan_mode,
     )
 
 
@@ -156,6 +158,7 @@ def stream_chat_response(
         title_generator=title_generator,
         safeguard_service=safeguard_service,
         system_instruction=(req.system_instruction or "").strip(),
+        plan_mode=prepared.plan_mode,
         ollama_options=prepared.ollama_options,
         tabular_extractor=tabular_extractor,
         settings=settings,

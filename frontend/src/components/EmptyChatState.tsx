@@ -1,4 +1,6 @@
 import type { ChatLayoutDecisions } from '../utils/chatLayout'
+import GoatIcon from './GoatIcon'
+import { brandingConfig } from '../config/branding'
 
 export interface EmptyChatPrompt {
   text: string
@@ -24,22 +26,10 @@ export default function EmptyChatState({
     <div
       className={`flex h-full flex-col items-center justify-center text-center ${layoutDecisions.compactSpacing ? 'gap-4 px-3' : 'gap-5 px-4'}`}
     >
-      <div
-        className="h-20 w-20 overflow-hidden rounded-2xl"
-        style={{
-          border: '1.5px solid #FFCD00',
-          background: '#2b2b2b',
-        }}
-      >
-        <img
-          src="./golden_goat_icon.png"
-          alt="GOAT AI"
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        />
-      </div>
+      <GoatIcon size={80} />
       <div>
         <h2 className="mb-1 text-xl font-bold" style={{ color: 'var(--text-main)' }}>
-          Welcome to GOAT AI
+          Welcome to {brandingConfig.displayName}
         </h2>
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
           Strategic Intelligence - Simon Business School

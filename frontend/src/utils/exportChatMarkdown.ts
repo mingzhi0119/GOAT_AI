@@ -1,4 +1,5 @@
 import type { Message } from '../api/types'
+import { brandingConfig } from '../config/branding'
 
 /** Build Markdown text from completed messages (unit-testable; no DOM). */
 export function buildMarkdownForExport(messages: Message[], title?: string | null): string {
@@ -6,7 +7,7 @@ export function buildMarkdownForExport(messages: Message[], title?: string | nul
   if (completed.length === 0) {
     return ''
   }
-  const header = title?.trim() || 'GOAT AI conversation'
+  const header = title?.trim() || `${brandingConfig.displayName} conversation`
   const lines: string[] = [`# ${header}`, '']
   for (const m of completed) {
     const label = m.role === 'user' ? 'User' : 'Assistant'

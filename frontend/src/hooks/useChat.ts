@@ -34,6 +34,7 @@ export interface UseChatReturn {
     model: string,
     userName?: string,
     knowledgeDocumentIds?: string[],
+    planModeEnabled?: boolean,
     systemInstruction?: string,
     ollamaOptions?: OllamaOptionsPayload,
     onChartSpec?: (spec: ChartSpec) => void,
@@ -160,6 +161,7 @@ export function useChat(): UseChatReturn {
           id: asstId,
           role: 'assistant',
           content: '',
+          createdAt: new Date().toISOString(),
           isStreaming: true,
           artifacts: [],
           showThinking,
@@ -177,6 +179,7 @@ export function useChat(): UseChatReturn {
       model: string,
       userName?: string,
       knowledgeDocumentIds?: string[],
+      planModeEnabled?: boolean,
       systemInstruction?: string,
       ollamaOptions?: OllamaOptionsPayload,
       onChartSpec?: (spec: ChartSpec) => void,
@@ -207,6 +210,7 @@ export function useChat(): UseChatReturn {
         id: crypto.randomUUID(),
         role: 'user',
         content: userText,
+        createdAt: new Date().toISOString(),
         ...(imageAttachmentIds && imageAttachmentIds.length > 0
           ? { image_attachment_ids: imageAttachmentIds }
           : {}),
@@ -223,6 +227,7 @@ export function useChat(): UseChatReturn {
               ...(knowledgeDocumentIds && knowledgeDocumentIds.length > 0
                 ? { knowledge_document_ids: knowledgeDocumentIds }
                 : {}),
+              ...(typeof planModeEnabled === 'boolean' ? { plan_mode: planModeEnabled } : {}),
               ...(imageAttachmentIds && imageAttachmentIds.length > 0
                 ? { image_attachment_ids: imageAttachmentIds }
                 : {}),
@@ -235,7 +240,8 @@ export function useChat(): UseChatReturn {
                     temperature: ollamaOptions.temperature,
                     max_tokens: ollamaOptions.max_tokens,
                     top_p: ollamaOptions.top_p,
-                    ...(typeof ollamaOptions.think === 'boolean'
+                    ...(typeof ollamaOptions.think === 'boolean' ||
+                    typeof ollamaOptions.think === 'string'
                       ? { think: ollamaOptions.think }
                       : {}),
                   }

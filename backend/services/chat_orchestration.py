@@ -45,10 +45,20 @@ _CHART_INTENT_RE = re.compile(
 
 
 def _compose_system_prompt(
-    base_prompt: str, user_name: str, system_instruction: str
+    base_prompt: str,
+    user_name: str,
+    system_instruction: str,
+    *,
+    plan_mode: bool = False,
 ) -> str:
-    """Merge base GOAT prompt, optional name, and optional user instructions."""
+    """Merge base GOAT prompt, optional planning prompt, name, and user instructions."""
     parts: list[str] = [base_prompt]
+    if plan_mode:
+        parts.append(
+            "Plan mode is enabled. Think through the task in a few concise internal "
+            "steps before answering, then give the final response without exposing "
+            "hidden reasoning."
+        )
     if user_name.strip():
         parts.append(
             f"The student's name is {user_name.strip()}. Feel free to address them by name."
@@ -90,9 +100,19 @@ class PromptComposer:
     """Compose the effective system prompt for chat orchestration."""
 
     def compose(
-        self, *, base_prompt: str, user_name: str, system_instruction: str
+        self,
+        *,
+        base_prompt: str,
+        user_name: str,
+        system_instruction: str,
+        plan_mode: bool = False,
     ) -> str:
-        return _compose_system_prompt(base_prompt, user_name, system_instruction)
+        return _compose_system_prompt(
+            base_prompt,
+            user_name,
+            system_instruction,
+            plan_mode=plan_mode,
+        )
 
 
 class ChartToolOrchestrator:

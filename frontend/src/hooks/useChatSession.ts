@@ -10,6 +10,7 @@ interface UseChatSessionArgs {
   selectedModel: string
   userName: string
   systemInstruction: string
+  planModeEnabled: boolean
   ollamaOptions?: OllamaOptionsPayload
 }
 
@@ -30,6 +31,7 @@ export interface UseChatSessionReturn {
   loadHistorySession: (sessionId: string) => Promise<void>
   deleteHistorySession: (sessionId: string) => Promise<void>
   deleteAllHistory: () => Promise<void>
+  renameHistorySession: (sessionId: string, title: string) => Promise<void>
   refreshHistory: () => Promise<void>
   upsertFileContext: (ctx: {
     id?: string
@@ -51,6 +53,7 @@ export function useChatSession({
   selectedModel,
   userName,
   systemInstruction,
+  planModeEnabled,
   ollamaOptions,
 }: UseChatSessionArgs): UseChatSessionReturn {
   const chat = useChat()
@@ -136,6 +139,7 @@ export function useChatSession({
         selectedModel,
         userName,
         shouldAttachKnowledge ? knowledgeDocumentIds : undefined,
+        planModeEnabled,
         systemInstruction,
         ollamaOptions,
         setChartSpec,
@@ -153,6 +157,7 @@ export function useChatSession({
       history,
       ollamaOptions,
       selectedModel,
+      planModeEnabled,
       setFileContextMode,
       systemInstruction,
       userName,
@@ -176,6 +181,7 @@ export function useChatSession({
     loadHistorySession,
     deleteHistorySession: history.deleteSession,
     deleteAllHistory: history.deleteAll,
+    renameHistorySession: history.renameSession,
     refreshHistory: history.refresh,
     upsertFileContext,
     setFileContextBindingMode,

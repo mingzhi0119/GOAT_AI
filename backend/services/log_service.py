@@ -356,6 +356,37 @@ def upsert_session(
         )
 
 
+def rename_session_title(*, db_path: Path, session_id: str, title: str) -> None:
+    """Rename one persisted chat session without touching its message payload."""
+    try:
+        now = datetime.now(timezone.utc).isoformat()
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """
+                UPDATE sessions
+                SET title = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (title, now, session_id),
+            )
+    except Exception:
+        inc_sqlite_log_write_failure(
+            operation="session_rename", code=_SQLITE_WRITE_METRIC_CODE
+        )
+        logger.error(
+            "Failed to rename session in SQLite",
+            extra={
+                "event": "sqlite_log_write_failure",
+                "component": "log_service.rename_session_title",
+                "operation": "session_rename",
+                "code": _SQLITE_WRITE_METRIC_CODE,
+                "db_path": str(db_path),
+                "session_id": session_id,
+            },
+            exc_info=True,
+        )
+
+
 def list_sessions(
     *,
     db_path: Path,

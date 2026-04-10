@@ -467,6 +467,90 @@
       }
     },
     "/api/history/{session_id}": {
+      "patch": {
+        "tags": [
+          "history"
+        ],
+        "summary": "Rename one persisted chat session",
+        "description": "Rename one persisted session.",
+        "operationId": "rename_history_session_route_api_history__session_id__patch",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HistorySessionRenameRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "get": {
         "tags": [
           "history"
@@ -1785,11 +1869,25 @@
                 "type": "boolean"
               },
               {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ]
+              },
+              {
                 "type": "null"
               }
             ],
             "title": "Think",
-            "description": "Ollama thinking mode toggle; true enables Thinking, false enables Quick."
+            "description": "Ollama thinking mode toggle or effort level; true enables Thinking, false disables it, and low/medium/high request an effort level."
+          },
+          "plan_mode": {
+            "type": "boolean",
+            "title": "Plan Mode",
+            "description": "When true, the system prompt asks the model to plan before answering.",
+            "default": false
           }
         },
         "type": "object",
@@ -2175,6 +2273,22 @@
         ],
         "title": "HistorySessionMessage",
         "description": "Stored message row for persisted session history."
+      },
+      "HistorySessionRenameRequest": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "HistorySessionRenameRequest",
+        "description": "Body for PATCH /api/history/{session_id}."
       },
       "HistorySessionSummary": {
         "properties": {

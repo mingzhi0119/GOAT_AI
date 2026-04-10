@@ -49,7 +49,6 @@ Last updated: 2026-04-10
 - Black-box API contract coverage through `__tests__/test_api_blackbox_contract.py`
 - Architecture guard suite (`__tests__/test_architecture_boundaries.py`) included in standard `unittest discover` runs
 - Lightweight safeguard layer for clearly unsafe sexual or violent misuse requests in chat
-- Single-port runtime-target policy (`:62606`) across deploy scripts and runtime-target API
 - Post-deploy contract verification script integrated into Linux and Windows deploy flows
 - Model capability probing includes in-process TTL caching
 - Stable JSON error envelope now uses `detail`, `code`, and `request_id` across exception handlers and protected middleware paths
@@ -63,7 +62,6 @@ Last updated: 2026-04-10
 - SQLite backup/restore runbook published at [BACKUP_RESTORE.md](BACKUP_RESTORE.md) and linked from OPERATIONS
 - Security/tooling baseline includes [SECURITY.md](SECURITY.md), `ruff check` in CI, `pip-audit` in CI, and changed-file `ruff format` gating for Python edits
 - Operations baseline includes graceful shutdown, ref-aware rollback via `deploy.sh` / `deploy.ps1`, and documented Phase 13 risk triggers in OPERATIONS
-- Codex-like frontend appearance system with a dedicated settings panel, named styles, root-applied theme tokens, startup anti-flicker hydration, and local appearance persistence
 - Sidebar history optimistic insertion now makes the active conversation appear immediately before the post-stream refresh lands
 - UI hides Thinking disclosures unless the message was sent with thinking enabled, even if the backend stream still includes reasoning events
 

@@ -25,8 +25,6 @@ function buildProps(themeStyle: 'classic' | 'urochester' | 'thu' = 'classic') {
     historyError: null,
     onLoadHistorySession: vi.fn(),
     onDeleteHistorySession: vi.fn(),
-    onRefreshHistory: vi.fn(),
-    onDeleteAllHistory: vi.fn(),
   }
 }
 
@@ -42,6 +40,14 @@ describe('Sidebar', () => {
 
     expect(screen.queryByText('Your Name')).not.toBeInTheDocument()
     expect(screen.queryByPlaceholderText(/optional - ai will address you/i)).not.toBeInTheDocument()
+  })
+
+  it('shows Chats and keeps New Chat', () => {
+    renderSidebar()
+
+    expect(screen.queryByText('Actions')).not.toBeInTheDocument()
+    expect(screen.getByText('Chats')).toBeInTheDocument()
+    expect(screen.getByText('New Chat')).toBeInTheDocument()
   })
 
   it('renders history rows without timestamps', () => {

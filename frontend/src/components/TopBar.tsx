@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState, type FC } from 'react'
 import type { ChatLayoutMode } from '../utils/chatLayout'
+import {
+  AppearanceIcon,
+  MoreIcon,
+  SettingsIcon,
+  SidebarToggleIcon,
+} from './uiIcons'
 
 interface Props {
   sessionTitle: string | null
@@ -9,6 +15,8 @@ interface Props {
   layoutMode?: ChatLayoutMode
   onSidebarToggle?: () => void
   onOpenAppearance: () => void
+  onRenameConversation: () => void
+  thinkingEnabled?: boolean
   systemInstruction: string
   onSystemInstructionChange: (value: string) => void
   onExportMarkdown: () => void
@@ -32,6 +40,7 @@ const API_MAX_GENERATION_TOKENS = 131_072
 function formatSkillLabel(capability: string): string | null {
   const normalized = capability.trim().toLowerCase()
   if (!normalized || normalized === 'completion') return null
+  if (normalized === 'thinking') return 'Thinking'
   if (normalized === 'tools' || normalized === 'tool_calling') return 'Tools'
   if (normalized === 'vision') return 'Vision'
   if (normalized === 'audio' || normalized === 'sound' || normalized === 'speech') return 'Sound'
@@ -43,6 +52,40 @@ function formatSkillLabel(capability: string): string | null {
     .join(' ')
 }
 
+const CAPABILITY_PRIORITY: Record<string, number> = {
+  Thinking: 0,
+  Vision: 1,
+  Tools: 2,
+}
+
+interface CapabilityItem {
+  key: string
+  label: string
+  active: boolean
+}
+
+function buildCapabilityItems(
+  modelCapabilities: string[] | null,
+  thinkingEnabled: boolean,
+): CapabilityItem[] {
+  const labels = (modelCapabilities ?? []).map(formatSkillLabel).filter(
+    (label): label is string => Boolean(label),
+  )
+  const uniqueLabels = Array.from(new Set(labels))
+  return uniqueLabels
+    .sort((left, right) => {
+      const leftRank = CAPABILITY_PRIORITY[left] ?? 99
+      const rightRank = CAPABILITY_PRIORITY[right] ?? 99
+      if (leftRank !== rightRank) return leftRank - rightRank
+      return left.localeCompare(right)
+    })
+    .map(label => ({
+      key: label,
+      label,
+      active: label === 'Thinking' ? thinkingEnabled : false,
+    }))
+}
+
 const TopBar: FC<Props> = ({
   sessionTitle,
   hasSession,
@@ -51,6 +94,8 @@ const TopBar: FC<Props> = ({
   layoutMode = 'wide',
   onSidebarToggle,
   onOpenAppearance,
+  onRenameConversation,
+  thinkingEnabled = false,
   systemInstruction,
   onSystemInstructionChange,
   onExportMarkdown,
@@ -69,9 +114,10 @@ const TopBar: FC<Props> = ({
   const [actionsOpen, setActionsOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const isNarrow = layoutMode === 'narrow'
-  const skillLabels = (modelCapabilities ?? []).map(formatSkillLabel).filter(
-    (label): label is string => Boolean(label),
-  )
+  const capabilityItems = buildCapabilityItems(modelCapabilities, thinkingEnabled)
+  const visibleCapabilities = isNarrow ? capabilityItems.slice(0, 2) : capabilityItems
+  const hiddenCapabilities = isNarrow ? capabilityItems.slice(2) : []
+  const capabilitySummary = capabilityItems.map(item => item.label).join(' · ')
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -121,21 +167,62 @@ const TopBar: FC<Props> = ({
         >
           {sessionTitle ?? 'New conversation'}
         </h1>
-        {skillLabels.length > 0 && (
-          <div className="flex min-w-0 flex-wrap items-center gap-1.5 select-none cursor-default">
-            {skillLabels.map(label => (
-              <span
-                key={label}
-                className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium"
+        {capabilityItems.length > 0 && (
+          <div
+            className="group/caps relative flex min-w-0 items-start gap-1.5 select-none cursor-default"
+            aria-label={`Model capabilities: ${capabilitySummary}`}
+          >
+            <div
+              className={`flex min-w-0 ${isNarrow ? 'items-center gap-1' : 'flex-wrap items-center gap-1.5'}`}
+            >
+              {visibleCapabilities.map(item => (
+                <span
+                  key={item.key}
+                  data-testid="model-capability-badge"
+                  data-capability={item.label}
+                  className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium"
+                  style={{
+                    borderColor: item.active ? 'var(--theme-accent)' : 'var(--border-color)',
+                    color: item.active ? 'var(--theme-accent-contrast)' : 'var(--text-main)',
+                    background: item.active ? 'var(--theme-accent)' : 'var(--composer-muted-surface)',
+                  }}
+                >
+                  {item.label}
+                </span>
+              ))}
+            </div>
+            {isNarrow && hiddenCapabilities.length > 0 && (
+              <div
+                role="tooltip"
+                className="pointer-events-none absolute left-0 top-full z-50 mt-2 hidden min-w-[12rem] rounded-2xl border p-2 text-left shadow-[0_12px_24px_rgba(15,23,42,0.14)] group-hover/caps:block group-focus-within/caps:block"
                 style={{
-                  borderColor: 'var(--border-color)',
-                  color: 'var(--text-main)',
-                  background: 'var(--composer-muted-surface)',
+                  borderColor: 'var(--input-border)',
+                  background: 'var(--composer-menu-bg-strong)',
                 }}
               >
-                {label}
-              </span>
-            ))}
+                <p
+                  className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em]"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  More capabilities
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {capabilityItems.map(item => (
+                    <span
+                      key={item.key}
+                      className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium"
+                      style={{
+                        borderColor: item.active ? 'var(--theme-accent)' : 'var(--border-color)',
+                        color: item.active ? 'var(--theme-accent-contrast)' : 'var(--text-main)',
+                        background: item.active ? 'var(--theme-accent)' : 'var(--composer-muted-surface)',
+                      }}
+                    >
+                      {item.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -143,10 +230,9 @@ const TopBar: FC<Props> = ({
         <div className="relative flex items-center gap-2">
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full transition-all hover:opacity-90"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-[var(--composer-muted-surface)]"
             style={{
               color: 'var(--text-main)',
-              background: 'var(--composer-muted-surface)',
             }}
             aria-label="Conversation actions"
             aria-expanded={actionsOpen}
@@ -175,6 +261,25 @@ const TopBar: FC<Props> = ({
               <button
                 type="button"
                 role="menuitem"
+                disabled={!hasSession}
+                className={`${actionButtonCls} ${hasSession ? '' : 'cursor-not-allowed opacity-50'}`}
+                style={{ color: hasSession ? 'var(--text-main)' : 'var(--text-muted)' }}
+                onClick={() => {
+                  if (!hasSession) return
+                  onRenameConversation()
+                  setActionsOpen(false)
+                }}
+              >
+                <span>
+                  <span className="block font-medium leading-none">Rename</span>
+                  <span className="block pt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    Change the current conversation title
+                  </span>
+                </span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
                 className={actionButtonCls}
                 style={{ color: 'var(--text-main)' }}
                 onClick={() => {
@@ -188,7 +293,6 @@ const TopBar: FC<Props> = ({
                     Save the current conversation as a Markdown file
                   </span>
                 </span>
-                <ChevronRightIcon />
               </button>
               <button
                 type="button"
@@ -208,7 +312,6 @@ const TopBar: FC<Props> = ({
                     Remove this saved conversation
                   </span>
                 </span>
-                <ChevronRightIcon />
               </button>
             </div>
           )}
@@ -216,12 +319,11 @@ const TopBar: FC<Props> = ({
           <div className="relative">
             <button
               type="button"
-              className={`inline-flex items-center gap-2 rounded-full font-medium transition-all hover:opacity-90 ${isNarrow ? 'px-2.5 py-1.5 text-[13px]' : 'px-3 py-1.5 text-sm'}`}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-[var(--composer-muted-surface)]"
               style={{
                 color: 'var(--text-main)',
-                background: 'var(--composer-muted-surface)',
               }}
-              aria-label="Options"
+              aria-label="Settings"
               aria-expanded={optionsOpen}
               aria-haspopup="dialog"
               onClick={e => {
@@ -230,8 +332,7 @@ const TopBar: FC<Props> = ({
                 setActionsOpen(false)
               }}
             >
-              <OptionsIcon />
-              <span>Options</span>
+              <SettingsIcon />
             </button>
 
             {optionsOpen && (
@@ -244,7 +345,7 @@ const TopBar: FC<Props> = ({
                 backdropFilter: 'blur(18px)',
               }}
               role="dialog"
-              aria-label="Options"
+              aria-label="Settings"
               onClick={e => e.stopPropagation()}
             >
               <div className="space-y-3">
@@ -436,60 +537,5 @@ const TopBar: FC<Props> = ({
     </header>
   )
 }
-
-const SidebarToggleIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-    <path
-      d="M3.25 4.5h9.5M3.25 8h9.5M3.25 11.5h6.25"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-    />
-  </svg>
-)
-
-const OptionsIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-    <path
-      d="M3.25 4.5h9.5M3.25 8h9.5M3.25 11.5h9.5"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-    />
-  </svg>
-)
-
-const MoreIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-    <circle cx="3.25" cy="8" r="1.1" fill="currentColor" />
-    <circle cx="8" cy="8" r="1.1" fill="currentColor" />
-    <circle cx="12.75" cy="8" r="1.1" fill="currentColor" />
-  </svg>
-)
-
-const ChevronRightIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-    <path
-      d="M5.25 3.5 8.75 7l-3.5 3.5"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-)
-
-const AppearanceIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-    <path
-      d="M8 1.75a6.25 6.25 0 1 0 0 12.5c1.61 0 2.68-.49 3.4-1.15.68-.63.61-1.66-.2-2.1l-.58-.31c-.82-.44-.95-1.52-.28-2.14l1.24-1.16a1.65 1.65 0 0 0 .37-1.9A6.25 6.25 0 0 0 8 1.75Z"
-      stroke="currentColor"
-      strokeWidth="1.3"
-    />
-    <circle cx="5.1" cy="6.1" r=".8" fill="currentColor" />
-    <circle cx="7.95" cy="4.85" r=".8" fill="currentColor" />
-    <circle cx="5.8" cy="9.25" r=".8" fill="currentColor" />
-  </svg>
-)
 
 export default TopBar

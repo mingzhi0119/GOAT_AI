@@ -1,4 +1,6 @@
-/** API types — mirror the backend Pydantic models exactly. */
+/** API types - mirror the backend Pydantic models exactly. */
+
+export type ReasoningLevel = 'low' | 'medium' | 'high'
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
@@ -23,12 +25,14 @@ export interface ChatRequest {
   session_id?: string
   /** Optional user-defined instructions merged into the server system prompt. */
   system_instruction?: string
+  /** Planner-style prompt layer that asks the model to plan before answering. */
+  plan_mode?: boolean
   /** Ollama sampling options (optional; sent when set from Advanced settings). */
   temperature?: number
   max_tokens?: number
   top_p?: number
-  /** Quick = false, Thinking = true. Sent through to the model backend. */
-  think?: boolean
+  /** Quick = false; Thinking may also use low/medium/high effort levels. */
+  think?: boolean | ReasoningLevel
 }
 
 export interface ModelsResponse {
@@ -51,7 +55,7 @@ export interface OllamaOptionsPayload {
   temperature: number
   max_tokens: number
   top_p: number
-  think?: boolean
+  think?: boolean | ReasoningLevel
 }
 
 export interface ChartSeries {
@@ -140,6 +144,8 @@ export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+  /** UI-only timestamp used for message chrome like copy controls. */
+  createdAt?: string
   /** Accumulated model thinking / reasoning trace (not shown inline). */
   thinkingContent?: string
   /** Whether the UI should render the Thinking disclosure for this message. */

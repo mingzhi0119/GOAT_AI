@@ -1,10 +1,12 @@
 import { useEffect, useState, type FC } from 'react'
+import { brandingConfig } from '../config/branding'
 import {
   CODE_FONT_OPTIONS,
   THEME_STYLES,
   UI_FONT_OPTIONS,
   getComputedThemeTokens,
   getStyleAccentPresets,
+  formatColorTokenDisplay,
   type AppearanceConfig,
   type AppearanceMode,
   type AppearanceStyleId,
@@ -81,7 +83,7 @@ const AppearancePanel: FC<Props> = ({
           <div>
             <h2 className="text-[1.75rem] font-semibold tracking-[-0.03em]">Appearance</h2>
             <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
-              Tune the shell, typography, and contrast of GOAT AI.
+              Tune the shell, typography, and contrast of {brandingConfig.displayName}.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -416,7 +418,7 @@ const AppearancePanel: FC<Props> = ({
                 >
                   <div>
                     <p className="text-sm font-semibold" style={{ color: tokens.textMain }}>
-                      GOAT AI shell
+                      {brandingConfig.displayName} shell
                     </p>
                     <p className="text-xs" style={{ color: tokens.textMuted }}>
                       {appearance.themeStyle} · {appearance.themeMode} · {effectiveMode}
@@ -571,6 +573,7 @@ function FontSelect({ label, value, options, onChange }: FontSelectProps) {
 }
 
 function ColorReadout({ label, value }: { label: string; value: string }) {
+  const displayValue = formatColorTokenDisplay(value)
   return (
     <div
       className="rounded-[22px] border px-4 py-3"
@@ -584,7 +587,7 @@ function ColorReadout({ label, value }: { label: string; value: string }) {
           className="inline-block h-8 w-8 rounded-full border"
           style={{ background: value, borderColor: 'var(--border-color)' }}
         />
-        <code style={{ fontFamily: 'var(--code-font-family)' }}>{value}</code>
+        <code style={{ fontFamily: 'var(--code-font-family)' }}>{displayValue}</code>
       </div>
     </div>
   )
@@ -600,7 +603,7 @@ function MetricCard({ label, value }: { label: string; value: string }) {
         {label}
       </p>
       <p className="mt-2 text-sm font-medium" style={{ fontFamily: 'var(--code-font-family)' }}>
-        {value}
+        {formatColorTokenDisplay(value)}
       </p>
     </div>
   )

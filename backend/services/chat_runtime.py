@@ -82,6 +82,8 @@ class SessionRepository(Protocol):
 
     def upsert_session(self, payload: SessionUpsertPayload) -> None: ...
 
+    def rename_session(self, session_id: str, title: str) -> None: ...
+
     def delete_session(self, session_id: str) -> None: ...
 
     def delete_all_sessions(
@@ -181,6 +183,13 @@ class SQLiteSessionRepository:
             owner_id=payload.owner_id,
             tenant_id=payload.tenant_id,
             principal_id=payload.principal_id,
+        )
+
+    def rename_session(self, session_id: str, title: str) -> None:
+        log_service.rename_session_title(
+            db_path=self._db_path,
+            session_id=session_id,
+            title=title,
         )
 
     def delete_session(self, session_id: str) -> None:

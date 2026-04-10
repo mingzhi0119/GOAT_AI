@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useBranding } from './config/branding'
 import { useAdvancedSettings } from './hooks/useAdvancedSettings'
 import { useAppearance } from './hooks/useAppearance'
 import { useChatLayoutMode } from './hooks/useChatLayoutMode'
@@ -23,6 +24,7 @@ export default function App() {
   const [thinkingEnabled, setThinkingEnabled] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [appearanceOpen, setAppearanceOpen] = useState(false)
+  const branding = useBranding()
   const { appearance, effectiveMode, appearanceSummary, updateAppearance, resetAppearance } =
     useAppearance()
   const models = useModels()
@@ -33,15 +35,23 @@ export default function App() {
   const { userName, setUserName } = useUserName()
   const { systemInstruction, setSystemInstruction } = useSystemInstruction()
   const advanced = useAdvancedSettings()
+  const ollamaOptions = advanced.getOptionsForRequest(
+    effectiveThinkingEnabled ? reasoningLevel : false,
+  )
   const session = useChatSession({
     selectedModel: models.selectedModel,
     userName,
     systemInstruction,
-    ollamaOptions: advanced.getOptionsForRequest(effectiveThinkingEnabled),
+    planModeEnabled,
+    ollamaOptions,
   })
   const gpu = useGpuStatus(session.isStreaming)
   const { refreshNow } = gpu
   const wasStreamingRef = useRef(session.isStreaming)
+
+  useEffect(() => {
+    document.title = branding.appTitle
+  }, [branding.appTitle])
 
   useEffect(() => {
     setSidebarOpen(chatLayout.sidebarBehavior === 'docked')
@@ -58,19 +68,6 @@ export default function App() {
     return () => window.clearTimeout(timer)
   }, [refreshNow, session.isStreaming])
 
-  const handleDeleteAllHistory = () => {
-    if (
-      !window.confirm(
-        'Delete all saved conversations from the server? This cannot be undone. Your current chat will also be cleared.',
-      )
-    ) {
-      return
-    }
-    void session.deleteAllHistory().then(() => {
-      session.clearChatSession()
-    })
-  }
-
   const handleDeleteConversation = () => {
     if (!session.sessionId) return
     if (!window.confirm('Delete this saved conversation? This cannot be undone.')) {
@@ -79,6 +76,16 @@ export default function App() {
     void session.deleteHistorySession(session.sessionId).then(() => {
       session.clearChatSession()
     })
+  }
+
+  const handleRenameConversation = () => {
+    if (!session.sessionId) return
+    const currentTitle = session.sessionTitle ?? 'New conversation'
+    const nextTitle = window.prompt('Rename this conversation', currentTitle)
+    if (nextTitle == null) return
+    const normalizedTitle = nextTitle.trim()
+    if (!normalizedTitle || normalizedTitle === currentTitle) return
+    void session.renameHistorySession(session.sessionId, normalizedTitle)
   }
 
   const handleUploadEvent = (event: UploadStreamEvent) => {
@@ -125,8 +132,6 @@ export default function App() {
         historySessions={session.historySessions}
         isLoadingHistory={session.isLoadingHistory}
         historyError={session.historyError}
-        onRefreshHistory={() => void session.refreshHistory()}
-        onDeleteAllHistory={handleDeleteAllHistory}
         onLoadHistorySession={sessionId => {
           void session.loadHistorySession(sessionId)
         }}
@@ -143,6 +148,8 @@ export default function App() {
           layoutMode={layoutMode}
           onSidebarToggle={() => setSidebarOpen(open => !open)}
           onOpenAppearance={() => setAppearanceOpen(true)}
+          onRenameConversation={handleRenameConversation}
+          thinkingEnabled={effectiveThinkingEnabled}
           systemInstruction={systemInstruction}
           onSystemInstructionChange={setSystemInstruction}
           onExportMarkdown={() =>

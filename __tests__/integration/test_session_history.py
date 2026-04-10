@@ -127,6 +127,30 @@ def test_delete_history_session_not_found(app_client: object) -> None:
     assert response.status_code == 404
 
 
+def test_rename_history_session_updates_title(app_client: object) -> None:
+    from fastapi.testclient import TestClient
+    from backend.config import get_settings
+
+    assert isinstance(app_client, TestClient)
+    settings = get_settings()
+    db = settings.log_db_path
+
+    from backend.services import log_service
+
+    log_service.init_db(db)
+    _seed_session(db, "sess-rename-1", "Original Title")
+
+    response = app_client.patch(
+        "/api/history/sess-rename-1",
+        json={"title": "Renamed Title"},
+    )
+    assert response.status_code == 204
+
+    detail = app_client.get("/api/history/sess-rename-1")
+    assert detail.status_code == 200
+    assert detail.json()["title"] == "Renamed Title"
+
+
 # ── delete all ────────────────────────────────────────────────────────────────
 
 

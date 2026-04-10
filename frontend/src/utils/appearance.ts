@@ -510,12 +510,78 @@ function normalizeHexColor(value: unknown, fallback: string): string {
   return fallback
 }
 
+function expandHexColor(value: string): string | null {
+  const trimmed = value.trim()
+  const hex = trimmed.startsWith('#') ? trimmed.slice(1) : trimmed
+  if (/^[0-9a-f]{3}$/i.test(hex)) {
+    return `#${hex
+      .split('')
+      .map(channel => `${channel}${channel}`)
+      .join('')}`
+  }
+  if (/^[0-9a-f]{6}$/i.test(hex)) {
+    return `#${hex}`.toLowerCase()
+  }
+  if (/^[0-9a-f]{8}$/i.test(hex)) {
+    const rgb = `#${hex.slice(0, 6)}`
+    return rgb.toLowerCase()
+  }
+  return null
+}
+
 function parseRgb(value: string): [number, number, number] {
   const normalized = value.replace('#', '')
   const r = Number.parseInt(normalized.slice(0, 2), 16)
   const g = Number.parseInt(normalized.slice(2, 4), 16)
   const b = Number.parseInt(normalized.slice(4, 6), 16)
   return [r, g, b]
+}
+
+function parseHexAlpha(value: string): number | null {
+  const trimmed = value.trim()
+  const hex = trimmed.startsWith('#') ? trimmed.slice(1) : trimmed
+  if (/^[0-9a-f]{8}$/i.test(hex)) {
+    return Number.parseInt(hex.slice(6, 8), 16) / 255
+  }
+  if (/^[0-9a-f]{4}$/i.test(hex)) {
+    return Number.parseInt(hex.slice(3, 4).repeat(2), 16) / 255
+  }
+  return null
+}
+
+function parseCssColor(value: string): { hex: string; alpha: number | null } | null {
+  const expandedHex = expandHexColor(value)
+  if (expandedHex) {
+    return { hex: expandedHex.toUpperCase(), alpha: parseHexAlpha(value) }
+  }
+
+  const rgbaMatch = value
+    .trim()
+    .match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*([0-9.]+)\s*)?\)$/i)
+  if (!rgbaMatch) return null
+
+  const r = Number.parseInt(rgbaMatch[1] ?? '', 10)
+  const g = Number.parseInt(rgbaMatch[2] ?? '', 10)
+  const b = Number.parseInt(rgbaMatch[3] ?? '', 10)
+  if ([r, g, b].some(channel => Number.isNaN(channel) || channel < 0 || channel > 255)) return null
+
+  const hex = `#${[r, g, b].map(channel => channel.toString(16).padStart(2, '0')).join('')}`.toUpperCase()
+  const alpha = rgbaMatch[4] === undefined ? null : Number.parseFloat(rgbaMatch[4])
+  return {
+    hex,
+    alpha: alpha !== null && !Number.isNaN(alpha) ? alpha : null,
+  }
+}
+
+export function formatColorTokenDisplay(value: string): string {
+  const parsed = parseCssColor(value)
+  if (!parsed) return value
+  if (parsed.alpha === null || parsed.alpha <= 0 || parsed.alpha >= 1) {
+    return parsed.hex
+  }
+
+  const percent = Math.round(parsed.alpha * 100)
+  return `${parsed.hex}, ${percent}%`
 }
 
 function colorMix(hex: string, target: string, ratio: number): string {

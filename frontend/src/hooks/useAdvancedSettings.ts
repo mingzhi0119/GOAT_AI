@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import type { OllamaOptionsPayload } from '../api/types'
+import type { OllamaOptionsPayload, ReasoningLevel } from '../api/types'
 
 const STORAGE_TEMP = 'goat-ai-ollama-temperature'
 const STORAGE_MAX = 'goat-ai-ollama-max-tokens'
@@ -33,7 +33,7 @@ export interface UseAdvancedSettingsReturn {
   setTopP: (v: number) => void
   /** Restore temperature / max tokens / top_p to defaults and persist. */
   resetAdvancedToDefaults: () => void
-  getOptionsForRequest: (think?: boolean) => OllamaOptionsPayload
+  getOptionsForRequest: (think?: boolean | ReasoningLevel) => OllamaOptionsPayload
 }
 
 /** Advanced Ollama sampling options; persisted in localStorage. */
@@ -87,7 +87,7 @@ export function useAdvancedSettings(): UseAdvancedSettingsReturn {
     setTopP(DEFAULT_TOP_P)
   }, [setTemperature, setMaxTokens, setTopP])
 
-  const getOptionsForRequest = useCallback((think?: boolean): OllamaOptionsPayload => {
+  const getOptionsForRequest = useCallback((think?: boolean | ReasoningLevel): OllamaOptionsPayload => {
     return {
       temperature,
       max_tokens: maxTokens,

@@ -33,6 +33,7 @@ import {
   ProcessingDot,
   ReadyDot,
 } from './chatComposerPrimitives'
+import { brandingConfig } from '../config/branding'
 
 const LazyChartCard = lazy(() => import('./ChartCard'))
 
@@ -459,7 +460,7 @@ const ChatWindow: FC<Props> = ({
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Message GOAT AI"
+                  placeholder={`Message ${brandingConfig.displayName}`}
                   rows={1}
                   disabled={isStreaming}
                   className="w-full resize-none bg-transparent px-0 py-0 text-[15px] placeholder:text-zinc-400 focus:outline-none"

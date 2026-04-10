@@ -4,6 +4,7 @@ import {
   deleteSession as deleteSessionApi,
   fetchHistory,
   fetchSession,
+  renameSession as renameSessionApi,
   type HistorySessionDetail,
   type HistorySessionItem,
 } from '../api/history'
@@ -17,6 +18,7 @@ export interface UseHistoryReturn {
   loadSession: (sessionId: string) => Promise<HistorySessionDetail>
   deleteSession: (sessionId: string) => Promise<void>
   deleteAll: () => Promise<void>
+  renameSession: (sessionId: string, title: string) => Promise<void>
 }
 
 export function useHistory(): UseHistoryReturn {
@@ -62,6 +64,15 @@ export function useHistory(): UseHistoryReturn {
     setSessions([])
   }, [])
 
+  const renameSession = useCallback(async (sessionId: string, title: string) => {
+    const normalizedTitle = title.trim()
+    if (!normalizedTitle) return
+    await renameSessionApi(sessionId, normalizedTitle)
+    setSessions(prev =>
+      prev.map(item => (item.id === sessionId ? { ...item, title: normalizedTitle } : item)),
+    )
+  }, [])
+
   return {
     sessions,
     isLoading,
@@ -71,5 +82,6 @@ export function useHistory(): UseHistoryReturn {
     loadSession,
     deleteSession,
     deleteAll,
+    renameSession,
   }
 }

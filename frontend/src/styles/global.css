@@ -1,3 +1,5 @@
+@import 'katex/dist/katex.min.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -178,6 +180,11 @@ html[data-theme-resolved="dark"] .simon-footer-logo {
   height: auto;
 }
 
+.thu-footer-logo {
+  width: 80%;
+  margin-inline: auto;
+}
+
 html[data-theme-resolved="dark"] .thu-footer-logo {
   filter: brightness(0) invert(1);
 }
@@ -249,6 +256,25 @@ html[data-sidebar-translucent="false"] .app-sidebar-glass {
   border-radius: 4px;
   font-size: 0.85em;
   font-family: var(--code-font-family);
+}
+
+.prose-msg .katex {
+  color: var(--text-main);
+  font-size: 1em;
+}
+
+.prose-msg .katex-display {
+  margin: 0.75rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.prose-msg .katex-display > .katex {
+  display: inline-block;
+}
+
+.prose-msg .katex .katex-html {
+  white-space: normal;
 }
 
 .prose-msg pre {

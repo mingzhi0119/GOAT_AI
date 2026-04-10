@@ -4,6 +4,7 @@ import TopBar from '../components/TopBar'
 
 function renderTopBar() {
   const onOpenAppearance = vi.fn()
+  const onRenameConversation = vi.fn()
   const onSystemInstructionChange = vi.fn()
   const onExportMarkdown = vi.fn()
   const onDeleteConversation = vi.fn()
@@ -17,9 +18,11 @@ function renderTopBar() {
     <TopBar
       sessionTitle="Strategy Sync"
       hasSession={true}
-      modelCapabilities={['completion', 'tools', 'vision']}
+      modelCapabilities={['completion', 'tools', 'thinking', 'vision']}
       appearanceSummary="Classic System"
       onOpenAppearance={onOpenAppearance}
+      onRenameConversation={onRenameConversation}
+      thinkingEnabled={true}
       systemInstruction="Be concise."
       onSystemInstructionChange={onSystemInstructionChange}
       onExportMarkdown={onExportMarkdown}
@@ -47,6 +50,7 @@ function renderTopBar() {
     onTopPChange,
     onResetAdvanced,
     onOpenAppearance,
+    onRenameConversation,
   }
 }
 
@@ -58,30 +62,34 @@ describe('TopBar options callout', () => {
       color: 'var(--text-main)',
     })
     expect(screen.queryByText('Skills')).not.toBeInTheDocument()
-    expect(screen.getByText('Tools')).toBeInTheDocument()
+    const badges = screen.getAllByTestId('model-capability-badge')
+    expect(badges.map(node => node.textContent)).toEqual(['Thinking', 'Vision', 'Tools'])
+    expect(screen.getByText('Thinking')).toHaveStyle({
+      color: 'var(--theme-accent-contrast)',
+    })
     expect(screen.getByText('Vision')).toBeInTheDocument()
   })
 
-  it('opens the options callout and no longer shows legacy helper copy', () => {
+  it('opens the settings callout and no longer shows legacy helper copy', () => {
     renderTopBar()
 
-    fireEvent.click(screen.getByRole('button', { name: /options/i }))
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
 
-    expect(screen.getByRole('dialog', { name: /options/i })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: /settings/i })).toBeInTheDocument()
     expect(screen.queryByText(/Enter sends the message/i)).not.toBeInTheDocument()
     expect(screen.getByText(/^Generation$/)).toBeInTheDocument()
   })
 
   it('removes the max-token helper copy from the options panel', () => {
     renderTopBar()
-    fireEvent.click(screen.getByRole('button', { name: /options/i }))
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
     expect(screen.queryByText(/API allows up to 131,072 generation tokens/i)).not.toBeInTheDocument()
   })
 
   it('keeps system instruction editing and clear actions wired', () => {
     const { onSystemInstructionChange } = renderTopBar()
 
-    fireEvent.click(screen.getByRole('button', { name: /options/i }))
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
     fireEvent.change(screen.getByPlaceholderText(/optional: tone, format, or constraints/i), {
       target: { value: 'Use bullets.' },
     })
@@ -91,18 +99,19 @@ describe('TopBar options callout', () => {
     expect(onSystemInstructionChange).toHaveBeenCalledWith('')
   })
 
-  it('keeps generation settings, appearance, export, and delete actions wired', () => {
+  it('keeps generation settings, appearance, rename, export, and delete actions wired', () => {
     const {
       onTemperatureChange,
       onMaxTokensChange,
       onTopPChange,
       onResetAdvanced,
+      onRenameConversation,
       onExportMarkdown,
       onDeleteConversation,
       onOpenAppearance,
     } = renderTopBar()
 
-    fireEvent.click(screen.getByRole('button', { name: /options/i }))
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
 
     const inputs = screen.getAllByRole('spinbutton')
     fireEvent.change(inputs[0]!, { target: { value: '1.1' } })
@@ -110,6 +119,8 @@ describe('TopBar options callout', () => {
     fireEvent.change(inputs[2]!, { target: { value: '0.8' } })
     fireEvent.click(screen.getByRole('button', { name: /reset generation settings to defaults/i }))
     fireEvent.click(screen.getByText('Classic System').closest('button') as HTMLButtonElement)
+    fireEvent.click(screen.getByRole('button', { name: /conversation actions/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /rename/i }))
     fireEvent.click(screen.getByRole('button', { name: /conversation actions/i }))
     fireEvent.click(screen.getByRole('menuitem', { name: /export to markdown/i }))
     fireEvent.click(screen.getByRole('button', { name: /conversation actions/i }))
@@ -119,20 +130,57 @@ describe('TopBar options callout', () => {
     expect(onMaxTokensChange).toHaveBeenCalledWith(131072)
     expect(onTopPChange).toHaveBeenCalledWith(0.8)
     expect(onResetAdvanced).toHaveBeenCalled()
+    expect(onRenameConversation).toHaveBeenCalled()
     expect(onExportMarkdown).toHaveBeenCalled()
     expect(onDeleteConversation).toHaveBeenCalled()
     expect(onOpenAppearance).toHaveBeenCalled()
   })
 
-  it('removes export from options and places conversation actions in the ellipsis menu', () => {
+  it('keeps export, rename, and delete in the ellipsis menu', () => {
     renderTopBar()
 
-    fireEvent.click(screen.getByRole('button', { name: /options/i }))
-    expect(screen.queryByRole('button', { name: /export markdown/i })).not.toBeInTheDocument()
-
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
     fireEvent.click(screen.getByRole('button', { name: /conversation actions/i }))
     expect(screen.getByRole('menu', { name: /conversation actions/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /rename/i })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /export to markdown/i })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /delete/i })).toBeInTheDocument()
+  })
+
+  it('shows only two capability badges in narrow mode and reveals the rest in a tooltip', () => {
+    render(
+      <TopBar
+        sessionTitle="Strategy Sync"
+        hasSession={true}
+        modelCapabilities={['completion', 'tools', 'thinking', 'vision']}
+        appearanceSummary="Classic System"
+        layoutMode="narrow"
+        onOpenAppearance={vi.fn()}
+        onRenameConversation={vi.fn()}
+        thinkingEnabled={true}
+        systemInstruction="Be concise."
+        onSystemInstructionChange={vi.fn()}
+        onExportMarkdown={vi.fn()}
+        onDeleteConversation={vi.fn()}
+        advancedOpen={true}
+        onAdvancedOpenChange={vi.fn()}
+        temperature={0.7}
+        onTemperatureChange={vi.fn()}
+        maxTokens={4096}
+        onMaxTokensChange={vi.fn()}
+        topP={0.9}
+        onTopPChange={vi.fn()}
+        onResetAdvanced={vi.fn()}
+      />,
+    )
+
+    const badges = screen.getAllByTestId('model-capability-badge')
+    expect(badges).toHaveLength(2)
+    expect(badges.map(node => node.textContent)).toEqual(['Thinking', 'Vision'])
+
+    fireEvent.mouseEnter(screen.getByLabelText(/model capabilities/i))
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Tools')
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Thinking')
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Vision')
   })
 })

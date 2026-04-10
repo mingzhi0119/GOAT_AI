@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from backend.models.chat import ChatRequest
+
+ThinkValue = bool | Literal["low", "medium", "high"]
 
 
 def build_ollama_options(
@@ -10,10 +14,10 @@ def build_ollama_options(
     temperature: float | None = None,
     max_tokens: int | None = None,
     top_p: float | None = None,
-    think: bool | None = None,
-) -> dict[str, float | int | bool] | None:
+    think: ThinkValue | None = None,
+) -> dict[str, float | int | bool | str] | None:
     """Build Ollama ``options`` from optional fields; None if all unset."""
-    opts: dict[str, float | int | bool] = {}
+    opts: dict[str, float | int | bool | str] = {}
     if temperature is not None:
         opts["temperature"] = temperature
     if max_tokens is not None:
@@ -27,7 +31,7 @@ def build_ollama_options(
 
 def ollama_options_from_chat_request(
     req: ChatRequest,
-) -> dict[str, float | int | bool] | None:
+) -> dict[str, float | int | bool | str] | None:
     """Build Ollama ``options`` from POST /api/chat body."""
     return build_ollama_options(
         temperature=req.temperature,

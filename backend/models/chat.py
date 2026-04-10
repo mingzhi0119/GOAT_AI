@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -57,9 +59,16 @@ class ChatRequest(BaseModel):
         le=1.0,
         description="Ollama top_p nucleus sampling.",
     )
-    think: bool | None = Field(
+    think: bool | Literal["low", "medium", "high"] | None = Field(
         default=None,
-        description="Ollama thinking mode toggle; true enables Thinking, false enables Quick.",
+        description=(
+            "Ollama thinking mode toggle or effort level; true enables Thinking, "
+            "false disables it, and low/medium/high request an effort level."
+        ),
+    )
+    plan_mode: bool = Field(
+        default=False,
+        description="When true, the system prompt asks the model to plan before answering.",
     )
 
 

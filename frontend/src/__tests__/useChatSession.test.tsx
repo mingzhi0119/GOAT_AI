@@ -12,6 +12,7 @@ const upsertHistorySessionMock = vi.fn()
 const loadHistoryMock = vi.fn()
 const deleteSessionMock = vi.fn()
 const deleteAllMock = vi.fn()
+const renameSessionMock = vi.fn()
 
 vi.mock('../hooks/useChat', () => ({
   useChat: () => ({
@@ -36,6 +37,7 @@ vi.mock('../hooks/useHistory', () => ({
     loadSession: loadHistoryMock,
     deleteSession: deleteSessionMock,
     deleteAll: deleteAllMock,
+    renameSession: renameSessionMock,
   }),
 }))
 
@@ -47,11 +49,12 @@ describe('useChatSession', () => {
 
   it('attaches the knowledge document id when the file context is ready', async () => {
     const { result } = renderHook(() =>
-      useChatSession({
-        selectedModel: 'test-model',
-        userName: 'Simon',
-        systemInstruction: '',
-      }),
+    useChatSession({
+      selectedModel: 'test-model',
+      userName: 'Simon',
+      systemInstruction: '',
+      planModeEnabled: false,
+    }),
     )
 
     act(() => {
@@ -72,6 +75,7 @@ describe('useChatSession', () => {
       'test-model',
       'Simon',
       ['doc-quiz-4'],
+      false,
       '',
       undefined,
       expect.any(Function),
@@ -83,11 +87,12 @@ describe('useChatSession', () => {
 
   it('does not pretend an unfinished file upload is attached', async () => {
     const { result } = renderHook(() =>
-      useChatSession({
-        selectedModel: 'test-model',
-        userName: 'Simon',
-        systemInstruction: '',
-      }),
+    useChatSession({
+      selectedModel: 'test-model',
+      userName: 'Simon',
+      systemInstruction: '',
+      planModeEnabled: false,
+    }),
     )
 
     act(() => {
@@ -107,6 +112,7 @@ describe('useChatSession', () => {
       'test-model',
       'Simon',
       undefined,
+      false,
       '',
       undefined,
       expect.any(Function),

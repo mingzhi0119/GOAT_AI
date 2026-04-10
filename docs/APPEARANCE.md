@@ -156,7 +156,11 @@ When updating frontend visuals, prefer these rules:
 
 Additional UI behavior rules:
 
+- Frontend UI iconography must use `lucide-react`.
+- Standard icon stroke width is `2`; use `1.5` only for dense utility glyphs and `1.25` only for rare cramped micro-icons.
 - `Thinking` traces may still arrive over SSE even when the user has thinking disabled; the UI must hide the disclosure unless the message was created with thinking enabled
+- explicit LaTeX formulas in chat messages may render with KaTeX, but only after the message is complete and the delimiter pairs are balanced; while streaming, keep the plain-text preview
+- color readouts in Appearance should use hex-first notation: `#RRGGBB` for fully opaque or fully transparent values, and `#RRGGBB, NN%` for partially transparent values
 - do not emit sidebar delete affordances on keyboard focus alone; hover-only reveal avoids accidental white overlay artifacts in the history list
 - keep theme cards top-aligned in `AppearancePanel`; shorter descriptions such as `Classic` should not vertically center while longer descriptions wrap
 

@@ -15,6 +15,7 @@ from backend.application.history import (
     delete_history_session as delete_history_session_use_case,
     get_history_session_detail,
     list_history_sessions,
+    rename_history_session,
 )
 from backend.application.ports import SessionRepository, Settings
 from backend.config import get_settings
@@ -23,6 +24,7 @@ from backend.models.common import ErrorResponse
 from backend.models.history import (
     HistorySessionDetailResponse,
     HistorySessionListResponse,
+    HistorySessionRenameRequest,
 )
 
 router = APIRouter()
@@ -89,6 +91,45 @@ def delete_all_history(
         )
     except HistoryOwnerRequiredError as exc:
         _raise_owner_required(exc)
+    return Response(status_code=204)
+
+
+@router.patch(
+    "/history/{session_id}",
+    status_code=204,
+    summary="Rename one persisted chat session",
+    responses={
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+    },
+)
+def rename_history_session_route(
+    session_id: str,
+    payload: HistorySessionRenameRequest,
+    request: Request,
+    session_repository: SessionRepository = Depends(get_session_repository),
+    settings: Settings = Depends(get_settings),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
+) -> Response:
+    """Rename one persisted session."""
+    title = payload.title.strip()
+    if not title:
+        raise HTTPException(status_code=422, detail="Title cannot be empty")
+    try:
+        rename_history_session(
+            repository=session_repository,
+            session_id=session_id,
+            title=title,
+            settings=settings,
+            auth_context=auth_context,
+            request_id=getattr(request.state, "request_id", ""),
+        )
+    except HistoryOwnerRequiredError as exc:
+        _raise_owner_required(exc)
+    except HistorySessionNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return Response(status_code=204)
 
 

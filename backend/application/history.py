@@ -6,7 +6,7 @@ from dataclasses import asdict
 from typing import Any
 
 from backend.domain.authz_types import AuthorizationContext
-from backend.services.authorizer import authorize_session_read
+from backend.services.authorizer import authorize_session_read, authorize_session_write
 from backend.application.exceptions import (
     HistoryOwnerRequiredError,
     HistorySessionNotFoundError,
@@ -95,6 +95,38 @@ def delete_history_session(
         request_id=request_id,
     )
     repository.delete_session(session_id)
+
+
+def rename_history_session(
+    *,
+    repository: SessionRepository,
+    session_id: str,
+    title: str,
+    settings: Settings,
+    auth_context: AuthorizationContext,
+    request_id: str,
+) -> None:
+    """Rename one session, enforcing owner visibility rules."""
+    session = repository.get_session(session_id)
+    if session is None:
+        raise HistorySessionNotFoundError("Session not found")
+
+    decision = authorize_session_write(
+        ctx=auth_context,
+        session=session,
+        require_owner_header=settings.require_session_owner,
+    )
+    emit_authorization_audit(
+        ctx=auth_context,
+        action="history.session.write",
+        resource=ResourceRef(resource_type="session", resource_id=session_id),
+        decision=decision,
+        request_id=request_id,
+    )
+    if not decision.allowed:
+        raise HistorySessionNotFoundError("Session not found")
+
+    repository.rename_session(session_id, title)
 
 
 def get_history_session_detail(

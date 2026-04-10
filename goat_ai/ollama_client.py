@@ -117,7 +117,7 @@ class LLMClient(Protocol):
         messages: list[ChatTurn],
         system_prompt: str,
         *,
-        ollama_options: dict[str, float | int | bool] | None = None,
+        ollama_options: dict[str, float | int | bool | str] | None = None,
         last_user_images_base64: list[str] | None = None,
     ) -> Generator[str | StreamTextPart, None, None]: ...
 
@@ -128,7 +128,7 @@ class LLMClient(Protocol):
         system_prompt: str,
         *,
         tools: list[dict[str, Any]],
-        ollama_options: dict[str, float | int | bool] | None = None,
+        ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> Generator[str | StreamTextPart | ToolCallPlan, None, None]: ...
 
     def plan_tool_call(
@@ -138,7 +138,7 @@ class LLMClient(Protocol):
         system_prompt: str,
         *,
         tools: list[dict[str, Any]],
-        ollama_options: dict[str, float | int | bool] | None = None,
+        ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> ToolCallPlan | None: ...
 
     def stream_tool_followup(
@@ -147,7 +147,7 @@ class LLMClient(Protocol):
         followup_messages: list[dict[str, Any]],
         *,
         tools: list[dict[str, Any]],
-        ollama_options: dict[str, float | int | bool] | None = None,
+        ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> Generator[str | StreamTextPart, None, None]: ...
 
     def generate_completion(
@@ -155,7 +155,7 @@ class LLMClient(Protocol):
         model: str,
         prompt: str,
         *,
-        ollama_options: dict[str, float | int | bool] | None = None,
+        ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> str:
         """Non-streaming /api/generate response body (session titles, etc.)."""
         ...
@@ -406,7 +406,7 @@ class OllamaService:
         model: str,
         api_messages: list[dict[str, Any]],
         *,
-        ollama_options: dict[str, float | int | bool] | None = None,
+        ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> Generator[StreamTextPart, None, None]:
         """Yield streamed text segments from /api/chat (thinking vs answer)."""
         payload: dict[str, Any] = {
@@ -431,7 +431,7 @@ class OllamaService:
         model: str,
         prompt: str,
         *,
-        ollama_options: dict[str, float | int | bool] | None = None,
+        ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> Generator[StreamTextPart, None, None]:
         """Yield streamed text segments from /api/generate (thinking vs answer)."""
         payload: dict[str, Any] = {"model": model, "prompt": prompt, "stream": True}
@@ -461,7 +461,7 @@ class OllamaService:
         model: str,
         prompt: str,
         *,
-        ollama_options: dict[str, float | int | bool] | None = None,
+        ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> str:
         """Return a single non-streaming completion from /api/generate."""
         payload: dict[str, Any] = {"model": model, "prompt": prompt, "stream": False}
@@ -490,7 +490,7 @@ class OllamaService:
         messages: list[ChatTurn],
         system_prompt: str,
         *,
-        ollama_options: dict[str, float | int | bool] | None = None,
+        ollama_options: dict[str, float | int | bool | str] | None = None,
         last_user_images_base64: list[str] | None = None,
     ) -> Generator[str | StreamTextPart, None, None]:
         """Unified token stream for the FastAPI layer (satisfies LLMClient Protocol)."""
@@ -522,7 +522,7 @@ class OllamaService:
         system_prompt: str,
         *,
         tools: list[dict[str, Any]],
-        ollama_options: dict[str, float | int | bool] | None = None,
+        ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> Generator[str | StreamTextPart | ToolCallPlan, None, None]:
         """Stream assistant segments and surface native tool calls when they occur."""
         payload: dict[str, Any] = {
@@ -578,7 +578,7 @@ class OllamaService:
         system_prompt: str,
         *,
         tools: list[dict[str, Any]],
-        ollama_options: dict[str, float | int | bool] | None = None,
+        ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> ToolCallPlan | None:
         """Ask Ollama for a single native tool call plan without streaming."""
         payload: dict[str, Any] = {
@@ -628,7 +628,7 @@ class OllamaService:
         followup_messages: list[dict[str, Any]],
         *,
         tools: list[dict[str, Any]],
-        ollama_options: dict[str, float | int | bool] | None = None,
+        ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> Generator[str | StreamTextPart, None, None]:
         """Stream the model's final response after a tool result is appended."""
         payload: dict[str, Any] = {

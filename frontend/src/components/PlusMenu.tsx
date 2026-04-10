@@ -47,7 +47,7 @@ export default function PlusMenu({
       <button
         type="button"
         onClick={onUploadFiles}
-        className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-slate-900/[0.04]"
+        className="flex w-full items-center rounded-xl px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-slate-900/[0.04]"
         style={{ color: 'var(--text-main)' }}
       >
         <span className="inline-flex items-center gap-2.5">
@@ -61,7 +61,6 @@ export default function PlusMenu({
             </span>
           </span>
         </span>
-        <ChevronRightIcon />
       </button>
 
       <button
