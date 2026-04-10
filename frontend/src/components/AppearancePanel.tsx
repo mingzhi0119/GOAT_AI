@@ -58,11 +58,10 @@ const AppearancePanel: FC<Props> = ({
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/30 px-4 py-6 backdrop-blur-[2px]">
-      <button
-        type="button"
-        aria-label="Close appearance panel"
+      <div
+        aria-hidden="true"
         className="absolute inset-0"
-        onClick={onClose}
+        onMouseDown={onClose}
       />
       <section
         role="dialog"
@@ -209,24 +208,27 @@ const AppearancePanel: FC<Props> = ({
                             </div>
                           </div>
                         </div>
-                        <div className="mt-3 flex items-center justify-between gap-3">
-                          <div>
+                        <div className="mt-3">
+                          <div className="relative min-h-[1.5rem] pr-16">
                             <p className="text-sm font-semibold">{style.label}</p>
-                            <p className="mt-1 text-xs leading-5" style={{ color: 'var(--text-muted)' }}>
-                              {style.description}
-                            </p>
+                            {selected && (
+                              <span
+                                className="absolute right-0 top-0 rounded-full px-2 py-1 text-[11px] font-semibold leading-none"
+                                style={{
+                                  background: 'var(--theme-accent)',
+                                  color: 'var(--theme-accent-contrast)',
+                                }}
+                              >
+                                Active
+                              </span>
+                            )}
                           </div>
-                          {selected && (
-                            <span
-                              className="rounded-full px-2 py-1 text-[11px] font-semibold"
-                              style={{
-                                background: 'var(--theme-accent)',
-                                color: 'var(--theme-accent-contrast)',
-                              }}
-                            >
-                              Active
-                            </span>
-                          )}
+                          <p
+                            className="mt-1 text-xs leading-5"
+                            style={{ color: 'var(--text-muted)' }}
+                          >
+                            {style.description}
+                          </p>
                         </div>
                       </button>
                     )
@@ -347,7 +349,8 @@ const AppearancePanel: FC<Props> = ({
                   aria-label="Contrast"
                   value={appearance.contrast}
                   onChange={event => onChange({ contrast: Number.parseInt(event.target.value, 10) })}
-                  className="mt-4 w-full accent-[var(--theme-accent)]"
+                  className="appearance-contrast-slider mt-4 w-full accent-[var(--theme-accent)]"
+                  style={{ cursor: 'ew-resize' }}
                 />
               </section>
 

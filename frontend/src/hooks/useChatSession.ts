@@ -4,6 +4,7 @@ import { useChat } from './useChat'
 import { useFileContext, type FileBindingMode, type FileContextItem } from './useFileContext'
 import { useHistory } from './useHistory'
 import { historyKnowledgeAttachments } from '../utils/sessionHistory'
+import { normalizeSessionTitle, truncateSessionTitle } from '../utils/sessionTitle'
 
 interface UseChatSessionArgs {
   selectedModel: string
@@ -78,8 +79,7 @@ export function useChatSession({
         message.content.trim().length > 0,
     )
     if (!firstUser) return null
-    const normalized = firstUser.content.trim().replace(/\n/g, ' ')
-    return normalized.length > 80 ? `${normalized.slice(0, 80)}…` : normalized
+    return truncateSessionTitle(firstUser.content)
   }, [chat.messages, chat.sessionId, history.sessions])
 
   const clearChatSession = useCallback(() => {
@@ -115,6 +115,17 @@ export function useChatSession({
 
   const sendMessage = useCallback(
     async (content: string, imageAttachmentIds?: string[]) => {
+      const activeSessionId = chat.sessionId ?? crypto.randomUUID()
+      const optimisticTitle = normalizeSessionTitle(content) || 'New Chat'
+      const nowIso = new Date().toISOString()
+      history.upsertSession({
+        id: activeSessionId,
+        title: optimisticTitle,
+        model: selectedModel,
+        created_at: nowIso,
+        updated_at: nowIso,
+      })
+
       const knowledgeDocumentIds = fileContexts
         .filter(item => item.documentId && item.bindingMode !== 'idle')
         .map(item => item.documentId!)
@@ -129,6 +140,7 @@ export function useChatSession({
         ollamaOptions,
         setChartSpec,
         imageAttachmentIds,
+        activeSessionId,
       )
       fileContexts
         .filter(item => item.bindingMode === 'single')

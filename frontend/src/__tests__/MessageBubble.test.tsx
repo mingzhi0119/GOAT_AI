@@ -34,4 +34,20 @@ describe('MessageBubble', () => {
     expect(link).toHaveAttribute('href', '/api/artifacts/art-1')
     expect(screen.getByText('128 B')).toBeInTheDocument()
   })
+
+  it('does not render assistant markdown chrome labels for assistant messages', () => {
+    render(
+      <MessageBubble
+        message={{
+          id: 'm3',
+          role: 'assistant',
+          content: 'Revenue mix looks stable.',
+        }}
+      />,
+    )
+
+    expect(screen.queryByText('Assistant')).not.toBeInTheDocument()
+    expect(screen.queryByText('Markdown')).not.toBeInTheDocument()
+    expect(screen.getByText('Revenue mix looks stable.')).toBeInTheDocument()
+  })
 })

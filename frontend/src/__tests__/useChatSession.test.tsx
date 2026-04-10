@@ -8,6 +8,7 @@ const clearMessagesMock = vi.fn()
 const loadSessionMock = vi.fn()
 const stopStreamingMock = vi.fn()
 const refreshHistoryMock = vi.fn().mockResolvedValue(undefined)
+const upsertHistorySessionMock = vi.fn()
 const loadHistoryMock = vi.fn()
 const deleteSessionMock = vi.fn()
 const deleteAllMock = vi.fn()
@@ -31,6 +32,7 @@ vi.mock('../hooks/useHistory', () => ({
     isLoading: false,
     error: null,
     refresh: refreshHistoryMock,
+    upsertSession: upsertHistorySessionMock,
     loadSession: loadHistoryMock,
     deleteSession: deleteSessionMock,
     deleteAll: deleteAllMock,
@@ -74,7 +76,9 @@ describe('useChatSession', () => {
       undefined,
       expect.any(Function),
       undefined,
+      expect.any(String),
     )
+    expect(upsertHistorySessionMock).toHaveBeenCalledTimes(1)
   })
 
   it('does not pretend an unfinished file upload is attached', async () => {
@@ -107,6 +111,8 @@ describe('useChatSession', () => {
       undefined,
       expect.any(Function),
       undefined,
+      expect.any(String),
     )
+    expect(upsertHistorySessionMock).toHaveBeenCalledTimes(1)
   })
 })

@@ -13,6 +13,7 @@ export interface UseHistoryReturn {
   isLoading: boolean
   error: string | null
   refresh: () => Promise<void>
+  upsertSession: (session: HistorySessionItem) => void
   loadSession: (sessionId: string) => Promise<HistorySessionDetail>
   deleteSession: (sessionId: string) => Promise<void>
   deleteAll: () => Promise<void>
@@ -41,6 +42,13 @@ export function useHistory(): UseHistoryReturn {
 
   const loadSession = useCallback(async (sessionId: string) => fetchSession(sessionId), [])
 
+  const upsertSession = useCallback((session: HistorySessionItem) => {
+    setSessions(prev => {
+      const remaining = prev.filter(item => item.id !== session.id)
+      return [session, ...remaining]
+    })
+  }, [])
+
   const deleteSession = useCallback(
     async (sessionId: string) => {
       await deleteSessionApi(sessionId)
@@ -54,5 +62,14 @@ export function useHistory(): UseHistoryReturn {
     setSessions([])
   }, [])
 
-  return { sessions, isLoading, error, refresh, loadSession, deleteSession, deleteAll }
+  return {
+    sessions,
+    isLoading,
+    error,
+    refresh,
+    upsertSession,
+    loadSession,
+    deleteSession,
+    deleteAll,
+  }
 }

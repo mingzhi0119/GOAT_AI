@@ -107,6 +107,8 @@ export default function App() {
         onClearChat={session.clearChatSession}
         userName={userName}
         onUserNameChange={setUserName}
+        themeStyle={appearance.themeStyle}
+        currentSessionId={session.sessionId}
         layoutMode={layoutMode}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}

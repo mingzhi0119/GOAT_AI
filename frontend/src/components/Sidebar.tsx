@@ -1,6 +1,7 @@
 import { type FC, type MouseEvent } from 'react'
 import type { HistorySessionItem } from '../api/history'
 import type { ChatLayoutMode } from '../utils/chatLayout'
+import type { AppearanceStyleId } from '../utils/appearance'
 import GoatIcon from './GoatIcon'
 import {
   sidebarFooterAttributionClass,
@@ -15,6 +16,8 @@ interface Props {
   onClearChat: () => void
   userName: string
   onUserNameChange: (name: string) => void
+  themeStyle?: AppearanceStyleId
+  currentSessionId?: string | null
   layoutMode?: ChatLayoutMode
   open?: boolean
   onClose?: () => void
@@ -53,6 +56,8 @@ const Sidebar: FC<Props> = ({
   onClearChat,
   userName: _userName,
   onUserNameChange: _onUserNameChange,
+  themeStyle = 'classic',
+  currentSessionId = null,
   layoutMode = 'wide',
   open = true,
   onClose,
@@ -66,6 +71,20 @@ const Sidebar: FC<Props> = ({
 }) => {
   const isNarrow = layoutMode === 'narrow'
   const isOpen = isNarrow ? open : true
+  const schoolLogo =
+    themeStyle === 'urochester'
+      ? {
+          src: '/simon_logo.svg',
+          alt: 'Simon Business School - University of Rochester',
+          className: 'simon-footer-logo w-full max-w-[148px]',
+        }
+      : themeStyle === 'thu'
+        ? {
+            src: '/Tsinghua_University_Logo.svg',
+            alt: 'Tsinghua University',
+            className: 'w-full max-w-[148px]',
+          }
+        : null
 
   const closeOverlay = () => {
     if (isNarrow) onClose?.()
@@ -174,44 +193,62 @@ const Sidebar: FC<Props> = ({
               No saved conversations
             </p>
           )}
-          {historySessions.slice(0, 20).map(item => (
-            <div key={item.id} className="group/history flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  onLoadHistorySession(item.id)
-                  closeOverlay()
-                }}
-                title={item.title || 'New Chat'}
-                className="min-w-0 flex-1 rounded-lg px-2.5 py-2 text-left text-xs transition-all"
-                style={{ color: 'var(--text-sidebar)', background: 'var(--sidebar-surface-muted)' }}
-                {...hoverHandlers('var(--sidebar-hover)', 'var(--sidebar-surface-muted)')}
+          {historySessions.slice(0, 20).map(item => {
+            const isCurrent = item.id === currentSessionId
+            const rowBg = isCurrent ? 'var(--sidebar-surface)' : 'transparent'
+            const fadeBg = isCurrent ? 'var(--sidebar-surface)' : 'var(--bg-sidebar)'
+            return (
+              <div
+                key={item.id}
+                className="group/history relative"
+                style={{ borderRadius: '0.9rem', background: rowBg }}
               >
-                <p className={`truncate ${sidebarStaticBaseClass}`}>{item.title || 'New Chat'}</p>
-              </button>
-              <button
-                type="button"
-                onClick={() => onDeleteHistorySession(item.id)}
-                className="rounded-md px-2 py-1 text-xs opacity-0 transition-opacity group-hover/history:opacity-100 focus-visible:opacity-100"
-                style={{ color: 'var(--sidebar-danger)', background: 'var(--sidebar-surface)' }}
-                title="Delete conversation"
-              >
-                x
-              </button>
-            </div>
-          ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onLoadHistorySession(item.id)
+                    closeOverlay()
+                  }}
+                  title={item.title || 'New Chat'}
+                  className="block w-full min-w-0 rounded-[inherit] px-4 py-3 pr-12 text-left text-[15px] leading-6 transition-all"
+                  style={{ color: 'var(--text-sidebar)', background: rowBg }}
+                  {...hoverHandlers(isCurrent ? rowBg : 'transparent', rowBg)}
+                >
+                  <p className={`truncate ${sidebarStaticBaseClass}`}>{item.title || 'New Chat'}</p>
+                </button>
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-y-1 right-8 w-12 opacity-0 transition-opacity group-hover/history:opacity-100 group-focus-within/history:opacity-100"
+                  style={{
+                    background: `linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, ${fadeBg} 55%, ${fadeBg} 100%)`,
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => onDeleteHistorySession(item.id)}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-xs opacity-0 transition-opacity group-hover/history:opacity-100 focus-visible:opacity-100 group-focus-within/history:opacity-100"
+                  style={{ color: 'var(--sidebar-danger)', background: fadeBg }}
+                  title="Delete conversation"
+                >
+                  x
+                </button>
+              </div>
+            )
+          })}
         </section>
       </div>
 
       <div className="flex-shrink-0 space-y-3 px-5 py-4">
-        <img
-          src="./simon_logo.svg"
-          alt="Simon Business School - University of Rochester"
-          className="simon-footer-logo w-full max-w-[148px]"
-          style={{
-            opacity: 0.85,
-          }}
-        />
+        {schoolLogo && (
+          <img
+            src={schoolLogo.src}
+            alt={schoolLogo.alt}
+            className={schoolLogo.className}
+            style={{
+              opacity: 0.85,
+            }}
+          />
+        )}
 
         <p className={sidebarFooterAttributionClass} style={{ color: 'var(--sidebar-muted)' }}>
           Powered by{' '}

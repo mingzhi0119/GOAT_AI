@@ -38,7 +38,8 @@ export interface UseChatReturn {
     ollamaOptions?: OllamaOptionsPayload,
     onChartSpec?: (spec: ChartSpec) => void,
     imageAttachmentIds?: string[],
-  ) => Promise<void>
+    sessionIdOverride?: string,
+  ) => Promise<string | undefined>
   streamToChat: (gen: AsyncGenerator<ChatStreamEvent>) => Promise<void>
   clearMessages: () => void
   stopStreaming: () => void
@@ -172,10 +173,11 @@ export function useChat(): UseChatReturn {
       ollamaOptions?: OllamaOptionsPayload,
       onChartSpec?: (spec: ChartSpec) => void,
       imageAttachmentIds?: string[],
+      sessionIdOverride?: string,
     ) => {
-      if (isStreaming) return
+      if (isStreaming) return undefined
 
-      const activeSessionId = sessionId ?? crypto.randomUUID()
+      const activeSessionId = sessionIdOverride ?? sessionId ?? crypto.randomUUID()
       if (!sessionId) setSessionId(activeSessionId)
 
       const userText =
@@ -239,6 +241,7 @@ export function useChat(): UseChatReturn {
       } finally {
         abortControllerRef.current = null
       }
+      return activeSessionId
     },
     [isStreaming, sessionId, _startStream],
   )

@@ -3,6 +3,7 @@ import {
   APPEARANCE_STORAGE_KEY,
   DEFAULT_APPEARANCE_CONFIG,
   applyAppearanceToRoot,
+  getComputedThemeTokens,
   loadStoredAppearance,
   sanitizeAppearanceConfig,
 } from '../utils/appearance'
@@ -41,6 +42,31 @@ describe('appearance helpers', () => {
       ...DEFAULT_APPEARANCE_CONFIG,
       themeMode: 'dark',
     })
+  })
+
+  it('uses blue as the classic default accent and applies it to classic user bubbles', () => {
+    expect(DEFAULT_APPEARANCE_CONFIG.accentColor).toBe('#2563eb')
+
+    const tokens = getComputedThemeTokens(DEFAULT_APPEARANCE_CONFIG, false)
+    expect(tokens.userBubbleBg).toBe('#2563eb')
+    expect(tokens.chatBg).toBe('#ffffff')
+    expect(tokens.sidebarBg).toBe('#f4f4f5')
+  })
+
+  it('applies accent color to user bubbles across non-classic themes too', () => {
+    const rochesterTokens = getComputedThemeTokens(
+      { ...DEFAULT_APPEARANCE_CONFIG, themeStyle: 'urochester', accentColor: '#ffd82b' },
+      false,
+    )
+    const thuTokens = getComputedThemeTokens(
+      { ...DEFAULT_APPEARANCE_CONFIG, themeStyle: 'thu', accentColor: '#8e2f9d' },
+      false,
+    )
+
+    expect(rochesterTokens.userBubbleBg).toBe('#ffd82b')
+    expect(rochesterTokens.textUserBubble).toBe('#111827')
+    expect(thuTokens.userBubbleBg).toBe('#8e2f9d')
+    expect(thuTokens.textUserBubble).toBe('#ffffff')
   })
 
   it('applies attributes and semantic vars to the document root', () => {

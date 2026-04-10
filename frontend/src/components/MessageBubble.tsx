@@ -157,24 +157,13 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode 
             )}
           </div>
         ) : (
-          <div className="assistant-document-card w-full min-w-0 rounded-lg px-1 py-2 transition-[background-color] duration-150 sm:px-2">
-            <div className="mb-2 flex min-h-[1.25rem] flex-wrap items-center justify-between gap-2">
-              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                <span className="assistant-meta-badge inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em]">
-                  Assistant
+          <div className="assistant-document-card w-full min-w-0 rounded-lg px-1 py-2 sm:px-2">
+            <div className="mb-2 flex min-h-[1.25rem] flex-wrap items-center justify-end gap-2">
+              {message.isStreaming && (
+                <span className="mr-auto text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                  Writing...
                 </span>
-                {message.isStreaming && (
-                  <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
-                    Writing…
-                  </span>
-                )}
-                <span
-                  className="hidden text-[10px] sm:inline"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  Markdown
-                </span>
-              </div>
+              )}
               {!message.isStreaming && displayContent && (
                 <div className="flex shrink-0 items-center">
                   {copyControl('assistant-copy-hit flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs', {

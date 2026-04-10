@@ -269,12 +269,14 @@ class OllamaTitleGenerator:
         assistant_text: str,
     ) -> str | None:
         prompt = (
-            "Write ONE short line (maximum 12 words) summarizing this exchange for a chat sidebar title. "
-            "Output only the title text, no quotes, no role labels.\n\n"
+            "Write ONE chat sidebar title for this exchange. "
+            "If the title is in English, keep it to 26 characters or fewer. "
+            "If the title is in Chinese, keep it to 15 characters or fewer. "
+            "Output only the title text, no quotes, no labels, no decorative punctuation.\n\n"
             f"User: {user_text[:4000]}\n\nAssistant: {assistant_text[:4000]}"
         )
         text = self._llm.generate_completion(model, prompt)
         one_line = " ".join(text.splitlines()).strip()
         if not one_line:
             return None
-        return one_line[:120] if len(one_line) > 120 else one_line
+        return one_line

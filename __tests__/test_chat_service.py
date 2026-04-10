@@ -8,8 +8,8 @@ from datetime import datetime, timezone
 
 from backend.models.chat import ChatMessage
 from backend.services.chat_runtime import SessionDetailRecord, SessionUpsertPayload
-from backend.services.session_message_codec import decode_session_payload
 from backend.services.session_message_codec import SESSION_PAYLOAD_VERSION
+from backend.services.session_message_codec import decode_session_payload
 from backend.services.session_message_codec import (
     FILE_CONTEXT_REPLY,
     STORED_CHART_ROLE,
@@ -20,6 +20,7 @@ from backend.services.session_service import (
     build_session_title_fallback,
     persist_chat_session,
     session_title_for_upsert,
+    truncate_session_title,
 )
 from goat_ai.clocks import FakeClock
 
@@ -84,8 +85,12 @@ class ChatServiceTitleTests(unittest.TestCase):
         title = build_session_title_fallback(
             [ChatMessage(role="user", content=long_user)],
         )
-        self.assertEqual(81, len(title))
-        self.assertTrue(title.endswith("…"))
+        self.assertEqual(26, len(title))
+        self.assertTrue(title.endswith("..."))
+
+    def test_truncate_session_title_uses_shorter_limit_for_cjk(self) -> None:
+        title = truncate_session_title("如何回复父亲的移民焦虑与就业前景担忧")
+        self.assertEqual("如何回复父亲的移民焦虑与...", title)
 
     def test_first_exchange_uses_ollama_summary(self) -> None:
         title = session_title_for_upsert(
@@ -97,6 +102,17 @@ class ChatServiceTitleTests(unittest.TestCase):
             title_generator=FakeTitleGenerator("Math help: 2+2 explained"),
         )
         self.assertEqual("Math help: 2+2 explained", title)
+
+    def test_generated_titles_are_normalized_without_forced_clamp(self) -> None:
+        title = session_title_for_upsert(
+            messages=[ChatMessage(role="user", content="What is 2+2?")],
+            assistant_text="The answer is four.",
+            session_id="sid-1",
+            model="llama3:latest",
+            session_repository=FakeSessionRepository(sessions={}),
+            title_generator=FakeTitleGenerator("Frontier Macroeconomic Research Outlook"),
+        )
+        self.assertEqual("Frontier Macroeconomic Research Outlook", title)
 
     def test_subsequent_turn_keeps_existing_title(self) -> None:
         repository = FakeSessionRepository(

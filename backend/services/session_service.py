@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from backend.domain.chart_provenance_policy import resolve_chart_data_source_for_persist
 from backend.domain.chart_types import ChartDataSource
@@ -19,6 +20,25 @@ from backend.services.session_message_codec import (
 from goat_ai.clocks import Clock, SystemClock
 
 logger = logging.getLogger(__name__)
+_CJK_CHAR_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
+
+
+def _normalize_session_title(text: str) -> str:
+    return re.sub(r"\s+", " ", text.strip())
+
+
+def truncate_session_title(text: str) -> str:
+    """Clamp session titles to a compact UI-safe length."""
+    normalized = _normalize_session_title(text)
+    if not normalized:
+        return ""
+
+    limit = 15 if _CJK_CHAR_RE.search(normalized) else 26
+    if len(normalized) <= limit:
+        return normalized
+    if limit <= 3:
+        return "." * limit
+    return normalized[: limit - 3].rstrip() + "..."
 
 
 def last_user_message(messages: list[ChatMessage]) -> str:
@@ -33,8 +53,7 @@ def build_session_title_fallback(messages: list[ChatMessage]) -> str:
     """Fallback title from the last user message when no model title is available."""
     for msg in reversed(messages):
         if msg.role == "user":
-            text = msg.content.strip().replace("\n", " ")
-            return (text[:80] + "…") if len(text) > 80 else text
+            return truncate_session_title(msg.content)
     return "New Chat"
 
 
@@ -64,7 +83,7 @@ def session_title_for_upsert(
             logger.exception("Session title generation failed")
             generated = None
         if generated:
-            return generated
+            return _normalize_session_title(generated)
     return build_session_title_fallback(messages)
 
 

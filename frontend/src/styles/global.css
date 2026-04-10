@@ -4,10 +4,10 @@
 
 :root {
   --navy: #16181d;
-  --gold: #339cff;
-  --theme-accent: #339cff;
+  --gold: #2563eb;
+  --theme-accent: #2563eb;
   --theme-accent-strong: #2563eb;
-  --theme-accent-soft: rgba(51, 156, 255, 0.14);
+  --theme-accent-soft: rgba(37, 99, 235, 0.14);
   --theme-accent-contrast: #ffffff;
   --ui-font-family:
     "Inter",
@@ -19,24 +19,24 @@
     system-ui,
     sans-serif;
   --code-font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
-  --bg-main: #f3f5f8;
-  --bg-sidebar: #eef2f6;
-  --bg-chat: #f8fafc;
-  --bg-user-bubble: #17181c;
+  --bg-main: #f7f7f8;
+  --bg-sidebar: #f4f4f5;
+  --bg-chat: #ffffff;
+  --bg-user-bubble: #2563eb;
   --bg-asst-bubble: #ffffff;
   --text-main: #16181d;
-  --text-muted: #6f7683;
+  --text-muted: #6b7280;
   --text-sidebar: #1d2128;
   --text-user-bubble: #ffffff;
   --text-asst-bubble: #16181d;
   --border-color: rgba(18, 24, 38, 0.08);
-  --input-bg: rgba(255, 255, 255, 0.94);
+  --input-bg: #ffffff;
   --input-border: rgba(18, 24, 38, 0.08);
-  --scrollbar-thumb: #cfd6df;
+  --scrollbar-thumb: #d1d5db;
   --scrollbar-track: transparent;
-  --sidebar-hover: rgba(18, 24, 38, 0.045);
-  --sidebar-surface: rgba(255, 255, 255, 0.86);
-  --sidebar-surface-muted: rgba(255, 255, 255, 0.72);
+  --sidebar-hover: rgba(18, 24, 38, 0.04);
+  --sidebar-surface: rgba(255, 255, 255, 0.92);
+  --sidebar-surface-muted: rgba(255, 255, 255, 0.82);
   --sidebar-border: rgba(18, 24, 38, 0.08);
   --sidebar-muted: #6b7280;
   --sidebar-danger: #b91c1c;
@@ -44,8 +44,8 @@
   --composer-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(255, 255, 255, 0.88) 100%);
   --composer-menu-bg: rgba(255, 255, 255, 0.88);
   --composer-menu-bg-strong: rgba(255, 255, 255, 0.97);
-  --composer-muted-surface: rgba(15, 23, 42, 0.03);
-  --composer-selected-surface: rgba(51, 156, 255, 0.11);
+  --composer-muted-surface: rgba(15, 23, 42, 0.028);
+  --composer-selected-surface: rgba(37, 99, 235, 0.11);
   --composer-chip-border: rgba(37, 99, 235, 0.18);
   --composer-danger-text: #b91c1c;
   --composer-danger-border: rgba(239, 68, 68, 0.28);
@@ -131,6 +131,26 @@ textarea:focus-visible,
 a:focus-visible {
   outline: 2px solid var(--theme-accent);
   outline-offset: 2px;
+}
+
+input[type="range"] {
+  cursor: ew-resize;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  cursor: ew-resize;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  cursor: ew-resize;
+}
+
+input[type="range"]::-moz-range-track {
+  cursor: ew-resize;
+}
+
+input[type="range"]::-moz-range-thumb {
+  cursor: ew-resize;
 }
 
 .chat-shell :not(input):not(textarea) {
@@ -348,10 +368,6 @@ html[data-sidebar-translucent="false"] .app-sidebar-glass {
   color: var(--text-main);
 }
 
-.assistant-document-card:hover {
-  background: var(--assistant-hover);
-}
-
 .assistant-document-card .prose-msg p {
   margin-bottom: 0.75rem;
 }
@@ -364,12 +380,6 @@ html[data-sidebar-translucent="false"] .app-sidebar-glass {
 .assistant-document-card .prose-msg h2:first-child,
 .assistant-document-card .prose-msg h3:first-child {
   margin-top: 0.35rem;
-}
-
-.assistant-document-card .assistant-meta-badge {
-  border-color: var(--border-color);
-  background: var(--composer-muted-surface);
-  color: var(--text-muted);
 }
 
 .assistant-document-card .assistant-copy-hit {

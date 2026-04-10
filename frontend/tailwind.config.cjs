@@ -5,8 +5,8 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        navy: '#003a70',
-        gold: '#ffcd00',
+        navy: 'var(--navy)',
+        gold: 'var(--gold)',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],

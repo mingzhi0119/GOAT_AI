@@ -33,4 +33,36 @@ describe('AppearancePanel', () => {
     expect(onChange).toHaveBeenCalledWith({ translucentSidebar: false })
     expect(onReset).toHaveBeenCalled()
   })
+
+  it('keeps the active badge anchored without displacing the theme title', () => {
+    render(
+      <AppearancePanel
+        open={true}
+        appearance={{ ...DEFAULT_APPEARANCE_CONFIG, themeStyle: 'thu' }}
+        effectiveMode="light"
+        onClose={vi.fn()}
+        onChange={vi.fn()}
+        onReset={vi.fn()}
+      />,
+    )
+
+    const activeBadge = screen.getByText('Active')
+    expect(activeBadge).toHaveClass('absolute', 'right-0', 'top-0')
+    expect(screen.getByText('THU')).toBeInTheDocument()
+  })
+
+  it('renders the contrast slider with a dedicated draggable class', () => {
+    render(
+      <AppearancePanel
+        open={true}
+        appearance={DEFAULT_APPEARANCE_CONFIG}
+        effectiveMode="light"
+        onClose={vi.fn()}
+        onChange={vi.fn()}
+        onReset={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByLabelText(/contrast/i)).toHaveClass('appearance-contrast-slider')
+  })
 })
