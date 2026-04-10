@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from backend.services import log_service
+from backend.services.exceptions import SessionNotFoundError
 
 
 class LogServiceTests(unittest.TestCase):
@@ -80,6 +81,21 @@ class LogServiceTests(unittest.TestCase):
             ).fetchone()[0]
         # Sidebar delete removes ``sessions`` only; per-turn audit rows stay.
         self.assertEqual(1, count)
+
+    def test_rename_missing_session_raises_not_found(self) -> None:
+        with self.assertRaises(SessionNotFoundError):
+            log_service.rename_session_title(
+                db_path=self.db_path,
+                session_id="missing-session",
+                title="Renamed",
+            )
+
+    def test_delete_missing_session_raises_not_found(self) -> None:
+        with self.assertRaises(SessionNotFoundError):
+            log_service.delete_session(
+                db_path=self.db_path,
+                session_id="missing-session",
+            )
 
 
 if __name__ == "__main__":

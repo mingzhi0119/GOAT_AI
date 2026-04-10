@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from backend.services import log_service
+from backend.services.exceptions import PersistenceWriteError
 
 
 class LogServiceWaveATests(unittest.TestCase):
@@ -37,15 +38,16 @@ class LogServiceWaveATests(unittest.TestCase):
     @patch("backend.services.log_service.inc_sqlite_log_write_failure")
     def test_upsert_session_failure_calls_metric(self, inc_mock: MagicMock) -> None:
         with patch("sqlite3.connect", side_effect=sqlite3.Error("injected")):
-            log_service.upsert_session(
-                db_path=self.db_path,
-                session_id="s1",
-                title="t",
-                model="m",
-                payload={"messages": []},
-                created_at="2020-01-01T00:00:00+00:00",
-                updated_at="2020-01-01T00:00:00+00:00",
-            )
+            with self.assertRaises(PersistenceWriteError):
+                log_service.upsert_session(
+                    db_path=self.db_path,
+                    session_id="s1",
+                    title="t",
+                    model="m",
+                    payload={"messages": []},
+                    created_at="2020-01-01T00:00:00+00:00",
+                    updated_at="2020-01-01T00:00:00+00:00",
+                )
         inc_mock.assert_called_once_with(
             operation="session_upsert", code="SQLITE_WRITE_FAILED"
         )

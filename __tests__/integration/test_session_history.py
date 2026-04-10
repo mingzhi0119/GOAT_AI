@@ -9,6 +9,10 @@ from __future__ import annotations
 
 import pytest
 from pathlib import Path
+from unittest.mock import patch
+
+from backend.api_errors import INTERNAL_ERROR
+from backend.services.exceptions import PersistenceWriteError
 
 pytestmark = pytest.mark.integration
 
@@ -151,6 +155,35 @@ def test_rename_history_session_updates_title(app_client: object) -> None:
     assert detail.json()["title"] == "Renamed Title"
 
 
+def test_rename_history_session_returns_500_on_persistence_failure(
+    integration_env: None,
+) -> None:
+    from fastapi.testclient import TestClient
+    from backend.config import get_settings
+    from backend.main import create_app
+
+    settings = get_settings()
+    db = settings.log_db_path
+
+    from backend.services import log_service
+
+    log_service.init_db(db)
+    _seed_session(db, "sess-rename-fail", "Original Title")
+
+    with TestClient(create_app(), raise_server_exceptions=False) as client:
+        with patch(
+            "backend.services.log_service.rename_session_title",
+            side_effect=PersistenceWriteError("db down"),
+        ):
+            response = client.patch(
+                "/api/history/sess-rename-fail",
+                json={"title": "Renamed Title"},
+            )
+
+    assert response.status_code == 500
+    assert response.json()["code"] == INTERNAL_ERROR
+
+
 # ── delete all ────────────────────────────────────────────────────────────────
 
 
@@ -171,3 +204,20 @@ def test_delete_all_history_removes_all(app_client: object) -> None:
     assert app_client.delete("/api/history").status_code == 204
     body = app_client.get("/api/history").json()
     assert body["sessions"] == []
+
+
+def test_delete_all_history_returns_500_on_persistence_failure(
+    integration_env: None,
+) -> None:
+    from fastapi.testclient import TestClient
+    from backend.main import create_app
+
+    with TestClient(create_app(), raise_server_exceptions=False) as client:
+        with patch(
+            "backend.services.log_service.delete_all_sessions",
+            side_effect=PersistenceWriteError("db down"),
+        ):
+            response = client.delete("/api/history")
+
+    assert response.status_code == 500
+    assert response.json()["code"] == INTERNAL_ERROR

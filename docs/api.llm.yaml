@@ -506,6 +506,7 @@ endpoints:
         - 401
         - 403
         - 429
+        - 500
   - op: delete_all_history
     method: DELETE
     path: /history
@@ -515,6 +516,7 @@ endpoints:
         - 401
         - 403
         - 429
+        - 500
   - op: rename_history_session_route
     method: PATCH
     path: /history/{session_id}
@@ -529,6 +531,7 @@ endpoints:
         - 403
         - 404
         - 429
+        - 500
   - op: get_history_session
     method: GET
     path: /history/{session_id}
@@ -541,6 +544,7 @@ endpoints:
         - 403
         - 404
         - 429
+        - 500
   - op: delete_history_session
     method: DELETE
     path: /history/{session_id}
@@ -553,6 +557,7 @@ endpoints:
         - 403
         - 404
         - 429
+        - 500
   - op: post_knowledge_upload
     method: POST
     path: /knowledge/uploads

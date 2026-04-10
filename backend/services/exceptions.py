@@ -38,6 +38,18 @@ class ArtifactNotFound(Exception):
     """Raised when a requested generated chat artifact does not exist."""
 
 
+class SessionNotFoundError(LookupError):
+    """Raised when a targeted persisted session row does not exist."""
+
+
+class PersistenceReadError(RuntimeError):
+    """Raised when persisted session state cannot be read reliably."""
+
+
+class PersistenceWriteError(RuntimeError):
+    """Raised when a persisted session write cannot be completed reliably."""
+
+
 class VisionNotSupported(Exception):
     """Raised when the selected model lacks Ollama-reported vision capability."""
 

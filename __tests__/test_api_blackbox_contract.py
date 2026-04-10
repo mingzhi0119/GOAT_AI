@@ -37,6 +37,7 @@ if TestClient is not None:
     from backend.main import create_app
     from backend.models.system import GPUStatusResponse
     from backend.services import log_service
+    from backend.services.exceptions import PersistenceWriteError
     from backend.services.session_message_codec import SESSION_PAYLOAD_VERSION
     from backend.services.safeguard_service import (
         SAFEGUARD_BLOCKED_TITLE,
@@ -503,6 +504,28 @@ class ApiBlackboxContractTests(unittest.TestCase):
         events = parse_sse_payloads(response.text)
         self.assertEqual(["token", "done"], [event["type"] for event in events])
         self.assertEqual(SAFEGUARD_REFUSAL_MESSAGE, events[0]["token"])
+
+    def test_chat_endpoint_emits_error_frame_when_session_persistence_fails(self) -> None:
+        with patch(
+            "backend.services.log_service.upsert_session",
+            side_effect=PersistenceWriteError("db down"),
+        ):
+            response = self.client.post(
+                "/api/chat",
+                json={
+                    "model": "blackbox-model",
+                    "session_id": "chat-persist-fail",
+                    "messages": [{"role": "user", "content": "Hello there"}],
+                },
+            )
+
+        self.assertEqual(200, response.status_code)
+        events = parse_sse_payloads(response.text)
+        self.assertEqual(
+            ["token", "token", "token", "error"],
+            [event["type"] for event in events],
+        )
+        self.assertEqual("Failed to persist chat result.", events[-1]["message"])
 
     def test_chat_chart_flow_returns_normalized_history_contract(self) -> None:
         file_context_prompt = (

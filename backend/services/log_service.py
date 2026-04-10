@@ -18,10 +18,66 @@ from pathlib import Path
 from typing import Any
 
 from backend.prometheus_metrics import inc_sqlite_log_write_failure
+from backend.services.exceptions import (
+    PersistenceReadError,
+    PersistenceWriteError,
+    SessionNotFoundError,
+)
 
 logger = logging.getLogger(__name__)
 
 _SQLITE_WRITE_METRIC_CODE = "SQLITE_WRITE_FAILED"
+
+
+def _raise_persistence_read_error(
+    *,
+    operation: str,
+    db_path: Path,
+    exc: Exception,
+    resource_id: str | None = None,
+) -> None:
+    logger.exception(
+        "Failed to %s in SQLite",
+        operation.replace("_", " "),
+        extra={
+            "event": "sqlite_read_failure",
+            "component": f"log_service.{operation}",
+            "operation": operation,
+            "db_path": str(db_path),
+            "resource_id": resource_id or "",
+        },
+    )
+    raise PersistenceReadError(f"Failed to {operation.replace('_', ' ')}.") from exc
+
+
+def _raise_persistence_write_error(
+    *,
+    operation: str,
+    db_path: Path,
+    exc: Exception,
+    session_id: str | None = None,
+    artifact_id: str | None = None,
+) -> None:
+    inc_sqlite_log_write_failure(
+        operation=operation, code=_SQLITE_WRITE_METRIC_CODE
+    )
+    logger.error(
+        "Failed to %s in SQLite",
+        operation.replace("_", " "),
+        extra={
+            "event": "sqlite_log_write_failure",
+            "component": f"log_service.{operation}",
+            "operation": operation,
+            "code": _SQLITE_WRITE_METRIC_CODE,
+            "db_path": str(db_path),
+            "session_id": session_id or "",
+            "artifact_id": artifact_id or "",
+        },
+        exc_info=True,
+    )
+    raise PersistenceWriteError(
+        f"Failed to {operation.replace('_', ' ')}."
+    ) from exc
 
 
 def _payload_visible_messages(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -338,21 +394,12 @@ def upsert_session(
             except Exception:
                 conn.rollback()
                 raise
-    except Exception:
-        inc_sqlite_log_write_failure(
-            operation="session_upsert", code=_SQLITE_WRITE_METRIC_CODE
-        )
-        logger.error(
-            "Failed to upsert session in SQLite",
-            extra={
-                "event": "sqlite_log_write_failure",
-                "component": "log_service.upsert_session",
-                "operation": "session_upsert",
-                "code": _SQLITE_WRITE_METRIC_CODE,
-                "db_path": str(db_path),
-                "session_id": session_id,
-            },
-            exc_info=True,
+    except Exception as exc:
+        _raise_persistence_write_error(
+            operation="session_upsert",
+            db_path=db_path,
+            exc=exc,
+            session_id=session_id,
         )
 
 
@@ -361,7 +408,8 @@ def rename_session_title(*, db_path: Path, session_id: str, title: str) -> None:
     try:
         now = datetime.now(timezone.utc).isoformat()
         with sqlite3.connect(db_path) as conn:
-            conn.execute(
+            conn.execute("BEGIN IMMEDIATE")
+            cursor = conn.execute(
                 """
                 UPDATE sessions
                 SET title = ?, updated_at = ?
@@ -369,21 +417,18 @@ def rename_session_title(*, db_path: Path, session_id: str, title: str) -> None:
                 """,
                 (title, now, session_id),
             )
-    except Exception:
-        inc_sqlite_log_write_failure(
-            operation="session_rename", code=_SQLITE_WRITE_METRIC_CODE
-        )
-        logger.error(
-            "Failed to rename session in SQLite",
-            extra={
-                "event": "sqlite_log_write_failure",
-                "component": "log_service.rename_session_title",
-                "operation": "session_rename",
-                "code": _SQLITE_WRITE_METRIC_CODE,
-                "db_path": str(db_path),
-                "session_id": session_id,
-            },
-            exc_info=True,
+            if cursor.rowcount == 0:
+                conn.rollback()
+                raise SessionNotFoundError("Session not found")
+            conn.commit()
+    except SessionNotFoundError:
+        raise
+    except Exception as exc:
+        _raise_persistence_write_error(
+            operation="session_rename",
+            db_path=db_path,
+            exc=exc,
+            session_id=session_id,
         )
 
 
@@ -425,9 +470,12 @@ def list_sessions(
                 tuple(params),
             ).fetchall()
         return [dict(r) for r in rows]
-    except Exception:
-        logger.exception("Failed to list sessions from %s", db_path)
-        return []
+    except Exception as exc:
+        _raise_persistence_read_error(
+            operation="session_list",
+            db_path=db_path,
+            exc=exc,
+        )
 
 
 def get_session(*, db_path: Path, session_id: str) -> dict[str, Any] | None:
@@ -465,9 +513,13 @@ def get_session(*, db_path: Path, session_id: str) -> dict[str, Any] | None:
                 normalized=normalized,
             )
         return item
-    except Exception:
-        logger.exception("Failed to fetch session %s from %s", session_id, db_path)
-        return None
+    except Exception as exc:
+        _raise_persistence_read_error(
+            operation="session_get",
+            db_path=db_path,
+            exc=exc,
+            resource_id=session_id,
+        )
 
 
 def delete_session(*, db_path: Path, session_id: str) -> None:
@@ -478,6 +530,14 @@ def delete_session(*, db_path: Path, session_id: str) -> None:
     """
     try:
         with sqlite3.connect(db_path) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                "SELECT 1 FROM sessions WHERE id = ?",
+                (session_id,),
+            ).fetchone()
+            if row is None:
+                conn.rollback()
+                raise SessionNotFoundError("Session not found")
             if _session_messages_table_exists(conn):
                 conn.execute(
                     "DELETE FROM session_messages WHERE session_id = ?", (session_id,)
@@ -487,21 +547,15 @@ def delete_session(*, db_path: Path, session_id: str) -> None:
                     "DELETE FROM chat_artifacts WHERE session_id = ?", (session_id,)
                 )
             conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
-    except Exception:
-        inc_sqlite_log_write_failure(
-            operation="session_delete", code=_SQLITE_WRITE_METRIC_CODE
-        )
-        logger.error(
-            "Failed to delete session from SQLite",
-            extra={
-                "event": "sqlite_log_write_failure",
-                "component": "log_service.delete_session",
-                "operation": "session_delete",
-                "code": _SQLITE_WRITE_METRIC_CODE,
-                "db_path": str(db_path),
-                "session_id": session_id,
-            },
-            exc_info=True,
+            conn.commit()
+    except SessionNotFoundError:
+        raise
+    except Exception as exc:
+        _raise_persistence_write_error(
+            operation="session_delete",
+            db_path=db_path,
+            exc=exc,
+            session_id=session_id,
         )
 
 
@@ -514,6 +568,7 @@ def delete_all_sessions(
     """Remove rows from ``sessions`` (and ``session_messages``); ``conversations`` audit rows remain."""
     try:
         with sqlite3.connect(db_path) as conn:
+            conn.execute("BEGIN IMMEDIATE")
             if (
                 owner_filter is not None or tenant_filter is not None
             ) and _sessions_has_owner_id_column(conn):
@@ -557,20 +612,12 @@ def delete_all_sessions(
                 if _chat_artifacts_table_exists(conn):
                     conn.execute("DELETE FROM chat_artifacts")
                 conn.execute("DELETE FROM sessions")
-    except Exception:
-        inc_sqlite_log_write_failure(
-            operation="session_delete_all", code=_SQLITE_WRITE_METRIC_CODE
-        )
-        logger.error(
-            "Failed to delete all sessions from SQLite",
-            extra={
-                "event": "sqlite_log_write_failure",
-                "component": "log_service.delete_all_sessions",
-                "operation": "session_delete_all",
-                "code": _SQLITE_WRITE_METRIC_CODE,
-                "db_path": str(db_path),
-            },
-            exc_info=True,
+            conn.commit()
+    except Exception as exc:
+        _raise_persistence_write_error(
+            operation="session_delete_all",
+            db_path=db_path,
+            exc=exc,
         )
 
 
@@ -632,21 +679,12 @@ def create_chat_artifact(
                         created_at,
                     ),
                 )
-    except Exception:
-        inc_sqlite_log_write_failure(
-            operation="chat_artifact_create", code=_SQLITE_WRITE_METRIC_CODE
-        )
-        logger.error(
-            "Failed to persist chat artifact in SQLite",
-            extra={
-                "event": "sqlite_log_write_failure",
-                "component": "log_service.create_chat_artifact",
-                "operation": "chat_artifact_create",
-                "code": _SQLITE_WRITE_METRIC_CODE,
-                "db_path": str(db_path),
-                "artifact_id": artifact_id,
-            },
-            exc_info=True,
+    except Exception as exc:
+        _raise_persistence_write_error(
+            operation="chat_artifact_create",
+            db_path=db_path,
+            exc=exc,
+            artifact_id=artifact_id,
         )
 
 

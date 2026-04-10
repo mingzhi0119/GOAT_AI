@@ -7,6 +7,7 @@ from typing import Any
 
 from backend.domain.authz_types import AuthorizationContext
 from backend.services.authorizer import authorize_session_read, authorize_session_write
+from backend.services.exceptions import SessionNotFoundError
 from backend.application.exceptions import (
     HistoryOwnerRequiredError,
     HistorySessionNotFoundError,
@@ -94,7 +95,10 @@ def delete_history_session(
         auth_context=auth_context,
         request_id=request_id,
     )
-    repository.delete_session(session_id)
+    try:
+        repository.delete_session(session_id)
+    except SessionNotFoundError as exc:
+        raise HistorySessionNotFoundError("Session not found") from exc
 
 
 def rename_history_session(
@@ -126,7 +130,10 @@ def rename_history_session(
     if not decision.allowed:
         raise HistorySessionNotFoundError("Session not found")
 
-    repository.rename_session(session_id, title)
+    try:
+        repository.rename_session(session_id, title)
+    except SessionNotFoundError as exc:
+        raise HistorySessionNotFoundError("Session not found") from exc
 
 
 def get_history_session_detail(
