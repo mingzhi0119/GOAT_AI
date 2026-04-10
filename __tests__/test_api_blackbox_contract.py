@@ -73,10 +73,16 @@ class ContractFakeLLM:
     def list_model_names(self) -> list[str]:
         return ["blackbox-model", "viz-model"]
 
-    def get_model_capabilities(self, model: str) -> list[str]:
+    def describe_model_for_api(self, model: str) -> tuple[list[str], int | None]:
         if model == "viz-model":
-            return ["completion", "tools", "vision"]
-        return ["completion"]
+            return ["completion", "tools", "vision"], None
+        return ["completion"], None
+
+    def get_model_capabilities(self, model: str) -> list[str]:
+        return self.describe_model_for_api(model)[0]
+
+    def get_model_context_length(self, model: str) -> int | None:
+        return self.describe_model_for_api(model)[1]
 
     def supports_tool_calling(self, model: str) -> bool:
         return "tools" in self.get_model_capabilities(model)
@@ -214,7 +220,13 @@ class UnavailableLLM(ContractFakeLLM):
     def list_model_names(self) -> list[str]:
         raise OllamaUnavailable("offline")
 
+    def describe_model_for_api(self, model: str) -> tuple[list[str], int | None]:
+        raise OllamaUnavailable("offline")
+
     def get_model_capabilities(self, model: str) -> list[str]:
+        raise OllamaUnavailable("offline")
+
+    def get_model_context_length(self, model: str) -> int | None:
         raise OllamaUnavailable("offline")
 
     def generate_completion(

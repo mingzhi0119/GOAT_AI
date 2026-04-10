@@ -40,6 +40,16 @@
   --composer-danger-border: rgba(239, 68, 68, 0.28);
   --composer-danger-bg: rgba(239, 68, 68, 0.08);
   --composer-danger-fg: #fca5a5;
+  /* Composer primary controls (+ / send): light theme */
+  --composer-control-icon: rgba(17, 24, 39, 0.45);
+  --composer-control-hover-bg: rgba(17, 24, 39, 0.08);
+  --composer-pill-open-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+  --composer-send-bg: #171717;
+  --composer-send-fg: #ffffff;
+  --composer-send-disabled-bg: #9ca3af;
+  /* GOAT icon frame: contrast on light sidebar/chat chrome */
+  --goat-icon-frame-bg: rgba(0, 0, 0, 0.06);
+  --goat-icon-circle-bg: #1a1a1a;
 }
 
 .dark {
@@ -75,6 +85,19 @@
   --composer-danger-border: rgba(248, 113, 113, 0.28);
   --composer-danger-bg: rgba(248, 113, 113, 0.1);
   --composer-danger-fg: #fecaca;
+  --composer-control-icon: rgba(244, 244, 245, 0.58);
+  --composer-control-hover-bg: rgba(255, 255, 255, 0.1);
+  --composer-pill-open-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+  --composer-send-bg: #e4e4e7;
+  --composer-send-fg: #18181b;
+  --composer-send-disabled-bg: #52525b;
+  --goat-icon-frame-bg: rgba(255, 255, 255, 0.1);
+  --goat-icon-circle-bg: #252a32;
+}
+
+/* Simon wordmark: navy SVG → light mark on dark sidebar (readable contrast) */
+.dark .simon-footer-logo {
+  filter: brightness(0) invert(1);
 }
 
 /* ─── Base ───────────────────────────────────────────────────────────────── */
@@ -196,9 +219,20 @@ body {
 .prose-msg th { background: rgba(0, 58, 112, 0.08); font-weight: 600; }
 .dark .prose-msg th { background: rgba(255,255,255,0.05); }
 
+.prose-msg h1,
+.prose-msg h2,
+.prose-msg h3,
+.prose-msg h4,
+.prose-msg h5,
+.prose-msg h6 {
+  color: var(--text-main);
+}
 .prose-msg h1 { font-size: 1.35em; font-weight: 700; margin: 0.9rem 0 0.4rem; }
 .prose-msg h2 { font-size: 1.15em; font-weight: 700; margin: 0.8rem 0 0.35rem; }
 .prose-msg h3 { font-size: 1.05em; font-weight: 600; margin: 0.7rem 0 0.3rem; }
+.prose-msg h4 { font-size: 1em; font-weight: 600; margin: 0.65rem 0 0.28rem; }
+.prose-msg h5 { font-size: 0.95em; font-weight: 600; margin: 0.55rem 0 0.25rem; }
+.prose-msg h6 { font-size: 0.92em; font-weight: 600; margin: 0.5rem 0 0.22rem; opacity: 0.95; }
 
 .prose-msg blockquote {
   border-left: 3px solid rgba(17, 24, 39, 0.18);
@@ -215,4 +249,47 @@ body {
 /* Collapsed model reasoning trace (MessageBubble <details>) */
 .thinking-disclosure[open] .thinking-chevron {
   transform: rotate(90deg);
+}
+
+/* Assistant turns: document-style block (no chat bubble chrome) */
+.assistant-document-card {
+  color: var(--text-main);
+}
+.assistant-document-card:hover {
+  background: rgba(17, 24, 39, 0.028);
+}
+.dark .assistant-document-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.assistant-document-card .prose-msg p {
+  margin-bottom: 0.75rem;
+}
+.assistant-document-card .prose-msg p:last-child {
+  margin-bottom: 0;
+}
+.assistant-document-card .prose-msg h1:first-child,
+.assistant-document-card .prose-msg h2:first-child,
+.assistant-document-card .prose-msg h3:first-child {
+  margin-top: 0.35rem;
+}
+.assistant-document-card .assistant-meta-badge {
+  border-color: var(--border-color);
+  background: var(--composer-muted-surface);
+  color: var(--text-muted);
+}
+.assistant-document-card .assistant-copy-hit {
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+.assistant-document-card:hover .assistant-copy-hit,
+.assistant-document-card:focus-within .assistant-copy-hit {
+  opacity: 1;
+}
+.assistant-document-card .assistant-copy-hit:hover {
+  color: var(--text-main);
+  background: rgba(17, 24, 39, 0.06);
+}
+.dark .assistant-document-card .assistant-copy-hit:hover {
+  background: rgba(255, 255, 255, 0.08);
 }

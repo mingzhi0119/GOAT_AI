@@ -78,3 +78,7 @@ class ModelCapabilitiesResponse(BaseModel):
     supports_chart_tools: bool
     supports_vision: bool
     supports_thinking: bool
+    context_length: int | None = Field(
+        default=None,
+        description="Ollama-reported context window in tokens, when discoverable from /api/show.",
+    )

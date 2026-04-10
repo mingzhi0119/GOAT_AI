@@ -141,6 +141,8 @@ export default function App() {
           onTemperatureChange={advanced.setTemperature}
           maxTokens={advanced.maxTokens}
           onMaxTokensChange={advanced.setMaxTokens}
+          modelContextLength={models.capabilities?.context_length ?? null}
+          modelCapabilitiesLoading={models.isLoadingCapabilities}
           topP={advanced.topP}
           onTopPChange={advanced.setTopP}
           onResetAdvanced={advanced.resetAdvancedToDefaults}

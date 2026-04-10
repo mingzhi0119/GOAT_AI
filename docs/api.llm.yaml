@@ -69,6 +69,7 @@ schemas:
       temperature: number|null
       max_tokens: integer|null
       top_p: number|null
+      think: boolean|null
   CodeSandboxFeaturePayload:
     type: object
     required:
@@ -335,12 +336,15 @@ schemas:
       - supports_tool_calling
       - supports_chart_tools
       - supports_vision
+      - supports_thinking
     properties:
       model: string
       capabilities: string[]
       supports_tool_calling: boolean
       supports_chart_tools: boolean
       supports_vision: boolean
+      supports_thinking: boolean
+      context_length: integer|null
   ModelsResponse:
     type: object
     required:

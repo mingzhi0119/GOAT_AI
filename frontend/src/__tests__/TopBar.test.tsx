@@ -27,6 +27,8 @@ function renderTopBar() {
       onTemperatureChange={onTemperatureChange}
       maxTokens={4096}
       onMaxTokensChange={onMaxTokensChange}
+      modelContextLength={16384}
+      modelCapabilitiesLoading={false}
       topP={0.9}
       onTopPChange={onTopPChange}
       onResetAdvanced={onResetAdvanced}
@@ -51,7 +53,7 @@ describe('TopBar options callout', () => {
     renderTopBar()
 
     expect(screen.getByRole('heading', { name: 'Strategy Sync' })).toHaveStyle({
-      color: '#000000',
+      color: 'var(--text-main)',
     })
     expect(screen.queryByText('Skills')).not.toBeInTheDocument()
     expect(screen.getByText('Tools')).toBeInTheDocument()
@@ -66,6 +68,13 @@ describe('TopBar options callout', () => {
     expect(screen.getByRole('dialog', { name: /options/i })).toBeInTheDocument()
     expect(screen.queryByText(/Enter sends the message/i)).not.toBeInTheDocument()
     expect(screen.getByText(/^Generation$/)).toBeInTheDocument()
+  })
+
+  it('shows API and model-reported context limits under Max tokens', () => {
+    renderTopBar()
+    fireEvent.click(screen.getByRole('button', { name: /options/i }))
+    expect(screen.getByText(/API allows up to 131,072 generation tokens/i)).toBeInTheDocument()
+    expect(screen.getByText(/16,384-token context window/i)).toBeInTheDocument()
   })
 
   it('keeps system instruction editing and clear actions wired', () => {

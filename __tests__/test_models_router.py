@@ -22,10 +22,16 @@ class FakeModelsLLMClient:
     def list_model_names(self) -> list[str]:
         return ["gemma4:26b", "qwen3"]
 
-    def get_model_capabilities(self, model: str) -> list[str]:
+    def describe_model_for_api(self, model: str) -> tuple[list[str], int | None]:
         if model == "qwen3":
-            return ["completion", "tools"]
-        return ["completion"]
+            return ["completion", "tools"], 32768
+        return ["completion"], None
+
+    def get_model_capabilities(self, model: str) -> list[str]:
+        return self.describe_model_for_api(model)[0]
+
+    def get_model_context_length(self, model: str) -> int | None:
+        return self.describe_model_for_api(model)[1]
 
     def supports_tool_calling(self, model: str) -> bool:
         return "tools" in self.get_model_capabilities(model)
@@ -114,6 +120,7 @@ class ModelsRouterIntegrationTests(unittest.TestCase):
         self.assertTrue(payload["supports_tool_calling"])
         self.assertTrue(payload["supports_chart_tools"])
         self.assertFalse(payload["supports_vision"])
+        self.assertEqual(32768, payload["context_length"])
 
 
 if __name__ == "__main__":

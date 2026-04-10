@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import random
+import re
 import threading
 import time
 from dataclasses import dataclass
@@ -56,6 +57,37 @@ def _iter_stream_parts_from_chunk(chunk: dict) -> list[StreamTextPart]:  # type:
     return []
 
 
+def _coerce_positive_int(raw: Any) -> int | None:
+    if isinstance(raw, bool):
+        return None
+    if isinstance(raw, int) and raw > 0:
+        return raw
+    if isinstance(raw, float) and raw > 0:
+        return int(raw)
+    return None
+
+
+def _context_length_from_show_json(payload: dict[str, Any]) -> int | None:
+    """Best-effort context window (tokens) from Ollama ``/api/show`` JSON."""
+    model_info = payload.get("model_info")
+    best: int | None = None
+    if isinstance(model_info, dict):
+        for key, raw in model_info.items():
+            if not isinstance(key, str) or not key.endswith("context_length"):
+                continue
+            n = _coerce_positive_int(raw)
+            if n is not None:
+                best = n if best is None else max(best, n)
+    if best is not None:
+        return best
+    params = payload.get("parameters")
+    if isinstance(params, str):
+        m = re.search(r"(?m)^num_ctx\s+(\d+)", params)
+        if m:
+            return int(m.group(1))
+    return None
+
+
 @dataclass(frozen=True)
 class ToolCallPlan:
     """Single native tool call requested by the model."""
@@ -71,7 +103,11 @@ class LLMClient(Protocol):
 
     def list_model_names(self) -> list[str]: ...
 
+    def describe_model_for_api(self, model: str) -> tuple[list[str], int | None]: ...
+
     def get_model_capabilities(self, model: str) -> list[str]: ...
+
+    def get_model_context_length(self, model: str) -> int | None: ...
 
     def supports_tool_calling(self, model: str) -> bool: ...
 
@@ -129,7 +165,7 @@ class LLMClient(Protocol):
 class OllamaService:
     """HTTP client for Ollama streaming APIs (chat + generate)."""
 
-    _cap_cache: dict[str, tuple[float, list[str]]] = {}
+    _cap_cache: dict[str, tuple[float, list[str], int | None]] = {}
     _cache_lock = threading.Lock()
 
     def __init__(self, settings: Settings) -> None:
@@ -278,17 +314,17 @@ class OllamaService:
         )
         raise OllamaUnavailable("Cannot reach Ollama /api/tags") from last_exc
 
-    def get_model_capabilities(self, model: str) -> list[str]:
-        """Return the Ollama-reported capability strings for a model."""
+    def _load_model_show(self, model: str) -> tuple[list[str], int | None]:
+        """Fetch ``/api/show`` once; return capabilities and parsed context length."""
         ttl_sec = max(0, int(self._s.model_cap_cache_ttl_sec))
         now = time.monotonic()
         if ttl_sec > 0:
             with self._cache_lock:
                 cached = self._cap_cache.get(model)
                 if cached is not None:
-                    expires_at, capabilities = cached
+                    expires_at, capabilities, context_length = cached
                     if now < expires_at:
-                        return list(capabilities)
+                        return list(capabilities), context_length
 
         self._before_read_call()
         attempts = max(1, int(self._s.ollama_read_retry_attempts))
@@ -304,16 +340,22 @@ class OllamaService:
                     )
                 res.raise_for_status()
                 self._mark_read_success()
-                capabilities = res.json().get("capabilities", [])
+                payload = res.json()
+                capabilities = payload.get("capabilities", [])
                 if not isinstance(capabilities, list):
                     normalized: list[str] = []
                 else:
                     normalized = [str(item) for item in capabilities]
+                context_length = _context_length_from_show_json(payload)
 
                 if ttl_sec > 0:
                     with self._cache_lock:
-                        self._cap_cache[model] = (now + ttl_sec, list(normalized))
-                return normalized
+                        self._cap_cache[model] = (
+                            now + ttl_sec,
+                            list(normalized),
+                            context_length,
+                        )
+                return normalized, context_length
             except requests.HTTPError as exc:
                 status_code = (
                     exc.response.status_code if exc.response is not None else None
@@ -341,6 +383,18 @@ class OllamaService:
             code=OLLAMA_ERROR_API_CODE, endpoint="show", http_status=last_http_status
         )
         raise OllamaUnavailable("Cannot reach Ollama /api/show") from last_exc
+
+    def describe_model_for_api(self, model: str) -> tuple[list[str], int | None]:
+        """Single ``/api/show`` read: capability tags and optional context length (tokens)."""
+        return self._load_model_show(model)
+
+    def get_model_capabilities(self, model: str) -> list[str]:
+        """Return the Ollama-reported capability strings for a model."""
+        return self.describe_model_for_api(model)[0]
+
+    def get_model_context_length(self, model: str) -> int | None:
+        """Return Ollama-reported context window in tokens, if present in ``/api/show``."""
+        return self.describe_model_for_api(model)[1]
 
     def supports_tool_calling(self, model: str) -> bool:
         """Return whether Ollama reports native tool-calling support for the model."""

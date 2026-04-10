@@ -40,8 +40,8 @@ interface ComposerControlsProps {
 function controlPillStyle(isOpen: boolean): CSSProperties {
   return {
     color: 'var(--text-muted)',
-    background: isOpen ? 'rgba(17,24,39,0.08)' : 'transparent',
-    boxShadow: isOpen ? '0 6px 14px rgba(15,23,42,0.08)' : 'none',
+    background: isOpen ? 'var(--composer-selected-surface)' : 'transparent',
+    boxShadow: isOpen ? 'var(--composer-pill-open-shadow)' : 'none',
   }
 }
 
@@ -88,15 +88,9 @@ export default function ComposerControls({
           type="button"
           disabled={isStreaming || attachmentUploading}
           onClick={onTogglePlusMenu}
-          className={`${layoutDecisions.compactComposer ? 'h-9 w-9' : 'h-10 w-10'} flex shrink-0 items-center justify-center rounded-full transition-all disabled:opacity-40`}
-          style={{ border: 'none', ...controlPillStyle(plusMenuOpen), color: 'rgba(17,24,39,0.42)' }}
+          className={`${layoutDecisions.compactComposer ? 'h-9 w-9' : 'h-10 w-10'} flex shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40 ${plusMenuOpen ? '' : 'hover:bg-[var(--composer-control-hover-bg)]'}`}
+          style={{ border: 'none', ...controlPillStyle(plusMenuOpen), color: 'var(--composer-control-icon)' }}
           title={plusMenuOpen ? 'Close actions' : 'Open upload and planning actions'}
-          onMouseEnter={e => {
-            if (!plusMenuOpen) e.currentTarget.style.background = 'rgba(17,24,39,0.08)'
-          }}
-          onMouseLeave={e => {
-            if (!plusMenuOpen) e.currentTarget.style.background = 'transparent'
-          }}
         >
           <PlusIcon />
         </button>
@@ -214,12 +208,13 @@ export default function ComposerControls({
           onClick={isStreaming ? onStop : onSubmit}
           disabled={!isStreaming && !canSend}
           aria-label={isStreaming ? 'Stop generating' : 'Send message'}
-          className="flex h-10 w-10 items-center justify-center rounded-full transition-all"
+          className="flex h-10 w-10 items-center justify-center rounded-full transition-colors disabled:opacity-90"
           style={{
-            background: isStreaming ? '#111111' : canSend ? '#111111' : '#9ca3af',
-            color: '#ffffff',
-            boxShadow: canSend || isStreaming ? 'none' : 'inset 0 0 0 1px rgba(0,0,0,0.04)',
-            cursor: 'default',
+            background:
+              isStreaming || canSend ? 'var(--composer-send-bg)' : 'var(--composer-send-disabled-bg)',
+            color: 'var(--composer-send-fg)',
+            boxShadow: 'none',
+            cursor: isStreaming || canSend ? 'pointer' : 'not-allowed',
           }}
           title={isStreaming ? 'Stop generating' : 'Send message'}
         >

@@ -204,10 +204,9 @@ const Sidebar: FC<Props> = ({
         <img
           src="./simon_logo.svg"
           alt="Simon Business School - University of Rochester"
-          className="w-full max-w-[148px]"
+          className="simon-footer-logo w-full max-w-[148px]"
           style={{
-            filter: 'none',
-            opacity: 0.68,
+            opacity: 0.85,
           }}
         />
 

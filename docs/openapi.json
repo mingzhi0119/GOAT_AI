@@ -1778,6 +1778,18 @@
             ],
             "title": "Top P",
             "description": "Ollama top_p nucleus sampling."
+          },
+          "think": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Think",
+            "description": "Ollama thinking mode toggle; true enables Thinking, false enables Quick."
           }
         },
         "type": "object",
@@ -2752,6 +2764,22 @@
           "supports_vision": {
             "type": "boolean",
             "title": "Supports Vision"
+          },
+          "supports_thinking": {
+            "type": "boolean",
+            "title": "Supports Thinking"
+          },
+          "context_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Length",
+            "description": "Ollama-reported context window in tokens, when discoverable from /api/show."
           }
         },
         "type": "object",
@@ -2760,7 +2788,8 @@
           "capabilities",
           "supports_tool_calling",
           "supports_chart_tools",
-          "supports_vision"
+          "supports_vision",
+          "supports_thinking"
         ],
         "title": "ModelCapabilitiesResponse",
         "description": "Capabilities for one Ollama model."

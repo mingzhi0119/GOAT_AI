@@ -27,8 +27,14 @@ class FakeLLMClient:
     def list_model_names(self) -> list[str]:
         return ["test-model"]
 
+    def describe_model_for_api(self, model: str) -> tuple[list[str], int | None]:
+        return [], None
+
     def get_model_capabilities(self, model: str) -> list[str]:
-        return []
+        return self.describe_model_for_api(model)[0]
+
+    def get_model_context_length(self, model: str) -> int | None:
+        return self.describe_model_for_api(model)[1]
 
     def supports_tool_calling(self, model: str) -> bool:
         return False
@@ -95,8 +101,14 @@ class FakeLLMClient:
 
 
 class FakeChartToolLLMClient(FakeLLMClient):
+    def describe_model_for_api(self, model: str) -> tuple[list[str], int | None]:
+        return ["completion", "tools"], None
+
     def get_model_capabilities(self, model: str) -> list[str]:
-        return ["completion", "tools"]
+        return self.describe_model_for_api(model)[0]
+
+    def get_model_context_length(self, model: str) -> int | None:
+        return self.describe_model_for_api(model)[1]
 
     def supports_tool_calling(self, model: str) -> bool:
         return True

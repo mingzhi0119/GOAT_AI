@@ -132,6 +132,42 @@ def test_get_model_capabilities_without_cache_calls_each_time() -> None:
     assert post_mock.call_count == 2
 
 
+def test_describe_model_for_api_parses_context_length() -> None:
+    service = OllamaService(_settings(ttl=60))
+
+    fake_response = Mock()
+    fake_response.json.return_value = {
+        "capabilities": ["completion"],
+        "model_info": {"llama.context_length": 4096},
+    }
+    fake_response.raise_for_status.return_value = None
+
+    with patch("goat_ai.ollama_client.requests.post", return_value=fake_response):
+        caps, ctx = service.describe_model_for_api("ctx-parse-model")
+
+    assert caps == ["completion"]
+    assert ctx == 4096
+
+
+def test_get_model_context_length_reuses_show_cache() -> None:
+    service = OllamaService(_settings(ttl=60))
+
+    fake_response = Mock()
+    fake_response.json.return_value = {
+        "capabilities": ["completion"],
+        "model_info": {"llama.context_length": 8192},
+    }
+    fake_response.raise_for_status.return_value = None
+
+    with patch(
+        "goat_ai.ollama_client.requests.post", return_value=fake_response
+    ) as post_mock:
+        assert service.get_model_capabilities("m") == ["completion"]
+        assert service.get_model_context_length("m") == 8192
+
+    assert post_mock.call_count == 1
+
+
 def test_list_model_names_retries_then_succeeds() -> None:
     service = OllamaService(_settings(ttl=60))
     failing = requests.ConnectionError("temporary outage")

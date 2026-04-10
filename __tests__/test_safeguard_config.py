@@ -214,8 +214,16 @@ class TestChatStreamWithDisabledSafeguard(unittest.TestCase):
             def list_model_names(self) -> list[str]:
                 return ["m"]
 
+            def describe_model_for_api(
+                self, model: str
+            ) -> tuple[list[str], int | None]:
+                return [], None
+
             def get_model_capabilities(self, model: str) -> list[str]:
-                return []
+                return self.describe_model_for_api(model)[0]
+
+            def get_model_context_length(self, model: str) -> int | None:
+                return self.describe_model_for_api(model)[1]
 
             def supports_tool_calling(self, model: str) -> bool:
                 return False

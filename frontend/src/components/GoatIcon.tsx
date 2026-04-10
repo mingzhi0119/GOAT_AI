@@ -11,6 +11,7 @@ const GoatIcon: FC<Props> = ({ size = 38, variant = 'rounded' }) => {
   const isCircle = variant === 'circle'
   return (
     <div
+      className="goat-icon-frame"
       style={{
         width: size,
         height: size,
@@ -21,7 +22,7 @@ const GoatIcon: FC<Props> = ({ size = 38, variant = 'rounded' }) => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: isCircle ? '#1a1a1a' : 'rgba(0, 0, 0, 0.25)',
+        background: isCircle ? 'var(--goat-icon-circle-bg)' : 'var(--goat-icon-frame-bg)',
       }}
     >
       <img

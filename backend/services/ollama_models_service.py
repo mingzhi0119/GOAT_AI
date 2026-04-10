@@ -26,7 +26,7 @@ def list_models_for_api(llm: LLMClient) -> ModelsResponse:
 def model_capabilities_for_api(llm: LLMClient, model: str) -> ModelCapabilitiesResponse:
     """Return Ollama-reported capabilities for one model."""
     try:
-        capabilities = llm.get_model_capabilities(model)
+        capabilities, context_length = llm.describe_model_for_api(model)
     except OllamaUnavailable as exc:
         logger.warning("Ollama unreachable during model capability lookup: %s", exc)
         raise InferenceBackendUnavailable from exc
@@ -40,4 +40,5 @@ def model_capabilities_for_api(llm: LLMClient, model: str) -> ModelCapabilitiesR
         supports_chart_tools=supports_tool_calling,
         supports_vision=supports_vision,
         supports_thinking=supports_thinking,
+        context_length=context_length,
     )

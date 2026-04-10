@@ -16,8 +16,14 @@ class _KnowledgeAwareFakeLLM:
     def list_model_names(self) -> list[str]:
         return ["test-model"]
 
+    def describe_model_for_api(self, model: str) -> tuple[list[str], int | None]:
+        return ["completion"], None
+
     def get_model_capabilities(self, model: str) -> list[str]:
-        return ["completion"]
+        return self.describe_model_for_api(model)[0]
+
+    def get_model_context_length(self, model: str) -> int | None:
+        return self.describe_model_for_api(model)[1]
 
     def supports_tool_calling(self, model: str) -> bool:
         return False

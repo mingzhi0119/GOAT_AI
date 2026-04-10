@@ -17,12 +17,18 @@ interface Props {
   onTemperatureChange: (v: number) => void
   maxTokens: number
   onMaxTokensChange: (v: number) => void
+  /** Ollama-reported context window for the selected model; null if unknown. */
+  modelContextLength: number | null
+  modelCapabilitiesLoading: boolean
   topP: number
   onTopPChange: (v: number) => void
   onResetAdvanced: () => void
 }
 
 const MAX_INSTRUCTION_LEN = 1000
+
+/** Upper bound for `max_tokens` in ChatRequest; must match backend `ChatRequest.max_tokens` le=. */
+const API_MAX_GENERATION_TOKENS = 131_072
 
 function formatSkillLabel(capability: string): string | null {
   const normalized = capability.trim().toLowerCase()
@@ -54,6 +60,8 @@ const TopBar: FC<Props> = ({
   onTemperatureChange,
   maxTokens,
   onMaxTokensChange,
+  modelContextLength,
+  modelCapabilitiesLoading,
   topP,
   onTopPChange,
   onResetAdvanced,
@@ -102,7 +110,7 @@ const TopBar: FC<Props> = ({
         <h1
           className="max-w-full truncate text-left text-sm font-medium select-none cursor-default"
           style={{
-            color: '#000000',
+            color: 'var(--text-main)',
           }}
           title={sessionTitle ?? undefined}
         >
@@ -268,11 +276,15 @@ const TopBar: FC<Props> = ({
                         type="number"
                         step={1}
                         min={1}
-                        max={131072}
+                        max={API_MAX_GENERATION_TOKENS}
                         value={maxTokens}
                         onChange={e => {
                           const v = parseInt(e.target.value, 10)
-                          if (!Number.isNaN(v)) onMaxTokensChange(Math.min(131072, Math.max(1, v)))
+                          if (!Number.isNaN(v)) {
+                            onMaxTokensChange(
+                              Math.min(API_MAX_GENERATION_TOKENS, Math.max(1, v)),
+                            )
+                          }
                         }}
                         className={fieldCls}
                         style={{
@@ -281,6 +293,17 @@ const TopBar: FC<Props> = ({
                           color: 'var(--text-main)',
                         }}
                       />
+                      <p
+                        className="mt-1 text-[10px] leading-snug"
+                        style={{ color: 'var(--text-muted)' }}
+                      >
+                        API allows up to {API_MAX_GENERATION_TOKENS.toLocaleString()} generation tokens.
+                        {modelCapabilitiesLoading
+                          ? ' Loading model metadata…'
+                          : modelContextLength != null
+                            ? ` Ollama reports a ${modelContextLength.toLocaleString()}-token context window for this model (prompt and completion share this budget).`
+                            : ' Ollama did not report a context length for this model.'}
+                      </p>
                     </div>
                     <div>
                       <label

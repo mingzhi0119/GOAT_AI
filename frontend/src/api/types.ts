@@ -42,6 +42,8 @@ export interface ModelCapabilitiesResponse {
   supports_chart_tools: boolean
   supports_vision: boolean
   supports_thinking: boolean
+  /** Ollama-reported context window (tokens), when present in /api/show. */
+  context_length: number | null
 }
 
 /** Ollama sampling options (Advanced settings); maps to backend ChatRequest fields. */

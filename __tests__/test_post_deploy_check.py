@@ -55,5 +55,5 @@ def test_expect_chat_stream_contract_accepts_token_then_done() -> None:
     payload = post.call_args.kwargs["json"]
     assert payload["model"] == "tinyllama:latest"
     assert payload["think"] is False
-    assert payload["max_tokens"] == 16
+    assert payload["max_tokens"] == 48
     assert payload["temperature"] == 0
