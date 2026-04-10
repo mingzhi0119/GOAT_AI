@@ -100,12 +100,18 @@ Single source of truth for repo-wide engineering rules. Keep [`AGENTS.md`](../AG
 - Do not revert unrelated user changes.
 - Use non-interactive git commands.
 - For reviews, call out bugs, regressions, risk, and missing tests first.
+- Keep `.github/CODEOWNERS` as the source of truth for default directory ownership.
+- Use four long-lived Codex owner lanes: Lead/Platform, Frontend, Backend, Docs/Assets.
+- Shared contracts and cross-layer boundaries must be jointly reviewed by the owning lanes.
+- Lead/Platform owns CI, governance boundaries, shared-boundary arbitration, and the final merge recommendation.
+- Keep the sync policy stable: `main` rebases `origin/main`; owner branches rebase `main`; do not default to `git merge origin/main` inside owner threads.
 
 ## 8. API Contract Workflow
 
 - Prefer contracts and tests over source spelunking.
 - Check black-box tests first for API work.
 - Keep generated artifacts in sync with the implementation.
+- Treat `docs/openapi.json`, `docs/api.llm.yaml`, and other shared contract surfaces as joint review boundaries, not single-owner files.
 
 ## 9. Project Snapshot
 

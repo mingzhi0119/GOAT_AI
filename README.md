@@ -161,6 +161,19 @@ npm test -- --run
 npm run build
 ```
 
+## Parallel Development / Repository Governance
+
+This repo uses four long-lived Codex owner lanes for parallel work:
+
+- Lead/Platform
+- Frontend
+- Backend
+- Docs/Assets
+
+Default directory ownership lives in [`.github/CODEOWNERS`](.github/CODEOWNERS). Each owner thread should work primarily inside its owned paths and rebase from the latest `main`; `main` itself rebases `origin/main`. Shared-boundary changes such as API contracts, CI, and cross-layer tests should be explicitly coordinated by Lead/Platform.
+
+Merges to `main` should be gated by GitHub branch protection, required checks, and code owner review. Lead/Platform gives the final merge recommendation after the relevant owner lanes review the change. Operational details for Codex threads live in [AGENTS.md](AGENTS.md), with repo-wide standards in [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md).
+
 ## Docs
 
 - [AGENTS.md](AGENTS.md): short index for agents; **canonical rules:** [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md)
