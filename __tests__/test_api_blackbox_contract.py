@@ -505,7 +505,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(["token", "done"], [event["type"] for event in events])
         self.assertEqual(SAFEGUARD_REFUSAL_MESSAGE, events[0]["token"])
 
-    def test_chat_endpoint_emits_error_frame_when_session_persistence_fails(self) -> None:
+    def test_chat_endpoint_emits_error_frame_when_session_persistence_fails(
+        self,
+    ) -> None:
         with patch(
             "backend.services.log_service.upsert_session",
             side_effect=PersistenceWriteError("db down"),
@@ -527,7 +529,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
         )
         self.assertEqual("Failed to persist chat result.", events[-2]["message"])
 
-    def test_chat_blocked_input_still_emits_refusal_when_persistence_fails(self) -> None:
+    def test_chat_blocked_input_still_emits_refusal_when_persistence_fails(
+        self,
+    ) -> None:
         with patch(
             "backend.services.log_service.upsert_session",
             side_effect=PersistenceWriteError("db down"),
@@ -555,7 +559,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(SAFEGUARD_REFUSAL_MESSAGE, events[0]["token"])
         self.assertEqual("Failed to persist chat result.", events[1]["message"])
 
-    def test_chat_blocked_output_still_emits_refusal_when_persistence_fails(self) -> None:
+    def test_chat_blocked_output_still_emits_refusal_when_persistence_fails(
+        self,
+    ) -> None:
         self.client.app.dependency_overrides[get_llm_client] = lambda: UnsafeOutputLLM()
         try:
             with patch(

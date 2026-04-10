@@ -58,9 +58,7 @@ def _raise_persistence_write_error(
     session_id: str | None = None,
     artifact_id: str | None = None,
 ) -> None:
-    inc_sqlite_log_write_failure(
-        operation=operation, code=_SQLITE_WRITE_METRIC_CODE
-    )
+    inc_sqlite_log_write_failure(operation=operation, code=_SQLITE_WRITE_METRIC_CODE)
     logger.error(
         "Failed to %s in SQLite",
         operation.replace("_", " "),
@@ -75,9 +73,7 @@ def _raise_persistence_write_error(
         },
         exc_info=True,
     )
-    raise PersistenceWriteError(
-        f"Failed to {operation.replace('_', ' ')}."
-    ) from exc
+    raise PersistenceWriteError(f"Failed to {operation.replace('_', ' ')}.") from exc
 
 
 def _payload_visible_messages(payload: dict[str, Any]) -> list[dict[str, Any]]:
