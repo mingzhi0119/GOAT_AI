@@ -204,6 +204,12 @@ Use separate Codex threads or subagents for distinct workstreams. Keep scopes na
 7. **Prefer small, reviewable patches.**
 - If a task spans layers, split into frontend, backend, and docs sub-patches when practical.
 
+8. **Use a single sync strategy.**
+- `main` is responsible for rebasing onto `origin/main`.
+- Agent branches should rebase onto `main`.
+- Do not default to `git merge origin/main` inside agent threads.
+- When opening a new thread or worktree, start from the latest clean `main`.
+
 ## Recommended Routing
 
 - UI bug, hook bug, or settings issue -> **Frontend Agent**
