@@ -12,6 +12,8 @@ from backend.services.chat_runtime import (
     TitleGenerator,
 )  # noqa: F401
 from backend.services.exceptions import (  # noqa: F401
+    PersistenceReadError,
+    PersistenceWriteError,
     FeatureNotAvailable,
     InferenceBackendUnavailable,
     ArtifactNotFound,
@@ -19,6 +21,7 @@ from backend.services.exceptions import (  # noqa: F401
     KnowledgeValidationError,
     MediaNotFound,
     MediaValidationError,
+    SessionNotFoundError,
     VisionNotSupported,
 )
 from backend.services.safeguard_service import SafeguardService  # noqa: F401
@@ -36,7 +39,10 @@ __all__ = [
     "LLMClient",
     "MediaNotFound",
     "MediaValidationError",
+    "PersistenceReadError",
+    "PersistenceWriteError",
     "SafeguardService",
+    "SessionNotFoundError",
     "SessionRepository",
     "Settings",
     "TabularContextExtractor",

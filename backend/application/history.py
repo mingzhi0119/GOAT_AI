@@ -7,12 +7,11 @@ from typing import Any
 
 from backend.domain.authz_types import AuthorizationContext
 from backend.services.authorizer import authorize_session_read, authorize_session_write
-from backend.services.exceptions import SessionNotFoundError
 from backend.application.exceptions import (
     HistoryOwnerRequiredError,
     HistorySessionNotFoundError,
 )
-from backend.application.ports import SessionRepository, Settings
+from backend.application.ports import SessionNotFoundError, SessionRepository, Settings
 from backend.domain.authorization import ResourceRef
 from backend.models.history import (
     HistorySessionDetailResponse,
