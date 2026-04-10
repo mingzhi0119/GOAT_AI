@@ -125,8 +125,10 @@ export function useChatSession({
         id: activeSessionId,
         title: optimisticTitle,
         model: selectedModel,
+        schema_version: 1,
         created_at: nowIso,
         updated_at: nowIso,
+        owner_id: '',
       })
 
       const knowledgeDocumentIds = fileContexts

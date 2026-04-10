@@ -201,6 +201,9 @@ export function useChat(): UseChatReturn {
         role: m.role,
         content: m.content,
         ...(m.file_context ? { file_context: true as const } : {}),
+        ...(m.image_attachment_ids && m.image_attachment_ids.length > 0
+          ? { image_attachment_ids: m.image_attachment_ids }
+          : {}),
       }))
       const history: ChatMessage[] = [
         ...baseHistory,

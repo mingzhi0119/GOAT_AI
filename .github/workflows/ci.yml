@@ -61,11 +61,15 @@ jobs:
   secrets-scan:
     runs-on: ubuntu-latest
     continue-on-error: true
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Gitleaks (informational)
+        continue-on-error: true
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -117,6 +117,7 @@ class Settings:
     max_image_edge_px: int = 2048
     rag_rerank_mode: Literal["passthrough", "lexical"] = "passthrough"
     feature_code_sandbox_enabled: bool = False
+    feature_agent_workbench_enabled: bool = False
     docker_socket_path: str = ""
     # Safeguard (content moderation) configuration.
     # safeguard_enabled=False or safeguard_mode="off" → no safeguard, None injected downstream.
@@ -202,6 +203,7 @@ def load_settings() -> Settings:
     if _rag_rerank not in ("passthrough", "lexical"):
         raise ValueError("GOAT_RAG_RERANK_MODE must be one of: passthrough, lexical")
     _feature_sandbox = _env_bool("GOAT_FEATURE_CODE_SANDBOX", "false")
+    _feature_agent_workbench = _env_bool("GOAT_FEATURE_AGENT_WORKBENCH", "false")
     _docker_sock = os.environ.get("GOAT_DOCKER_SOCKET", "").strip()
     _safeguard_enabled = _env_bool("GOAT_SAFEGUARD_ENABLED", "true")
     _safeguard_mode = os.environ.get("GOAT_SAFEGUARD_MODE", "full").strip().lower()
@@ -255,6 +257,7 @@ def load_settings() -> Settings:
         max_image_edge_px=_max_image_edge_px,
         rag_rerank_mode=cast(Literal["passthrough", "lexical"], _rag_rerank),
         feature_code_sandbox_enabled=_feature_sandbox,
+        feature_agent_workbench_enabled=_feature_agent_workbench,
         docker_socket_path=_docker_sock,
         safeguard_enabled=_safeguard_enabled,
         safeguard_mode=cast(

@@ -23,6 +23,7 @@ from backend.routers import (
     models,
     system,
     upload,
+    workbench,
 )
 from backend.services import log_service
 from backend.services.rate_limit_store import InMemorySlidingWindowRateLimitStore
@@ -71,6 +72,10 @@ def create_app() -> FastAPI:
                 "name": "code_sandbox",
                 "description": "Capability-gated code execution (scaffold).",
             },
+            {
+                "name": "workbench",
+                "description": "Future agent/workbench task orchestration (scaffold).",
+            },
         ],
     )
     app.openapi_version = "3.2.0"
@@ -117,6 +122,7 @@ def create_app() -> FastAPI:
     app.include_router(artifacts.router, prefix="/api", tags=["artifacts"])
     app.include_router(system.router, prefix="/api", tags=["system"])
     app.include_router(code_sandbox.router, prefix="/api", tags=["code_sandbox"])
+    app.include_router(workbench.router, prefix="/api", tags=["workbench"])
 
     @app.get("/api/health", tags=["system"], summary="Read service liveness")
     def health() -> dict[str, str]:

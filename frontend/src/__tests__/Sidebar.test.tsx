@@ -9,8 +9,10 @@ function buildProps(themeStyle: 'classic' | 'urochester' | 'thu' = 'classic') {
       id: 'session-1',
       title: 'Strategy review',
       model: 'gpt-5.4',
+      schema_version: 1,
       created_at: '2026-04-09T12:00:00Z',
       updated_at: '2026-04-09T13:00:00Z',
+      owner_id: '',
     },
   ]
 
@@ -73,15 +75,19 @@ describe('Sidebar', () => {
         id: 'session-1',
         title: 'Strategy review',
         model: 'gpt-5.4',
+        schema_version: 1,
         created_at: '2026-04-09T12:00:00Z',
         updated_at: '2026-04-09T13:00:00Z',
+        owner_id: '',
       },
       {
         id: 'session-2',
         title: 'Other chat',
         model: 'gpt-5.4',
+        schema_version: 1,
         created_at: '2026-04-09T14:00:00Z',
         updated_at: '2026-04-09T15:00:00Z',
+        owner_id: '',
       },
     ]
 

@@ -1,12 +1,13 @@
 import { useId, useState, type CSSProperties, type FC } from 'react'
+import { GPU_UTILIZATION_COLORS } from '../assets/uiVisualAssets'
 import type { GPUStatus, InferenceLatency } from '../api/system'
 
 /** Map GPU utilization to traffic-light colors (green / yellow / red). */
 export function utilizationTierColor(utilization: number | null, available: boolean): string {
-  if (!available || utilization === null) return '#9ca3af'
-  if (utilization < 50) return '#22c55e'
-  if (utilization < 80) return '#eab308'
-  return '#ef4444'
+  if (!available || utilization === null) return GPU_UTILIZATION_COLORS.unavailable
+  if (utilization < 50) return GPU_UTILIZATION_COLORS.low
+  if (utilization < 80) return GPU_UTILIZATION_COLORS.medium
+  return GPU_UTILIZATION_COLORS.high
 }
 
 function formatVramGb(usedMb: number | null, totalMb: number | null): string {

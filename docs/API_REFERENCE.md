@@ -46,6 +46,7 @@ Base path: `/api`
 | `GET` | `/api/system/runtime-target` | Runtime target resolution |
 | `GET` | `/api/system/features` | Capability-gated feature flags (config + host probe) |
 | `POST` | `/api/code-sandbox/exec` | Code sandbox scaffold (503 when runtime gate closed; 403 when policy denies; 501 when enabled but not implemented) |
+| `POST` | `/api/workbench/tasks` | Future agent/workbench task scaffold (503 when runtime gate closed; 501 when enabled but not implemented) |
 
 ## `GET /api/health`
 
@@ -65,6 +66,74 @@ Returns JSON `{ "ready": boolean, "checks": { ... } }`. HTTP `503` when any requ
 ## `GET /api/system/metrics`
 
 Returns Prometheus exposition text (`text/plain`). Requires `X-GOAT-API-Key` when `GOAT_API_KEY` is set. Includes `http_requests_total`, `http_request_duration_seconds`, `chat_stream_completed_total`, `ollama_errors_total`, `sqlite_log_write_failures_total`, `feature_gate_denials_total{feature,gate_kind,reason}` (when any), and **Section 14.7** retrieval counters: `knowledge_retrieval_requests_total{retrieval_profile,outcome}` and `knowledge_query_rewrite_applied_total{retrieval_profile}`.
+
+## `GET /api/system/features`
+
+Returns machine-readable capability state for optional/high-risk features.
+
+Example:
+
+```json
+{
+  "code_sandbox": {
+    "policy_allowed": true,
+    "allowed_by_config": false,
+    "available_on_host": false,
+    "effective_enabled": false,
+    "deny_reason": "disabled_by_operator"
+  },
+  "workbench": {
+    "agent_tasks": {
+      "allowed_by_config": false,
+      "available_on_host": false,
+      "effective_enabled": false,
+      "deny_reason": "disabled_by_operator"
+    },
+    "plan_mode": {
+      "allowed_by_config": false,
+      "available_on_host": false,
+      "effective_enabled": false,
+      "deny_reason": "disabled_by_operator"
+    },
+    "browse": {
+      "allowed_by_config": false,
+      "available_on_host": false,
+      "effective_enabled": false,
+      "deny_reason": "disabled_by_operator"
+    },
+    "deep_research": {
+      "allowed_by_config": false,
+      "available_on_host": false,
+      "effective_enabled": false,
+      "deny_reason": "disabled_by_operator"
+    },
+    "artifact_workspace": {
+      "allowed_by_config": false,
+      "available_on_host": false,
+      "effective_enabled": false,
+      "deny_reason": "disabled_by_operator"
+    },
+    "project_memory": {
+      "allowed_by_config": false,
+      "available_on_host": false,
+      "effective_enabled": false,
+      "deny_reason": "disabled_by_operator"
+    },
+    "connectors": {
+      "allowed_by_config": false,
+      "available_on_host": false,
+      "effective_enabled": false,
+      "deny_reason": "disabled_by_operator"
+    }
+  }
+}
+```
+
+Notes:
+
+- `code_sandbox.policy_allowed` remains caller-specific and separate from runtime readiness
+- `workbench.*` advertises planned surfaces without claiming runtime support before execution is implemented
+- frontend UI should use this endpoint to hide or disable unavailable surfaces instead of assuming that a visible button implies runtime support
 
 ## `GET /api/models`
 
@@ -227,6 +296,32 @@ Returns:
   "chart": null
 }
 ```
+
+## `POST /api/workbench/tasks`
+
+Purpose:
+
+- provide one stable future task-entry contract for Plan Mode, Browse, Deep Research, and Canvas
+- validate request shape now while the runtime remains gated off
+
+Request body:
+
+```json
+{
+  "task_kind": "plan",
+  "prompt": "Draft a research plan for the attached documents.",
+  "session_id": "session-123",
+  "project_id": "project-123",
+  "knowledge_document_ids": ["doc-123"],
+  "connector_ids": ["web"]
+}
+```
+
+Notes:
+
+- current deployments should expect `503` with `FEATURE_UNAVAILABLE` until the runtime exists
+- if operators enable the feature family before task execution lands, the route returns `501`
+- this endpoint is intentionally scaffold-only; it exists to stabilize the task envelope before frontend exposure
 
 `chart` is retained only for backward compatibility.
 

@@ -359,6 +359,17 @@ schemas:
       - models
     properties:
       models: string[]
+  RuntimeFeaturePayload:
+    type: object
+    required:
+      - allowed_by_config
+      - available_on_host
+      - effective_enabled
+    properties:
+      allowed_by_config: boolean
+      available_on_host: boolean
+      effective_enabled: boolean
+      deny_reason: string|null
   RuntimeTargetItemResponse:
     type: object
     required:
@@ -387,8 +398,10 @@ schemas:
     type: object
     required:
       - code_sandbox
+      - workbench
     properties:
       code_sandbox: CodeSandboxFeaturePayload
+      workbench: WorkbenchFeaturePayload
   UploadAnalysisResponse:
     type: object
     required:
@@ -408,6 +421,36 @@ schemas:
       retrieval_mode: string
       template_prompt: string
       chart: "null"
+  WorkbenchFeaturePayload:
+    type: object
+    required:
+      - agent_tasks
+      - plan_mode
+      - browse
+      - deep_research
+      - artifact_workspace
+      - project_memory
+      - connectors
+    properties:
+      agent_tasks: RuntimeFeaturePayload
+      plan_mode: RuntimeFeaturePayload
+      browse: RuntimeFeaturePayload
+      deep_research: RuntimeFeaturePayload
+      artifact_workspace: RuntimeFeaturePayload
+      project_memory: RuntimeFeaturePayload
+      connectors: RuntimeFeaturePayload
+  WorkbenchTaskRequest:
+    type: object
+    required:
+      - task_kind
+      - prompt
+    properties:
+      task_kind: plan|browse|deep_research|canvas
+      prompt: string
+      session_id: string|null
+      project_id: string|null
+      knowledge_document_ids: string[]
+      connector_ids: string[]
 endpoints:
   - op: list_models_route
     method: GET
@@ -703,6 +746,17 @@ endpoints:
         - 403
         - 429
         - 501
+        - 503
+  - op: post_workbench_task
+    method: POST
+    path: /workbench/tasks
+    body: WorkbenchTaskRequest
+    content_type: application/json
+    response:
+      200: map[string,string]
+      errors:
+        - 401
+        - 429
         - 503
   - op: health
     method: GET

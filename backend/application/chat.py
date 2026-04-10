@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from collections.abc import Generator
+from collections.abc import Generator, Iterable
 
 from backend.domain.authz_types import AuthorizationContext
 from fastapi.responses import StreamingResponse
@@ -55,7 +55,20 @@ class PreparedChatRequest:
     plan_mode: bool
 
 
-def _build_ollama_options(req: ChatRequest) -> dict[str, float | int | bool | str] | None:
+@dataclass(frozen=True)
+class ChatIdempotencyContext:
+    """Resolved idempotency scope for a session append request."""
+
+    store: SQLiteIdempotencyStore
+    key: str
+    route: str
+    scope: str
+    request_hash: str
+
+
+def _build_ollama_options(
+    req: ChatRequest,
+) -> dict[str, float | int | bool | str] | None:
     opts: dict[str, float | int | bool | str] = {}
     if req.temperature is not None:
         opts["temperature"] = req.temperature
@@ -127,7 +140,19 @@ def _idempotency_request_bytes(req: ChatRequest, user_name: str) -> bytes:
     return text.encode("utf-8")
 
 
-def stream_chat_response(
+def _streaming_sse_response(
+    stream: Iterable[str],
+    *,
+    content_type: str = "text/event-stream",
+) -> StreamingResponse:
+    return StreamingResponse(
+        stream,
+        media_type=content_type,
+        headers=_SSE_HEADERS,
+    )
+
+
+def _build_source_stream(
     *,
     req: ChatRequest,
     prepared: PreparedChatRequest,
@@ -140,11 +165,9 @@ def stream_chat_response(
     tabular_extractor: TabularContextExtractor,
     safeguard_service: SafeguardService | None,
     settings: Settings,
-    idempotency_key: str,
-    request_id: str = "",
-) -> StreamingResponse:
-    """Build the SSE response for chat, including optional idempotency replay."""
-    source_stream = stream_chat_sse(
+    request_id: str,
+) -> Generator[str, None, None]:
+    return stream_chat_sse(
         llm=llm,
         model=req.model,
         messages=prepared.merged_messages,
@@ -169,25 +192,37 @@ def stream_chat_response(
         request_id=request_id,
     )
 
-    if not idempotency_key or not req.session_id:
-        return StreamingResponse(
-            source_stream,
-            media_type="text/event-stream",
-            headers=_SSE_HEADERS,
-        )
 
-    store = SQLiteIdempotencyStore(
-        db_path=settings.log_db_path,
-        ttl_sec=settings.idempotency_ttl_sec,
-    )
-    idempotency_route = "/api/chat"
-    idempotency_scope = f"session_append:{req.session_id}"
-    request_hash = build_request_hash(_idempotency_request_bytes(req, user_name))
-    claim = store.claim(
+def _build_idempotency_context(
+    *,
+    req: ChatRequest,
+    user_name: str,
+    settings: Settings,
+    idempotency_key: str,
+) -> ChatIdempotencyContext | None:
+    if not idempotency_key or not req.session_id:
+        return None
+
+    return ChatIdempotencyContext(
+        store=SQLiteIdempotencyStore(
+            db_path=settings.log_db_path,
+            ttl_sec=settings.idempotency_ttl_sec,
+        ),
         key=idempotency_key,
-        route=idempotency_route,
-        scope=idempotency_scope,
-        request_hash=request_hash,
+        route="/api/chat",
+        scope=f"session_append:{req.session_id}",
+        request_hash=build_request_hash(_idempotency_request_bytes(req, user_name)),
+    )
+
+
+def _claim_or_replay_idempotent_stream(
+    context: ChatIdempotencyContext,
+) -> StreamingResponse | None:
+    claim = context.store.claim(
+        key=context.key,
+        route=context.route,
+        scope=context.scope,
+        request_hash=context.request_hash,
     )
     if claim.state == "conflict":
         raise ChatIdempotencyConflictError(
@@ -198,49 +233,107 @@ def stream_chat_response(
             "A request with this Idempotency-Key is already in progress."
         )
     if claim.state == "replay" and claim.completed is not None:
-        return StreamingResponse(
+        return _streaming_sse_response(
             iter([claim.completed.body]),
-            media_type=claim.completed.content_type or "text/event-stream",
-            headers=_SSE_HEADERS,
+            content_type=claim.completed.content_type or "text/event-stream",
         )
+    return None
 
-    def _capture_and_store() -> Generator[str, None, None]:
-        chunks: list[str] = []
-        saw_done = False
-        try:
-            for chunk in source_stream:
-                chunks.append(chunk)
-                if '"type": "done"' in chunk:
-                    saw_done = True
-                yield chunk
-        except BaseException:
-            store.release_pending(
-                key=idempotency_key,
-                route=idempotency_route,
-                scope=idempotency_scope,
-                request_hash=request_hash,
-            )
-            raise
-        if saw_done:
-            store.store_completed(
-                key=idempotency_key,
-                route=idempotency_route,
-                scope=idempotency_scope,
-                request_hash=request_hash,
-                status_code=200,
-                content_type="text/event-stream",
-                body="".join(chunks),
-            )
-            return
-        store.release_pending(
-            key=idempotency_key,
-            route=idempotency_route,
-            scope=idempotency_scope,
-            request_hash=request_hash,
-        )
 
-    return StreamingResponse(
-        _capture_and_store(),
-        media_type="text/event-stream",
-        headers=_SSE_HEADERS,
+def _release_pending_claim(context: ChatIdempotencyContext) -> None:
+    context.store.release_pending(
+        key=context.key,
+        route=context.route,
+        scope=context.scope,
+        request_hash=context.request_hash,
+    )
+
+
+def _store_completed_stream(
+    context: ChatIdempotencyContext,
+    *,
+    body: str,
+) -> None:
+    context.store.store_completed(
+        key=context.key,
+        route=context.route,
+        scope=context.scope,
+        request_hash=context.request_hash,
+        status_code=200,
+        content_type="text/event-stream",
+        body=body,
+    )
+
+
+def _capture_idempotent_stream(
+    source_stream: Generator[str, None, None],
+    *,
+    context: ChatIdempotencyContext,
+) -> Generator[str, None, None]:
+    chunks: list[str] = []
+    saw_done = False
+    try:
+        for chunk in source_stream:
+            chunks.append(chunk)
+            if '"type": "done"' in chunk:
+                saw_done = True
+            yield chunk
+    except BaseException:
+        _release_pending_claim(context)
+        raise
+
+    if saw_done:
+        _store_completed_stream(context, body="".join(chunks))
+        return
+
+    _release_pending_claim(context)
+
+
+def stream_chat_response(
+    *,
+    req: ChatRequest,
+    prepared: PreparedChatRequest,
+    client_ip: str,
+    user_name: str,
+    llm: LLMClient,
+    conversation_logger: ConversationLogger,
+    session_repository: SessionRepository,
+    title_generator: TitleGenerator,
+    tabular_extractor: TabularContextExtractor,
+    safeguard_service: SafeguardService | None,
+    settings: Settings,
+    idempotency_key: str,
+    request_id: str = "",
+) -> StreamingResponse:
+    """Build the SSE response for chat, including optional idempotency replay."""
+    source_stream = _build_source_stream(
+        req=req,
+        prepared=prepared,
+        client_ip=client_ip,
+        user_name=user_name,
+        llm=llm,
+        conversation_logger=conversation_logger,
+        session_repository=session_repository,
+        title_generator=title_generator,
+        tabular_extractor=tabular_extractor,
+        safeguard_service=safeguard_service,
+        settings=settings,
+        request_id=request_id,
+    )
+
+    context = _build_idempotency_context(
+        req=req,
+        user_name=user_name,
+        settings=settings,
+        idempotency_key=idempotency_key,
+    )
+    if context is None:
+        return _streaming_sse_response(source_stream)
+
+    replay_response = _claim_or_replay_idempotent_stream(context)
+    if replay_response is not None:
+        return replay_response
+
+    return _streaming_sse_response(
+        _capture_idempotent_stream(source_stream, context=context)
     )
