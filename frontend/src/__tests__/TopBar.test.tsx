@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import TopBar from '../components/TopBar'
 
 function renderTopBar() {
-  const onToggleTheme = vi.fn()
+  const onOpenAppearance = vi.fn()
   const onSystemInstructionChange = vi.fn()
   const onExportMarkdown = vi.fn()
   const onAdvancedOpenChange = vi.fn()
@@ -16,8 +16,8 @@ function renderTopBar() {
     <TopBar
       sessionTitle="Strategy Sync"
       modelCapabilities={['completion', 'tools', 'vision']}
-      theme="light"
-      onToggleTheme={onToggleTheme}
+      appearanceSummary="Classic · System"
+      onOpenAppearance={onOpenAppearance}
       systemInstruction="Be concise."
       onSystemInstructionChange={onSystemInstructionChange}
       onExportMarkdown={onExportMarkdown}
@@ -27,8 +27,6 @@ function renderTopBar() {
       onTemperatureChange={onTemperatureChange}
       maxTokens={4096}
       onMaxTokensChange={onMaxTokensChange}
-      modelContextLength={16384}
-      modelCapabilitiesLoading={false}
       topP={0.9}
       onTopPChange={onTopPChange}
       onResetAdvanced={onResetAdvanced}
@@ -37,7 +35,6 @@ function renderTopBar() {
 
   return {
     ...view,
-    onToggleTheme,
     onSystemInstructionChange,
     onExportMarkdown,
     onAdvancedOpenChange,
@@ -45,6 +42,7 @@ function renderTopBar() {
     onMaxTokensChange,
     onTopPChange,
     onResetAdvanced,
+    onOpenAppearance,
   }
 }
 
@@ -70,11 +68,10 @@ describe('TopBar options callout', () => {
     expect(screen.getByText(/^Generation$/)).toBeInTheDocument()
   })
 
-  it('shows API and model-reported context limits under Max tokens', () => {
+  it('removes the max-token helper copy from the options panel', () => {
     renderTopBar()
     fireEvent.click(screen.getByRole('button', { name: /options/i }))
-    expect(screen.getByText(/API allows up to 131,072 generation tokens/i)).toBeInTheDocument()
-    expect(screen.getByText(/16,384-token context window/i)).toBeInTheDocument()
+    expect(screen.queryByText(/API allows up to 131,072 generation tokens/i)).not.toBeInTheDocument()
   })
 
   it('keeps system instruction editing and clear actions wired', () => {
@@ -90,33 +87,33 @@ describe('TopBar options callout', () => {
     expect(onSystemInstructionChange).toHaveBeenCalledWith('')
   })
 
-  it('keeps generation settings, export, and theme actions wired', () => {
+  it('keeps generation settings, export, and appearance actions wired', () => {
     const {
       onTemperatureChange,
       onMaxTokensChange,
       onTopPChange,
       onResetAdvanced,
       onExportMarkdown,
-      onToggleTheme,
+      onOpenAppearance,
     } = renderTopBar()
 
     fireEvent.click(screen.getByRole('button', { name: /options/i }))
 
     const inputs = screen.getAllByRole('spinbutton')
     fireEvent.change(inputs[0]!, { target: { value: '1.1' } })
-    fireEvent.change(inputs[1]!, { target: { value: '2048' } })
+    fireEvent.change(inputs[1]!, { target: { value: '999999' } })
     fireEvent.change(inputs[2]!, { target: { value: '0.8' } })
     fireEvent.click(screen.getByRole('button', { name: /reset generation settings to defaults/i }))
     fireEvent.click(screen.getByRole('button', { name: /export markdown/i }))
 
     fireEvent.click(screen.getByRole('button', { name: /options/i }))
-    fireEvent.click(screen.getByRole('button', { name: /dark mode/i }))
+    fireEvent.click(screen.getByRole('button', { name: /open appearance/i }))
 
     expect(onTemperatureChange).toHaveBeenCalledWith(1.1)
-    expect(onMaxTokensChange).toHaveBeenCalledWith(2048)
+    expect(onMaxTokensChange).toHaveBeenCalledWith(131072)
     expect(onTopPChange).toHaveBeenCalledWith(0.8)
     expect(onResetAdvanced).toHaveBeenCalled()
     expect(onExportMarkdown).toHaveBeenCalled()
-    expect(onToggleTheme).toHaveBeenCalled()
+    expect(onOpenAppearance).toHaveBeenCalled()
   })
 })

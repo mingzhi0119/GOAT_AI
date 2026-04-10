@@ -22,3 +22,17 @@ const ls: Storage = {
   },
 }
 Object.defineProperty(globalThis, 'localStorage', { value: ls, writable: true })
+
+Object.defineProperty(globalThis, 'matchMedia', {
+  writable: true,
+  value: (query: string) => ({
+    matches: query.includes('dark'),
+    media: query,
+    onchange: null,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => true,
+  }),
+})

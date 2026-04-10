@@ -41,7 +41,9 @@ def _normalize_gpu_name(raw_name: str) -> str:
     cleaned = text
     for token in _GPU_NAME_NOISE:
         cleaned = re.sub(rf"\b{re.escape(token)}\b", "", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"\b(SXM\d+|PCIe|HBM\d+|SUPER|TI|LHR|MIG)\b", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(
+        r"\b(SXM\d+|PCIe|HBM\d+|SUPER|TI|LHR|MIG)\b", "", cleaned, flags=re.IGNORECASE
+    )
     cleaned = re.sub(r"[\s\-/_,()]+", " ", cleaned).strip()
     if not cleaned:
         return text

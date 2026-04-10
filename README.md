@@ -6,6 +6,7 @@ Strategic Intelligence assistant for Simon Business School, University of Roches
 - Repo: <https://github.com/mingzhi0119/GOAT_AI>
 - Current snapshot: [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md)
 - API contract: [docs/API_REFERENCE.md](docs/API_REFERENCE.md)
+- Frontend appearance hand-off: [docs/APPEARANCE.md](docs/APPEARANCE.md)
 
 ## Environments
 
@@ -163,6 +164,7 @@ npm run build
 
 - [AGENTS.md](AGENTS.md): short index for agents; **canonical rules:** [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md)
 - [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md): current shipped state
+- [docs/APPEARANCE.md](docs/APPEARANCE.md): appearance/theme architecture, controls, and extension rules
 - [docs/API_REFERENCE.md](docs/API_REFERENCE.md): endpoint contract
 - [docs/API_ERRORS.md](docs/API_ERRORS.md): stable error envelope and error-code rules
 - [docs/OPERATIONS.md](docs/OPERATIONS.md): deploy, env vars, ops notes

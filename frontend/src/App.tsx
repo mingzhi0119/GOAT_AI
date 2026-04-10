@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAdvancedSettings } from './hooks/useAdvancedSettings'
+import { useAppearance } from './hooks/useAppearance'
 import { useChatLayoutMode } from './hooks/useChatLayoutMode'
 import { useChatSession } from './hooks/useChatSession'
 import { useGpuStatus } from './hooks/useGpuStatus'
 import { useModels } from './hooks/useModels'
 import { useSystemInstruction } from './hooks/useSystemInstruction'
-import { useTheme } from './hooks/useTheme'
 import { useUserName } from './hooks/useUserName'
 import { getChatLayoutDecisions } from './utils/chatLayout'
 import { downloadChatAsMarkdown } from './utils/exportChatMarkdown'
+import AppearancePanel from './components/AppearancePanel'
 import ChatWindow from './components/ChatWindow'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import Sidebar from './components/Sidebar'
@@ -21,7 +22,9 @@ export default function App() {
   const [reasoningLevel, setReasoningLevel] = useState<'low' | 'medium' | 'high'>('medium')
   const [thinkingEnabled, setThinkingEnabled] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const { theme, toggleTheme } = useTheme()
+  const [appearanceOpen, setAppearanceOpen] = useState(false)
+  const { appearance, effectiveMode, appearanceSummary, updateAppearance, resetAppearance } =
+    useAppearance()
   const models = useModels()
   const { layoutMode } = useChatLayoutMode()
   const chatLayout = useMemo(() => getChatLayoutDecisions(layoutMode), [layoutMode])
@@ -123,10 +126,10 @@ export default function App() {
         <TopBar
           sessionTitle={session.sessionTitle}
           modelCapabilities={models.capabilities?.capabilities ?? null}
-          theme={theme}
+          appearanceSummary={appearanceSummary}
           layoutMode={layoutMode}
           onSidebarToggle={() => setSidebarOpen(open => !open)}
-          onToggleTheme={toggleTheme}
+          onOpenAppearance={() => setAppearanceOpen(true)}
           systemInstruction={systemInstruction}
           onSystemInstructionChange={setSystemInstruction}
           onExportMarkdown={() =>
@@ -141,8 +144,6 @@ export default function App() {
           onTemperatureChange={advanced.setTemperature}
           maxTokens={advanced.maxTokens}
           onMaxTokensChange={advanced.setMaxTokens}
-          modelContextLength={models.capabilities?.context_length ?? null}
-          modelCapabilitiesLoading={models.isLoadingCapabilities}
           topP={advanced.topP}
           onTopPChange={advanced.setTopP}
           onResetAdvanced={advanced.resetAdvancedToDefaults}
@@ -179,6 +180,14 @@ export default function App() {
           />
         </ErrorBoundary>
       </div>
+      <AppearancePanel
+        open={appearanceOpen}
+        appearance={appearance}
+        effectiveMode={effectiveMode}
+        onClose={() => setAppearanceOpen(false)}
+        onChange={updateAppearance}
+        onReset={resetAppearance}
+      />
     </div>
   )
 }

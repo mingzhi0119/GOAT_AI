@@ -5,7 +5,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend.services.gpu_service import _normalize_gpu_name, _parse_gpu_row, read_gpu_status
+from backend.services.gpu_service import (
+    _normalize_gpu_name,
+    _parse_gpu_row,
+    read_gpu_status,
+)
 from goat_ai.config import Settings
 
 

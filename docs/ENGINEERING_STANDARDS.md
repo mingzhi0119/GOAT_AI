@@ -585,9 +585,13 @@ Before every commit ask:
 
 ## 11. Theme (frontend)
 
-- Light/dark mode uses a `.dark` class on `<html>`.
+- Appearance state is applied at the document root via stable datasets and CSS custom properties, not a binary `.dark` class toggle.
 - Theme state persists in `localStorage`.
-- Global theme tokens live in `frontend/src/styles/global.css`.
+- The typed appearance model, theme registry, and migration logic live in `frontend/src/utils/appearance.ts`.
+- React entry/state wiring lives in `frontend/src/hooks/useAppearance.tsx`.
+- Global semantic theme tokens live in `frontend/src/styles/global.css`.
+- Startup anti-flicker theme hydration runs from `frontend/index.html`.
+- Canonical frontend appearance hand-off and extension rules live in [APPEARANCE.md](APPEARANCE.md).
 
 ---
 

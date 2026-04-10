@@ -6,6 +6,7 @@ Short durable index for coding agents and contributors. Canonical engineering ru
 
 - [`docs/ENGINEERING_STANDARDS.md`](docs/ENGINEERING_STANDARDS.md) - full rules for Python, TypeScript, testing, API design, cross-env behavior, production host constraints, documentation workflow, API artifacts, and recovery. Section 15 covers capability-based feature gates for optional high-risk features such as a future code sandbox.
 - [`docs/DOMAIN.md`](docs/DOMAIN.md) - ubiquitous domain language (Phase 15.1); update when user-visible chat, chart, or safeguard semantics change.
+- [`docs/APPEARANCE.md`](docs/APPEARANCE.md) - canonical frontend appearance/theme hand-off: root tokens, persistence, style registry, and extension rules.
 - Frontend manual UI verification rules live in `docs/ENGINEERING_STANDARDS.md` Section 3.4; keep `AGENTS.md` as the short pointer, not the full procedure.
 - Editor rules under `.cursor/rules/` must mirror the same principles; keep them aligned whenever either file changes (including the **Before delivering code** checklist in `core-principles.mdc` and `testing.mdc`).
 

@@ -4,10 +4,10 @@ import type { ChatLayoutMode } from '../utils/chatLayout'
 interface Props {
   sessionTitle: string | null
   modelCapabilities: string[] | null
-  theme: 'light' | 'dark'
+  appearanceSummary: string
   layoutMode?: ChatLayoutMode
   onSidebarToggle?: () => void
-  onToggleTheme: () => void
+  onOpenAppearance: () => void
   systemInstruction: string
   onSystemInstructionChange: (value: string) => void
   onExportMarkdown: () => void
@@ -17,9 +17,6 @@ interface Props {
   onTemperatureChange: (v: number) => void
   maxTokens: number
   onMaxTokensChange: (v: number) => void
-  /** Ollama-reported context window for the selected model; null if unknown. */
-  modelContextLength: number | null
-  modelCapabilitiesLoading: boolean
   topP: number
   onTopPChange: (v: number) => void
   onResetAdvanced: () => void
@@ -47,10 +44,10 @@ function formatSkillLabel(capability: string): string | null {
 const TopBar: FC<Props> = ({
   sessionTitle,
   modelCapabilities,
-  theme,
+  appearanceSummary,
   layoutMode = 'wide',
   onSidebarToggle,
-  onToggleTheme,
+  onOpenAppearance,
   systemInstruction,
   onSystemInstructionChange,
   onExportMarkdown,
@@ -60,8 +57,6 @@ const TopBar: FC<Props> = ({
   onTemperatureChange,
   maxTokens,
   onMaxTokensChange,
-  modelContextLength,
-  modelCapabilitiesLoading,
   topP,
   onTopPChange,
   onResetAdvanced,
@@ -157,7 +152,7 @@ const TopBar: FC<Props> = ({
 
           {menuOpen && (
             <div
-              className={`absolute right-0 z-50 mt-2 max-h-[min(85vh,38rem)] overflow-y-auto rounded-[24px] border px-4 py-3 shadow-[0_16px_36px_rgba(15,23,42,0.12)] ${isNarrow ? 'w-[min(96vw,22rem)]' : 'w-[min(92vw,26rem)]'}`}
+              className={`absolute right-0 z-50 mt-2 max-h-[min(85vh,38rem)] overflow-y-auto rounded-[24px] border px-4 py-3 shadow-[0_16px_36px_var(--panel-shadow-color)] ${isNarrow ? 'w-[min(96vw,22rem)]' : 'w-[min(92vw,26rem)]'}`}
               style={{
                 background: 'var(--composer-menu-bg-strong)',
                 borderColor: 'var(--input-border)',
@@ -276,7 +271,6 @@ const TopBar: FC<Props> = ({
                         type="number"
                         step={1}
                         min={1}
-                        max={API_MAX_GENERATION_TOKENS}
                         value={maxTokens}
                         onChange={e => {
                           const v = parseInt(e.target.value, 10)
@@ -293,17 +287,6 @@ const TopBar: FC<Props> = ({
                           color: 'var(--text-main)',
                         }}
                       />
-                      <p
-                        className="mt-1 text-[10px] leading-snug"
-                        style={{ color: 'var(--text-muted)' }}
-                      >
-                        API allows up to {API_MAX_GENERATION_TOKENS.toLocaleString()} generation tokens.
-                        {modelCapabilitiesLoading
-                          ? ' Loading model metadata…'
-                          : modelContextLength != null
-                            ? ` Ollama reports a ${modelContextLength.toLocaleString()}-token context window for this model (prompt and completion share this budget).`
-                            : ' Ollama did not report a context length for this model.'}
-                      </p>
                     </div>
                     <div>
                       <label
@@ -375,16 +358,16 @@ const TopBar: FC<Props> = ({
                       color: 'var(--text-main)',
                     }}
                     onClick={() => {
-                      onToggleTheme()
+                      onOpenAppearance()
                       setMenuOpen(false)
                     }}
                   >
                     <span className="inline-flex items-center gap-2">
-                      {theme === 'light' ? <MoonIcon /> : <SunIcon />}
-                      <span>{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>
+                      <AppearanceIcon />
+                      <span>Open Appearance</span>
                     </span>
                     <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                      {theme === 'light' ? 'Switch to dark' : 'Switch to light'}
+                      {appearanceSummary}
                     </span>
                   </button>
                 </section>
@@ -431,15 +414,16 @@ const ChevronRightIcon = () => (
   </svg>
 )
 
-const MoonIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-    <path d="M6 .278a.768.768 0 0 1 .08.858 7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278z" />
-  </svg>
-)
-
-const SunIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-    <path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707z" />
+const AppearanceIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <path
+      d="M8 1.75a6.25 6.25 0 1 0 0 12.5c1.61 0 2.68-.49 3.4-1.15.68-.63.61-1.66-.2-2.1l-.58-.31c-.82-.44-.95-1.52-.28-2.14l1.24-1.16a1.65 1.65 0 0 0 .37-1.9A6.25 6.25 0 0 0 8 1.75Z"
+      stroke="currentColor"
+      strokeWidth="1.3"
+    />
+    <circle cx="5.1" cy="6.1" r=".8" fill="currentColor" />
+    <circle cx="7.95" cy="4.85" r=".8" fill="currentColor" />
+    <circle cx="5.8" cy="9.25" r=".8" fill="currentColor" />
   </svg>
 )
 

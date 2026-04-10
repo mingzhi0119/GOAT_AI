@@ -30,8 +30,7 @@ def test_expect_chat_stream_contract_accepts_thinking_only_stream() -> None:
     chat_response = Mock()
     chat_response.raise_for_status.return_value = None
     chat_response.text = (
-        'data: {"type":"thinking","token":"reasoning…"}\n\n'
-        'data: {"type":"done"}\n\n'
+        'data: {"type":"thinking","token":"reasoning…"}\n\ndata: {"type":"done"}\n\n'
     )
     with (
         patch("scripts.post_deploy_check.requests.get", return_value=model_response),
@@ -46,10 +45,14 @@ def test_expect_chat_stream_contract_accepts_token_then_done() -> None:
     model_response.json.return_value = {"models": ["tinyllama:latest"]}
     chat_response = Mock()
     chat_response.raise_for_status.return_value = None
-    chat_response.text = 'data: {"type":"token","token":"hello"}\n\ndata: {"type":"done"}\n\n'
+    chat_response.text = (
+        'data: {"type":"token","token":"hello"}\n\ndata: {"type":"done"}\n\n'
+    )
     with (
         patch("scripts.post_deploy_check.requests.get", return_value=model_response),
-        patch("scripts.post_deploy_check.requests.post", return_value=chat_response) as post,
+        patch(
+            "scripts.post_deploy_check.requests.post", return_value=chat_response
+        ) as post,
     ):
         assert _expect_chat_stream_contract("http://127.0.0.1:62606") == 0
     payload = post.call_args.kwargs["json"]

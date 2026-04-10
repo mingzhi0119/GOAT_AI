@@ -14,7 +14,9 @@ class ChatOptionsTests(unittest.TestCase):
         self.assertIsNone(build_ollama_options())
 
     def test_build_maps_num_predict(self) -> None:
-        o = build_ollama_options(temperature=0.7, max_tokens=512, top_p=0.95, think=True)
+        o = build_ollama_options(
+            temperature=0.7, max_tokens=512, top_p=0.95, think=True
+        )
         assert o is not None
         self.assertEqual(0.7, o["temperature"])
         self.assertEqual(512, o["num_predict"])

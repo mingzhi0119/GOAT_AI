@@ -74,13 +74,16 @@ const Sidebar: FC<Props> = ({
   return (
     <aside
       className={[
-        'flex min-h-0 flex-col overflow-x-hidden transition-transform duration-200 ease-out',
+        'app-sidebar-glass flex min-h-0 flex-col overflow-x-hidden transition-transform duration-200 ease-out',
         isNarrow
           ? 'fixed inset-y-0 left-0 z-40 h-[100dvh] w-[min(16rem,calc(100vw-1.25rem))] max-w-[16rem] shadow-[0_20px_48px_rgba(15,23,42,0.16)]'
           : 'h-screen w-64 flex-shrink-0',
         isNarrow && !isOpen ? '-translate-x-full' : 'translate-x-0',
       ].join(' ')}
-      style={{ background: 'var(--bg-sidebar)' }}
+      style={{
+        background: 'var(--bg-sidebar)',
+        borderRight: '1px solid var(--sidebar-border)',
+      }}
       aria-hidden={isNarrow ? !isOpen : undefined}
     >
       <div className="flex h-12 flex-shrink-0 items-center justify-between gap-2.5 px-4">

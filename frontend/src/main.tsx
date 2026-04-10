@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './styles/global.css'
 import App from './App.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary.tsx'
+import { AppearanceProvider } from './hooks/useAppearance.tsx'
 
 const rootEl = document.getElementById('root')
 if (!rootEl) throw new Error('#root element missing from index.html')
@@ -10,7 +11,9 @@ if (!rootEl) throw new Error('#root element missing from index.html')
 createRoot(rootEl).render(
   <StrictMode>
     <ErrorBoundary>
-      <App />
+      <AppearanceProvider>
+        <App />
+      </AppearanceProvider>
     </ErrorBoundary>
   </StrictMode>,
 )
