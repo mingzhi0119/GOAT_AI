@@ -219,6 +219,7 @@ const Sidebar: FC<Props> = ({
                     closeOverlay()
                   }}
                   title={item.title || 'New Chat'}
+                  aria-current={isCurrent ? 'true' : undefined}
                   className="block w-full min-w-0 rounded-[inherit] px-4 py-2.5 pr-12 text-left text-[15px] leading-5 transition-all"
                   style={{ color: 'var(--text-sidebar)', background: rowBg }}
                   {...hoverHandlers(isCurrent ? rowBg : 'transparent', rowBg)}

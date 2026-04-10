@@ -204,9 +204,7 @@ class ApiAuthzTests(unittest.TestCase):
         self.assertTrue(write_features.json()["code_sandbox"]["effective_enabled"])
 
     @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=True)
-    def test_code_sandbox_exec_policy_denial_returns_403(
-        self, _mock: object
-    ) -> None:
+    def test_code_sandbox_exec_policy_denial_returns_403(self, _mock: object) -> None:
         self.settings = replace(
             self.settings,
             feature_code_sandbox_enabled=True,

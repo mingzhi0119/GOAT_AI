@@ -66,7 +66,9 @@ class TestFeatureGates(unittest.TestCase):
             self.assertFalse(probe_docker_available(s))
 
     def test_policy_gate_allows_local_context_with_sandbox_scope(self) -> None:
-        self.assertTrue(code_sandbox_policy_allowed(build_local_authorization_context()))
+        self.assertTrue(
+            code_sandbox_policy_allowed(build_local_authorization_context())
+        )
 
     @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=True)
     def test_require_code_sandbox_enabled_allows_when_policy_and_runtime_allow(

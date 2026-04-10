@@ -61,11 +61,34 @@ describe('Sidebar', () => {
     expect(deleteButton.className).toContain('group-hover/history:opacity-100')
   })
 
-  it('only gives the current session a filled container treatment', () => {
-    render(<Sidebar {...buildProps('classic')} currentSessionId="session-1" />)
+  it('only marks the active history session with aria-current', () => {
+    const historySessions: HistorySessionItem[] = [
+      {
+        id: 'session-1',
+        title: 'Strategy review',
+        model: 'gpt-5.4',
+        created_at: '2026-04-09T12:00:00Z',
+        updated_at: '2026-04-09T13:00:00Z',
+      },
+      {
+        id: 'session-2',
+        title: 'Other chat',
+        model: 'gpt-5.4',
+        created_at: '2026-04-09T14:00:00Z',
+        updated_at: '2026-04-09T15:00:00Z',
+      },
+    ]
 
-    const currentButton = screen.getByTitle('Strategy review')
-    expect(currentButton).toHaveStyle({ background: 'var(--sidebar-surface)' })
+    render(
+      <Sidebar
+        {...buildProps('classic')}
+        historySessions={historySessions}
+        currentSessionId="session-1"
+      />,
+    )
+
+    expect(screen.getByTitle('Strategy review')).toHaveAttribute('aria-current', 'true')
+    expect(screen.getByTitle('Other chat')).not.toHaveAttribute('aria-current')
   })
 
   it('switches the footer school logo by theme style', () => {

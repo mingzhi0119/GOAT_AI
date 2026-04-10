@@ -110,7 +110,9 @@ class ChatServiceTitleTests(unittest.TestCase):
             session_id="sid-1",
             model="llama3:latest",
             session_repository=FakeSessionRepository(sessions={}),
-            title_generator=FakeTitleGenerator("Frontier Macroeconomic Research Outlook"),
+            title_generator=FakeTitleGenerator(
+                "Frontier Macroeconomic Research Outlook"
+            ),
         )
         self.assertEqual("Frontier Macroeconomic Research Outlook", title)
 
