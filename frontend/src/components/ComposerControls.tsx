@@ -6,6 +6,7 @@ import {
   ChevronDownIcon,
   PlusIcon,
   PlanModeIcon,
+  ThinkingModeIcon,
   SendArrowIcon,
   StopIcon,
   type ReasoningLevel,
@@ -31,7 +32,7 @@ interface ComposerControlsProps {
   onTogglePlusMenu: () => void
   onToggleModelMenu: () => void
   onToggleReasoningMenu: () => void
-  onToggleThinkingMode: () => void
+  onThinkingEnabledChange: (enabled: boolean) => void
   onStop: () => void
   onSubmit: () => void
 }
@@ -64,20 +65,20 @@ export default function ComposerControls({
   onTogglePlusMenu,
   onToggleModelMenu,
   onToggleReasoningMenu,
-  onToggleThinkingMode,
+  onThinkingEnabledChange,
   onStop,
   onSubmit,
 }: ComposerControlsProps) {
-  const [hoveredIndicator, setHoveredIndicator] = useState<boolean>(false)
+  const [hoveredCapability, setHoveredCapability] = useState<'plan' | 'thinking' | null>(null)
 
   return (
     <div
       data-testid="composer-control-row"
-      className="ui-static flex items-center justify-between gap-2 px-0.5"
+      className="ui-static flex items-center justify-between gap-1 px-0.5"
     >
       <div
         data-testid="composer-left-controls"
-        className={`-ml-1 flex min-w-0 flex-1 items-center ${layoutDecisions.compactComposer ? 'gap-1.5 overflow-x-auto pr-2' : 'gap-1.5'}`}
+        className={`-ml-1 flex min-w-0 flex-1 items-center ${layoutDecisions.compactComposer ? 'gap-1 overflow-x-auto pr-1.5' : 'gap-1'}`}
         style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
@@ -87,7 +88,7 @@ export default function ComposerControls({
           type="button"
           disabled={isStreaming || attachmentUploading}
           onClick={onTogglePlusMenu}
-          className={`${layoutDecisions.compactComposer ? 'h-9 w-9' : 'h-10 w-10'} flex flex-shrink-0 items-center justify-center rounded-full transition-all disabled:opacity-40`}
+          className={`${layoutDecisions.compactComposer ? 'h-9 w-9' : 'h-10 w-10'} flex shrink-0 items-center justify-center rounded-full transition-all disabled:opacity-40`}
           style={{ border: 'none', ...controlPillStyle(plusMenuOpen), color: 'rgba(17,24,39,0.42)' }}
           title={plusMenuOpen ? 'Close actions' : 'Open upload and planning actions'}
           onMouseEnter={e => {
@@ -100,17 +101,20 @@ export default function ComposerControls({
           <PlusIcon />
         </button>
 
-        <div className={`flex min-w-0 flex-shrink-0 items-center ${layoutDecisions.compactComposer ? 'gap-1.5' : 'gap-3'}`}>
+        <div
+          className={`flex min-w-0 flex-1 items-center ${layoutDecisions.compactComposer ? 'gap-1' : 'gap-1.5'}`}
+        >
           <button
             type="button"
             aria-label="Open model menu"
             aria-expanded={modelMenuOpen}
+            title={selectedModel}
             onClick={onToggleModelMenu}
-            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[13px] font-medium transition-all ${layoutDecisions.compactComposer ? 'max-w-[104px]' : 'max-w-[180px]'}`}
+            className={`inline-flex min-w-0 shrink items-center gap-1 overflow-hidden rounded-full px-2 py-1 text-[13px] font-medium transition-all ${layoutDecisions.compactComposer ? 'max-w-[min(5.5rem,28vw)]' : 'max-w-[min(9.5rem,36vw)]'}`}
             style={controlPillStyle(modelMenuOpen)}
           >
-            <span className="truncate">{selectedModel}</span>
-            <span className="inline-flex flex-shrink-0 items-center justify-center">
+            <span className="min-w-0 flex-1 truncate text-left">{selectedModel}</span>
+            <span className="inline-flex shrink-0 items-center justify-center">
               <ChevronDownIcon />
             </span>
           </button>
@@ -120,7 +124,7 @@ export default function ComposerControls({
             aria-label="Open reasoning menu"
             aria-expanded={reasoningMenuOpen}
             onClick={onToggleReasoningMenu}
-            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[13px] font-medium transition-all ${layoutDecisions.compactComposer ? 'max-w-[78px] flex-shrink-0' : ''}`}
+            className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[13px] font-medium transition-all ${layoutDecisions.compactComposer ? 'max-w-[4.5rem]' : ''}`}
             style={controlPillStyle(reasoningMenuOpen)}
           >
             <span className="truncate">
@@ -131,42 +135,24 @@ export default function ComposerControls({
             </span>
           </button>
 
-          {supportsThinking && (
-            <button
-              type="button"
-              aria-label={thinkingEnabled ? 'Set quick mode' : 'Set thinking mode'}
-              aria-pressed={thinkingEnabled}
-              onClick={onToggleThinkingMode}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[13px] font-medium transition-colors hover:bg-slate-900/[0.06] ${layoutDecisions.compactComposer ? 'max-w-[104px] flex-shrink-0' : ''}`}
-              style={{
-                color: 'var(--text-muted)',
-                background: 'transparent',
-                borderColor: 'var(--border-color)',
-              }}
-              title={thinkingEnabled ? 'Thinking enabled' : 'Quick mode enabled'}
-            >
-              <span className="truncate">{thinkingEnabled ? 'Thinking' : 'Quick'}</span>
-            </button>
-          )}
-
           {planModeEnabled && (
             <button
               type="button"
-              className="relative inline-flex items-center gap-1.5 text-[13px] font-medium"
+              className="relative inline-flex shrink-0 items-center gap-1 text-[13px] font-medium"
               style={{ color: '#3b82f6' }}
               aria-label="Plan enabled"
               title="Planning mode is enabled."
               onClick={() => onPlanModeChange(false)}
-              onMouseEnter={() => setHoveredIndicator(true)}
-              onMouseLeave={() => setHoveredIndicator(false)}
-              onFocus={() => setHoveredIndicator(true)}
-              onBlur={() => setHoveredIndicator(false)}
+              onMouseEnter={() => setHoveredCapability('plan')}
+              onMouseLeave={() => setHoveredCapability(null)}
+              onFocus={() => setHoveredCapability('plan')}
+              onBlur={() => setHoveredCapability(null)}
             >
               <span className="inline-flex h-4 w-4 items-center justify-center">
                 <PlanModeIcon />
               </span>
               <span>Plan</span>
-              {hoveredIndicator && (
+              {hoveredCapability === 'plan' && (
                 <span
                   role="tooltip"
                   className="pointer-events-none absolute bottom-[calc(100%+0.45rem)] left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-medium shadow-[0_10px_20px_rgba(15,23,42,0.14)]"
@@ -181,10 +167,43 @@ export default function ComposerControls({
               )}
             </button>
           )}
+
+          {supportsThinking && thinkingEnabled && (
+            <button
+              type="button"
+              className="relative inline-flex shrink-0 items-center gap-1 text-[13px] font-medium"
+              style={{ color: '#3b82f6' }}
+              aria-label="Thinking mode enabled"
+              title="Thinking mode is enabled."
+              onClick={() => onThinkingEnabledChange(false)}
+              onMouseEnter={() => setHoveredCapability('thinking')}
+              onMouseLeave={() => setHoveredCapability(null)}
+              onFocus={() => setHoveredCapability('thinking')}
+              onBlur={() => setHoveredCapability(null)}
+            >
+              <span className="inline-flex h-4 w-4 items-center justify-center">
+                <ThinkingModeIcon />
+              </span>
+              <span>Thinking</span>
+              {hoveredCapability === 'thinking' && (
+                <span
+                  role="tooltip"
+                  className="pointer-events-none absolute bottom-[calc(100%+0.45rem)] left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-medium shadow-[0_10px_20px_rgba(15,23,42,0.14)]"
+                  style={{
+                    background: 'var(--composer-menu-bg-strong)',
+                    color: 'var(--text-main)',
+                    border: '1px solid var(--input-border)',
+                  }}
+                >
+                  Thinking mode is enabled.
+                </span>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
-      <div data-testid="composer-right-controls" className="flex flex-shrink-0 items-center gap-2">
+      <div data-testid="composer-right-controls" className="flex shrink-0 items-center gap-1">
         <GpuStatusDot
           gpuStatus={gpuStatus}
           gpuError={gpuError}

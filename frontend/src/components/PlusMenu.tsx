@@ -1,13 +1,22 @@
 import type { CSSProperties } from 'react'
-import { ChevronRightIcon, ManageIcon, PlanModeIcon, UploadIcon } from './chatComposerPrimitives'
+import {
+  ChevronRightIcon,
+  ManageIcon,
+  PlanModeIcon,
+  ThinkingModeIcon,
+  UploadIcon,
+} from './chatComposerPrimitives'
 
 interface PlusMenuProps {
   isOpen: boolean
   isNarrow: boolean
   planModeEnabled: boolean
+  supportsThinking: boolean
+  thinkingEnabled: boolean
   onUploadFiles: () => void
   onOpenManageUploads: () => void
   onTogglePlanMode: () => void
+  onToggleThinkingMode: () => void
 }
 
 const menuStyle = {
@@ -21,9 +30,12 @@ export default function PlusMenu({
   isOpen,
   isNarrow,
   planModeEnabled,
+  supportsThinking,
+  thinkingEnabled,
   onUploadFiles,
   onOpenManageUploads,
   onTogglePlanMode,
+  onToggleThinkingMode,
 }: PlusMenuProps) {
   if (!isOpen) return null
 
@@ -90,6 +102,7 @@ export default function PlusMenu({
         <button
           type="button"
           role="switch"
+          aria-label="Plan mode"
           aria-checked={planModeEnabled}
           onClick={onTogglePlanMode}
           className="relative inline-flex h-5 w-[34px] items-center rounded-full transition-colors"
@@ -106,6 +119,44 @@ export default function PlusMenu({
           />
         </button>
       </div>
+
+      {supportsThinking && (
+        <div
+          className="mt-0.5 flex items-center justify-between rounded-xl px-2.5 py-2"
+          style={{ color: 'var(--text-main)' }}
+        >
+          <span className="inline-flex items-center gap-2.5">
+            <span className="inline-flex h-4 w-4 items-center justify-center">
+              <ThinkingModeIcon />
+            </span>
+            <span>
+              <span className="block text-[13px] font-medium leading-none">Thinking Mode</span>
+              <span className="block text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                Model reasoning trace (Ollama thinking)
+              </span>
+            </span>
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-label="Thinking mode"
+            aria-checked={thinkingEnabled}
+            onClick={onToggleThinkingMode}
+            className="relative inline-flex h-5 w-[34px] items-center rounded-full transition-colors"
+            style={{
+              background: thinkingEnabled ? '#3b82f6' : 'rgba(15,23,42,0.12)',
+              cursor: 'default',
+            }}
+          >
+            <span
+              className="inline-flex h-3.5 w-3.5 rounded-full bg-white transition-transform"
+              style={{
+                transform: thinkingEnabled ? 'translateX(17px)' : 'translateX(3px)',
+              }}
+            />
+          </button>
+        </div>
+      )}
     </div>
   )
 }

@@ -77,6 +77,24 @@ export const PlanModeIcon = () => (
   </svg>
 )
 
+export const ThinkingModeIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <path
+      d="M8 2.75a3.25 3.25 0 0 0-3.25 3.25c0 1.28.74 2.39 1.82 2.92.22.11.36.33.36.57v.96h2.14v-.96c0-.24.14-.46.36-.57A3.245 3.245 0 0 0 11.25 6 3.25 3.25 0 0 0 8 2.75Z"
+      stroke="currentColor"
+      strokeWidth="1.25"
+      strokeLinejoin="round"
+    />
+    <path d="M6.25 12.25h3.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    <path
+      d="M8 13.25v.75M5.9 4.9l-.9-.9M10.1 4.9l.9-.9"
+      stroke="currentColor"
+      strokeWidth="1.1"
+      strokeLinecap="round"
+    />
+  </svg>
+)
+
 export const ChevronRightIcon = () => (
   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
     <path

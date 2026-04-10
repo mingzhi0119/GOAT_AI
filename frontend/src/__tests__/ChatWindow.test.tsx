@@ -110,10 +110,19 @@ describe('ChatWindow composer', () => {
     expect(screen.getByRole('button', { name: /open reasoning menu/i })).toBeInTheDocument()
   })
 
-  it('shows a quick/thinking toggle when the model supports thinking', () => {
+  it('shows Thinking Mode in the plus menu when the model supports thinking', () => {
     renderChatWindow({ supportsThinking: true })
 
-    expect(screen.getByRole('button', { name: /set thinking mode/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
+    expect(screen.getByText('Thinking Mode')).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: /thinking mode/i })).toBeInTheDocument()
+  })
+
+  it('hides Thinking Mode in the plus menu when the model does not support thinking', () => {
+    renderChatWindow({ supportsThinking: false })
+
+    fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
+    expect(screen.queryByText('Thinking Mode')).not.toBeInTheDocument()
   })
 
   it('opens model and reasoning menus and applies the selected options', () => {
@@ -128,7 +137,7 @@ describe('ChatWindow composer', () => {
     expect(onReasoningLevelChange).toHaveBeenCalledWith('high')
   })
 
-  it('keeps upload, manage uploads, and plan mode inside the plus popover', () => {
+  it('keeps upload, manage uploads, plan mode, and thinking mode inside the plus popover', () => {
     renderChatWindow()
 
     fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
@@ -136,6 +145,7 @@ describe('ChatWindow composer', () => {
     expect(screen.getByText('Upload Files')).toBeInTheDocument()
     expect(screen.getByText('Manage Uploads')).toBeInTheDocument()
     expect(screen.getByText('Plan Mode')).toBeInTheDocument()
+    expect(screen.getByText('Thinking Mode')).toBeInTheDocument()
   })
 
   it('shows a compact blue plan indicator beside reasoning only when plan mode is enabled', () => {
@@ -151,7 +161,7 @@ describe('ChatWindow composer', () => {
     const { onPlanModeChange } = renderChatWindow({ planModeEnabled: true })
 
     fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
-    fireEvent.click(screen.getByRole('switch'))
+    fireEvent.click(screen.getByRole('switch', { name: /plan mode/i }))
 
     expect(onPlanModeChange).toHaveBeenCalledWith(false)
 
@@ -223,6 +233,29 @@ describe('ChatWindow composer', () => {
 
     fireEvent.click(planButton)
     expect(onPlanModeChange).toHaveBeenCalledWith(false)
+  })
+
+  it('shows a compact blue thinking indicator and lets it disable thinking mode', () => {
+    const onThinkingEnabledChange = vi.fn()
+    renderChatWindow({ thinkingEnabled: true, onThinkingEnabledChange })
+
+    const thinkingButton = screen.getByRole('button', { name: /thinking mode enabled/i })
+    expect(screen.getByText('Thinking')).toBeInTheDocument()
+
+    fireEvent.mouseEnter(thinkingButton)
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Thinking mode is enabled.')
+
+    fireEvent.click(thinkingButton)
+    expect(onThinkingEnabledChange).toHaveBeenCalledWith(false)
+  })
+
+  it('wires the thinking mode switch in the plus menu', () => {
+    const onThinkingEnabledChange = vi.fn()
+    renderChatWindow({ supportsThinking: true, thinkingEnabled: false, onThinkingEnabledChange })
+
+    fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
+    fireEvent.click(screen.getByRole('switch', { name: /thinking mode/i }))
+    expect(onThinkingEnabledChange).toHaveBeenCalledWith(true)
   })
 
   it('shows a product-style validation message only after unsupported upload', async () => {

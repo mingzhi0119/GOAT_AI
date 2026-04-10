@@ -361,9 +361,12 @@ const ChatWindow: FC<Props> = ({
                 isOpen={plusMenuOpen}
                 isNarrow={isNarrow}
                 planModeEnabled={planModeEnabled}
+                supportsThinking={supportsThinking ?? false}
+                thinkingEnabled={thinkingEnabled}
                 onUploadFiles={() => fileInputRef.current?.click()}
                 onOpenManageUploads={() => setActivePanel('manage-uploads')}
                 onTogglePlanMode={() => onPlanModeChange(!planModeEnabled)}
+                onToggleThinkingMode={() => onThinkingEnabledChange(!thinkingEnabled)}
               />
               <ModelMenu
                 isOpen={modelMenuOpen}
@@ -476,7 +479,7 @@ const ChatWindow: FC<Props> = ({
                 layoutDecisions={layoutDecisions}
                 selectedModel={selectedModel}
                 reasoningLevel={reasoningLevel}
-                supportsThinking={supportsThinking}
+                supportsThinking={supportsThinking ?? false}
                 thinkingEnabled={thinkingEnabled}
                 planModeEnabled={planModeEnabled}
                 onPlanModeChange={onPlanModeChange}
@@ -498,7 +501,7 @@ const ChatWindow: FC<Props> = ({
                 onToggleReasoningMenu={() => {
                   setActivePanel(prev => (prev === 'reasoning' ? null : 'reasoning'))
                 }}
-                onToggleThinkingMode={() => onThinkingEnabledChange(!thinkingEnabled)}
+                onThinkingEnabledChange={onThinkingEnabledChange}
                 onStop={onStop}
                 onSubmit={handleSubmit}
               />
