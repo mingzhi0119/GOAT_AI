@@ -522,6 +522,7 @@ class ChatStreamService:
             except (OSError, PersistenceReadError, PersistenceWriteError):
                 logger.exception("Failed to persist completed chat result")
                 yield sse_error_event("Failed to persist chat result.")
+                yield sse_done_event()
                 return
             yield sse_done_event()
             inc_chat_stream_completed()

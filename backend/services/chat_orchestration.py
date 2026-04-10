@@ -348,6 +348,7 @@ def _yield_blocked_response(
 ) -> Generator[str, None, None]:
     """Emit a policy refusal and finalize logging/persistence."""
     refusal = assessment.refusal_message
+    yield sse_token_event(refusal)
     try:
         if persistence is not None:
             persistence.persist_and_log_chat_result(
@@ -394,7 +395,7 @@ def _yield_blocked_response(
     except (OSError, PersistenceReadError, PersistenceWriteError):
         logger.exception("Failed to persist blocked chat result")
         yield sse_error_event("Failed to persist chat result.")
+        yield sse_done_event()
         return
 
-    yield sse_token_event(refusal)
     yield sse_done_event()
