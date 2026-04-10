@@ -127,6 +127,7 @@ Self-managed VMs, Docker Compose, Kubernetes, or developer laptops use the same 
 | `GOAT_MAX_CHAT_MESSAGES` | Max message count accepted by `POST /api/chat` (422 if exceeded) | `120` |
 | `GOAT_MAX_CHAT_PAYLOAD_BYTES` | Max UTF-8 request payload bytes accepted by `POST /api/chat` (422 if exceeded) | `512000` |
 | `GOAT_FEATURE_CODE_SANDBOX` | Operator allows code-sandbox feature (`0`/`1`); `effective_enabled` still requires Docker probe | `0` |
+| `GOAT_FEATURE_AGENT_WORKBENCH` | Operator exposes the shared workbench feature family (`plan`, `browse`, `deep_research`, `canvas`, project memory, connectors); runtime remains unavailable until implementation lands | `0` |
 | `GOAT_DOCKER_SOCKET` | Override Docker socket/pipe path (empty = defaults: Unix `/var/run/docker.sock`, Windows `\\.\pipe\docker_engine`) | empty |
 
 ### OpenTelemetry (optional, Phase 15.6)

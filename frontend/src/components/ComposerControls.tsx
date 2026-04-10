@@ -133,7 +133,7 @@ export default function ComposerControls({
             <button
               type="button"
               className="relative inline-flex shrink-0 items-center gap-1 text-[13px] font-medium"
-              style={{ color: '#3b82f6' }}
+              style={{ color: 'var(--theme-accent-strong)' }}
               aria-label="Plan enabled"
               title="Planning mode is enabled."
               onClick={() => onPlanModeChange(false)}
@@ -166,7 +166,7 @@ export default function ComposerControls({
             <button
               type="button"
               className="relative inline-flex shrink-0 items-center gap-1 text-[13px] font-medium"
-              style={{ color: '#3b82f6' }}
+              style={{ color: 'var(--theme-accent-strong)' }}
               aria-label="Thinking mode enabled"
               title="Thinking mode is enabled."
               onClick={() => onThinkingEnabledChange(false)}

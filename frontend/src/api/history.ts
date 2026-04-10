@@ -1,19 +1,6 @@
-import type { ChartSpec, HistorySessionMessage } from './types'
+import type { HistorySessionDetail, HistorySessionItem } from './types'
 
-export interface HistorySessionItem {
-  id: string
-  title: string
-  model: string
-  created_at: string
-  updated_at: string
-}
-
-export interface HistorySessionDetail extends HistorySessionItem {
-  messages: HistorySessionMessage[]
-  chart_spec: ChartSpec | null
-  file_context: { prompt: string } | null
-  knowledge_documents: Array<{ document_id: string; filename: string; mime_type: string }>
-}
+export type { HistorySessionDetail, HistorySessionItem } from './types'
 
 export async function fetchHistory(): Promise<HistorySessionItem[]> {
   const resp = await fetch('./api/history')

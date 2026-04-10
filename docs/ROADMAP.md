@@ -19,9 +19,65 @@ Revisit datastore changes only after authorization and resource boundaries are e
 - Dependencies: must wait on the Phase 16 authz envelope and any resulting resource scoping rules.
 - Planning artifact: [`STORAGE_EVOLUTION_DECISION_PACKAGE.md`](STORAGE_EVOLUTION_DECISION_PACKAGE.md)
 
-### Frontend backlog
+### Phase 17: agent/workbench runtime scaffolding
 
-These items remain roadmap-only until the supporting runtime exists.
+Prioritize the backend/runtime seams for the next frontend surfaces before exposing them in the SPA.
+
+- Goal: ship a capability-discovered workbench/task envelope that can safely back future Plan Mode, Browse, Deep Research, Canvas, project memory, and connectors.
+- Why this shape: modern coding/research products converge on capability discovery, long-running task envelopes, memory/context layers, and connector/tool registries instead of hard-wiring isolated UI buttons.
+- Reference implementations:
+  - OpenAI Codex product notes emphasize a threaded/task-oriented runtime, approvals, artifacts, and integrations rather than one-off pages: [Unlocking the Codex Harness](https://openai.com/index/unlocking-the-codex-harness/)
+  - Claude Code docs expose slash commands, hierarchical `CLAUDE.md` memory, MCP-based connectors/tools, and custom subagents as first-class runtime concepts: [Claude Code overview](https://docs.anthropic.com/en/docs/claude-code/overview), [MCP](https://docs.anthropic.com/en/docs/claude-code/mcp), [Slash commands](https://docs.anthropic.com/en/docs/claude-code/slash-commands)
+- Exit criteria:
+  - `GET /api/system/features` advertises the workbench capability family without claiming unavailable runtime support
+  - one stable task-entry contract exists for future long-running agent work
+  - docs and error semantics make clear that unavailable runtime returns `503` / `FEATURE_UNAVAILABLE`
+
+### Phase 17A: workbench contract and capability discovery
+
+- Backend-first scaffold:
+  - shared `workbench` capability family in `GET /api/system/features`
+  - stable task envelope for `plan`, `browse`, `deep_research`, and `canvas`
+  - disabled-by-default operator flag plus runtime-gated stub route
+- Non-goals:
+  - no fake task execution
+  - no frontend exposure beyond capability-aware hiding/disabled states
+
+### Phase 17B: Plan Mode runtime integration
+
+- Goal: server-side plan/task orchestration with durable task ids, status polling/streaming, and artifact references
+- Backend prerequisites:
+  - task state model
+  - task event stream or polling contract
+  - safe cancellation / retry semantics
+
+### Phase 17C: Browse and Deep Research runtime
+
+- Goal: add retrieval/browse execution primitives before exposing real Search/Browse and Deep Research in the UI
+- Backend prerequisites:
+  - source registry abstraction for web and connector-backed retrieval
+  - citation model shared by chat and research outputs
+  - bounded multi-step task execution rather than direct request/response only
+
+### Phase 17D: canvas and artifact workspace
+
+- Goal: make artifacts/work products first-class so research and planning outputs can be revisited and iterated
+- Backend prerequisites:
+  - artifact/workspace metadata beyond chat-only downloadable files
+  - task-to-artifact linkage
+  - history/session restoration rules for workbench outputs
+
+### Phase 17E: project memory and connectors
+
+- Goal: add project-scoped memory and external source plumbing after task/runtime contracts exist
+- Backend prerequisites:
+  - explicit project scope and tenancy rules
+  - connector registry / capability metadata
+  - memory write/read boundaries that do not bypass existing authz/resource rules
+
+### UI surfaces waiting on backend/runtime
+
+These items should remain roadmap-only in the frontend until the corresponding backend/runtime slice exists.
 
 - Plan Mode runtime integration
 - Cloud model API integration for non-local inference backends

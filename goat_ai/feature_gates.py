@@ -11,12 +11,23 @@ from goat_ai.feature_gate_reasons import (
     GateKind,
     RUNTIME_DISABLED_BY_OPERATOR,
     RUNTIME_DOCKER_UNAVAILABLE,
+    RUNTIME_NOT_IMPLEMENTED,
 )
 
 
 @dataclass(frozen=True)
 class CodeSandboxFeatureSnapshot:
     """Runtime / dependency readiness for the code-execution sandbox (not AuthZ)."""
+
+    allowed_by_config: bool
+    available_on_host: bool
+    effective_enabled: bool
+    deny_reason: str | None
+
+
+@dataclass(frozen=True)
+class RuntimeFeatureSnapshot:
+    """Runtime / dependency readiness for a non-policy-gated optional feature."""
 
     allowed_by_config: bool
     available_on_host: bool
@@ -35,6 +46,8 @@ def feature_gate_public_detail(
         return "This feature is disabled on this deployment."
     if deny_reason == RUNTIME_DOCKER_UNAVAILABLE:
         return "This feature is not available because required runtime dependencies are missing or not ready."
+    if deny_reason == RUNTIME_NOT_IMPLEMENTED:
+        return "This feature has not been implemented on this deployment yet."
     return "This feature is not available on this deployment."
 
 
@@ -89,4 +102,21 @@ def compute_code_sandbox_snapshot(settings: Settings) -> CodeSandboxFeatureSnaps
         available_on_host=True,
         effective_enabled=True,
         deny_reason=None,
+    )
+
+
+def compute_agent_workbench_snapshot(settings: Settings) -> RuntimeFeatureSnapshot:
+    """Resolve the shared workbench runtime envelope for future agent surfaces."""
+    if not settings.feature_agent_workbench_enabled:
+        return RuntimeFeatureSnapshot(
+            allowed_by_config=False,
+            available_on_host=False,
+            effective_enabled=False,
+            deny_reason=RUNTIME_DISABLED_BY_OPERATOR,
+        )
+    return RuntimeFeatureSnapshot(
+        allowed_by_config=True,
+        available_on_host=False,
+        effective_enabled=False,
+        deny_reason=RUNTIME_NOT_IMPLEMENTED,
     )

@@ -1586,6 +1586,82 @@
         }
       }
     },
+    "/api/workbench/tasks": {
+      "post": {
+        "tags": [
+          "workbench"
+        ],
+        "summary": "Start a workbench task (scaffold)",
+        "description": "Validate the contract shape and enforce the runtime gate for future tasks.",
+        "operationId": "post_workbench_task_api_workbench_tasks_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkbenchTaskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Post Workbench Task Api Workbench Tasks Post"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Workbench runtime is not available on this deployment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "tags": [
@@ -2919,6 +2995,45 @@
         "title": "ModelsResponse",
         "description": "Body for GET /api/models."
       },
+      "RuntimeFeaturePayload": {
+        "properties": {
+          "allowed_by_config": {
+            "type": "boolean",
+            "title": "Allowed By Config",
+            "description": "Operator enabled the feature family in deployment config."
+          },
+          "available_on_host": {
+            "type": "boolean",
+            "title": "Available On Host",
+            "description": "Required runtime dependencies and executors are available."
+          },
+          "effective_enabled": {
+            "type": "boolean",
+            "title": "Effective Enabled",
+            "description": "Both config and runtime are ready."
+          },
+          "deny_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deny Reason",
+            "description": "Controlled enum for runtime gate only; never raw exception text."
+          }
+        },
+        "type": "object",
+        "required": [
+          "allowed_by_config",
+          "available_on_host",
+          "effective_enabled"
+        ],
+        "title": "RuntimeFeaturePayload",
+        "description": "Runtime / dependency readiness for optional non-policy-gated features."
+      },
       "RuntimeTargetItemResponse": {
         "properties": {
           "mode": {
@@ -2983,11 +3098,15 @@
         "properties": {
           "code_sandbox": {
             "$ref": "#/components/schemas/CodeSandboxFeaturePayload"
+          },
+          "workbench": {
+            "$ref": "#/components/schemas/WorkbenchFeaturePayload"
           }
         },
         "type": "object",
         "required": [
-          "code_sandbox"
+          "code_sandbox",
+          "workbench"
         ],
         "title": "SystemFeaturesResponse",
         "description": "Public feature flags derived from config + host probes."
@@ -3086,6 +3205,111 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "WorkbenchFeaturePayload": {
+        "properties": {
+          "agent_tasks": {
+            "$ref": "#/components/schemas/RuntimeFeaturePayload"
+          },
+          "plan_mode": {
+            "$ref": "#/components/schemas/RuntimeFeaturePayload"
+          },
+          "browse": {
+            "$ref": "#/components/schemas/RuntimeFeaturePayload"
+          },
+          "deep_research": {
+            "$ref": "#/components/schemas/RuntimeFeaturePayload"
+          },
+          "artifact_workspace": {
+            "$ref": "#/components/schemas/RuntimeFeaturePayload"
+          },
+          "project_memory": {
+            "$ref": "#/components/schemas/RuntimeFeaturePayload"
+          },
+          "connectors": {
+            "$ref": "#/components/schemas/RuntimeFeaturePayload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_tasks",
+          "plan_mode",
+          "browse",
+          "deep_research",
+          "artifact_workspace",
+          "project_memory",
+          "connectors"
+        ],
+        "title": "WorkbenchFeaturePayload",
+        "description": "Capability inventory for future agent/workbench surfaces."
+      },
+      "WorkbenchTaskRequest": {
+        "properties": {
+          "task_kind": {
+            "type": "string",
+            "enum": [
+              "plan",
+              "browse",
+              "deep_research",
+              "canvas"
+            ],
+            "title": "Task Kind",
+            "description": "Planned task surface requested by the client."
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Prompt",
+            "description": "Primary user instruction."
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id",
+            "description": "Optional chat/session affinity for future task replay."
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id",
+            "description": "Optional project/memory scope for future project workspaces."
+          },
+          "knowledge_document_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Knowledge Document Ids",
+            "description": "Optional attached knowledge documents for retrieval-aware tasks."
+          },
+          "connector_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Connector Ids",
+            "description": "Optional connector scopes for future browse/research tasks."
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_kind",
+          "prompt"
+        ],
+        "title": "WorkbenchTaskRequest",
+        "description": "Scaffold request body for future long-running workbench tasks."
       }
     }
   },
@@ -3125,6 +3349,10 @@
     {
       "name": "code_sandbox",
       "description": "Capability-gated code execution (scaffold)."
+    },
+    {
+      "name": "workbench",
+      "description": "Future agent/workbench task orchestration (scaffold)."
     }
   ]
 }

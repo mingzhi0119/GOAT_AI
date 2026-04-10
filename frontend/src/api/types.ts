@@ -7,6 +7,8 @@ export interface ChatMessage {
   content: string
   /** When true, this user turn is upload-derived tabular file context (preferred over content sniffing). */
   file_context?: boolean
+  /** Optional image attachment ids associated with this turn. */
+  image_attachment_ids?: string[]
 }
 
 export interface HistorySessionMessage {
@@ -35,6 +37,36 @@ export interface ChatRequest {
   think?: boolean | ReasoningLevel
 }
 
+export interface HistorySessionItem {
+  id: string
+  title: string
+  model: string
+  schema_version: number
+  created_at: string
+  updated_at: string
+  owner_id: string
+}
+
+export interface HistorySessionFileContext {
+  prompt: string
+}
+
+export interface HistorySessionKnowledgeDocument {
+  document_id: string
+  filename: string
+  mime_type: string
+}
+
+export type HistoryChartDataSource = 'uploaded' | 'demo' | 'none'
+
+export interface HistorySessionDetail extends HistorySessionItem {
+  messages: HistorySessionMessage[]
+  chart_spec: ChartSpec | null
+  file_context: HistorySessionFileContext | null
+  knowledge_documents: HistorySessionKnowledgeDocument[]
+  chart_data_source: HistoryChartDataSource | null
+}
+
 export interface ModelsResponse {
   models: string[]
 }
@@ -48,6 +80,55 @@ export interface ModelCapabilitiesResponse {
   supports_thinking: boolean
   /** Ollama-reported context window (tokens), when present in /api/show. */
   context_length: number | null
+}
+
+export interface GPUStatus {
+  available: boolean
+  active: boolean
+  message: string
+  name: string
+  uuid: string
+  utilization_gpu: number | null
+  memory_used_mb: number | null
+  memory_total_mb: number | null
+  temperature_c: number | null
+  power_draw_w: number | null
+}
+
+export interface InferenceLatency {
+  chat_avg_ms: number
+  chat_sample_count: number
+  chat_p50_ms: number
+  chat_p95_ms: number
+  first_token_avg_ms: number
+  first_token_sample_count: number
+  first_token_p50_ms: number
+  first_token_p95_ms: number
+  model_buckets: Record<
+    string,
+    {
+      chat_avg_ms: number
+      chat_p50_ms: number
+      chat_p95_ms: number
+      chat_sample_count: number
+      first_token_avg_ms: number
+      first_token_p50_ms: number
+      first_token_p95_ms: number
+      first_token_sample_count: number
+    }
+  >
+}
+
+export interface CodeSandboxFeature {
+  policy_allowed: boolean
+  allowed_by_config: boolean
+  available_on_host: boolean
+  effective_enabled: boolean
+  deny_reason: string | null
+}
+
+export interface SystemFeatures {
+  code_sandbox: CodeSandboxFeature
 }
 
 /** Ollama sampling options (Advanced settings); maps to backend ChatRequest fields. */

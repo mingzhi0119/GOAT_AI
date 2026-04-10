@@ -10,6 +10,7 @@ import {
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import * as echarts from 'echarts/core'
+import { CHART_THEME_FALLBACK } from '../assets/uiVisualAssets'
 import type { ChartSpec, ChartSpecV2, LegacyChartSpec } from '../api/types'
 
 interface Props {
@@ -71,17 +72,13 @@ const ChartCard: FC<Props> = ({ spec }) => {
   const isPieChart = normalized.kind === 'pie'
   const themeColors = useMemo(() => {
     if (typeof window === 'undefined') {
-      return {
-        text: '#e5e7eb',
-        muted: '#94a3b8',
-        border: '#334155',
-      }
+      return CHART_THEME_FALLBACK
     }
     const styles = window.getComputedStyle(document.documentElement)
     return {
-      text: styles.getPropertyValue('--text-main').trim() || '#e5e7eb',
-      muted: styles.getPropertyValue('--text-muted').trim() || '#94a3b8',
-      border: styles.getPropertyValue('--border-color').trim() || '#334155',
+      text: styles.getPropertyValue('--text-main').trim() || CHART_THEME_FALLBACK.text,
+      muted: styles.getPropertyValue('--text-muted').trim() || CHART_THEME_FALLBACK.muted,
+      border: styles.getPropertyValue('--border-color').trim() || CHART_THEME_FALLBACK.border,
     }
   }, [])
   const option = useMemo(
@@ -139,7 +136,7 @@ const ChartCard: FC<Props> = ({ spec }) => {
         </div>
         <span
           className="text-[10px] uppercase tracking-wide px-2 py-1 rounded-full"
-          style={{ color: 'var(--gold)', background: 'rgba(255,205,0,0.08)' }}
+          style={{ color: 'var(--link-color)', background: 'var(--table-header-bg)' }}
         >
           Apache ECharts
         </span>

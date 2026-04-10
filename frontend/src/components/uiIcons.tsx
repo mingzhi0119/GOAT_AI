@@ -8,7 +8,9 @@ import {
   FileText,
   Image,
   List,
+  MonitorCog,
   MoreHorizontal,
+  MoonStar,
   Palette,
   PanelLeft,
   Plus,
@@ -16,6 +18,7 @@ import {
   Settings,
   Square,
   SquarePen,
+  SunMedium,
   Trash2,
   Upload,
   X,
@@ -69,6 +72,15 @@ export const MoreIcon = (props: SVGProps<SVGSVGElement>) => (
 )
 export const AppearanceIcon = (props: SVGProps<SVGSVGElement>) => (
   <Palette {...iconProps(14, props)} />
+)
+export const LightModeIcon = (props: SVGProps<SVGSVGElement>) => (
+  <SunMedium {...iconProps(14, props)} />
+)
+export const DarkModeIcon = (props: SVGProps<SVGSVGElement>) => (
+  <MoonStar {...iconProps(14, props)} />
+)
+export const SystemModeIcon = (props: SVGProps<SVGSVGElement>) => (
+  <MonitorCog {...iconProps(14, props)} />
 )
 export const CopyIcon = (props: SVGProps<SVGSVGElement>) => <Copy {...iconProps(12, props)} />
 export const CopiedIcon = (props: SVGProps<SVGSVGElement>) => <Check {...iconProps(12, props)} />

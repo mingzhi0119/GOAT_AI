@@ -7,13 +7,19 @@ from backend.domain.authz_types import AuthorizationContext
 from backend.models.system import (
     CodeSandboxFeaturePayload,
     InferenceLatencyResponse,
+    RuntimeFeaturePayload,
     RuntimeTargetItemResponse,
     RuntimeTargetResponse,
     SystemFeaturesResponse,
+    WorkbenchFeaturePayload,
 )
 from backend.services.feature_gate_service import code_sandbox_policy_allowed
 from backend.types import Settings
-from goat_ai.feature_gates import compute_code_sandbox_snapshot
+from goat_ai.feature_gates import (
+    RuntimeFeatureSnapshot,
+    compute_agent_workbench_snapshot,
+    compute_code_sandbox_snapshot,
+)
 from goat_ai.latency_metrics import get_inference_snapshot
 from goat_ai.runtime_target import current_runtime_target, ordered_runtime_targets
 
@@ -40,6 +46,16 @@ def build_system_features_response(
 ) -> SystemFeaturesResponse:
     """Expose machine-readable capability flags for optional / high-risk features."""
     snap = compute_code_sandbox_snapshot(settings)
+    workbench = compute_agent_workbench_snapshot(settings)
+
+    def _runtime_payload(snapshot: RuntimeFeatureSnapshot) -> RuntimeFeaturePayload:
+        return RuntimeFeaturePayload(
+            allowed_by_config=snapshot.allowed_by_config,
+            available_on_host=snapshot.available_on_host,
+            effective_enabled=snapshot.effective_enabled,
+            deny_reason=snapshot.deny_reason,
+        )
+
     return SystemFeaturesResponse(
         code_sandbox=CodeSandboxFeaturePayload(
             policy_allowed=code_sandbox_policy_allowed(auth_context),
@@ -47,6 +63,15 @@ def build_system_features_response(
             available_on_host=snap.available_on_host,
             effective_enabled=snap.effective_enabled,
             deny_reason=snap.deny_reason,
+        ),
+        workbench=WorkbenchFeaturePayload(
+            agent_tasks=_runtime_payload(workbench),
+            plan_mode=_runtime_payload(workbench),
+            browse=_runtime_payload(workbench),
+            deep_research=_runtime_payload(workbench),
+            artifact_workspace=_runtime_payload(workbench),
+            project_memory=_runtime_payload(workbench),
+            connectors=_runtime_payload(workbench),
         ),
     )
 

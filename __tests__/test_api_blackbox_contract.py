@@ -957,13 +957,24 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(200, features.status_code)
         feat_body = features.json()
         self.assertIn("code_sandbox", feat_body)
+        self.assertIn("workbench", feat_body)
         self.assertTrue(feat_body["code_sandbox"]["policy_allowed"])
         self.assertFalse(feat_body["code_sandbox"]["effective_enabled"])
+        self.assertFalse(feat_body["workbench"]["agent_tasks"]["effective_enabled"])
+        self.assertFalse(feat_body["workbench"]["plan_mode"]["effective_enabled"])
+        self.assertFalse(feat_body["workbench"]["browse"]["effective_enabled"])
 
         exec_stub = self.client.post("/api/code-sandbox/exec")
         self.assertEqual(503, exec_stub.status_code)
         ej = exec_stub.json()
         self.assertEqual(FEATURE_UNAVAILABLE, ej["code"])
+
+        workbench_stub = self.client.post(
+            "/api/workbench/tasks",
+            json={"task_kind": "plan", "prompt": "Draft a plan"},
+        )
+        self.assertEqual(503, workbench_stub.status_code)
+        self.assertEqual(FEATURE_UNAVAILABLE, workbench_stub.json()["code"])
 
     def test_vision_media_upload_and_chat_contract(self) -> None:
         self.settings.data_dir.mkdir(parents=True, exist_ok=True)
@@ -1153,6 +1164,11 @@ class ApiProtectedBlackboxContractTests(unittest.TestCase):
             ("GET", "/api/system/runtime-target", {}),
             ("GET", "/api/system/features", {}),
             ("POST", "/api/code-sandbox/exec", {}),
+            (
+                "POST",
+                "/api/workbench/tasks",
+                {"json": {"task_kind": "plan", "prompt": "Draft a plan"}},
+            ),
             ("GET", "/api/system/metrics", {}),
         ]
 
