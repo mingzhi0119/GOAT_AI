@@ -66,7 +66,9 @@ class ChatIdempotencyContext:
     request_hash: str
 
 
-def _build_ollama_options(req: ChatRequest) -> dict[str, float | int | bool | str] | None:
+def _build_ollama_options(
+    req: ChatRequest,
+) -> dict[str, float | int | bool | str] | None:
     opts: dict[str, float | int | bool | str] = {}
     if req.temperature is not None:
         opts["temperature"] = req.temperature

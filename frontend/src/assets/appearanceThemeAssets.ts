@@ -1,5 +1,24 @@
 const rgba = (r: number, g: number, b: number, a: number): string => `rgba(${r}, ${g}, ${b}, ${a})`
 
+type ThemeModeTokens = ReturnType<typeof buildClassicTokens>
+type UIFontAssetId = 'inter' | 'system-sans' | 'humanist'
+type CodeFontAssetId = 'jetbrains' | 'sfmono' | 'mono'
+type ThemeStyleAssetId = 'classic' | 'urochester' | 'thu'
+
+interface FontOptionAsset<TId extends string> {
+  id: TId
+  label: string
+  cssValue: string
+}
+
+interface ThemeStyleAsset {
+  id: ThemeStyleAssetId
+  label: string
+  description: string
+  accentPresets: string[]
+  tokens: ThemeModeTokens
+}
+
 const buildClassicTokens = () => ({
   light: {
     mainBg: '#f7f7f8',
@@ -315,7 +334,7 @@ const buildThuTokens = () => ({
   },
 })
 
-export const UI_FONT_OPTIONS = [
+export const UI_FONT_OPTIONS: FontOptionAsset<UIFontAssetId>[] = [
   {
     id: 'inter',
     label: 'Codex Sans',
@@ -336,7 +355,7 @@ export const UI_FONT_OPTIONS = [
   },
 ]
 
-export const CODE_FONT_OPTIONS = [
+export const CODE_FONT_OPTIONS: FontOptionAsset<CodeFontAssetId>[] = [
   {
     id: 'jetbrains',
     label: 'JetBrains Mono',
@@ -354,7 +373,7 @@ export const CODE_FONT_OPTIONS = [
   },
 ]
 
-export const THEME_STYLES = [
+export const THEME_STYLES: ThemeStyleAsset[] = [
   {
     id: 'classic',
     label: 'Classic',

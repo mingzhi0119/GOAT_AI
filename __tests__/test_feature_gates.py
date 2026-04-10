@@ -136,7 +136,9 @@ class TestFeatureGates(unittest.TestCase):
         self.assertEqual("policy", exc_info.exception.gate_kind)
         self.assertEqual("permission_denied", exc_info.exception.deny_reason)
 
-    def test_require_agent_workbench_enabled_raises_when_operator_disabled(self) -> None:
+    def test_require_agent_workbench_enabled_raises_when_operator_disabled(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             settings = _settings(Path(tmp), feature_agent_workbench_enabled=False)
             with self.assertRaises(FeatureNotAvailable) as exc_info:

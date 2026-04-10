@@ -7,11 +7,14 @@ describe('session history utils', () => {
       id: 's1',
       title: 'Chart run',
       model: 'm',
+      schema_version: 1,
       created_at: 'c',
       updated_at: 'u',
+      owner_id: '',
       file_context: { prompt: '[User uploaded tabular data for analysis]\n\nCHART_DATA_CSV:\n```csv```' },
       knowledge_documents: [],
       chart_spec: null,
+      chart_data_source: 'uploaded',
       messages: [
         { role: 'user', content: 'Please chart revenue.' },
         {
