@@ -208,7 +208,7 @@ const AppearancePanel: FC<Props> = ({
                             </div>
                           </div>
                         </div>
-                        <div className="mt-3">
+                        <div className="mt-3 flex min-h-[8.75rem] flex-col justify-start">
                           <div className="relative min-h-[1.5rem] pr-16">
                             <p className="text-sm font-semibold">{style.label}</p>
                             {selected && (

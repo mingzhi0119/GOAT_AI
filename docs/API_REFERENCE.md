@@ -64,7 +64,7 @@ Returns JSON `{ "ready": boolean, "checks": { ... } }`. HTTP `503` when any requ
 
 ## `GET /api/system/metrics`
 
-Returns Prometheus exposition text (`text/plain`). Requires `X-GOAT-API-Key` when `GOAT_API_KEY` is set. Includes `http_requests_total`, `http_request_duration_seconds`, `chat_stream_completed_total`, `ollama_errors_total`, `sqlite_log_write_failures_total`, `feature_gate_denials_total` (when any), and **Section 14.7** retrieval counters: `knowledge_retrieval_requests_total{retrieval_profile,outcome}` and `knowledge_query_rewrite_applied_total{retrieval_profile}`.
+Returns Prometheus exposition text (`text/plain`). Requires `X-GOAT-API-Key` when `GOAT_API_KEY` is set. Includes `http_requests_total`, `http_request_duration_seconds`, `chat_stream_completed_total`, `ollama_errors_total`, `sqlite_log_write_failures_total`, `feature_gate_denials_total{feature,gate_kind,reason}` (when any), and **Section 14.7** retrieval counters: `knowledge_retrieval_requests_total{retrieval_profile,outcome}` and `knowledge_query_rewrite_applied_total{retrieval_profile}`.
 
 ## `GET /api/models`
 
@@ -461,7 +461,7 @@ Returns machine-readable flags for optional high-risk features (see `docs/ENGINE
 ```json
 {
   "code_sandbox": {
-    "policy_allowed": null,
+    "policy_allowed": false,
     "allowed_by_config": false,
     "available_on_host": false,
     "effective_enabled": false,
@@ -470,11 +470,11 @@ Returns machine-readable flags for optional high-risk features (see `docs/ENGINE
 }
 ```
 
-`policy_allowed` is reserved for future per-caller authorization; until then it is **`null`**. `deny_reason` when the **runtime** gate is closed is one of: `disabled_by_operator`, `docker_unavailable` (controlled enum; not raw exception text).
+`policy_allowed` is evaluated per caller from the current request's authorization context; for `code_sandbox`, the scope is `sandbox:execute`. `deny_reason` when the **runtime** gate is closed is one of: `disabled_by_operator`, `docker_unavailable` (controlled enum; not raw exception text).
 
 ## `POST /api/code-sandbox/exec`
 
-Scaffold endpoint: enforces the code-sandbox gate. When the **runtime** gate fails (operator off or Docker unavailable), returns **`503`** with `code: FEATURE_UNAVAILABLE` and a stable `detail` string mapped from `deny_reason`. When **policy** denies the caller (future AuthZ), expect **`403`** with `code: FEATURE_DISABLED`. Returns **`501`** when the gate passes but execution is not implemented yet.
+Scaffold endpoint: enforces the code-sandbox gate. When the **runtime** gate fails (operator off or Docker unavailable), returns **`503`** with `code: FEATURE_UNAVAILABLE` and a stable `detail` string mapped from `deny_reason`. When **policy** denies the caller (`sandbox:execute` missing), returns **`403`** with `code: FEATURE_DISABLED`. Returns **`501`** when the gate passes but execution is not implemented yet.
 
 ## Canonical sources
 
@@ -483,4 +483,3 @@ For machine-readable contract details, prefer:
 - [openapi.json](openapi.json)
 - [api.llm.yaml](api.llm.yaml)
 - `__tests__/test_api_blackbox_contract.py`
-

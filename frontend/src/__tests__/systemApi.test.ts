@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fetchGpuStatus, fetchInferenceLatency } from '../api/system'
+import {
+  fetchGpuStatus,
+  fetchInferenceLatency,
+  fetchSystemFeatures,
+} from '../api/system'
 
 describe('system api', () => {
   afterEach(() => {
@@ -40,5 +44,24 @@ describe('system api', () => {
     const payload = await fetchInferenceLatency()
     expect(payload.chat_sample_count).toBe(3)
     expect(mockedFetch).toHaveBeenCalledWith('./api/system/inference')
+  })
+
+  it('fetches system features payload', async () => {
+    const mockedFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code_sandbox: {
+          policy_allowed: false,
+          allowed_by_config: true,
+          available_on_host: true,
+          effective_enabled: true,
+          deny_reason: null,
+        },
+      }),
+    })
+    vi.stubGlobal('fetch', mockedFetch)
+    const payload = await fetchSystemFeatures()
+    expect(payload.code_sandbox.policy_allowed).toBe(false)
+    expect(mockedFetch).toHaveBeenCalledWith('./api/system/features')
   })
 })

@@ -142,6 +142,8 @@ export interface Message {
   content: string
   /** Accumulated model thinking / reasoning trace (not shown inline). */
   thinkingContent?: string
+  /** Whether the UI should render the Thinking disclosure for this message. */
+  showThinking?: boolean
   artifacts?: ChatArtifact[]
   /** Set when this user turn included vision image attachments (for UI hints). */
   image_attachment_ids?: string[]

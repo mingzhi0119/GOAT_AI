@@ -3,6 +3,7 @@ import type { ChatLayoutMode } from '../utils/chatLayout'
 
 interface Props {
   sessionTitle: string | null
+  hasSession: boolean
   modelCapabilities: string[] | null
   appearanceSummary: string
   layoutMode?: ChatLayoutMode
@@ -11,6 +12,7 @@ interface Props {
   systemInstruction: string
   onSystemInstructionChange: (value: string) => void
   onExportMarkdown: () => void
+  onDeleteConversation: () => void
   advancedOpen: boolean
   onAdvancedOpenChange: (open: boolean) => void
   temperature: number
@@ -43,6 +45,7 @@ function formatSkillLabel(capability: string): string | null {
 
 const TopBar: FC<Props> = ({
   sessionTitle,
+  hasSession,
   modelCapabilities,
   appearanceSummary,
   layoutMode = 'wide',
@@ -51,6 +54,7 @@ const TopBar: FC<Props> = ({
   systemInstruction,
   onSystemInstructionChange,
   onExportMarkdown,
+  onDeleteConversation,
   advancedOpen,
   onAdvancedOpenChange,
   temperature,
@@ -61,7 +65,8 @@ const TopBar: FC<Props> = ({
   onTopPChange,
   onResetAdvanced,
 }) => {
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [optionsOpen, setOptionsOpen] = useState(false)
+  const [actionsOpen, setActionsOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const isNarrow = layoutMode === 'narrow'
   const skillLabels = (modelCapabilities ?? []).map(formatSkillLabel).filter(
@@ -70,7 +75,10 @@ const TopBar: FC<Props> = ({
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setMenuOpen(false)
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOptionsOpen(false)
+        setActionsOpen(false)
+      }
     }
     document.addEventListener('click', close)
     return () => document.removeEventListener('click', close)
@@ -78,6 +86,8 @@ const TopBar: FC<Props> = ({
 
   const fieldCls =
     'w-full rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/35 cursor-text select-text'
+  const actionButtonCls =
+    'flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-slate-900/[0.04]'
   return (
     <header
       className={`z-20 flex h-12 flex-shrink-0 items-center ${isNarrow ? 'gap-2 px-2.5' : 'px-3'}`}
@@ -130,27 +140,101 @@ const TopBar: FC<Props> = ({
         )}
       </div>
       <div className="flex min-w-0 flex-shrink-0 justify-end" ref={wrapRef}>
-        <div className="relative">
+        <div className="relative flex items-center gap-2">
           <button
             type="button"
-            className={`inline-flex items-center gap-2 rounded-full font-medium transition-all hover:opacity-90 ${isNarrow ? 'px-2.5 py-1.5 text-[13px]' : 'px-3 py-1.5 text-sm'}`}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full transition-all hover:opacity-90"
             style={{
               color: 'var(--text-main)',
               background: 'var(--composer-muted-surface)',
             }}
-            aria-label="Options"
-            aria-expanded={menuOpen}
-            aria-haspopup="dialog"
+            aria-label="Conversation actions"
+            aria-expanded={actionsOpen}
+            aria-haspopup="menu"
             onClick={e => {
               e.stopPropagation()
-              setMenuOpen(o => !o)
+              setActionsOpen(open => !open)
+              setOptionsOpen(false)
             }}
           >
-            <OptionsIcon />
-            <span>Options</span>
+            <MoreIcon />
           </button>
+          {actionsOpen && (
+            <div
+              className={`absolute right-0 top-full z-50 mt-2 rounded-2xl border p-1.5 shadow-[0_10px_20px_rgba(15,23,42,0.08)] ${isNarrow ? 'w-[min(92vw,20rem)]' : 'w-[332px]'}`}
+              style={{
+                borderColor: 'var(--input-border)',
+                background: 'var(--composer-menu-bg)',
+                backdropFilter: 'blur(14px)',
+                boxShadow: '0 10px 20px rgba(15,23,42,0.08)',
+              }}
+              role="menu"
+              aria-label="Conversation actions"
+              onClick={e => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                className={actionButtonCls}
+                style={{ color: 'var(--text-main)' }}
+                onClick={() => {
+                  onExportMarkdown()
+                  setActionsOpen(false)
+                }}
+              >
+                <span>
+                  <span className="block font-medium leading-none">Export to Markdown</span>
+                  <span className="block pt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    Save the current conversation as a Markdown file
+                  </span>
+                </span>
+                <ChevronRightIcon />
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={!hasSession}
+                className={`${actionButtonCls} mt-0.5 ${hasSession ? '' : 'cursor-not-allowed opacity-50'}`}
+                style={{ color: hasSession ? 'var(--text-main)' : 'var(--text-muted)' }}
+                onClick={() => {
+                  if (!hasSession) return
+                  onDeleteConversation()
+                  setActionsOpen(false)
+                }}
+              >
+                <span>
+                  <span className="block font-medium leading-none">Delete</span>
+                  <span className="block pt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    Remove this saved conversation
+                  </span>
+                </span>
+                <ChevronRightIcon />
+              </button>
+            </div>
+          )}
 
-          {menuOpen && (
+          <div className="relative">
+            <button
+              type="button"
+              className={`inline-flex items-center gap-2 rounded-full font-medium transition-all hover:opacity-90 ${isNarrow ? 'px-2.5 py-1.5 text-[13px]' : 'px-3 py-1.5 text-sm'}`}
+              style={{
+                color: 'var(--text-main)',
+                background: 'var(--composer-muted-surface)',
+              }}
+              aria-label="Options"
+              aria-expanded={optionsOpen}
+              aria-haspopup="dialog"
+              onClick={e => {
+                e.stopPropagation()
+                setOptionsOpen(o => !o)
+                setActionsOpen(false)
+              }}
+            >
+              <OptionsIcon />
+              <span>Options</span>
+            </button>
+
+            {optionsOpen && (
             <div
               className={`absolute right-0 z-50 mt-2 max-h-[min(85vh,38rem)] overflow-y-auto rounded-[24px] border px-4 py-3 shadow-[0_16px_36px_var(--panel-shadow-color)] ${isNarrow ? 'w-[min(96vw,22rem)]' : 'w-[min(92vw,26rem)]'}`}
               style={{
@@ -321,34 +405,6 @@ const TopBar: FC<Props> = ({
                   style={{ borderColor: 'var(--border-color)' }}
                 >
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>
-                    Conversation
-                  </p>
-                  <button
-                    type="button"
-                    className="mt-1.5 flex w-full items-center justify-between rounded-2xl px-2 py-1.5 text-left text-sm transition-colors hover:bg-slate-900/[0.04]"
-                    style={{
-                      color: 'var(--text-main)',
-                    }}
-                    onClick={() => {
-                      onExportMarkdown()
-                      setMenuOpen(false)
-                    }}
-                  >
-                    <span>
-                      <span className="block font-medium">Export Markdown</span>
-                      <span className="mt-0.5 block text-xs" style={{ color: 'var(--text-muted)' }}>
-                        Save the current conversation as a Markdown file.
-                      </span>
-                    </span>
-                    <ChevronRightIcon />
-                  </button>
-                </section>
-
-                <section
-                  className="border-t pt-3"
-                  style={{ borderColor: 'var(--border-color)' }}
-                >
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>
                     Appearance
                   </p>
                   <button
@@ -359,7 +415,7 @@ const TopBar: FC<Props> = ({
                     }}
                     onClick={() => {
                       onOpenAppearance()
-                      setMenuOpen(false)
+                      setOptionsOpen(false)
                     }}
                   >
                     <span className="inline-flex items-center gap-2">
@@ -374,6 +430,7 @@ const TopBar: FC<Props> = ({
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
     </header>
@@ -399,6 +456,14 @@ const OptionsIcon = () => (
       strokeWidth="1.4"
       strokeLinecap="round"
     />
+  </svg>
+)
+
+const MoreIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <circle cx="3.25" cy="8" r="1.1" fill="currentColor" />
+    <circle cx="8" cy="8" r="1.1" fill="currentColor" />
+    <circle cx="12.75" cy="8" r="1.1" fill="currentColor" />
   </svg>
 )
 

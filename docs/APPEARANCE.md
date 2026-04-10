@@ -1,6 +1,6 @@
 # GOAT AI Appearance System
 
-Last updated: 2026-04-09
+Last updated: 2026-04-10
 
 This document is the durable hand-off for the frontend appearance system added in Phase 16 planning follow-up work. It is written for both human contributors and coding agents so they can change the UI without reverse-engineering theme behavior from scattered components.
 
@@ -29,6 +29,14 @@ The current frontend supports these appearance controls:
 - `contrast`: integer slider used to strengthen borders, muted text separation, and selected surfaces
 - `translucentSidebar`: glass treatment for sidebar/menu surfaces
 
+Current shipped theme behavior also includes:
+
+- `Classic` defaults to a blue accent, pure-white chat surface, and a slightly gray-white sidebar
+- all three styles (`classic`, `urochester`, `thu`) apply the active accent color to the user bubble / send-action family
+- the sidebar footer logo is style-specific: no school logo for `classic`, Rochester logo for `urochester`, and Tsinghua logo for `thu`
+- dark mode inverts the school-mark treatment for readability; Tsinghua uses a white-reversed rendering in dark mode
+- history rows use a denser list layout and only the active conversation receives the filled container treatment
+
 The settings entry point is:
 
 - top bar `Options` -> `Appearance` -> dedicated modal panel
@@ -55,6 +63,7 @@ Supporting integration points:
 
 - `frontend/src/App.tsx`
 - `frontend/src/components/Sidebar.tsx`
+- `frontend/src/components/MessageBubble.tsx`
 - `frontend/src/__tests__/appearance.test.ts`
 - `frontend/src/__tests__/AppearancePanel.test.tsx`
 - `frontend/src/__tests__/TopBar.test.tsx`
@@ -90,6 +99,10 @@ Important rule:
 
 - component code should consume semantic CSS vars such as `--bg-chat` or `--text-muted`
 - component code should not branch on `classic` vs `thu` directly unless the UI behavior itself differs
+
+Current exception:
+
+- `Sidebar` legitimately branches on `themeStyle` for footer logo selection because the rendered asset itself differs by style
 
 ### 3. Root application of tokens
 
@@ -141,6 +154,12 @@ When updating frontend visuals, prefer these rules:
 - add preview-only structure inside `AppearancePanel`, not in unrelated app components
 - if a new appearance control changes persisted state, model it in `AppearanceConfig` first
 
+Additional UI behavior rules:
+
+- `Thinking` traces may still arrive over SSE even when the user has thinking disabled; the UI must hide the disclosure unless the message was created with thinking enabled
+- do not emit sidebar delete affordances on keyboard focus alone; hover-only reveal avoids accidental white overlay artifacts in the history list
+- keep theme cards top-aligned in `AppearancePanel`; shorter descriptions such as `Classic` should not vertically center while longer descriptions wrap
+
 ## Max tokens UX rule
 
 Generation settings intentionally do not warn when the user enters a `max_tokens` value above the API ceiling.
@@ -167,6 +186,8 @@ Current automated coverage includes:
 - `appearance.test.ts`
 - `AppearancePanel.test.tsx`
 - updated `TopBar.test.tsx`
+- `Sidebar.test.tsx`
+- `MessageBubble.test.tsx`
 
 For layout-affecting changes, still follow the manual verification loop from `docs/ENGINEERING_STANDARDS.md`.
 

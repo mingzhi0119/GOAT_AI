@@ -37,6 +37,7 @@ class CredentialRegistryTests(unittest.TestCase):
         self.assertEqual("principal:read-default", credentials[0].principal_id.value)
         self.assertIn("history:read", credentials[0].scopes)
         self.assertIn("history:write", credentials[1].scopes)
+        self.assertIn("sandbox:execute", credentials[1].scopes)
 
     def test_json_credentials_parse(self) -> None:
         settings = _settings(

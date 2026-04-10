@@ -55,13 +55,12 @@ class RuntimeTargetResponse(BaseModel):
 class CodeSandboxFeaturePayload(BaseModel):
     """Runtime / dependency readiness for the code sandbox (§15).
 
-    **Policy / AuthZ** (per-user, per-role) is separate: use ``policy_allowed`` when implemented;
-    until then it stays ``null``. Do not confuse with Docker/runtime probes below.
+    ``policy_allowed`` is evaluated from the current request's authorization context.
+    Runtime availability remains separate and must not be conflated with policy denial.
     """
 
-    policy_allowed: bool | None = Field(
-        default=None,
-        description="Reserved for authorization; null until AuthZ lands.",
+    policy_allowed: bool = Field(
+        description="Caller-scoped policy gate derived from credential scopes."
     )
     allowed_by_config: bool = Field(
         description="Operator enabled the feature in deployment config."

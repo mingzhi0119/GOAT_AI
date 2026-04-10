@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from backend.config import BACKEND_HOST, BACKEND_PORT
+from backend.domain.authz_types import AuthorizationContext
 from backend.models.system import (
     CodeSandboxFeaturePayload,
     InferenceLatencyResponse,
@@ -10,6 +11,7 @@ from backend.models.system import (
     RuntimeTargetResponse,
     SystemFeaturesResponse,
 )
+from backend.services.feature_gate_service import code_sandbox_policy_allowed
 from backend.types import Settings
 from goat_ai.feature_gates import compute_code_sandbox_snapshot
 from goat_ai.latency_metrics import get_inference_snapshot
@@ -32,12 +34,15 @@ def build_inference_latency_response() -> InferenceLatencyResponse:
     )
 
 
-def build_system_features_response(settings: Settings) -> SystemFeaturesResponse:
+def build_system_features_response(
+    settings: Settings,
+    auth_context: AuthorizationContext,
+) -> SystemFeaturesResponse:
     """Expose machine-readable capability flags for optional / high-risk features."""
     snap = compute_code_sandbox_snapshot(settings)
     return SystemFeaturesResponse(
         code_sandbox=CodeSandboxFeaturePayload(
-            policy_allowed=None,
+            policy_allowed=code_sandbox_policy_allowed(auth_context),
             allowed_by_config=snap.allowed_by_config,
             available_on_host=snap.available_on_host,
             effective_enabled=snap.effective_enabled,

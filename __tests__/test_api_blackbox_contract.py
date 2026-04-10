@@ -957,7 +957,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(200, features.status_code)
         feat_body = features.json()
         self.assertIn("code_sandbox", feat_body)
-        self.assertIsNone(feat_body["code_sandbox"]["policy_allowed"])
+        self.assertTrue(feat_body["code_sandbox"]["policy_allowed"])
         self.assertFalse(feat_body["code_sandbox"]["effective_enabled"])
 
         exec_stub = self.client.post("/api/code-sandbox/exec")

@@ -13,8 +13,10 @@ from backend.application.system import (
     get_system_features,
     get_system_metrics,
 )
+from backend.domain.authz_types import AuthorizationContext
 from backend.application.ports import Settings
 from backend.config import get_settings
+from backend.dependencies import get_authorization_context
 from backend.models.common import ErrorResponse
 from backend.models.system import (
     GPUStatusResponse,
@@ -56,9 +58,10 @@ def get_inference_latency_route() -> InferenceLatencyResponse:
 )
 def get_system_features_route(
     settings: Settings = Depends(get_settings),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
 ) -> SystemFeaturesResponse:
     """Return config + host probes for optional high-risk features (see docs/ENGINEERING_STANDARDS.md §15)."""
-    return get_system_features(settings)
+    return get_system_features(settings, auth_context)
 
 
 @router.get(

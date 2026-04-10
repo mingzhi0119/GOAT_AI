@@ -172,6 +172,16 @@ html[data-theme-resolved="dark"] .simon-footer-logo {
   filter: brightness(0) invert(1);
 }
 
+.sidebar-footer-logo {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+html[data-theme-resolved="dark"] .thu-footer-logo {
+  filter: brightness(0) invert(1);
+}
+
 .app-sidebar-glass {
   backdrop-filter: blur(18px);
 }

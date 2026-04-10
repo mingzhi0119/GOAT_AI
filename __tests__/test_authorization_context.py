@@ -49,6 +49,7 @@ class AuthorizationContextTests(unittest.TestCase):
         assert ctx is not None
         self.assertIn("history:write", ctx.scopes)
         self.assertIn("artifact:write", ctx.scopes)
+        self.assertIn("sandbox:execute", ctx.scopes)
 
     def test_invalid_key_returns_none(self) -> None:
         settings = _settings(api_key="read-key")

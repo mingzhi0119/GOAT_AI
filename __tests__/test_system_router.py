@@ -73,7 +73,7 @@ class SystemRouterIntegrationTests(unittest.TestCase):
         self.assertIn("effective_enabled", cs)
         self.assertIn("deny_reason", cs)
         self.assertIn("policy_allowed", cs)
-        self.assertIsNone(cs["policy_allowed"])
+        self.assertTrue(cs["policy_allowed"])
         self.assertFalse(cs["allowed_by_config"])
 
     def test_code_sandbox_exec_forbidden_when_feature_off(self) -> None:

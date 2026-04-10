@@ -52,7 +52,7 @@ This document names **user-visible and persistence concepts** shared across chat
 |------|---------|
 | **Credential principal** | Minimal trusted caller identity derived from an API credential. It is not end-user identity. |
 | **Tenant** | Explicit resource boundary carried in authz context and persisted metadata; v1 defaults to `tenant:default`. |
-| **Scope** | Stable authorization capability string such as `history:read` or `artifact:write`. |
+| **Scope** | Stable authorization capability string such as `history:read`, `artifact:write`, or `sandbox:execute`. |
 | **AuthorizationContext** | Request-scoped authz state: `principal_id`, `tenant_id`, `scopes`, `credential_id`, legacy owner header, and auth mode. |
 | **AuthorizationDecision** | Pure allow/deny result with a stable `reason_code` plus optional concealment semantics for `404`-style denials. |
 

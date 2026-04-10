@@ -151,11 +151,19 @@ export function useChat(): UseChatReturn {
       gen: AsyncGenerator<ChatStreamEvent>,
       prependMessages?: Message[],
       onChartSpec?: (spec: ChartSpec) => void,
+      showThinking?: boolean,
     ) => {
       const asstId = crypto.randomUUID()
       setMessages(prev => [
         ...(prependMessages ?? prev),
-        { id: asstId, role: 'assistant', content: '', isStreaming: true, artifacts: [] },
+        {
+          id: asstId,
+          role: 'assistant',
+          content: '',
+          isStreaming: true,
+          artifacts: [],
+          showThinking,
+        },
       ])
       setIsStreaming(true)
       await _runStream(gen, asstId, setMessages, setIsStreaming, onChartSpec)
@@ -237,6 +245,7 @@ export function useChat(): UseChatReturn {
           ),
           [...messagesRef.current, userMsg],
           onChartSpec,
+          ollamaOptions?.think === true,
         )
       } finally {
         abortControllerRef.current = null
@@ -249,7 +258,7 @@ export function useChat(): UseChatReturn {
   const streamToChat = useCallback(
     async (gen: AsyncGenerator<ChatStreamEvent>) => {
       if (isStreaming) return
-      await _startStream(gen)
+      await _startStream(gen, undefined, undefined, false)
     },
     [isStreaming, _startStream],
   )

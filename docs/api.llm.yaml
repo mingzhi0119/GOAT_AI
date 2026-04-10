@@ -73,11 +73,12 @@ schemas:
   CodeSandboxFeaturePayload:
     type: object
     required:
+      - policy_allowed
       - allowed_by_config
       - available_on_host
       - effective_enabled
     properties:
-      policy_allowed: boolean|null
+      policy_allowed: boolean
       allowed_by_config: boolean
       available_on_host: boolean
       effective_enabled: boolean

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi.responses import JSONResponse, PlainTextResponse
 
+from backend.domain.authz_types import AuthorizationContext
 from backend.application.ports import Settings
 from backend.models.system import (
     GPUStatusResponse,
@@ -29,8 +30,11 @@ def get_inference_latency() -> InferenceLatencyResponse:
     return build_inference_latency_response()
 
 
-def get_system_features(settings: Settings) -> SystemFeaturesResponse:
-    return build_system_features_response(settings)
+def get_system_features(
+    settings: Settings,
+    auth_context: AuthorizationContext,
+) -> SystemFeaturesResponse:
+    return build_system_features_response(settings, auth_context)
 
 
 def get_runtime_target(settings: Settings) -> RuntimeTargetResponse:

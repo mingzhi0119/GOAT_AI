@@ -1,6 +1,6 @@
 # GOAT AI Project Status
 
-Last updated: 2026-04-09
+Last updated: 2026-04-10
 
 ## Release
 
@@ -18,8 +18,8 @@ Last updated: 2026-04-09
 - **Phase 15.11 status:** complete. `RateLimitSubject`, `RateLimitDecision`, and `RateLimitPolicy` now live in `backend.domain.rate_limit_policy`, `backend.http_security` delegates rate limiting through a policy/store pair, [DOMAIN.md](DOMAIN.md) documents the terms, and `decode_session_payload` now raises `SessionSchemaError` for unsupported future payload versions while preserving older payload compatibility.
 - **Phase 15 overall:** complete on main. Remaining roadmap work is now Phase 16 planning and decision-log sequencing.
 - **Frontend shell status:** composer control-surface polish, responsive `wide/narrow` chat-shell baseline, and the integrated manual UI verification workflow are landed on `main`.
-- **Frontend appearance status:** a Codex-like appearance system is landed on `main`: dedicated Appearance panel, `light/dark/system` mode, `classic/urochester/thu` styles, accent color, UI/code font selection, contrast tuning, translucent sidebar control, root-token theming, and local preference persistence. Architecture hand-off: [APPEARANCE.md](APPEARANCE.md).
-- **Feature gates (Section 15):** `GET /api/system/features` exposes a stable `code_sandbox` snapshot (config + Docker probe; `policy_allowed` reserved for future AuthZ). `POST /api/code-sandbox/exec` is a scaffold: **503** + `FEATURE_UNAVAILABLE` when the **runtime** gate is closed; **403** + `FEATURE_DISABLED` reserved for **policy** denial; **501** when the gate passes but execution is not implemented.
+- **Frontend appearance status:** a Codex-like appearance system is landed on `main`: dedicated Appearance panel, `light/dark/system` mode, `classic/urochester/thu` styles, accent color, UI/code font selection, contrast tuning, translucent sidebar control, root-token theming, local preference persistence, style-specific footer logos, denser sidebar history layout, and theme-card alignment polish. Architecture hand-off: [APPEARANCE.md](APPEARANCE.md).
+- **Phase 16A status:** complete. `code_sandbox` now enforces separate policy and runtime gates on top of request-scoped `AuthorizationContext`: `GET /api/system/features` returns caller-specific `policy_allowed`, `POST /api/code-sandbox/exec` returns **503** + `FEATURE_UNAVAILABLE` for runtime denial and **403** + `FEATURE_DISABLED` for policy denial (`sandbox:execute`), and Prometheus exposes `feature_gate_denials_total{feature,gate_kind,reason}`.
 - **RAG-ready wording:** use the term **RAG-ready** in release notes or marketing only after `python -m tools.run_rag_eval` passes in CI or pre-release checks and this file still documents the same threshold.
 
 ## What is shipped
@@ -64,6 +64,8 @@ Last updated: 2026-04-09
 - Security/tooling baseline includes [SECURITY.md](SECURITY.md), `ruff check` in CI, `pip-audit` in CI, and changed-file `ruff format` gating for Python edits
 - Operations baseline includes graceful shutdown, ref-aware rollback via `deploy.sh` / `deploy.ps1`, and documented Phase 13 risk triggers in OPERATIONS
 - Codex-like frontend appearance system with a dedicated settings panel, named styles, root-applied theme tokens, startup anti-flicker hydration, and local appearance persistence
+- Sidebar history optimistic insertion now makes the active conversation appear immediately before the post-stream refresh lands
+- UI hides Thinking disclosures unless the message was sent with thinking enabled, even if the backend stream still includes reasoning events
 
 ## Current API surface
 

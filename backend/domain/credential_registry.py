@@ -29,6 +29,7 @@ _WRITE_SCOPES: frozenset[Scope] = frozenset(
         "knowledge:write",
         "media:write",
         "artifact:write",
+        "sandbox:execute",
     }
 )
 _FULL_SCOPES: frozenset[Scope] = frozenset({*_READ_SCOPES, *_WRITE_SCOPES})

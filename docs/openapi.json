@@ -1802,16 +1802,9 @@
       "CodeSandboxFeaturePayload": {
         "properties": {
           "policy_allowed": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "boolean",
             "title": "Policy Allowed",
-            "description": "Reserved for authorization; null until AuthZ lands."
+            "description": "Caller-scoped policy gate derived from credential scopes."
           },
           "allowed_by_config": {
             "type": "boolean",
@@ -1843,12 +1836,13 @@
         },
         "type": "object",
         "required": [
+          "policy_allowed",
           "allowed_by_config",
           "available_on_host",
           "effective_enabled"
         ],
         "title": "CodeSandboxFeaturePayload",
-        "description": "Runtime / dependency readiness for the code sandbox (§15).\n\n**Policy / AuthZ** (per-user, per-role) is separate: use ``policy_allowed`` when implemented;\nuntil then it stays ``null``. Do not confuse with Docker/runtime probes below."
+        "description": "Runtime / dependency readiness for the code sandbox (§15).\n\n``policy_allowed`` is evaluated from the current request's authorization context.\nRuntime availability remains separate and must not be conflated with policy denial."
       },
       "ErrorResponse": {
         "properties": {

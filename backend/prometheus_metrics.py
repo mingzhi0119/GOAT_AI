@@ -142,14 +142,15 @@ def render_prometheus_text() -> str:
         )
 
     lines.append(
-        "# HELP feature_gate_denials_total Feature gate denials by feature and reason (§15)."
+        "# HELP feature_gate_denials_total Feature gate denials by feature, gate kind, and reason (§15)."
     )
     lines.append("# TYPE feature_gate_denials_total counter")
-    for (feature, reason), count in sorted(fg_copy.items()):
+    for (feature, gate_kind, reason), count in sorted(fg_copy.items()):
         ff = _escape_label_value(feature)
+        gg = _escape_label_value(gate_kind)
         rr = _escape_label_value(reason)
         lines.append(
-            f'feature_gate_denials_total{{feature="{ff}",reason="{rr}"}} {count}'
+            f'feature_gate_denials_total{{feature="{ff}",gate_kind="{gg}",reason="{rr}"}} {count}'
         )
 
     lines.append(

@@ -173,7 +173,9 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode 
               )}
             </div>
 
-            {message.thinkingContent && message.thinkingContent.trim().length > 0 && (
+            {message.showThinking &&
+              message.thinkingContent &&
+              message.thinkingContent.trim().length > 0 && (
               <details
                 className="thinking-disclosure mb-3 w-full min-w-0 rounded-lg border px-3 py-2 text-left text-xs"
                 aria-label="Thinking"

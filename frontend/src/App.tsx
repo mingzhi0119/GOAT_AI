@@ -71,6 +71,16 @@ export default function App() {
     })
   }
 
+  const handleDeleteConversation = () => {
+    if (!session.sessionId) return
+    if (!window.confirm('Delete this saved conversation? This cannot be undone.')) {
+      return
+    }
+    void session.deleteHistorySession(session.sessionId).then(() => {
+      session.clearChatSession()
+    })
+  }
+
   const handleUploadEvent = (event: UploadStreamEvent) => {
     if (event.type === 'file_prompt') {
       session.upsertFileContext({
@@ -127,6 +137,7 @@ export default function App() {
       <div className="flex flex-col flex-1 min-w-0 min-h-0">
         <TopBar
           sessionTitle={session.sessionTitle}
+          hasSession={Boolean(session.sessionId)}
           modelCapabilities={models.capabilities?.capabilities ?? null}
           appearanceSummary={appearanceSummary}
           layoutMode={layoutMode}
@@ -140,6 +151,7 @@ export default function App() {
               session.sessionTitle,
             )
           }
+          onDeleteConversation={handleDeleteConversation}
           advancedOpen={advanced.advancedOpen}
           onAdvancedOpenChange={advanced.setAdvancedOpen}
           temperature={advanced.temperature}

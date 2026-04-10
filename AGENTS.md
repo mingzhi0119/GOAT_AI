@@ -53,6 +53,11 @@ cd frontend && npm ci && npm test -- --run && npm run build
 
 The `secrets-scan` job (Gitleaks) is informational in CI; no local equivalent required for routine delivery.
 
+## Local collaboration defaults
+
+- Do not automatically run `npm run build` for frontend work unless the user explicitly asks for it.
+- Do not automatically run manual frontend visual verification; only do frontend visual testing when the user explicitly requests it.
+
 ## Where to look first (API work)
 
 - Black-box: `__tests__/test_api_blackbox_contract.py` (plus auth/security suites when relevant).

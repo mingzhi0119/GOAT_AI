@@ -5,8 +5,14 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from backend.domain.credential_registry import build_local_authorization_context
 from goat_ai.config import Settings
 from goat_ai.feature_gates import compute_code_sandbox_snapshot, probe_docker_available
+from backend.services.feature_gate_service import (
+    code_sandbox_policy_allowed,
+    require_code_sandbox_enabled,
+)
+from backend.services.exceptions import FeatureNotAvailable
 
 
 def _settings(root: Path, **kwargs: object) -> Settings:
@@ -58,6 +64,53 @@ class TestFeatureGates(unittest.TestCase):
                 root, feature_code_sandbox_enabled=True, docker_socket_path=str(bogus)
             )
             self.assertFalse(probe_docker_available(s))
+
+    def test_policy_gate_allows_local_context_with_sandbox_scope(self) -> None:
+        self.assertTrue(code_sandbox_policy_allowed(build_local_authorization_context()))
+
+    @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=True)
+    def test_require_code_sandbox_enabled_allows_when_policy_and_runtime_allow(
+        self, _mock: object
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = _settings(Path(tmp), feature_code_sandbox_enabled=True)
+            require_code_sandbox_enabled(settings, build_local_authorization_context())
+
+    @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=False)
+    def test_require_code_sandbox_enabled_raises_runtime_denial_first(
+        self, _mock: object
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = _settings(Path(tmp), feature_code_sandbox_enabled=True)
+            with self.assertRaises(FeatureNotAvailable) as exc_info:
+                require_code_sandbox_enabled(
+                    settings, build_local_authorization_context()
+                )
+        self.assertEqual("runtime", exc_info.exception.gate_kind)
+        self.assertEqual("docker_unavailable", exc_info.exception.deny_reason)
+
+    @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=True)
+    def test_require_code_sandbox_enabled_raises_policy_denial(
+        self, _mock: object
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = _settings(
+                Path(tmp),
+                feature_code_sandbox_enabled=True,
+                api_key="read-key",
+            )
+            from backend.domain.credential_registry import resolve_authorization_context
+
+            ctx = resolve_authorization_context(
+                provided_api_key="read-key",
+                settings=settings,
+                legacy_owner_id="",
+            )
+            assert ctx is not None
+            with self.assertRaises(FeatureNotAvailable) as exc_info:
+                require_code_sandbox_enabled(settings, ctx)
+        self.assertEqual("policy", exc_info.exception.gate_kind)
+        self.assertEqual("permission_denied", exc_info.exception.deny_reason)
 
 
 if __name__ == "__main__":

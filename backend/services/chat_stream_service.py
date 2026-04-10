@@ -478,8 +478,6 @@ class ChatStreamService:
                 )
             if chart_spec is not None:
                 yield sse_event({"type": "chart_spec", "chart": chart_spec})
-            yield sse_done_event()
-            inc_chat_stream_completed()
             first_token_ms = (
                 round((run.first_token_emitted_at - run.started_at) * 1000, 1)
                 if run.first_token_emitted_at is not None
@@ -512,6 +510,8 @@ class ChatStreamService:
                 tenant_id=run.tenant_id,
                 principal_id=run.principal_id,
             )
+            yield sse_done_event()
+            inc_chat_stream_completed()
         else:
             yield from run.persistence.yield_blocked_response(
                 assessment=output_assessment,

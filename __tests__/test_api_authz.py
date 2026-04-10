@@ -8,13 +8,19 @@ from dataclasses import replace
 from datetime import datetime, timezone
 import io
 from pathlib import Path
+from unittest.mock import patch
 
 try:
     from fastapi.testclient import TestClient
 except ImportError:  # pragma: no cover
     TestClient = None  # type: ignore[assignment]
 
-from backend.api_errors import AUTH_SESSION_OWNER_REQUIRED, AUTH_WRITE_KEY_REQUIRED
+from backend.api_errors import (
+    AUTH_SESSION_OWNER_REQUIRED,
+    AUTH_WRITE_KEY_REQUIRED,
+    FEATURE_DISABLED,
+    FEATURE_UNAVAILABLE,
+)
 from goat_ai.config import Settings
 
 if TestClient is not None:
@@ -175,6 +181,74 @@ class ApiAuthzTests(unittest.TestCase):
             },
         )
         self.assertEqual(404, response.status_code)
+
+    @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=True)
+    def test_system_features_resolve_policy_gate_per_credential(
+        self, _mock: object
+    ) -> None:
+        self.settings = replace(self.settings, feature_code_sandbox_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        read_features = self.client.get(
+            "/api/system/features", headers={"X-GOAT-API-Key": "read-key"}
+        )
+        self.assertEqual(200, read_features.status_code)
+        self.assertFalse(read_features.json()["code_sandbox"]["policy_allowed"])
+        self.assertTrue(read_features.json()["code_sandbox"]["effective_enabled"])
+
+        write_features = self.client.get(
+            "/api/system/features", headers={"X-GOAT-API-Key": "write-key"}
+        )
+        self.assertEqual(200, write_features.status_code)
+        self.assertTrue(write_features.json()["code_sandbox"]["policy_allowed"])
+        self.assertTrue(write_features.json()["code_sandbox"]["effective_enabled"])
+
+    @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=True)
+    def test_code_sandbox_exec_policy_denial_returns_403(
+        self, _mock: object
+    ) -> None:
+        self.settings = replace(
+            self.settings,
+            feature_code_sandbox_enabled=True,
+            api_key="bootstrap-auth-enabled",
+            api_key_write="",
+            api_credentials_json="""
+            [
+              {
+                "credential_id": "cred-limited-write",
+                "secret": "limited-write",
+                "principal_id": "principal:limited-write",
+                "tenant_id": "tenant:default",
+                "status": "active",
+                "scopes": ["history:write", "history:read"]
+              }
+            ]
+            """,
+        )
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        response = self.client.post(
+            "/api/code-sandbox/exec",
+            headers={"X-GOAT-API-Key": "limited-write"},
+        )
+        self.assertEqual(403, response.status_code)
+        body = response.json()
+        self.assertEqual(FEATURE_DISABLED, body["code"])
+
+    @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=False)
+    def test_code_sandbox_exec_runtime_denial_returns_503_even_for_write_key(
+        self, _mock: object
+    ) -> None:
+        self.settings = replace(self.settings, feature_code_sandbox_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        response = self.client.post(
+            "/api/code-sandbox/exec",
+            headers={"X-GOAT-API-Key": "write-key"},
+        )
+        self.assertEqual(503, response.status_code)
+        body = response.json()
+        self.assertEqual(FEATURE_UNAVAILABLE, body["code"])
 
 
 if __name__ == "__main__":

@@ -10,14 +10,6 @@ This roadmap only tracks **unfinished work**. Completed phases and archived clos
 
 ## Open Work
 
-### Phase 16A: production-safe capability gates
-
-Build capability gates on top of the credential-backed authorization context introduced by Phase 16C, not on raw shared-key checks.
-
-- Goal: distinguish runtime availability from policy denial with stable behavior.
-- Exit criteria: `runtime gate` and `policy gate` are separately enforced and documented.
-- Dependencies: requires the Phase 16C authz context, tenant boundary, and resource-level decision flow to remain the source of truth.
-
 ### Phase 16B: storage evolution
 
 Revisit datastore changes only after authorization and resource boundaries are explicit.
@@ -25,6 +17,7 @@ Revisit datastore changes only after authorization and resource boundaries are e
 - Goal: define the next storage shape without weakening current single-instance guarantees.
 - Exit criteria: migration strategy, compatibility strategy, and rollback strategy are all defined before implementation.
 - Dependencies: must wait on the Phase 16 authz envelope and any resulting resource scoping rules.
+- Planning artifact: [`STORAGE_EVOLUTION_DECISION_PACKAGE.md`](STORAGE_EVOLUTION_DECISION_PACKAGE.md)
 
 ### Frontend backlog
 
@@ -42,7 +35,7 @@ These items remain roadmap-only until the supporting runtime exists.
 
 ## Dependencies / Constraints
 
-- Phase 16 work builds on the completed credential-backed authorization context and tenancy envelope from Phase 16C.
+- Phase 16A capability gates now build on the completed credential-backed authorization context and tenancy envelope from Phase 16C.
 - Capability gates should continue to separate runtime unavailability from policy denial.
 - Storage evolution must preserve the current single-writer / SQLite-first operational contract unless a separate decision log changes that assumption.
 - Search, research, canvas, connector UI, and future cloud model selection should not expose fake capabilities before the backend/runtime can actually support them.

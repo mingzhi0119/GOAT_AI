@@ -50,4 +50,22 @@ describe('MessageBubble', () => {
     expect(screen.queryByText('Markdown')).not.toBeInTheDocument()
     expect(screen.getByText('Revenue mix looks stable.')).toBeInTheDocument()
   })
+
+  it('hides the thinking disclosure when the message is not marked to show thinking', () => {
+    render(
+      <MessageBubble
+        message={{
+          id: 'm4',
+          role: 'assistant',
+          content: 'Final answer.',
+          thinkingContent: 'Hidden reasoning trace',
+          showThinking: false,
+        }}
+      />,
+    )
+
+    expect(screen.getByText('Final answer.')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Thinking')).not.toBeInTheDocument()
+    expect(screen.queryByText('Hidden reasoning trace')).not.toBeInTheDocument()
+  })
 })

@@ -32,7 +32,7 @@ JSON error responses use a **stable envelope** so logs, metrics, and clients sha
 | `NOT_IMPLEMENTED` | 501 | no | Contract exists but the feature has not landed yet |
 | `INFERENCE_BACKEND_UNAVAILABLE` | 503 | yes | Ollama (or equivalent) unreachable |
 | `INTERNAL_ERROR` | 500 | no | Unhandled server error (detail sanitized) |
-| `FEATURE_DISABLED` | 403 | no | Policy / AuthZ: caller is not allowed to use this capability (see Section 15 in `docs/ENGINEERING_STANDARDS.md`) |
+| `FEATURE_DISABLED` | 403 | no | Policy / AuthZ: caller is not allowed to use this capability (for `code_sandbox`, this is currently `sandbox:execute`) |
 | `FEATURE_UNAVAILABLE` | 503 | yes | Runtime / deployment: feature is off or a dependency (e.g. Docker) is not ready on this host-not an authorization decision |
 
 \*Retry hint is **documentary** for Wave B client policy; server behavior is defined per endpoint.

@@ -158,7 +158,7 @@ Example line:
 - This is credential-backed authorization, not end-user identity.
 - When `GOAT_API_CREDENTIALS_JSON` is empty:
   - `GOAT_API_KEY` becomes `principal:read-default` with read scopes
-  - `GOAT_API_KEY_WRITE` becomes `principal:write-default` with read+write scopes
+  - `GOAT_API_KEY_WRITE` becomes `principal:write-default` with read+write scopes plus `sandbox:execute`
   - default tenant is `tenant:default`
 - Cross-owner or cross-tenant reads are concealed as `404` where possible.
 - Missing API key remains `401`; insufficient scope remains `403`.

@@ -76,13 +76,13 @@ const Sidebar: FC<Props> = ({
       ? {
           src: '/simon_logo.svg',
           alt: 'Simon Business School - University of Rochester',
-          className: 'simon-footer-logo w-full max-w-[148px]',
+          className: 'sidebar-footer-logo simon-footer-logo w-full max-w-none',
         }
       : themeStyle === 'thu'
         ? {
             src: '/Tsinghua_University_Logo.svg',
             alt: 'Tsinghua University',
-            className: 'w-full max-w-[148px]',
+            className: 'sidebar-footer-logo thu-footer-logo w-full max-w-none',
           }
         : null
 
@@ -128,7 +128,7 @@ const Sidebar: FC<Props> = ({
         )}
       </div>
 
-      <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4">
+      <div className="flex-1 space-y-3.5 overflow-y-auto px-4 py-4">
         <section className="space-y-1">
           <p className={sidebarSectionLabelClass} style={{ color: 'var(--sidebar-muted)' }}>
             Actions
@@ -152,7 +152,7 @@ const Sidebar: FC<Props> = ({
         </section>
 
         <section className="space-y-1">
-          <div className="mb-2 flex min-w-0 items-center gap-1.5">
+          <div className="mb-1.5 flex min-w-0 items-center gap-1.5">
             <p
               className={`${sidebarSectionLabelRowClass} min-w-0 flex-1 truncate`}
               style={{ color: 'var(--sidebar-muted)' }}
@@ -195,13 +195,22 @@ const Sidebar: FC<Props> = ({
           )}
           {historySessions.slice(0, 20).map(item => {
             const isCurrent = item.id === currentSessionId
-            const rowBg = isCurrent ? 'var(--sidebar-surface)' : 'transparent'
-            const fadeBg = isCurrent ? 'var(--sidebar-surface)' : 'var(--bg-sidebar)'
+            const rowBg = isCurrent
+              ? 'color-mix(in srgb, var(--theme-accent) 18%, var(--bg-sidebar))'
+              : 'transparent'
+            const fadeBg = isCurrent ? rowBg : 'var(--bg-sidebar)'
+            const rowBorder = isCurrent
+              ? 'color-mix(in srgb, var(--theme-accent) 30%, var(--sidebar-border))'
+              : 'transparent'
             return (
               <div
                 key={item.id}
                 className="group/history relative"
-                style={{ borderRadius: '0.9rem', background: rowBg }}
+                style={{
+                  borderRadius: '0.9rem',
+                  background: rowBg,
+                  border: `1px solid ${rowBorder}`,
+                }}
               >
                 <button
                   type="button"
@@ -210,7 +219,7 @@ const Sidebar: FC<Props> = ({
                     closeOverlay()
                   }}
                   title={item.title || 'New Chat'}
-                  className="block w-full min-w-0 rounded-[inherit] px-4 py-3 pr-12 text-left text-[15px] leading-6 transition-all"
+                  className="block w-full min-w-0 rounded-[inherit] px-4 py-2.5 pr-12 text-left text-[15px] leading-5 transition-all"
                   style={{ color: 'var(--text-sidebar)', background: rowBg }}
                   {...hoverHandlers(isCurrent ? rowBg : 'transparent', rowBg)}
                 >
@@ -218,15 +227,15 @@ const Sidebar: FC<Props> = ({
                 </button>
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-y-1 right-8 w-12 opacity-0 transition-opacity group-hover/history:opacity-100 group-focus-within/history:opacity-100"
+                  className="pointer-events-none absolute inset-y-1 right-8 w-12 rounded-r-[inherit] opacity-0 transition-opacity group-hover/history:opacity-100"
                   style={{
-                    background: `linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, ${fadeBg} 55%, ${fadeBg} 100%)`,
+                    background: `linear-gradient(90deg, color-mix(in srgb, ${fadeBg} 0%, transparent) 0%, ${fadeBg} 55%, ${fadeBg} 100%)`,
                   }}
                 />
                 <button
                   type="button"
                   onClick={() => onDeleteHistorySession(item.id)}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-xs opacity-0 transition-opacity group-hover/history:opacity-100 focus-visible:opacity-100 group-focus-within/history:opacity-100"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-xs opacity-0 transition-opacity group-hover/history:opacity-100 focus-visible:opacity-100"
                   style={{ color: 'var(--sidebar-danger)', background: fadeBg }}
                   title="Delete conversation"
                 >
@@ -238,7 +247,7 @@ const Sidebar: FC<Props> = ({
         </section>
       </div>
 
-      <div className="flex-shrink-0 space-y-3 px-5 py-4">
+      <div className="flex flex-shrink-0 flex-col items-center space-y-3 px-5 py-4 text-center">
         {schoolLogo && (
           <img
             src={schoolLogo.src}
@@ -250,7 +259,10 @@ const Sidebar: FC<Props> = ({
           />
         )}
 
-        <p className={sidebarFooterAttributionClass} style={{ color: 'var(--sidebar-muted)' }}>
+        <p
+          className={`${sidebarFooterAttributionClass} w-full text-[15px] font-medium leading-6 tracking-[0.01em]`}
+          style={{ color: 'var(--sidebar-muted)', textAlign: 'center' }}
+        >
           Powered by{' '}
           <a
             href="https://mingzhi0119.github.io/"
