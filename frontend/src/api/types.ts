@@ -127,8 +127,26 @@ export interface CodeSandboxFeature {
   deny_reason: string | null
 }
 
+export interface RuntimeFeature {
+  allowed_by_config: boolean
+  available_on_host: boolean
+  effective_enabled: boolean
+  deny_reason: string | null
+}
+
+export interface WorkbenchFeatures {
+  agent_tasks: RuntimeFeature
+  plan_mode: RuntimeFeature
+  browse: RuntimeFeature
+  deep_research: RuntimeFeature
+  artifact_workspace: RuntimeFeature
+  project_memory: RuntimeFeature
+  connectors: RuntimeFeature
+}
+
 export interface SystemFeatures {
   code_sandbox: CodeSandboxFeature
+  workbench: WorkbenchFeatures
 }
 
 /** Ollama sampling options (Advanced settings); maps to backend ChatRequest fields. */

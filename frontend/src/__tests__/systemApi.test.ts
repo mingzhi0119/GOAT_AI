@@ -57,11 +57,56 @@ describe('system api', () => {
           effective_enabled: true,
           deny_reason: null,
         },
+        workbench: {
+          agent_tasks: {
+            allowed_by_config: true,
+            available_on_host: true,
+            effective_enabled: true,
+            deny_reason: null,
+          },
+          plan_mode: {
+            allowed_by_config: true,
+            available_on_host: true,
+            effective_enabled: true,
+            deny_reason: null,
+          },
+          browse: {
+            allowed_by_config: true,
+            available_on_host: true,
+            effective_enabled: true,
+            deny_reason: null,
+          },
+          deep_research: {
+            allowed_by_config: true,
+            available_on_host: true,
+            effective_enabled: true,
+            deny_reason: null,
+          },
+          artifact_workspace: {
+            allowed_by_config: true,
+            available_on_host: true,
+            effective_enabled: true,
+            deny_reason: null,
+          },
+          project_memory: {
+            allowed_by_config: true,
+            available_on_host: true,
+            effective_enabled: true,
+            deny_reason: null,
+          },
+          connectors: {
+            allowed_by_config: true,
+            available_on_host: true,
+            effective_enabled: true,
+            deny_reason: null,
+          },
+        },
       }),
     })
     vi.stubGlobal('fetch', mockedFetch)
     const payload = await fetchSystemFeatures()
     expect(payload.code_sandbox.policy_allowed).toBe(false)
+    expect(payload.workbench.agent_tasks.effective_enabled).toBe(true)
     expect(mockedFetch).toHaveBeenCalledWith('./api/system/features')
   })
 })

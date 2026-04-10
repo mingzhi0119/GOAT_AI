@@ -7,9 +7,14 @@ from unittest.mock import patch
 
 from backend.domain.credential_registry import build_local_authorization_context
 from goat_ai.config import Settings
-from goat_ai.feature_gates import compute_code_sandbox_snapshot, probe_docker_available
+from goat_ai.feature_gates import (
+    compute_agent_workbench_snapshot,
+    compute_code_sandbox_snapshot,
+    probe_docker_available,
+)
 from backend.services.feature_gate_service import (
     code_sandbox_policy_allowed,
+    require_agent_workbench_enabled,
     require_code_sandbox_enabled,
 )
 from backend.services.exceptions import FeatureNotAvailable
@@ -38,6 +43,23 @@ class TestFeatureGates(unittest.TestCase):
             snap = compute_code_sandbox_snapshot(s)
             self.assertFalse(snap.effective_enabled)
             self.assertEqual("disabled_by_operator", snap.deny_reason)
+
+    def test_agent_workbench_disabled_by_operator(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            s = _settings(Path(tmp), feature_agent_workbench_enabled=False)
+            snap = compute_agent_workbench_snapshot(s)
+            self.assertFalse(snap.effective_enabled)
+            self.assertEqual("disabled_by_operator", snap.deny_reason)
+
+    def test_agent_workbench_enabled_opens_runtime_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = _settings(Path(tmp), feature_agent_workbench_enabled=True)
+            snap = compute_agent_workbench_snapshot(settings)
+            self.assertTrue(snap.allowed_by_config)
+            self.assertTrue(snap.available_on_host)
+            self.assertTrue(snap.effective_enabled)
+            self.assertIsNone(snap.deny_reason)
+            require_agent_workbench_enabled(settings)
 
     @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=True)
     def test_code_sandbox_enabled_when_config_and_probe_ok(self, _mock: object) -> None:
@@ -113,6 +135,14 @@ class TestFeatureGates(unittest.TestCase):
                 require_code_sandbox_enabled(settings, ctx)
         self.assertEqual("policy", exc_info.exception.gate_kind)
         self.assertEqual("permission_denied", exc_info.exception.deny_reason)
+
+    def test_require_agent_workbench_enabled_raises_when_operator_disabled(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = _settings(Path(tmp), feature_agent_workbench_enabled=False)
+            with self.assertRaises(FeatureNotAvailable) as exc_info:
+                require_agent_workbench_enabled(settings)
+        self.assertEqual("runtime", exc_info.exception.gate_kind)
+        self.assertEqual("disabled_by_operator", exc_info.exception.deny_reason)
 
 
 if __name__ == "__main__":

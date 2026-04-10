@@ -4,6 +4,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -1059,6 +1060,25 @@ class ApiBlackboxContractTests(unittest.TestCase):
             files={"file": ("x.bin", b"not an image", "application/octet-stream")},
         )
         self.assertEqual(400, bad.status_code)
+
+    def test_workbench_enabled_reaches_not_implemented_scaffold(self) -> None:
+        self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
+
+        features = self.client.get("/api/system/features")
+        self.assertEqual(200, features.status_code)
+        feature_body = features.json()
+        self.assertTrue(feature_body["workbench"]["agent_tasks"]["effective_enabled"])
+        self.assertTrue(feature_body["workbench"]["plan_mode"]["effective_enabled"])
+
+        response = self.client.post(
+            "/api/workbench/tasks",
+            json={"task_kind": "plan", "prompt": "Draft a plan"},
+        )
+        self.assertEqual(501, response.status_code)
+        self.assertEqual(
+            "Workbench task execution is not implemented yet.",
+            response.json()["detail"],
+        )
 
 
 @unittest.skipUnless(TestClient is not None, "fastapi not installed")

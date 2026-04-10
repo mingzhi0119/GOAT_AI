@@ -116,7 +116,7 @@ def compute_agent_workbench_snapshot(settings: Settings) -> RuntimeFeatureSnapsh
         )
     return RuntimeFeatureSnapshot(
         allowed_by_config=True,
-        available_on_host=False,
-        effective_enabled=False,
-        deny_reason=RUNTIME_NOT_IMPLEMENTED,
+        available_on_host=True,
+        effective_enabled=True,
+        deny_reason=None,
     )
