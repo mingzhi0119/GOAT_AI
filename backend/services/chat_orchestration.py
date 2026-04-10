@@ -22,12 +22,16 @@ from backend.services.chat_runtime import (
     SessionRepository,
     TitleGenerator,
 )
+from backend.services.exceptions import (
+    PersistenceReadError,
+    PersistenceWriteError,
+)
 from backend.services.safeguard_service import (
     SAFEGUARD_BLOCKED_TITLE,
     SafeguardAssessment,
 )
 from backend.services.session_service import last_user_message, persist_chat_session
-from backend.services.sse import sse_done_event, sse_token_event
+from backend.services.sse import sse_done_event, sse_error_event, sse_token_event
 from backend.services.tabular_context import TabularContextExtractor
 from goat_ai.clocks import Clock
 from goat_ai.echarts_tool import parse_chart_intent_v2
@@ -345,47 +349,53 @@ def _yield_blocked_response(
     """Emit a policy refusal and finalize logging/persistence."""
     refusal = assessment.refusal_message
     yield sse_token_event(refusal)
-    yield sse_done_event()
-    if persistence is not None:
-        persistence.persist_and_log_chat_result(
-            model=model,
-            messages=messages,
-            system_prompt=system_prompt,
-            ip=ip,
-            conversation_logger=conversation_logger,
-            user_name=user_name,
-            session_id=session_id,
-            all_messages=all_messages,
-            session_repository=session_repository,
-            title_generator=title_generator,
-            assistant_text=refusal,
-            chart_spec=None,
-            chart_data_source="none",
-            started_at=started_at,
-            title_override=SAFEGUARD_BLOCKED_TITLE,
-            session_owner_id=session_owner_id,
-            tenant_id=tenant_id,
-            principal_id=principal_id,
-        )
+    try:
+        if persistence is not None:
+            persistence.persist_and_log_chat_result(
+                model=model,
+                messages=messages,
+                system_prompt=system_prompt,
+                ip=ip,
+                conversation_logger=conversation_logger,
+                user_name=user_name,
+                session_id=session_id,
+                all_messages=all_messages,
+                session_repository=session_repository,
+                title_generator=title_generator,
+                assistant_text=refusal,
+                chart_spec=None,
+                chart_data_source="none",
+                started_at=started_at,
+                title_override=SAFEGUARD_BLOCKED_TITLE,
+                session_owner_id=session_owner_id,
+                tenant_id=tenant_id,
+                principal_id=principal_id,
+            )
+        else:
+            _persist_and_log_chat_result(
+                model=model,
+                messages=messages,
+                system_prompt=system_prompt,
+                ip=ip,
+                conversation_logger=conversation_logger,
+                user_name=user_name,
+                session_id=session_id,
+                all_messages=all_messages,
+                session_repository=session_repository,
+                title_generator=title_generator,
+                assistant_text=refusal,
+                chart_spec=None,
+                started_at=started_at,
+                chart_data_source="none",
+                title_override=SAFEGUARD_BLOCKED_TITLE,
+                session_owner_id=session_owner_id,
+                tenant_id=tenant_id,
+                principal_id=principal_id,
+            )
+    except (OSError, PersistenceReadError, PersistenceWriteError):
+        logger.exception("Failed to persist blocked chat result")
+        yield sse_error_event("Failed to persist chat result.")
+        yield sse_done_event()
         return
 
-    _persist_and_log_chat_result(
-        model=model,
-        messages=messages,
-        system_prompt=system_prompt,
-        ip=ip,
-        conversation_logger=conversation_logger,
-        user_name=user_name,
-        session_id=session_id,
-        all_messages=all_messages,
-        session_repository=session_repository,
-        title_generator=title_generator,
-        assistant_text=refusal,
-        chart_spec=None,
-        started_at=started_at,
-        chart_data_source="none",
-        title_override=SAFEGUARD_BLOCKED_TITLE,
-        session_owner_id=session_owner_id,
-        tenant_id=tenant_id,
-        principal_id=principal_id,
-    )
+    yield sse_done_event()

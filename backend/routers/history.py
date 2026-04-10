@@ -49,6 +49,7 @@ def _raise_owner_required(exc: HistoryOwnerRequiredError) -> None:
         401: {"model": ErrorResponse},
         403: {"model": ErrorResponse},
         429: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
     },
 )
 def list_history(
@@ -75,6 +76,7 @@ def list_history(
         401: {"model": ErrorResponse},
         403: {"model": ErrorResponse},
         429: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
     },
 )
 def delete_all_history(
@@ -102,7 +104,9 @@ def delete_all_history(
         401: {"model": ErrorResponse},
         403: {"model": ErrorResponse},
         404: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
         429: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
     },
 )
 def rename_history_session_route(
@@ -142,6 +146,7 @@ def rename_history_session_route(
         403: {"model": ErrorResponse},
         404: {"model": ErrorResponse},
         429: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
     },
 )
 def get_history_session(
@@ -175,6 +180,7 @@ def get_history_session(
         403: {"model": ErrorResponse},
         404: {"model": ErrorResponse},
         429: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
     },
 )
 def delete_history_session(

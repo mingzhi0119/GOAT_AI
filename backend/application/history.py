@@ -11,7 +11,7 @@ from backend.application.exceptions import (
     HistoryOwnerRequiredError,
     HistorySessionNotFoundError,
 )
-from backend.application.ports import SessionRepository, Settings
+from backend.application.ports import SessionNotFoundError, SessionRepository, Settings
 from backend.domain.authorization import ResourceRef
 from backend.models.history import (
     HistorySessionDetailResponse,
@@ -94,7 +94,10 @@ def delete_history_session(
         auth_context=auth_context,
         request_id=request_id,
     )
-    repository.delete_session(session_id)
+    try:
+        repository.delete_session(session_id)
+    except SessionNotFoundError as exc:
+        raise HistorySessionNotFoundError("Session not found") from exc
 
 
 def rename_history_session(
@@ -126,7 +129,10 @@ def rename_history_session(
     if not decision.allowed:
         raise HistorySessionNotFoundError("Session not found")
 
-    repository.rename_session(session_id, title)
+    try:
+        repository.rename_session(session_id, title)
+    except SessionNotFoundError as exc:
+        raise HistorySessionNotFoundError("Session not found") from exc
 
 
 def get_history_session_detail(

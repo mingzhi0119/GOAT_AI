@@ -120,7 +120,17 @@ def persist_artifact(
         tenant_id=tenant_id,
         principal_id=principal_id,
     )
-    register_artifact(record)
+    try:
+        register_artifact(record)
+    except Exception:
+        try:
+            if target.exists():
+                target.unlink()
+            if base.is_dir():
+                base.rmdir()
+        except OSError:
+            pass
+        raise
     return record
 
 

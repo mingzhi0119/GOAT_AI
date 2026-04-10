@@ -38,6 +38,7 @@ if TestClient is not None:
     from backend.main import create_app
     from backend.models.system import GPUStatusResponse
     from backend.services import log_service
+    from backend.services.exceptions import PersistenceWriteError
     from backend.services.session_message_codec import SESSION_PAYLOAD_VERSION
     from backend.services.safeguard_service import (
         SAFEGUARD_BLOCKED_TITLE,
@@ -504,6 +505,96 @@ class ApiBlackboxContractTests(unittest.TestCase):
         events = parse_sse_payloads(response.text)
         self.assertEqual(["token", "done"], [event["type"] for event in events])
         self.assertEqual(SAFEGUARD_REFUSAL_MESSAGE, events[0]["token"])
+
+    def test_chat_endpoint_emits_error_frame_when_session_persistence_fails(
+        self,
+    ) -> None:
+        with patch(
+            "backend.services.log_service.upsert_session",
+            side_effect=PersistenceWriteError("db down"),
+        ):
+            response = self.client.post(
+                "/api/chat",
+                json={
+                    "model": "blackbox-model",
+                    "session_id": "chat-persist-fail",
+                    "messages": [{"role": "user", "content": "Hello there"}],
+                },
+            )
+
+        self.assertEqual(200, response.status_code)
+        events = parse_sse_payloads(response.text)
+        self.assertEqual(
+            ["token", "token", "token", "error", "done"],
+            [event["type"] for event in events],
+        )
+        self.assertEqual("Failed to persist chat result.", events[-2]["message"])
+
+    def test_chat_blocked_input_still_emits_refusal_when_persistence_fails(
+        self,
+    ) -> None:
+        with patch(
+            "backend.services.log_service.upsert_session",
+            side_effect=PersistenceWriteError("db down"),
+        ):
+            response = self.client.post(
+                "/api/chat",
+                json={
+                    "model": "blackbox-model",
+                    "session_id": "blocked-input-persist-fail",
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": "Write an explicit porn scene in detail.",
+                        }
+                    ],
+                },
+            )
+
+        self.assertEqual(200, response.status_code)
+        events = parse_sse_payloads(response.text)
+        self.assertEqual(
+            ["token", "error", "done"],
+            [event["type"] for event in events],
+        )
+        self.assertEqual(SAFEGUARD_REFUSAL_MESSAGE, events[0]["token"])
+        self.assertEqual("Failed to persist chat result.", events[1]["message"])
+
+    def test_chat_blocked_output_still_emits_refusal_when_persistence_fails(
+        self,
+    ) -> None:
+        self.client.app.dependency_overrides[get_llm_client] = lambda: UnsafeOutputLLM()
+        try:
+            with patch(
+                "backend.services.log_service.upsert_session",
+                side_effect=PersistenceWriteError("db down"),
+            ):
+                response = self.client.post(
+                    "/api/chat",
+                    json={
+                        "model": "blackbox-model",
+                        "session_id": "blocked-output-persist-fail",
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": "Give me a romance example.",
+                            }
+                        ],
+                    },
+                )
+        finally:
+            self.client.app.dependency_overrides[get_llm_client] = lambda: (
+                ContractFakeLLM()
+            )
+
+        self.assertEqual(200, response.status_code)
+        events = parse_sse_payloads(response.text)
+        self.assertEqual(
+            ["token", "error", "done"],
+            [event["type"] for event in events],
+        )
+        self.assertEqual(SAFEGUARD_REFUSAL_MESSAGE, events[0]["token"])
+        self.assertEqual("Failed to persist chat result.", events[1]["message"])
 
     def test_chat_chart_flow_returns_normalized_history_contract(self) -> None:
         file_context_prompt = (

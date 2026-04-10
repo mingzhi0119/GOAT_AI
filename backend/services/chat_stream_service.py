@@ -25,6 +25,10 @@ from backend.services.chat_runtime import (
     TitleGenerator,
 )
 from backend.services.artifact_service import create_chat_artifacts_from_text
+from backend.services.exceptions import (
+    PersistenceReadError,
+    PersistenceWriteError,
+)
 from backend.services.safeguard_service import SafeguardAssessment, SafeguardService
 from backend.domain.chart_types import ChartDataSource
 from backend.services.session_service import last_user_message
@@ -468,52 +472,58 @@ class ChatStreamService:
             )
         )
         if output_assessment.allowed:
-            for token_event in run.output_buffer.flush():
-                if run.first_token_emitted_at is None:
-                    run.first_token_emitted_at = time.monotonic()
-                yield token_event
-            artifact_events = self._emit_artifacts(run, assistant_text=clean_text)
-            for artifact in artifact_events:
-                yield sse_event(
-                    {
-                        "type": "artifact",
-                        **artifact.model_dump(mode="json"),
-                    }
+            try:
+                for token_event in run.output_buffer.flush():
+                    if run.first_token_emitted_at is None:
+                        run.first_token_emitted_at = time.monotonic()
+                    yield token_event
+                artifact_events = self._emit_artifacts(run, assistant_text=clean_text)
+                for artifact in artifact_events:
+                    yield sse_event(
+                        {
+                            "type": "artifact",
+                            **artifact.model_dump(mode="json"),
+                        }
+                    )
+                if chart_spec is not None:
+                    yield sse_event({"type": "chart_spec", "chart": chart_spec})
+                first_token_ms = (
+                    round((run.first_token_emitted_at - run.started_at) * 1000, 1)
+                    if run.first_token_emitted_at is not None
+                    else None
                 )
-            if chart_spec is not None:
-                yield sse_event({"type": "chart_spec", "chart": chart_spec})
-            first_token_ms = (
-                round((run.first_token_emitted_at - run.started_at) * 1000, 1)
-                if run.first_token_emitted_at is not None
-                else None
-            )
-            run.persistence.persist_and_log_chat_result(
-                model=run.model,
-                messages=run.messages,
-                system_prompt=run.system_prompt,
-                ip=run.ip,
-                conversation_logger=run.conversation_logger,
-                user_name=run.user_name,
-                session_id=run.session_id,
-                all_messages=run.all_messages,
-                session_repository=run.session_repository,
-                title_generator=run.title_generator,
-                assistant_text=clean_text,
-                chart_spec=chart_spec,
-                knowledge_documents=run.knowledge_documents,
-                assistant_artifacts=[
-                    artifact.model_dump(mode="json")
-                    for artifact in run.emitted_artifacts
-                ],
-                chart_data_source=(
-                    run.chart_data_source if chart_spec is not None else "none"
-                ),
-                started_at=run.started_at,
-                first_token_ms=first_token_ms,
-                session_owner_id=run.session_owner_id,
-                tenant_id=run.tenant_id,
-                principal_id=run.principal_id,
-            )
+                run.persistence.persist_and_log_chat_result(
+                    model=run.model,
+                    messages=run.messages,
+                    system_prompt=run.system_prompt,
+                    ip=run.ip,
+                    conversation_logger=run.conversation_logger,
+                    user_name=run.user_name,
+                    session_id=run.session_id,
+                    all_messages=run.all_messages,
+                    session_repository=run.session_repository,
+                    title_generator=run.title_generator,
+                    assistant_text=clean_text,
+                    chart_spec=chart_spec,
+                    knowledge_documents=run.knowledge_documents,
+                    assistant_artifacts=[
+                        artifact.model_dump(mode="json")
+                        for artifact in run.emitted_artifacts
+                    ],
+                    chart_data_source=(
+                        run.chart_data_source if chart_spec is not None else "none"
+                    ),
+                    started_at=run.started_at,
+                    first_token_ms=first_token_ms,
+                    session_owner_id=run.session_owner_id,
+                    tenant_id=run.tenant_id,
+                    principal_id=run.principal_id,
+                )
+            except (OSError, PersistenceReadError, PersistenceWriteError):
+                logger.exception("Failed to persist completed chat result")
+                yield sse_error_event("Failed to persist chat result.")
+                yield sse_done_event()
+                return
             yield sse_done_event()
             inc_chat_stream_completed()
         else:
