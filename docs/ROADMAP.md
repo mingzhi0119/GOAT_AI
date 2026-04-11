@@ -1,6 +1,6 @@
 # GOAT AI Roadmap
 
-> Last updated: 2026-04-10
+> Last updated: 2026-04-11
 > Current release tag: **v1.2.0**
 > Shipped status: [PROJECT_STATUS.md](PROJECT_STATUS.md)
 
@@ -9,6 +9,97 @@ This roadmap only tracks **unfinished work**. Completed phases and archived clos
 ---
 
 ## Open Work
+
+### Engineering quality uplift plan (`7/10 -> 9/10`)
+
+This track is about preventing score regressions while raising the repo from "solid and reviewable" to "industrial-grade and continuously provable." Product work must not bypass these gates.
+
+#### P0: stop score leaks and restore release confidence
+
+Ship these before taking on net-new product promises that widen the runtime surface.
+
+- [x] Fix any red CI-equivalent local gate before merge, especially frontend build failures.
+- [x] Add and enforce coverage reporting plus fail-under thresholds for backend and frontend.
+- [x] Close direct-test gaps for core decision-heavy modules:
+  - `backend/services/knowledge_service.py`
+  - `backend/services/workbench_execution_service.py`
+  - history/workbench application paths
+  - frontend persistence/layout/error-boundary and menu hooks/components
+- [x] Eliminate visible encoding/garbled-text defects in user-facing or operator-facing paths.
+- [x] Tighten credential handling:
+  - stop relying on plain string equality for secrets
+  - move toward hashed or otherwise non-reversible credential storage
+  - require constant-time comparison where raw comparisons still exist
+- Add supply-chain gates for desktop/frontend dependencies (`npm audit`, `cargo audit`, signed-artifact plan).
+- Reduce the highest-risk large-file hotspots by extracting focused submodules instead of adding more logic inline.
+- Add direct automated tests for delivery-critical scripts and desktop wrappers.
+- Keep Rust migration work scoped to stable, systems-oriented boundaries during P0; do not begin broad business-logic rewrites before the quality gates above are green.
+
+P0 exit criteria:
+
+- `lint + format + test + build + contract + security` are all green for touched layers
+- coverage is reported in CI and enforced by threshold
+- core release flows no longer rely on "tests pass even though build is red"
+- the worst correctness and security footguns are removed rather than documented away
+
+#### P1: turn quality checks into durable release controls
+
+- Add staged release automation for at least a reproducible staging deploy and a documented production approval gate.
+- Turn `.github/CODEOWNERS` into real path ownership rather than bootstrap placeholders.
+- Version and store observability assets in-repo:
+  - dashboards
+  - alert rules
+  - scrape config or equivalent metrics wiring
+  - failure triage notes for common incidents
+- Introduce performance regression checks:
+  - nightly or pre-release smoke/load validation
+  - explicit budgets for first-token latency, full response latency, and desktop startup where relevant
+- Upgrade single-process reliability assumptions behind replaceable interfaces where scaling may grow:
+  - rate limiting
+  - idempotency
+  - durable background execution
+- Add desktop smoke coverage for sidecar boot, health-wait handshake, and first-run diagnostics.
+- Exercise backup, restore, and rollback paths rather than treating them as documentation-only flows.
+
+P1 exit criteria:
+
+- releases are reproducible and reviewable
+- operational alerts and dashboards exist for critical user-facing paths
+- performance and deployment regressions are detectable before production
+- ownership, release, and rollback paths are explicit enough to survive team hand-offs
+
+#### P2: finish the move from mature codebase to industrial operating model
+
+- Add signed-release and provenance/SBOM workflows for distributable artifacts.
+- Establish vulnerability response, dependency-refresh cadence, and credential-rotation policy.
+- Add targeted fault-injection or chaos-style validation for upstream timeouts, SSE interruption, file-system failure, and sidecar boot failure.
+- Continue decomposing large multi-responsibility modules until typical feature changes stay localized.
+- Extend architecture-drift controls to shared DTOs, desktop bridges, and future connector/runtime boundaries.
+- Track quality trends over time:
+  - coverage trend
+  - CI stability
+  - defect escape rate
+  - performance trend
+  - dependency vulnerability backlog
+
+P2 exit criteria:
+
+- artifacts are traceable, signed where applicable, and auditable
+- reliability and security are proven by drills, not only by code inspection
+- core engineering scores stay stable release over release instead of depending on individual contributors
+
+Score target by end of this uplift track:
+
+- Correctness: `>= 9/10`
+- Testability: `>= 9/10`
+- Maintainability: `>= 8.5/10`
+- Readability: `>= 8/10`
+- Architecture & Decoupling: `>= 9/10`
+- Reliability: `>= 9/10`
+- Performance: `>= 8.5/10`
+- Security: `>= 9/10`
+- Observability: `>= 9/10`
+- Delivery Maturity: `>= 9/10`
 
 ### Immediate priority queue
 
@@ -139,6 +230,29 @@ Use the same runtime primitives across 17C/17D/17E instead of building isolated 
   - alternate providers behind the same sandbox boundary (for example E2B/Daytona-style adapters)
   - richer terminal / PTY UX beyond replayable chunked logs
 
+### Phase 18B: Rust sandbox supervisor
+
+- Goal: move the most systems-heavy sandbox supervision responsibilities into a Rust runtime component while preserving the existing HTTP/API contract.
+- Why this route:
+  - process lifecycle control, timeout enforcement, cancellation, log streaming, and resource-boundary enforcement are a better fit for a memory-safe systems language than for growing Python orchestration code
+  - the sandbox boundary is already a separable runtime seam, so it is a safer migration target than higher-level chat or domain logic
+- Planned scope:
+  - execution supervisor process or library written in Rust
+  - child-process lifecycle management
+  - timeout and cancellation enforcement
+  - stdout/stderr event streaming and bounded buffering
+  - workspace and egress policy enforcement at the supervisor boundary
+- Non-goals for this phase:
+  - no rewrite of chat, knowledge, authz, or other application/domain logic into Rust
+  - no public API contract expansion solely because the runtime implementation changed
+- Sequencing:
+  - begin after P0 engineering gates are green enough to prove parity
+  - keep the existing Python-facing adapter thin and contract-stable during rollout
+- Exit criteria:
+  - the Rust supervisor can back the existing execution contract without changing API semantics
+  - parity tests cover success, failure, timeout, cancellation, and log replay behavior
+  - rollout can be feature-gated so the Python path remains a fallback until the Rust path is proven
+
 ### Phase 19: desktop app packaging and native distribution
 
 - Goal: turn GOAT AI into a first-class desktop app for Windows, macOS, and Linux instead of relying on "open localhost in a browser" as the primary local experience.
@@ -230,6 +344,29 @@ Use the same runtime primitives across 17C/17D/17E instead of building isolated 
   - keep code sandbox disabled by default in packaged builds unless the selected provider/runtime is explicitly available and documented
 - Exit criteria:
   - desktop app can be installed, launched, updated, and diagnosed without dropping users into raw terminal workflows
+
+### Phase 19E: Rust desktop runtime bridge
+
+- Goal: harden packaged-app startup and local-runtime operations by moving desktop process supervision deeper into the native Rust layer that already exists in the Tauri shell.
+- Why this route:
+  - sidecar lifecycle management, startup handshake, restart/backoff behavior, log sinks, and first-run diagnostics are desktop/runtime concerns rather than frontend concerns
+  - the Tauri shell already provides a natural Rust host boundary, so this improves reliability without forcing a rewrite of the SPA or backend API semantics
+- Planned scope:
+  - native sidecar boot coordination
+  - `/api/health` and readiness handshake before window reveal
+  - native log sink wiring for shell and sidecar diagnostics
+  - restart/backoff and clearer first-run failure reporting
+  - desktop-safe local data and path handling at the Rust boundary
+- Non-goals for this phase:
+  - no rewrite of the SPA into Rust
+  - no rewrite of backend business logic solely for desktop packaging
+- Sequencing:
+  - start only after P0 release-confidence work is in place
+  - prefer incremental migration of startup/diagnostic responsibilities instead of replacing the entire desktop flow at once
+- Exit criteria:
+  - packaged desktop launches remain contract-compatible with the current backend sidecar
+  - first-run diagnostics, startup timing, and failure recovery are measurably better than the current shell-managed flow
+  - desktop startup, shutdown, and recovery paths are covered by repeatable smoke checks
 
 ### UI surfaces waiting on backend/runtime
 

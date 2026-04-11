@@ -1,0 +1,219 @@
+from __future__ import annotations
+
+import unittest
+from pathlib import Path
+
+from backend.application.exceptions import (
+    WorkbenchSourceValidationError,
+    WorkbenchTaskNotFoundError,
+)
+from backend.application.workbench import (
+    create_and_dispatch_workbench_task,
+    create_workbench_task,
+    get_workbench_task,
+)
+from backend.domain.authz_types import AuthorizationContext
+from backend.domain.authorization import AuthorizationDecision, PrincipalId, TenantId
+from backend.models.workbench import WorkbenchTaskRequest
+from backend.services.workbench_runtime import (
+    WorkbenchTaskCreatePayload,
+    WorkbenchTaskRecord,
+)
+from backend.services.workbench_source_registry import WorkbenchSourceDescriptor
+from goat_ai.config import Settings
+
+
+def _settings() -> Settings:
+    return Settings(
+        ollama_base_url="http://127.0.0.1:11434",
+        generate_timeout=120,
+        max_upload_mb=20,
+        max_upload_bytes=20 * 1024 * 1024,
+        max_dataframe_rows=50000,
+        use_chat_api=True,
+        system_prompt="test",
+        app_root=Path("."),
+        logo_svg=Path("logo.svg"),
+        log_db_path=Path("chat_logs.db"),
+        data_dir=Path("data"),
+        feature_agent_workbench_enabled=True,
+        require_session_owner=True,
+    )
+
+
+def _auth_context(owner_id: str = "owner-1") -> AuthorizationContext:
+    return AuthorizationContext(
+        principal_id=PrincipalId("principal-1"),
+        tenant_id=TenantId("tenant-1"),
+        scopes=frozenset({"knowledge:read"}),
+        credential_id="cred-1",
+        legacy_owner_id=owner_id,
+        auth_mode="api_key",
+    )
+
+
+class _FakeRepository:
+    def __init__(self) -> None:
+        self.created_payload: WorkbenchTaskCreatePayload | None = None
+        self.task: WorkbenchTaskRecord | None = None
+
+    def create_task(self, payload: WorkbenchTaskCreatePayload) -> WorkbenchTaskRecord:
+        self.created_payload = payload
+        self.task = WorkbenchTaskRecord(
+            id=payload.task_id,
+            task_kind=payload.task_kind,
+            status=payload.status,
+            prompt=payload.prompt,
+            session_id=payload.session_id,
+            project_id=payload.project_id,
+            knowledge_document_ids=list(payload.knowledge_document_ids),
+            connector_ids=list(payload.connector_ids),
+            source_ids=list(payload.source_ids),
+            created_at=payload.created_at,
+            updated_at=payload.updated_at,
+            auth_scopes=list(payload.auth_scopes or []),
+            credential_id=payload.credential_id,
+            auth_mode=payload.auth_mode,
+            owner_id=payload.owner_id,
+            tenant_id=payload.tenant_id,
+            principal_id=payload.principal_id,
+        )
+        return self.task
+
+    def get_task(self, task_id: str) -> WorkbenchTaskRecord | None:
+        if self.task and self.task.id == task_id:
+            return self.task
+        return None
+
+    def list_task_events(self, task_id: str) -> list[object]:
+        _ = task_id
+        return []
+
+
+class _FakeDispatcher:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+
+    def dispatch_task(self, *, task_id: str, request_id: str = "") -> None:
+        self.calls.append((task_id, request_id))
+
+
+class ApplicationWorkbenchTests(unittest.TestCase):
+    def test_create_browse_task_requires_runtime_ready_source(self) -> None:
+        repository = _FakeRepository()
+        request = WorkbenchTaskRequest(
+            task_kind="browse",
+            prompt="Find evidence",
+            source_ids=["web"],
+        )
+
+        from unittest.mock import patch
+
+        with patch(
+            "backend.application.workbench.resolve_requested_sources",
+            return_value=[
+                WorkbenchSourceDescriptor(
+                    source_id="web",
+                    display_name="Public Web",
+                    kind="builtin",
+                    scope_kind="global",
+                    capabilities=("search",),
+                    task_kinds=("browse",),
+                    read_only=True,
+                    runtime_ready=False,
+                    deny_reason="not_implemented",
+                    description="web",
+                )
+            ],
+        ):
+            with self.assertRaises(WorkbenchSourceValidationError):
+                create_workbench_task(
+                    request=request,
+                    repository=repository,
+                    settings=_settings(),
+                    auth_context=_auth_context(),
+                )
+
+    def test_create_and_dispatch_workbench_task_preserves_request_context(self) -> None:
+        repository = _FakeRepository()
+        dispatcher = _FakeDispatcher()
+        request = WorkbenchTaskRequest(
+            task_kind="plan",
+            prompt="Plan the migration",
+            knowledge_document_ids=["doc-1"],
+        )
+
+        from unittest.mock import patch
+
+        with patch(
+            "backend.application.workbench.resolve_requested_sources",
+            return_value=[
+                WorkbenchSourceDescriptor(
+                    source_id="knowledge",
+                    display_name="Knowledge Base",
+                    kind="knowledge",
+                    scope_kind="knowledge_documents",
+                    capabilities=("search",),
+                    task_kinds=("plan",),
+                    read_only=True,
+                    runtime_ready=True,
+                    deny_reason=None,
+                    description="knowledge",
+                    required_scope="knowledge:read",
+                )
+            ],
+        ):
+            accepted = create_and_dispatch_workbench_task(
+                request=request,
+                repository=repository,
+                dispatcher=dispatcher,
+                settings=_settings(),
+                auth_context=_auth_context(),
+                request_id="req-123",
+            )
+
+        assert repository.created_payload is not None
+        self.assertEqual(["knowledge"], repository.created_payload.source_ids)
+        self.assertEqual(
+            ("{}".format(accepted.task_id), "req-123"), dispatcher.calls[0]
+        )
+
+    def test_get_workbench_task_conceals_unauthorized_records(self) -> None:
+        repository = _FakeRepository()
+        repository.task = WorkbenchTaskRecord(
+            id="wb-1",
+            task_kind="plan",
+            status="queued",
+            prompt="Plan",
+            session_id=None,
+            project_id=None,
+            knowledge_document_ids=[],
+            connector_ids=[],
+            source_ids=[],
+            created_at="2026-04-11T00:00:00+00:00",
+            updated_at="2026-04-11T00:00:00+00:00",
+            auth_scopes=["knowledge:read"],
+            credential_id="cred-1",
+            auth_mode="api_key",
+            owner_id="owner-1",
+            tenant_id="tenant-1",
+            principal_id="principal-1",
+        )
+
+        from unittest.mock import patch
+
+        with patch(
+            "backend.application.workbench.authorize_workbench_task_read",
+            return_value=AuthorizationDecision(
+                allowed=False,
+                reason_code="owner_mismatch",
+                conceal_existence=True,
+            ),
+        ):
+            with self.assertRaises(WorkbenchTaskNotFoundError):
+                get_workbench_task(
+                    task_id="wb-1",
+                    repository=repository,
+                    settings=_settings(),
+                    auth_context=_auth_context(owner_id="other-owner"),
+                )

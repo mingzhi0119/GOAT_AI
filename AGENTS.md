@@ -17,6 +17,7 @@ Short index for coding agents. Canonical rules live in the docs below.
 3. Support Windows dev and Ubuntu prod without source edits.
 4. Type every function boundary.
 5. Test the boundary, mock external systems.
+6. Do not let touched layers regress industrial score guardrails: green gates, boundary tests, and recoverable runtime behavior.
 
 ## Before delivering code
 
@@ -25,7 +26,9 @@ Short index for coding agents. Canonical rules live in the docs below.
 - For Python changes, run `python -m ruff check` on the touched backend/shared/test files before pushing.
 - When formatting-sensitive Python files changed, also run `python -m ruff format --check` on the touched files.
 - For frontend changes, run `cd frontend && npm ci && npm test -- --run`.
-- CI also runs `cd frontend && npm run build`; run the local build when the task changes build tooling, packaging, or a failure would otherwise be invisible to tests.
+- CI also runs `cd frontend && npm run build`; run the local build for frontend changes that touch types, build inputs, packaging, test utilities, or any build-only failure path.
+- Add or update tests for happy path, failure path, and at least one boundary case when you touch core behavior.
+- Do not treat a red local CI-equivalent gate as follow-up work.
 - Do not run manual visual verification unless the user asks.
 
 ## Quick pointers

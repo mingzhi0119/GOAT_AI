@@ -165,7 +165,7 @@ Self-managed VMs, Docker Compose, Kubernetes, or developer laptops use the same 
 | `GOAT_DATA_DIR` | Root directory for persisted uploads, normalized knowledge text, vector indexes, and vision attachments | `<project>/data` (gitignored by default; do not commit) |
 | `GOAT_API_KEY` | Protect non-health APIs via `X-GOAT-API-Key` | empty |
 | `GOAT_API_KEY_WRITE` | Optional second key: `GET`/`HEAD`/`OPTIONS` may use read key (`GOAT_API_KEY`); other methods require this write key when set | empty |
-| `GOAT_API_CREDENTIALS_JSON` | Optional JSON credential registry; when empty, the app derives default read/write credentials from `GOAT_API_KEY` and `GOAT_API_KEY_WRITE` | empty |
+| `GOAT_API_CREDENTIALS_JSON` | Optional JSON credential registry; each entry may provide `secret` or `secret_sha256`, and when empty the app derives default read/write credentials from `GOAT_API_KEY` and `GOAT_API_KEY_WRITE` | empty |
 | `GOAT_REQUIRE_SESSION_OWNER` | When `true`/`1`, chat and history routes require `X-GOAT-Owner-Id` (session scoping) | `false` |
 | `GOAT_RATE_LIMIT_WINDOW_SEC` | Rate limit window | `60` |
 | `GOAT_RATE_LIMIT_MAX_REQUESTS` | Max requests per window | `60` |
@@ -255,6 +255,10 @@ Example line:
   - `GOAT_API_KEY` becomes `principal:read-default` with read scopes
   - `GOAT_API_KEY_WRITE` becomes `principal:write-default` with read+write scopes plus `sandbox:execute`
   - default tenant is `tenant:default`
+- Credential registry entries may provide either:
+  - `secret` for compatibility with existing deployments
+  - `secret_sha256` for non-reversible config storage
+- Raw API keys are hashed to SHA-256 in memory before comparison, and credential matching uses constant-time digest comparison.
 - Cross-owner or cross-tenant reads are concealed as `404` where possible.
 - Missing API key remains `401`; insufficient scope remains `403`.
 
@@ -264,7 +268,7 @@ Example `GOAT_API_CREDENTIALS_JSON`:
 [
   {
     "credential_id": "cred-read-analytics",
-    "secret": "replace-me",
+    "secret_sha256": "replace-with-lowercase-sha256-hex",
     "principal_id": "principal:analytics-read",
     "tenant_id": "tenant:default",
     "status": "active",

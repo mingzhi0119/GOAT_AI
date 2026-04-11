@@ -10,6 +10,22 @@ Single source of truth for repo-wide engineering rules. Keep [`AGENTS.md`](../AG
 4. Type every function boundary.
 5. Test boundaries and mock external systems.
 
+## 0A. Industrial Score Guardrails
+
+Engineering work must not silently lower the repo's correctness, testability, maintainability, readability, architecture, reliability, performance, security, observability, or delivery maturity.
+
+- Treat a failing CI-equivalent local gate as a release blocker, not as follow-up cleanup.
+- New feature work must not widen a public capability surface while the corresponding build, contract, or runtime gate is red.
+- When touching a core path, add or update tests for:
+  - normal flow
+  - failure flow
+  - at least one boundary or limit case
+- Contract changes must update implementation, tests, and generated artifacts in the same change.
+- Changes that add more logic to a known hotspot should first extract or isolate responsibilities instead of extending a large mixed-concern module inline.
+- Security-sensitive changes must preserve or improve validation, authz, secret handling, and auditability.
+- Runtime or deployment changes must preserve or improve observability, rollbackability, and failure diagnostics.
+- If a change would knowingly reduce one of the industrial-score dimensions, document the tradeoff explicitly in the PR and add a follow-up gate or remediation item before merge.
+
 ## 1. Python Standards
 
 - Annotate every function and module-level variable.
@@ -70,9 +86,13 @@ Single source of truth for repo-wide engineering rules. Keep [`AGENTS.md`](../AG
 - Mock external services in unit tests.
 - Python tests use `pytest`.
 - Frontend tests use `Vitest` and `React Testing Library`.
+- Core-path tests must cover happy path, failure path, and at least one boundary condition.
+- When fixing a bug, add or update the test that would have caught it before the fix.
+- Prefer direct tests for decision-heavy modules; do not rely only on end-to-end or black-box coverage when the internal branch logic is complex.
 - Run the relevant CI-equivalent checks for the layer you changed.
 - For frontend changes, run `cd frontend && npm ci && npm test -- --run`.
-- CI also runs `cd frontend && npm run build`; run that locally when the task changes build tooling, packaging, or likely build-only failure paths.
+- CI also runs `cd frontend && npm run build`; run that locally for frontend changes that touch types, build inputs, packaging, test utilities, or any path that may compile differently from `vitest`.
+- Prefer coverage reporting and fail-under thresholds for backend and frontend; do not lower thresholds without an explicit documented exception.
 - Do not run manual visual verification unless the user asks.
 
 ## 4. Cross-Environment Compatibility
@@ -101,6 +121,9 @@ Single source of truth for repo-wide engineering rules. Keep [`AGENTS.md`](../AG
 - Do not revert unrelated user changes.
 - Use non-interactive git commands.
 - For reviews, call out bugs, regressions, risk, and missing tests first.
+- Reject changes that leave touched layers with red `lint`, `test`, `build`, `contract`, or security gates.
+- Treat user-visible garbled text, encoding regressions, or broken diagnostics as correctness issues, not cosmetic follow-ups.
+- Flag growing hotspot files early; if a touched mixed-concern file is already oversized, prefer extraction over further inline expansion.
 - Keep `.github/CODEOWNERS` as the source of truth for default directory ownership.
 - Use four long-lived Codex owner lanes: Lead/Platform, Frontend, Backend, Docs/Assets.
 - Shared contracts and cross-layer boundaries must be jointly reviewed by the owning lanes.
@@ -113,6 +136,7 @@ Single source of truth for repo-wide engineering rules. Keep [`AGENTS.md`](../AG
 - Check black-box tests first for API work.
 - Keep generated artifacts in sync with the implementation.
 - Treat `docs/openapi.json`, `docs/api.llm.yaml`, and other shared contract surfaces as joint review boundaries, not single-owner files.
+- Do not merge public API behavior changes without matching boundary tests and updated error semantics where applicable.
 
 ## 9. Project Snapshot
 
@@ -136,6 +160,7 @@ Single source of truth for repo-wide engineering rules. Keep [`AGENTS.md`](../AG
 - `docs/` and `README.md` prose is English-only.
 - Keep docs UTF-8 without BOM.
 - Update related docs when user-visible semantics change.
+- Update roadmap, operations, or project-status docs when release gates, runbooks, or score-protection policies materially change.
 
 ## 13. API Artifacts
 
@@ -153,3 +178,4 @@ Single source of truth for repo-wide engineering rules. Keep [`AGENTS.md`](../AG
 - Use capability-based gates for risky or optional features.
 - Do not conflate UI availability with backend permission or execution safety.
 - Document gate behavior and safe failure modes.
+- Do not advertise a capability as ready in UI, docs, or release notes while build, runtime, or policy gates for that capability are known-red.

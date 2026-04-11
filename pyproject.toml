@@ -2,6 +2,16 @@
 root_packages = ["backend", "goat_ai"]
 include_external_packages = true
 
+[tool.coverage.run]
+branch = true
+source = ["backend", "goat_ai"]
+omit = ["__tests__/*", "backend/migrations/*"]
+
+[tool.coverage.report]
+skip_covered = true
+show_missing = true
+fail_under = 70
+
 # First row = outermost. Sibling layers (same | group) may not import each other.
 [[tool.importlinter.contracts]]
 name = "Backend layers: HTTP over wiring over app over shared"

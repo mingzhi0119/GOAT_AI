@@ -40,28 +40,31 @@ export class ErrorBoundary extends Component<Props, State> {
 
     return (
       <div
-        className="flex flex-col items-center justify-center h-full gap-5 p-8 text-center"
+        className="flex h-full flex-col items-center justify-center gap-5 p-8 text-center"
         style={{ background: 'var(--bg-chat)' }}
       >
         <div
-          className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
-          style={{ background: 'rgba(239,68,68,0.1)' }}
+          className="flex h-16 w-16 items-center justify-center rounded-2xl text-3xl font-bold"
+          style={{ background: 'rgba(239,68,68,0.1)', color: 'rgb(220,38,38)' }}
+          aria-hidden="true"
         >
-          ⚠️
+          !
         </div>
         <div>
-          <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--text-main)' }}>
+          <h2 className="mb-1 text-lg font-bold" style={{ color: 'var(--text-main)' }}>
             Something went wrong
           </h2>
-          <p className="text-sm max-w-sm" style={{ color: 'var(--text-muted)' }}>
-            An unexpected error occurred in the UI. Your conversation is safe —
-            click below to recover.
+          <p className="max-w-sm text-sm" style={{ color: 'var(--text-muted)' }}>
+            An unexpected error occurred in the UI. Your conversation is safe - click below
+            to recover.
           </p>
           {this.state.error && (
-            <details className="mt-3 text-xs text-left" style={{ color: 'var(--text-muted)' }}>
+            <details className="mt-3 text-left text-xs" style={{ color: 'var(--text-muted)' }}>
               <summary className="cursor-pointer hover:underline">Technical details</summary>
-              <pre className="mt-1 p-2 rounded overflow-x-auto"
-                style={{ background: 'var(--bg-asst-bubble)' }}>
+              <pre
+                className="mt-1 overflow-x-auto rounded p-2"
+                style={{ background: 'var(--bg-asst-bubble)' }}
+              >
                 {this.state.error.message}
               </pre>
             </details>
@@ -71,7 +74,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <button
             type="button"
             onClick={this.handleReset}
-            className="px-4 py-2 rounded-lg text-sm font-semibold transition-all"
+            className="rounded-lg px-4 py-2 text-sm font-semibold transition-all"
             style={{ background: 'var(--navy)', color: '#fff' }}
           >
             Try again
@@ -79,7 +82,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="px-4 py-2 rounded-lg text-sm transition-all"
+            className="rounded-lg px-4 py-2 text-sm transition-all"
             style={{ border: '1px solid var(--border-color)', color: 'var(--text-main)' }}
           >
             Reload page

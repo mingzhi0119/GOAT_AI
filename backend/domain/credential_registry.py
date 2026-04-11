@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 from dataclasses import dataclass
 from typing import FrozenSet
@@ -38,7 +40,7 @@ _FULL_SCOPES: frozenset[Scope] = frozenset({*_READ_SCOPES, *_WRITE_SCOPES})
 @dataclass(frozen=True)
 class ApiCredential:
     credential_id: str
-    secret: str
+    secret_sha256: str
     principal_id: PrincipalId
     tenant_id: TenantId
     scopes: FrozenSet[Scope]
@@ -64,7 +66,7 @@ def _build_default_credentials(settings: Settings) -> list[ApiCredential]:
         credentials.append(
             ApiCredential(
                 credential_id="credential:read-default",
-                secret=settings.api_key,
+                secret_sha256=_hash_secret(settings.api_key),
                 principal_id=PrincipalId("principal:read-default"),
                 tenant_id=TenantId(_DEFAULT_TENANT),
                 scopes=_READ_SCOPES,
@@ -77,7 +79,7 @@ def _build_default_credentials(settings: Settings) -> list[ApiCredential]:
         credentials.append(
             ApiCredential(
                 credential_id="credential:write-default",
-                secret=settings.api_key_write,
+                secret_sha256=_hash_secret(settings.api_key_write),
                 principal_id=PrincipalId("principal:write-default"),
                 tenant_id=TenantId(_DEFAULT_TENANT),
                 scopes=_FULL_SCOPES,
@@ -103,32 +105,32 @@ def load_api_credentials(settings: Settings) -> list[ApiCredential]:
 
     credentials: list[ApiCredential] = []
     seen_ids: set[str] = set()
-    seen_secrets: set[str] = set()
+    seen_secret_hashes: set[str] = set()
     for item in payload:
         if not isinstance(item, dict):
             raise ValueError("Each credential entry must be an object.")
         credential_id = str(item.get("credential_id", "")).strip()
-        secret = str(item.get("secret", "")).strip()
+        secret_sha256 = _resolve_secret_hash(item)
         principal_id = str(item.get("principal_id", "")).strip()
         tenant_id = (
             str(item.get("tenant_id", _DEFAULT_TENANT)).strip() or _DEFAULT_TENANT
         )
         status = str(item.get("status", "active")).strip() or "active"
         auth_mode = _AUTH_MODE_REGISTRY
-        if not credential_id or not secret or not principal_id:
+        if not credential_id or not secret_sha256 or not principal_id:
             raise ValueError(
-                "Each credential requires credential_id, secret, and principal_id."
+                "Each credential requires credential_id, principal_id, and either secret or secret_sha256."
             )
         if credential_id in seen_ids:
             raise ValueError(f"Duplicate credential_id: {credential_id}")
-        if secret in seen_secrets:
+        if secret_sha256 in seen_secret_hashes:
             raise ValueError("Duplicate credential secrets are not allowed.")
         if status not in {"active", "disabled"}:
             raise ValueError("Credential status must be 'active' or 'disabled'.")
         credentials.append(
             ApiCredential(
                 credential_id=credential_id,
-                secret=secret,
+                secret_sha256=secret_sha256,
                 principal_id=PrincipalId(principal_id),
                 tenant_id=TenantId(tenant_id),
                 scopes=_parse_scope_set(item.get("scopes", [])),
@@ -138,20 +140,41 @@ def load_api_credentials(settings: Settings) -> list[ApiCredential]:
             )
         )
         seen_ids.add(credential_id)
-        seen_secrets.add(secret)
+        seen_secret_hashes.add(secret_sha256)
     return credentials
 
 
 def resolve_credential(
     *, provided_api_key: str, settings: Settings
 ) -> ApiCredential | None:
+    provided_secret_hash = _hash_secret(provided_api_key)
     for credential in load_api_credentials(settings):
-        if credential.secret != provided_api_key:
+        if not hmac.compare_digest(credential.secret_sha256, provided_secret_hash):
             continue
         if credential.status != "active":
             return None
         return credential
     return None
+
+
+def _hash_secret(secret: str) -> str:
+    return hashlib.sha256(secret.encode("utf-8")).hexdigest()
+
+
+def _resolve_secret_hash(item: dict[str, object]) -> str:
+    secret_sha256 = str(item.get("secret_sha256", "")).strip().lower()
+    raw_secret = str(item.get("secret", "")).strip()
+    if secret_sha256:
+        if len(secret_sha256) != 64 or any(
+            ch not in "0123456789abcdef" for ch in secret_sha256
+        ):
+            raise ValueError(
+                "Credential secret_sha256 must be a lowercase SHA-256 hex digest."
+            )
+        return secret_sha256
+    if raw_secret:
+        return _hash_secret(raw_secret)
+    return ""
 
 
 def build_local_authorization_context() -> AuthorizationContext:

@@ -6,6 +6,7 @@ from pathlib import Path
 from backend.domain.credential_registry import (
     load_api_credentials,
     resolve_authorization_context,
+    resolve_credential,
 )
 from goat_ai.config import Settings
 
@@ -79,6 +80,75 @@ class CredentialRegistryTests(unittest.TestCase):
             legacy_owner_id="alice",
         )
         self.assertIsNone(ctx)
+
+    def test_secret_sha256_credentials_resolve_without_plaintext_storage(self) -> None:
+        settings = _settings(
+            api_credentials_json="""
+            [
+              {
+                "credential_id": "cred-1",
+                "secret_sha256": "8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8",
+                "principal_id": "principal:alpha",
+                "tenant_id": "tenant:a",
+                "status": "active",
+                "scopes": ["history:read"]
+              }
+            ]
+            """,
+        )
+
+        credential = resolve_credential(provided_api_key="alpha", settings=settings)
+
+        self.assertIsNotNone(credential)
+        assert credential is not None
+        self.assertEqual("cred-1", credential.credential_id)
+        self.assertEqual(
+            "8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8",
+            credential.secret_sha256,
+        )
+
+    def test_duplicate_secret_hashes_are_rejected(self) -> None:
+        settings = _settings(
+            api_credentials_json="""
+            [
+              {
+                "credential_id": "cred-1",
+                "secret": "alpha",
+                "principal_id": "principal:a",
+                "status": "active",
+                "scopes": ["history:read"]
+              },
+              {
+                "credential_id": "cred-2",
+                "secret_sha256": "8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8",
+                "principal_id": "principal:b",
+                "status": "active",
+                "scopes": ["history:read"]
+              }
+            ]
+            """,
+        )
+
+        with self.assertRaises(ValueError):
+            load_api_credentials(settings)
+
+    def test_secret_sha256_must_be_valid_hex(self) -> None:
+        settings = _settings(
+            api_credentials_json="""
+            [
+              {
+                "credential_id": "cred-1",
+                "secret_sha256": "not-a-digest",
+                "principal_id": "principal:a",
+                "status": "active",
+                "scopes": ["history:read"]
+              }
+            ]
+            """,
+        )
+
+        with self.assertRaises(ValueError):
+            load_api_credentials(settings)
 
     def test_duplicate_credential_rejected(self) -> None:
         settings = _settings(

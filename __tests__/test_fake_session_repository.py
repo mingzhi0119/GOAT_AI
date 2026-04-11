@@ -100,6 +100,12 @@ class InMemorySessionRepository:
     def delete_session(self, session_id: str) -> None:
         self._rows.pop(session_id, None)
 
+    def rename_session(self, session_id: str, title: str) -> None:
+        row = self._rows.get(session_id)
+        if row is None:
+            return
+        row["title"] = title
+
     def delete_all_sessions(
         self,
         owner_filter: str | None = None,
