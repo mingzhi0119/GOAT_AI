@@ -1,0 +1,39 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { uploadMediaImage } from '../api/media'
+
+describe('media api', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('uploads an image file through multipart form data', async () => {
+    const mockedFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        attachment_id: 'att-1',
+        filename: 'chart.png',
+        mime_type: 'image/png',
+        byte_size: 12,
+        width_px: 1,
+        height_px: 1,
+      }),
+    })
+    vi.stubGlobal('fetch', mockedFetch)
+
+    const file = new File(['img'], 'chart.png', { type: 'image/png' })
+    const payload = await uploadMediaImage(file)
+
+    expect(payload.attachment_id).toBe('att-1')
+    expect(mockedFetch).toHaveBeenCalledWith(
+      './api/media/uploads',
+      expect.objectContaining({ method: 'POST', body: expect.any(FormData) }),
+    )
+  })
+
+  it('throws a stable error on upload failure', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 413 }))
+    const file = new File(['img'], 'chart.png', { type: 'image/png' })
+
+    await expect(uploadMediaImage(file)).rejects.toThrow('Media upload API: HTTP 413')
+  })
+})
