@@ -20,7 +20,7 @@ def test_expect_runtime_target_accepts_server_port() -> None:
     response.raise_for_status.return_value = None
     response.json.return_value = {"ordered_targets": [{"port": 62606}]}
     with patch("scripts.post_deploy_check.requests.get", return_value=response):
-        assert _expect_runtime_target("http://127.0.0.1:62606") == 0
+        assert _expect_runtime_target("http://127.0.0.1:62606", "") == 0
 
 
 def test_expect_chat_stream_contract_accepts_thinking_only_stream() -> None:
@@ -36,7 +36,7 @@ def test_expect_chat_stream_contract_accepts_thinking_only_stream() -> None:
         patch("scripts.post_deploy_check.requests.get", return_value=model_response),
         patch("scripts.post_deploy_check.requests.post", return_value=chat_response),
     ):
-        assert _expect_chat_stream_contract("http://127.0.0.1:62606") == 0
+        assert _expect_chat_stream_contract("http://127.0.0.1:62606", "") == 0
 
 
 def test_expect_chat_stream_contract_accepts_token_then_done() -> None:
@@ -54,9 +54,11 @@ def test_expect_chat_stream_contract_accepts_token_then_done() -> None:
             "scripts.post_deploy_check.requests.post", return_value=chat_response
         ) as post,
     ):
-        assert _expect_chat_stream_contract("http://127.0.0.1:62606") == 0
+        assert _expect_chat_stream_contract("http://127.0.0.1:62606", "secret-123") == 0
     payload = post.call_args.kwargs["json"]
+    headers = post.call_args.kwargs["headers"]
     assert payload["model"] == "tinyllama:latest"
     assert payload["think"] is False
     assert payload["max_tokens"] == 48
     assert payload["temperature"] == 0
+    assert headers == {"X-GOAT-API-Key": "secret-123"}

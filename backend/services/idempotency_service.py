@@ -8,6 +8,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
+from typing import Protocol
 
 from goat_ai.clocks import Clock, SystemClock
 
@@ -33,6 +34,40 @@ class CompletedResponse:
 class ClaimResult:
     state: str
     completed: CompletedResponse | None = None
+
+
+class IdempotencyStore(Protocol):
+    """Persistence boundary for idempotent request claim/replay semantics."""
+
+    def claim(
+        self,
+        *,
+        key: str,
+        route: str,
+        scope: str,
+        request_hash: str,
+    ) -> ClaimResult: ...
+
+    def store_completed(
+        self,
+        *,
+        key: str,
+        route: str,
+        scope: str,
+        request_hash: str,
+        status_code: int,
+        content_type: str,
+        body: str,
+    ) -> None: ...
+
+    def release_pending(
+        self,
+        *,
+        key: str,
+        route: str,
+        scope: str,
+        request_hash: str,
+    ) -> None: ...
 
 
 class SQLiteIdempotencyStore:

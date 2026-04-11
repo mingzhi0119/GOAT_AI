@@ -1,83 +1,56 @@
-# Temporary CODEOWNERS bootstrap for the four Codex owner threads.
-# Replace every @mingzhi0119 entry below with the real GitHub usernames or team
-# slugs for these four roles before enabling "Require review from Code Owners":
-# - Lead / Platform Owner
-# - Frontend Owner
-# - Backend Owner
-# - Docs / Assets Owner
+# GOAT AI CODEOWNERS
 #
-# GitHub CODEOWNERS cannot encode Codex subthreads directly. These entries mirror
-# the intended responsibility lanes so GitHub review gates and Codex owner
-# branches can stay aligned.
+# GitHub review lanes are expressed as path ownership. The lane names below are
+# the operational ownership model used by the repo:
+# - Lead / Platform
+# - Frontend
+# - Backend
+# - Docs / Assets
+#
+# Current GitHub owner mapping:
+# - Lead / Platform: @mingzhi0119
+# - Frontend: @mingzhi0119
+# - Backend: @mingzhi0119
+# - Docs / Assets: @mingzhi0119
+#
+# These entries are the active ownership map for branch protection and review
+# routing today. Update this file in the same change whenever the GitHub owner
+# mapping changes.
 
-# Lead / Platform Owner
+# Lead / Platform
 * @mingzhi0119
 .github/** @mingzhi0119
-__tests__/test_application_ports_contract.py @mingzhi0119
-__tests__/test_architecture_boundaries.py @mingzhi0119
-__tests__/test_router_direct_imports.py @mingzhi0119
+scripts/** @mingzhi0119
+tools/** @mingzhi0119
+goat_ai/** @mingzhi0119
+ops/** @mingzhi0119
 
-# Frontend Owner
-frontend/src/components/** @mingzhi0119
-frontend/src/hooks/** @mingzhi0119
-frontend/src/utils/** @mingzhi0119
-frontend/src/styles/** @mingzhi0119
-frontend/src/config/** @mingzhi0119
-frontend/src/assets/** @mingzhi0119
-frontend/src/__tests__/** @mingzhi0119
-frontend/src/App.tsx @mingzhi0119
-frontend/src/main.tsx @mingzhi0119
-frontend/src/api/*.ts @mingzhi0119
+# Frontend
+frontend/src/** @mingzhi0119
+frontend/scripts/** @mingzhi0119
+frontend/src-tauri/** @mingzhi0119
+frontend/package.json @mingzhi0119
+frontend/package-lock.json @mingzhi0119
+frontend/tsconfig*.json @mingzhi0119
+frontend/vite.config.ts @mingzhi0119
 
-# Backend Owner
-backend/application/** @mingzhi0119
-backend/routers/** @mingzhi0119
-backend/services/** @mingzhi0119
-backend/models/** @mingzhi0119
-backend/domain/** @mingzhi0119
-backend/migrations/** @mingzhi0119
-backend/main.py @mingzhi0119
-backend/dependencies.py @mingzhi0119
-backend/exception_handlers.py @mingzhi0119
-backend/api_errors.py @mingzhi0119
-backend/http_security.py @mingzhi0119
-backend/readiness_service.py @mingzhi0119
-backend/types.py @mingzhi0119
-backend/config.py @mingzhi0119
+# Backend
+backend/** @mingzhi0119
+requirements*.txt @mingzhi0119
+pyproject.toml @mingzhi0119
+pytest.ini @mingzhi0119
 __tests__/** @mingzhi0119
 
-# Docs / Assets Owner
+# Docs / Assets
 docs/** @mingzhi0119
 .cursor/rules/** @mingzhi0119
 AGENTS.md @mingzhi0119
 README.md @mingzhi0119
 CONTRIBUTING.md @mingzhi0119
-.github/pull_request_template.md @mingzhi0119
 
 # Shared boundaries
-# Backend + Docs / Assets
 docs/openapi.json @mingzhi0119
 docs/api.llm.yaml @mingzhi0119
-docs/API_REFERENCE.md @mingzhi0119
-docs/API_ERRORS.md @mingzhi0119
-
-# Frontend + Backend
 frontend/src/api/types.ts @mingzhi0119
-__tests__/test_api_blackbox_contract.py @mingzhi0119
-__tests__/integration/test_app_smoke.py @mingzhi0119
-
-# Backend + Lead / Platform
 backend/application/ports.py @mingzhi0119
-__tests__/test_application_ports_contract.py @mingzhi0119
-__tests__/test_architecture_boundaries.py @mingzhi0119
-__tests__/test_router_direct_imports.py @mingzhi0119
-
-# All four owners
 .github/CODEOWNERS @mingzhi0119
-
-# Lead / Platform + Frontend + Backend
-.github/workflows/ci.yml @mingzhi0119
-
-# Shared runtime/core layer
-# Do not assign goat_ai/** to a single default owner. Lead / Platform should
-# explicitly coordinate the owning Codex thread for any goat_ai change.

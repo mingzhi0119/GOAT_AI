@@ -8,7 +8,10 @@ from unittest.mock import patch
 from backend.models.knowledge import KnowledgeCitation, KnowledgeSearchResponse
 from backend.services import log_service
 from backend.services.exceptions import KnowledgeDocumentNotFound
-from backend.services.workbench_execution_service import execute_workbench_task
+from backend.services.workbench_execution_service import (
+    execute_workbench_task,
+    recover_workbench_tasks,
+)
 from backend.services.workbench_runtime import (
     SQLiteWorkbenchTaskRepository,
     WorkbenchTaskCreatePayload,
@@ -203,3 +206,34 @@ class WorkbenchExecutionServiceTests(unittest.TestCase):
         assert stored is not None
         self.assertEqual("failed", stored.status)
         self.assertEqual("Knowledge document not found.", stored.error_detail)
+
+    def test_recover_workbench_tasks_replays_queued_and_fails_interrupted_running(
+        self,
+    ) -> None:
+        self._create_task(task_id="wb-recover-queued", task_kind="plan")
+        self._create_task(task_id="wb-recover-running", task_kind="plan")
+        claimed = self.repository.claim_task_for_execution(
+            "wb-recover-running",
+            updated_at="2026-04-11T00:00:01+00:00",
+        )
+        assert claimed is not None
+
+        recovered = recover_workbench_tasks(
+            repository=self.repository,
+            llm=_FakeLLM(),
+            settings=self.settings,
+        )
+
+        self.assertEqual(["wb-recover-queued"], recovered.replayed_task_ids)
+        self.assertEqual(["wb-recover-running"], recovered.interrupted_task_ids)
+
+        queued = self.repository.get_task("wb-recover-queued")
+        running = self.repository.get_task("wb-recover-running")
+        assert queued is not None
+        assert running is not None
+        self.assertEqual("completed", queued.status)
+        self.assertEqual("failed", running.status)
+        self.assertEqual(
+            "Task execution was interrupted during a previous process lifetime.",
+            running.error_detail,
+        )

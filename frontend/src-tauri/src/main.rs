@@ -13,9 +13,9 @@ use std::{
     process::{Command, Stdio},
 };
 
-use tauri::Manager;
 #[cfg(not(debug_assertions))]
 use std::fs;
+use tauri::Manager;
 #[cfg(not(debug_assertions))]
 use tauri_plugin_shell::{process::CommandChild, process::CommandEvent, ShellExt};
 
@@ -32,32 +32,50 @@ enum BackendProcessHandle {
     Release(CommandChild),
 }
 
-fn backend_host() -> String {
-    std::env::var("GOAT_DESKTOP_BACKEND_HOST")
-        .ok()
-        .and_then(|value| {
-            let trimmed = value.trim().to_string();
+fn normalize_configured_value(value: Option<String>, default: &str) -> String {
+    value
+        .and_then(|raw| {
+            let trimmed = raw.trim().to_string();
             if trimmed.is_empty() {
                 None
             } else {
                 Some(trimmed)
             }
         })
-        .unwrap_or_else(|| DEFAULT_BACKEND_HOST.to_string())
+        .unwrap_or_else(|| default.to_string())
+}
+
+fn backend_host() -> String {
+    normalize_configured_value(
+        std::env::var("GOAT_DESKTOP_BACKEND_HOST").ok(),
+        DEFAULT_BACKEND_HOST,
+    )
 }
 
 fn backend_port() -> String {
-    std::env::var("GOAT_DESKTOP_BACKEND_PORT")
-        .ok()
-        .and_then(|value| {
-            let trimmed = value.trim().to_string();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed)
-            }
-        })
-        .unwrap_or_else(|| DEFAULT_BACKEND_PORT.to_string())
+    normalize_configured_value(
+        std::env::var("GOAT_DESKTOP_BACKEND_PORT").ok(),
+        DEFAULT_BACKEND_PORT,
+    )
+}
+
+fn backend_health_url(host: &str, port: &str) -> String {
+    format!("http://{}:{}/api/health", host, port)
+}
+
+fn startup_failure_diagnostic(stage: &str, health_url: &str, detail: Option<&str>) -> String {
+    let mut message = format!(
+        "GOAT desktop startup issue [{}]: backend health probe did not become ready at {}.",
+        stage, health_url
+    );
+    if let Some(detail) = detail {
+        let trimmed = detail.trim();
+        if !trimmed.is_empty() {
+            message.push_str(" Detail: ");
+            message.push_str(trimmed);
+        }
+    }
+    message
 }
 
 fn main() {
@@ -70,7 +88,7 @@ fn main() {
             let window = app
                 .get_webview_window("main")
                 .ok_or("missing desktop main window")?;
-            let health_url = format!("http://{}:{}/api/health", backend_host, backend_port);
+            let health_url = backend_health_url(&backend_host, &backend_port);
 
             match spawn_backend(app.handle()) {
                 Ok(child) => {
@@ -80,7 +98,18 @@ fn main() {
                     }
                     let app_handle = app.handle().clone();
                     thread::spawn(move || {
-                        wait_for_backend(&health_url, Duration::from_secs(HEALTH_TIMEOUT_SEC));
+                        let ready =
+                            wait_for_backend(&health_url, Duration::from_secs(HEALTH_TIMEOUT_SEC));
+                        if !ready {
+                            eprintln!(
+                                "{}",
+                                startup_failure_diagnostic(
+                                    "health_wait_timeout",
+                                    &health_url,
+                                    Some("Timed out while waiting for the bundled backend to answer /api/health."),
+                                )
+                            );
+                        }
                         if let Some(window) = app_handle.get_webview_window("main") {
                             let _ = window.show();
                             let _ = window.set_focus();
@@ -88,7 +117,10 @@ fn main() {
                     });
                 }
                 Err(err) => {
-                    eprintln!("GOAT desktop failed to start backend: {err}");
+                    eprintln!(
+                        "{}",
+                        startup_failure_diagnostic("backend_spawn_failed", &health_url, Some(&err))
+                    );
                     let _ = window.show();
                     let _ = window.set_focus();
                 }
@@ -208,14 +240,24 @@ fn repo_root() -> Option<PathBuf> {
     Some(repo_root.to_path_buf())
 }
 
-fn wait_for_backend(health_url: &str, timeout: Duration) {
+fn wait_for_backend_with_probe<F>(timeout: Duration, interval: Duration, mut probe: F) -> bool
+where
+    F: FnMut() -> bool,
+{
     let deadline = Instant::now() + timeout;
     while Instant::now() < deadline {
-        if backend_ready(health_url) {
-            return;
+        if probe() {
+            return true;
         }
-        thread::sleep(Duration::from_millis(350));
+        thread::sleep(interval);
     }
+    false
+}
+
+fn wait_for_backend(health_url: &str, timeout: Duration) -> bool {
+    wait_for_backend_with_probe(timeout, Duration::from_millis(350), || {
+        backend_ready(health_url)
+    })
 }
 
 fn backend_ready(health_url: &str) -> bool {
@@ -228,6 +270,75 @@ fn backend_ready(health_url: &str) -> bool {
 #[allow(dead_code)]
 fn _path_exists(path: &Path) -> bool {
     path.exists()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        backend_health_url, normalize_configured_value, startup_failure_diagnostic,
+        wait_for_backend_with_probe,
+    };
+    use std::time::Duration;
+
+    #[test]
+    fn normalize_configured_value_trims_and_falls_back() {
+        assert_eq!(
+            normalize_configured_value(Some(" 127.0.0.1 ".into()), "fallback"),
+            "127.0.0.1"
+        );
+        assert_eq!(
+            normalize_configured_value(Some("   ".into()), "fallback"),
+            "fallback"
+        );
+        assert_eq!(normalize_configured_value(None, "fallback"), "fallback");
+    }
+
+    #[test]
+    fn backend_health_url_formats_expected_path() {
+        assert_eq!(
+            backend_health_url("127.0.0.1", "62606"),
+            "http://127.0.0.1:62606/api/health"
+        );
+    }
+
+    #[test]
+    fn wait_for_backend_with_probe_succeeds_before_timeout() {
+        let mut attempts = 0;
+        let ready = wait_for_backend_with_probe(
+            Duration::from_millis(50),
+            Duration::from_millis(0),
+            || {
+                attempts += 1;
+                attempts >= 3
+            },
+        );
+
+        assert!(ready);
+        assert_eq!(attempts, 3);
+    }
+
+    #[test]
+    fn wait_for_backend_with_probe_times_out_when_probe_never_succeeds() {
+        let ready =
+            wait_for_backend_with_probe(Duration::from_millis(1), Duration::from_millis(0), || {
+                false
+            });
+
+        assert!(!ready);
+    }
+
+    #[test]
+    fn startup_failure_diagnostic_includes_stage_url_and_detail() {
+        let message = startup_failure_diagnostic(
+            "health_wait_timeout",
+            "http://127.0.0.1:62606/api/health",
+            Some("Timed out"),
+        );
+
+        assert!(message.contains("health_wait_timeout"));
+        assert!(message.contains("http://127.0.0.1:62606/api/health"));
+        assert!(message.contains("Timed out"));
+    }
 }
 
 #[cfg(not(debug_assertions))]
@@ -244,8 +355,12 @@ fn spawn_release_backend<R: tauri::Runtime>(
         .path()
         .app_log_dir()
         .map_err(|err| format!("could not resolve app log dir: {err}"))?;
-    fs::create_dir_all(&data_root)
-        .map_err(|err| format!("could not create app data dir {}: {err}", data_root.display()))?;
+    fs::create_dir_all(&data_root).map_err(|err| {
+        format!(
+            "could not create app data dir {}: {err}",
+            data_root.display()
+        )
+    })?;
     fs::create_dir_all(&logs_dir)
         .map_err(|err| format!("could not create app log dir {}: {err}", logs_dir.display()))?;
 

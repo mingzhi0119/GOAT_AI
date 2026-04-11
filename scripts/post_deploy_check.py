@@ -14,6 +14,12 @@ def _fail(message: str) -> int:
     return 1
 
 
+def _headers(api_key: str) -> dict[str, str]:
+    if not api_key:
+        return {}
+    return {"X-GOAT-API-Key": api_key}
+
+
 def _parse_sse_events(body: str) -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = []
     for line in body.splitlines():
@@ -36,8 +42,12 @@ def _first_event_timeout_sec() -> int:
     return timeout
 
 
-def _expect_runtime_target(base_url: str) -> int:
-    response = requests.get(f"{base_url}/api/system/runtime-target", timeout=10)
+def _expect_runtime_target(base_url: str, api_key: str) -> int:
+    response = requests.get(
+        f"{base_url}/api/system/runtime-target",
+        headers=_headers(api_key),
+        timeout=10,
+    )
     response.raise_for_status()
     body = response.json()
     ordered = body.get("ordered_targets", [])
@@ -49,8 +59,12 @@ def _expect_runtime_target(base_url: str) -> int:
     return 0
 
 
-def _resolve_chat_check_model(base_url: str) -> str:
-    response = requests.get(f"{base_url}/api/models", timeout=10)
+def _resolve_chat_check_model(base_url: str, api_key: str) -> str:
+    response = requests.get(
+        f"{base_url}/api/models",
+        headers=_headers(api_key),
+        timeout=10,
+    )
     response.raise_for_status()
     body = response.json()
     models = body.get("models", [])
@@ -64,9 +78,9 @@ def _resolve_chat_check_model(base_url: str) -> str:
     return normalized[0]
 
 
-def _expect_chat_stream_contract(base_url: str) -> int:
+def _expect_chat_stream_contract(base_url: str, api_key: str) -> int:
     timeout_sec = _first_event_timeout_sec()
-    model = _resolve_chat_check_model(base_url)
+    model = _resolve_chat_check_model(base_url, api_key)
     try:
         response = requests.post(
             f"{base_url}/api/chat",
@@ -81,6 +95,7 @@ def _expect_chat_stream_contract(base_url: str) -> int:
                 "max_tokens": 48,
                 "temperature": 0,
             },
+            headers=_headers(api_key),
             timeout=(5, timeout_sec),
         )
         response.raise_for_status()
@@ -116,14 +131,24 @@ def main() -> int:
         description="Verify GOAT AI post-deploy API contract checks."
     )
     parser.add_argument("--base-url", default="http://127.0.0.1:62606")
+    parser.add_argument("--api-key", default="")
     args = parser.parse_args()
     base_url = str(args.base_url).rstrip("/")
+    api_key = str(args.api_key).strip()
 
-    health = requests.get(f"{base_url}/api/health", timeout=10)
+    health = requests.get(
+        f"{base_url}/api/health",
+        headers=_headers(api_key),
+        timeout=10,
+    )
     if health.status_code != 200:
         return _fail(f"health check returned HTTP {health.status_code}")
 
-    ready = requests.get(f"{base_url}/api/ready", timeout=15)
+    ready = requests.get(
+        f"{base_url}/api/ready",
+        headers=_headers(api_key),
+        timeout=15,
+    )
     if ready.status_code != 200:
         return _fail(
             f"ready check returned HTTP {ready.status_code}: {ready.text[:500]}"
@@ -137,7 +162,7 @@ def main() -> int:
 
     for check in (_expect_runtime_target, _expect_chat_stream_contract):
         try:
-            result = check(base_url)
+            result = check(base_url, api_key)
             if result != 0:
                 return result
         except Exception as exc:

@@ -75,6 +75,12 @@ Run the same post-deploy contract check that production uses:
 python scripts/post_deploy_check.py --base-url http://127.0.0.1:62606
 ```
 
+For data-bearing rollbacks, rehearse the SQLite side separately before the maintenance window:
+
+```bash
+python -m scripts.exercise_recovery_drill --src /path/to/chat_logs.db --backup-dir /path/to/backups --required-table sessions --required-table session_messages
+```
+
 Confirm at least:
 
 - `GET /api/health`

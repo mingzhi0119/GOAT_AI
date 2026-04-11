@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from collections.abc import Generator, Iterable
+from typing import Callable
 
 from backend.domain.authz_types import AuthorizationContext
 from fastapi.responses import StreamingResponse
@@ -19,6 +20,7 @@ from backend.application.ports import (
     Settings,
     TabularContextExtractor,
     TitleGenerator,
+    IdempotencyStore,
     VisionNotSupported,
     validate_chat_capacity,
 )
@@ -31,8 +33,8 @@ from backend.application.exceptions import (
 from backend.models.chat import ChatMessage, ChatRequest
 from backend.services.chat_message_merge import merge_request_image_attachments
 from backend.services.idempotency_service import (
-    SQLiteIdempotencyStore,
     build_request_hash,
+    SQLiteIdempotencyStore,
 )
 from backend.services.media_service import load_images_base64_for_chat
 from backend.services.chat_service import stream_chat_sse
@@ -66,11 +68,14 @@ class PreparedChatRequest:
 class ChatIdempotencyContext:
     """Resolved idempotency scope for a session append request."""
 
-    store: SQLiteIdempotencyStore
+    store: IdempotencyStore
     key: str
     route: str
     scope: str
     request_hash: str
+
+
+IdempotencyStoreFactory = Callable[[Settings], IdempotencyStore]
 
 
 def _build_ollama_options(
@@ -206,19 +211,25 @@ def _build_idempotency_context(
     user_name: str,
     settings: Settings,
     idempotency_key: str,
+    idempotency_store_factory: IdempotencyStoreFactory | None = None,
 ) -> ChatIdempotencyContext | None:
     if not idempotency_key or not req.session_id:
         return None
+    store_factory = idempotency_store_factory or _default_idempotency_store_factory
 
     return ChatIdempotencyContext(
-        store=SQLiteIdempotencyStore(
-            db_path=settings.log_db_path,
-            ttl_sec=settings.idempotency_ttl_sec,
-        ),
+        store=store_factory(settings),
         key=idempotency_key,
         route="/api/chat",
         scope=f"session_append:{req.session_id}",
         request_hash=build_request_hash(_idempotency_request_bytes(req, user_name)),
+    )
+
+
+def _default_idempotency_store_factory(settings: Settings) -> IdempotencyStore:
+    return SQLiteIdempotencyStore(
+        db_path=settings.log_db_path,
+        ttl_sec=settings.idempotency_ttl_sec,
     )
 
 

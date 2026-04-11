@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import cast
 
 from backend.domain.authz_types import AuthorizationContext
@@ -35,6 +36,13 @@ _RETRIEVAL_NO_RUNNABLE_SOURCES = (
     "No runnable retrieval sources are currently available."
 )
 _RETRIEVAL_EXECUTION_FAILED = "Retrieval execution failed."
+_TASK_INTERRUPTED = "Task execution was interrupted during a previous process lifetime."
+
+
+@dataclass(frozen=True)
+class WorkbenchRecoveryResult:
+    replayed_task_ids: list[str]
+    interrupted_task_ids: list[str]
 
 
 def _resolve_plan_model(llm: LLMClient) -> str:
@@ -374,3 +382,38 @@ def execute_workbench_task(
             updated_at=_now_iso(),
             error_detail=error_detail,
         )
+
+
+def recover_workbench_tasks(
+    *,
+    repository: WorkbenchTaskRepository,
+    llm: LLMClient,
+    settings: Settings,
+) -> WorkbenchRecoveryResult:
+    """Recover persisted workbench tasks left behind by a prior process."""
+
+    replayed_task_ids: list[str] = []
+    interrupted_task_ids: list[str] = []
+
+    for task_id in repository.list_task_ids_by_status(["running"]):
+        repository.mark_task_failed(
+            task_id,
+            updated_at=_now_iso(),
+            error_detail=_TASK_INTERRUPTED,
+        )
+        interrupted_task_ids.append(task_id)
+
+    for task_id in repository.list_task_ids_by_status(["queued"]):
+        execute_workbench_task(
+            task_id=task_id,
+            repository=repository,
+            llm=llm,
+            settings=settings,
+            request_id="startup-recovery",
+        )
+        replayed_task_ids.append(task_id)
+
+    return WorkbenchRecoveryResult(
+        replayed_task_ids=replayed_task_ids,
+        interrupted_task_ids=interrupted_task_ids,
+    )

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import hashlib
 import logging
 import time
 import uuid
-from typing import Callable, Protocol, cast
+from typing import Callable, cast
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
@@ -21,6 +20,12 @@ from backend.domain.credential_registry import (
 )
 from backend.config import get_settings
 from backend.prometheus_metrics import record_http_request
+from backend.services.rate_limiter import (
+    RateLimiter,
+    RateLimitPolicyLike,
+    StoredSlidingWindowRateLimiter,
+)
+from backend.services.rate_limit_store import RateLimitStore
 from goat_ai.clocks import Clock, SystemClock
 from goat_ai.config import Settings
 from goat_ai.request_context import reset_request_id, set_request_id
@@ -49,29 +54,6 @@ _WRITE_SCOPES = frozenset(
 access_logger = logging.getLogger("goat_ai.access")
 
 SettingsFactory = Callable[[], Settings]
-
-
-class RateLimitDecisionLike(Protocol):
-    allowed: bool
-    retry_after: int
-
-
-class RateLimitStoreLike(Protocol):
-    def get_timestamps(
-        self, key: str, *, now: float, window_sec: int
-    ) -> list[float]: ...
-
-    def replace_timestamps(self, key: str, timestamps: list[float]) -> None: ...
-
-
-class RateLimitPolicyLike(Protocol):
-    window_sec: int
-
-    def key_for(self, subject: object) -> str: ...
-
-    def decide(
-        self, observed_timestamps: list[float], *, now: float
-    ) -> RateLimitDecisionLike: ...
 
 
 def _resolve_settings(app: FastAPI) -> Settings:
@@ -139,6 +121,8 @@ def _method_class(method: str) -> str:
 
 
 def _fingerprint_api_key(api_key: str) -> str:
+    import hashlib
+
     return hashlib.sha256(api_key.encode("utf-8")).hexdigest()
 
 
@@ -159,14 +143,39 @@ def _build_rate_limit_subject(
     }
 
 
+def _default_rate_limiter_factory(
+    *,
+    rate_limit_policy_factory: Callable[[Settings], RateLimitPolicyLike],
+    rate_limit_store: RateLimitStore,
+) -> Callable[[Settings], RateLimiter]:
+    def factory(settings: Settings) -> RateLimiter:
+        return StoredSlidingWindowRateLimiter(
+            policy=rate_limit_policy_factory(settings),
+            store=rate_limit_store,
+        )
+
+    return factory
+
+
 def register_http_security(
     app: FastAPI,
     *,
     clock: Clock | None = None,
-    rate_limit_policy_factory: Callable[[Settings], RateLimitPolicyLike],
-    rate_limit_store: RateLimitStoreLike,
+    rate_limiter_factory: Callable[[Settings], RateLimiter] | None = None,
+    rate_limit_policy_factory: Callable[[Settings], RateLimitPolicyLike] | None = None,
+    rate_limit_store: RateLimitStore | None = None,
 ) -> None:
     _clock = clock if clock is not None else SystemClock()
+    if rate_limiter_factory is None:
+        if rate_limit_policy_factory is None or rate_limit_store is None:
+            raise ValueError(
+                "register_http_security requires either rate_limiter_factory or "
+                "both rate_limit_policy_factory and rate_limit_store."
+            )
+        rate_limiter_factory = _default_rate_limiter_factory(
+            rate_limit_policy_factory=rate_limit_policy_factory,
+            rate_limit_store=rate_limit_store,
+        )
 
     @app.middleware("http")
     async def security_middleware(
@@ -207,22 +216,15 @@ def register_http_security(
                     return _build_forbidden_write_key_response(request_id)
                 request.state.authorization_context = auth_context
 
-                rate_limit_policy = rate_limit_policy_factory(settings)
                 subject = _build_rate_limit_subject(request, provided_api_key)
-                rate_limit_key = rate_limit_policy.key_for(subject)
                 now = _clock.monotonic()
-                timestamps = rate_limit_store.get_timestamps(
-                    rate_limit_key,
-                    now=now,
-                    window_sec=rate_limit_policy.window_sec,
-                )
-                decision = rate_limit_policy.decide(timestamps, now=now)
+                rate_limiter = rate_limiter_factory(settings)
+                decision = rate_limiter.evaluate(subject=subject, now=now)
                 if not decision.allowed:
                     status_code = 429
                     return _build_rate_limited_response(
                         request_id, decision.retry_after
                     )
-                rate_limit_store.replace_timestamps(rate_limit_key, [*timestamps, now])
             else:
                 request.state.authorization_context = (
                     build_local_authorization_context()

@@ -94,12 +94,21 @@ Desktop sidecar writable paths:
 - SQLite DB: `<app_local_data_dir>/chat_logs.db`
 - persisted app data: `<app_local_data_dir>/data`
 - desktop shell stdout/stderr are not yet persisted to a dedicated file sink; use backend SQLite/data plus the installer-run process logs for diagnostics today
+- Tauri startup now emits explicit diagnostics when sidecar spawn fails or `/api/health` does not become ready before the window reveal timeout
 
 Packaged desktop runtime config:
 
 - The packaged desktop app inherits runtime configuration from the parent OS environment rather than a repo-local `.env`.
 - Common runtime knobs for packaged installs are `OLLAMA_BASE_URL`, `GOAT_FEATURE_CODE_SANDBOX`, `GOAT_CODE_SANDBOX_PROVIDER`, and `GOAT_DESKTOP_BACKEND_PORT`.
 - Docker is the default sandbox backend for strong isolation. `localhost` is a trusted-dev fallback only and does not enforce the same network guarantees.
+
+Desktop smoke command:
+
+```bash
+python -m scripts.desktop_smoke --host 127.0.0.1 --port 62606
+```
+
+When API protection is enabled, pass `--api-key "$GOAT_API_KEY"`.
 
 ## Deploy
 
@@ -309,6 +318,11 @@ curl -sS -H "X-GOAT-API-Key: $GOAT_API_KEY" http://127.0.0.1:62606/api/system/me
   - `http_request_duration_seconds_sum`
   - `http_request_duration_seconds_count`
 - Counter semantics: `chat_stream_completed_total` counts only successful assistant completions, not safeguard-blocked refusal flows
+- Versioned observability assets live under [`../ops/observability/`](../ops/observability/README.md):
+  - Prometheus scrape example: [`../ops/observability/prometheus/goat-api-scrape.yml`](../ops/observability/prometheus/goat-api-scrape.yml)
+  - Alert rules: [`../ops/observability/alerts/goat-api-alerts.yml`](../ops/observability/alerts/goat-api-alerts.yml)
+  - Grafana dashboard: [`../ops/observability/grafana/goat-api-dashboard.json`](../ops/observability/grafana/goat-api-dashboard.json)
+- First-response runbook for failures is tracked in [INCIDENT_TRIAGE.md](INCIDENT_TRIAGE.md).
 
 ### Ollama client resilience policy (Phase 13 Wave B)
 
@@ -326,6 +340,7 @@ curl -sS -H "X-GOAT-API-Key: $GOAT_API_KEY" http://127.0.0.1:62606/api/system/me
 - Same key + same payload returns the same response body
 - Same key + different payload returns `409` (`code = IDEMPOTENCY_CONFLICT`)
 - Storage: SQLite `idempotency_keys` table with TTL cleanup on claim
+- Application boundaries now receive idempotency storage through an injectable `IdempotencyStore` protocol so higher-scale storage can replace the SQLite adapter without rewriting router/application logic
 
 ### Safeguard configuration
 
@@ -372,9 +387,10 @@ Setting `GOAT_SAFEGUARD_ENABLED=false` and `GOAT_SAFEGUARD_MODE=off` are equival
 
 ### Multi-instance stance (honest limits)
 
-- Rate limiting in `backend/http_security.py` is in-memory and per-process
+- Rate limiting in `backend/http_security.py` is still in-memory and per-process by default, but it now executes behind a replaceable `RateLimiter` boundary so a shared store can replace the current adapter without changing middleware semantics
 - Rolling latency samples (`/api/system/inference`) are process-local
 - Idempotency cache is SQLite-backed in this release; concurrent multi-writer behavior across many app instances is not treated as a cluster-wide guarantee
+- Durable background execution now also uses a replaceable runner boundary, and workbench startup recovery explicitly replays queued tasks while marking previously running tasks as interrupted
 - Mitigations without Redis/Postgres:
   - Use sticky sessions at the proxy layer
   - Lower per-instance rate limits to preserve global headroom
@@ -400,6 +416,22 @@ python -m tools.load_chat_smoke --base-url http://127.0.0.1:62606 --model gemma4
 ```
 
 When API protection is enabled, pass `--api-key "$GOAT_API_KEY"`.
+
+Performance governance:
+
+- `.github/workflows/performance-nightly.yml` runs the same smoke command on a schedule or manual dispatch.
+- The performance gate currently fails when:
+  - full chat p95 exceeds `12000 ms`
+  - first-token p95 exceeds `2000 ms`
+- Keep those thresholds aligned with the SLO starter table unless a reviewed change updates both the workflow and this document.
+
+## Release governance
+
+- `.github/workflows/release-governance.yml` is the P1 release workflow for:
+  - release manifest generation
+  - staging deployment
+  - production promotion behind GitHub Environment approval
+- Release policy and required environment secrets are documented in [RELEASE_GOVERNANCE.md](RELEASE_GOVERNANCE.md).
 
 ## Process and health
 
@@ -437,6 +469,14 @@ Graceful shutdown note:
 ```bash
 python scripts/backup_chat_db.py
 ```
+
+- Recovery drill:
+
+```bash
+python -m scripts.exercise_recovery_drill --src "$GOAT_LOG_PATH" --backup-dir ./backups --required-table sessions --required-table session_messages
+```
+
+- The recovery drill is now covered by automated tests; keep it passing whenever backup, restore, rollback, or SQLite persistence behavior changes.
 
 ## GPU and telemetry
 

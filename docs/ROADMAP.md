@@ -47,22 +47,22 @@ P0 exit criteria:
 
 #### P1: turn quality checks into durable release controls
 
-- Add staged release automation for at least a reproducible staging deploy and a documented production approval gate.
-- Turn `.github/CODEOWNERS` into real path ownership rather than bootstrap placeholders.
-- Version and store observability assets in-repo:
+- [x] Add staged release automation for at least a reproducible staging deploy and a documented production approval gate.
+- [x] Turn `.github/CODEOWNERS` into real path ownership rather than bootstrap placeholders.
+- [x] Version and store observability assets in-repo:
   - dashboards
   - alert rules
   - scrape config or equivalent metrics wiring
   - failure triage notes for common incidents
-- Introduce performance regression checks:
+- [x] Introduce performance regression checks:
   - nightly or pre-release smoke/load validation
   - explicit budgets for first-token latency, full response latency, and desktop startup where relevant
-- Upgrade single-process reliability assumptions behind replaceable interfaces where scaling may grow:
+- [x] Upgrade single-process reliability assumptions behind replaceable interfaces where scaling may grow:
   - rate limiting
   - idempotency
   - durable background execution
-- Add desktop smoke coverage for sidecar boot, health-wait handshake, and first-run diagnostics.
-- Exercise backup, restore, and rollback paths rather than treating them as documentation-only flows.
+- [x] Add desktop smoke coverage for sidecar boot, health-wait handshake, and first-run diagnostics.
+- [x] Exercise backup, restore, and rollback paths rather than treating them as documentation-only flows.
 
 P1 exit criteria:
 

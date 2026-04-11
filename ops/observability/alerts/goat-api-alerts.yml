@@ -1,0 +1,52 @@
+groups:
+  - name: goat-ai-api
+    rules:
+      - alert: GoatApiReadinessDown
+        expr: sum(rate(http_requests_total{route="/api/ready",status="503"}[5m])) > 0
+        for: 5m
+        labels:
+          severity: page
+          service: goat-ai
+        annotations:
+          summary: GOAT AI readiness is failing
+          description: The readiness endpoint has returned 503s for at least 5 minutes.
+
+      - alert: GoatApiLatencyP95High
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[10m]))) > 2
+        for: 15m
+        labels:
+          severity: warning
+          service: goat-ai
+        annotations:
+          summary: GOAT AI request latency p95 is above 2s
+          description: HTTP request latency p95 has remained above 2 seconds for 15 minutes.
+
+      - alert: GoatApiSQLiteWriteFailures
+        expr: increase(sqlite_log_write_failures_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: page
+          service: goat-ai
+        annotations:
+          summary: GOAT AI is failing SQLite write paths
+          description: One or more SQLite log/session writes failed in the last 15 minutes.
+
+      - alert: GoatApiOllamaErrorsBurst
+        expr: increase(ollama_errors_total[10m]) >= 5
+        for: 10m
+        labels:
+          severity: warning
+          service: goat-ai
+        annotations:
+          summary: GOAT AI is seeing repeated Ollama transport failures
+          description: Ollama transport failures reached 5 or more in a 10-minute window.
+
+      - alert: GoatApiRetrievalMissSpike
+        expr: sum(rate(knowledge_retrieval_requests_total{outcome="miss"}[15m])) > sum(rate(knowledge_retrieval_requests_total{outcome="hit"}[15m]))
+        for: 20m
+        labels:
+          severity: warning
+          service: goat-ai
+        annotations:
+          summary: GOAT AI retrieval misses are outpacing hits
+          description: Retrieval misses have exceeded hits for 20 minutes and may indicate indexing drift or degraded relevance.

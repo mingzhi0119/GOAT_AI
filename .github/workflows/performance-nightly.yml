@@ -1,0 +1,64 @@
+name: Performance Nightly
+
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Override the target base URL"
+        required: false
+        type: string
+      model:
+        description: "Model name used for the smoke run"
+        required: false
+        default: "gemma4:26b"
+        type: string
+      runs:
+        description: "Number of chat runs"
+        required: false
+        default: "10"
+        type: string
+
+jobs:
+  performance-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install runner dependencies
+        run: python -m pip install -r requirements-ci.txt
+      - name: Resolve target inputs
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_url="${{ inputs.base_url }}"
+          if [[ -z "${base_url}" ]]; then
+            base_url="${{ secrets.PERFORMANCE_BASE_URL }}"
+          fi
+          if [[ -z "${base_url}" ]]; then
+            echo "PERFORMANCE_BASE_URL is required." >&2
+            exit 1
+          fi
+          echo "base_url=${base_url}" >> "${GITHUB_OUTPUT}"
+      - name: Run latency smoke
+        env:
+          PERFORMANCE_API_KEY: ${{ secrets.PERFORMANCE_API_KEY }}
+        run: |
+          python -m tools.load_chat_smoke \
+            --base-url "${{ steps.target.outputs.base_url }}" \
+            --model "${{ inputs.model || 'gemma4:26b' }}" \
+            --runs "${{ inputs.runs || '10' }}" \
+            --api-key "${PERFORMANCE_API_KEY}" \
+            --show-system-inference \
+            --max-total-p95-ms 12000 \
+            --max-first-token-p95-ms 2000 | tee performance-smoke.log
+      - name: Upload performance log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-smoke-log
+          path: performance-smoke.log

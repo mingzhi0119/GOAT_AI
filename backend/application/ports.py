@@ -13,6 +13,7 @@ from backend.services.chat_runtime import (
     SessionRepository,
     TitleGenerator,
 )  # noqa: F401
+from backend.services.idempotency_service import IdempotencyStore  # noqa: F401
 from backend.services.workbench_runtime import WorkbenchTaskRepository  # noqa: F401
 from backend.services.code_sandbox_runtime import (  # noqa: F401
     CodeSandboxExecutionRepository,
@@ -58,6 +59,7 @@ __all__ = [
     "CodeSandboxExecutionRepository",
     "FeatureNotAvailable",
     "InferenceBackendUnavailable",
+    "IdempotencyStore",
     "KnowledgeDocumentNotFound",
     "KnowledgeValidationError",
     "LLMClient",

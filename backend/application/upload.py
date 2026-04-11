@@ -6,21 +6,28 @@ from collections.abc import Generator
 from typing import Callable
 
 from backend.domain.authz_types import AuthorizationContext
-from backend.application.ports import KnowledgeValidationError, Settings, LLMClient
+from backend.application.ports import (
+    IdempotencyStore,
+    KnowledgeValidationError,
+    Settings,
+    LLMClient,
+)
 from backend.application.exceptions import (
     UploadIdempotencyConflictError,
     UploadIdempotencyInProgressError,
 )
 from backend.models.upload import UploadAnalysisResponse
 from backend.services.idempotency_service import (
-    SQLiteIdempotencyStore,
     build_request_hash,
+    SQLiteIdempotencyStore,
 )
 from backend.services.knowledge_storage import SUPPORTED_KNOWLEDGE_EXTENSIONS
 from backend.services.upload_service import (
     ingest_upload as _ingest_upload,
     stream_upload_analysis_sse as _stream_upload_analysis_sse,
 )
+
+IdempotencyStoreFactory = Callable[[Settings], IdempotencyStore]
 
 
 def _validate_upload_input(*, filename: str, content: bytes) -> None:
@@ -81,17 +88,17 @@ def analyze_upload_json(
     idempotency_key: str | None = None,
     llm: LLMClient | None = None,
     ingest_upload_fn: Callable[..., UploadAnalysisResponse] = ingest_upload,
+    idempotency_store_factory: IdempotencyStoreFactory | None = None,
 ) -> UploadAnalysisResponse:
     """Validate upload input, ingest the file, and return JSON readiness metadata."""
     _validate_upload_input(filename=filename, content=content)
     key = (idempotency_key or "").strip()
     scope = "upload_analyze_json"
     request_hash = build_request_hash(filename.encode("utf-8") + b"\x00" + content)
+    store_factory = idempotency_store_factory or _default_idempotency_store_factory
 
     if key:
-        store = SQLiteIdempotencyStore(
-            db_path=settings.log_db_path, ttl_sec=settings.idempotency_ttl_sec
-        )
+        store = store_factory(settings)
         claim = store.claim(
             key=key,
             route="/api/upload/analyze",
@@ -138,3 +145,10 @@ def analyze_upload_json(
             body=response_model.model_dump_json(),
         )
     return response_model
+
+
+def _default_idempotency_store_factory(settings: Settings) -> IdempotencyStore:
+    return SQLiteIdempotencyStore(
+        db_path=settings.log_db_path,
+        ttl_sec=settings.idempotency_ttl_sec,
+    )

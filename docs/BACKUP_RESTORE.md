@@ -34,6 +34,12 @@ Expected output:
 ok
 ```
 
+Or run the scripted drill, which now exercises backup creation, restore-to-target, and rollback-to-original-copy in one pass:
+
+```bash
+python -m scripts.exercise_recovery_drill --src /path/to/chat_logs.db --backup-dir /path/to/backups --required-table sessions --required-table session_messages
+```
+
 ## 3) Restore drill (staging or maintenance window)
 
 1. Stop the API process.
@@ -62,4 +68,5 @@ python scripts/post_deploy_check.py --base-url http://127.0.0.1:62606
 ## Notes
 
 - SQLite backup is online-safe via `sqlite3.Connection.backup()` in `scripts/backup_chat_db.py`.
+- `python -m scripts.exercise_recovery_drill` is the preferred non-production rehearsal path because it verifies backup integrity, restore bytes, and rollback bytes together instead of relying on a handwritten copy sequence.
 - Keep backups on the same filesystem only for short-term recovery; copy to durable storage for disaster recovery.

@@ -24,6 +24,8 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 - Changes that add more logic to a known hotspot should first extract or isolate responsibilities instead of extending a large mixed-concern module inline.
 - Security-sensitive changes must preserve or improve validation, authz, secret handling, and auditability.
 - Runtime or deployment changes must preserve or improve observability, rollbackability, and failure diagnostics.
+- Changes to process-local reliability seams such as rate limiting, idempotency, and background execution must stay behind replaceable interfaces and keep direct tests for the recovery/failure behavior.
+- Desktop startup, sidecar boot, or first-run diagnostic changes must update both the Rust startup tests and the scripted desktop smoke path in the same change.
 - If a change would knowingly reduce one of the industrial-score dimensions, document the tradeoff explicitly in the PR and add a follow-up gate or remediation item before merge.
 
 ## 1. Python Standards
@@ -92,6 +94,8 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 - Run the relevant CI-equivalent checks for the layer you changed.
 - For frontend changes, run `cd frontend && npm ci && npm test -- --run`.
 - CI also runs `cd frontend && npm run build`; run that locally for frontend changes that touch types, build inputs, packaging, test utilities, or any path that may compile differently from `vitest`.
+- Desktop shell changes must keep `cargo test --manifest-path frontend/src-tauri/Cargo.toml` green.
+- Delivery and desktop wrapper changes must keep the scripted smoke coverage green (`python -m pytest __tests__/test_desktop_smoke.py` and any affected script tests).
 - Prefer coverage reporting and fail-under thresholds for backend and frontend; do not lower thresholds without an explicit documented exception.
 - Do not run manual visual verification unless the user asks.
 
@@ -125,6 +129,7 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 - Treat user-visible garbled text, encoding regressions, or broken diagnostics as correctness issues, not cosmetic follow-ups.
 - Flag growing hotspot files early; if a touched mixed-concern file is already oversized, prefer extraction over further inline expansion.
 - Keep `.github/CODEOWNERS` as the source of truth for default directory ownership.
+- Keep `.github/workflows/release-governance.yml` and the GitHub Environment approval rules aligned with the documented release process in `docs/RELEASE_GOVERNANCE.md`.
 - Use four long-lived Codex owner lanes: Lead/Platform, Frontend, Backend, Docs/Assets.
 - Shared contracts and cross-layer boundaries must be jointly reviewed by the owning lanes.
 - Lead/Platform owns CI, governance boundaries, shared-boundary arbitration, and the final merge recommendation.
@@ -161,6 +166,9 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 - Keep docs UTF-8 without BOM.
 - Update related docs when user-visible semantics change.
 - Update roadmap, operations, or project-status docs when release gates, runbooks, or score-protection policies materially change.
+- When changing operator-facing metrics, update the versioned observability assets under `ops/observability/` and any affected incident runbooks in the same change.
+- When changing performance budgets or smoke-test semantics, update `tools/load_chat_smoke.py`, the scheduled workflow, and `docs/OPERATIONS.md` together.
+- When changing backup, restore, rollback, or SQLite persistence semantics, update the recovery drill (`scripts/exercise_recovery_drill.py`), its tests, and the linked runbooks in the same change.
 
 ## 13. API Artifacts
 

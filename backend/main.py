@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -31,12 +30,20 @@ from backend.services import log_service
 from backend.services.code_sandbox_execution_service import (
     recover_queued_code_sandbox_executions,
 )
-from backend.services.code_sandbox_provider import DockerSandboxProvider, LocalHostProvider
+from backend.services.background_jobs import ThreadBackgroundJobRunner
+from backend.services.code_sandbox_provider import (
+    DockerSandboxProvider,
+    LocalHostProvider,
+)
 from backend.services.code_sandbox_runtime import SQLiteCodeSandboxExecutionRepository
+from backend.services.rate_limiter import StoredSlidingWindowRateLimiter
 from backend.services.rate_limit_store import InMemorySlidingWindowRateLimitStore
+from backend.services.workbench_execution_service import recover_workbench_tasks
+from backend.services.workbench_runtime import SQLiteWorkbenchTaskRepository
 from goat_ai.config import Settings
 from goat_ai.latency_metrics import init_latency_metrics
 from goat_ai.logging_config import configure_logging
+from goat_ai.ollama_client import OllamaService
 from goat_ai.otel_tracing import init_otel_if_enabled, is_otel_enabled
 
 configure_logging()
@@ -45,10 +52,21 @@ logger = logging.getLogger(__name__)
 DIST = Path(__file__).parent.parent / "frontend" / "dist"
 
 
-def _build_code_sandbox_provider(settings: Settings) -> DockerSandboxProvider | LocalHostProvider:
+def _build_code_sandbox_provider(
+    settings: Settings,
+) -> DockerSandboxProvider | LocalHostProvider:
     if settings.code_sandbox_provider == "localhost":
         return LocalHostProvider(settings)
     return DockerSandboxProvider(settings)
+
+
+def run_workbench_recovery(*, settings: Settings) -> None:
+    repository = SQLiteWorkbenchTaskRepository(settings.log_db_path)
+    recover_workbench_tasks(
+        repository=repository,
+        llm=OllamaService(settings),
+        settings=settings,
+    )
 
 
 def create_app() -> FastAPI:
@@ -57,7 +75,9 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
-        def run_recovery() -> None:
+        recovery_runner = ThreadBackgroundJobRunner()
+
+        def run_code_sandbox_recovery() -> None:
             repository = SQLiteCodeSandboxExecutionRepository(settings.log_db_path)
             provider = _build_code_sandbox_provider(settings)
             recover_queued_code_sandbox_executions(
@@ -66,7 +86,16 @@ def create_app() -> FastAPI:
                 settings=settings,
             )
 
-        threading.Thread(target=run_recovery, daemon=True).start()
+        recovery_runner.submit(
+            name="code-sandbox-recovery",
+            target=run_code_sandbox_recovery,
+        )
+        if settings.feature_agent_workbench_enabled:
+            recovery_runner.submit(
+                name="workbench-recovery",
+                target=run_workbench_recovery,
+                kwargs={"settings": settings},
+            )
         yield
 
     app = FastAPI(
@@ -130,16 +159,20 @@ def create_app() -> FastAPI:
     )
     rate_limit_store = InMemorySlidingWindowRateLimitStore()
 
-    def rate_limit_policy_factory(settings: Settings) -> RateLimitPolicy:
-        return RateLimitPolicy(
-            window_sec=settings.rate_limit_window_sec,
-            max_requests=settings.rate_limit_max_requests,
+    def rate_limiter_factory(
+        resolved_settings: Settings,
+    ) -> StoredSlidingWindowRateLimiter:
+        return StoredSlidingWindowRateLimiter(
+            policy=RateLimitPolicy(
+                window_sec=resolved_settings.rate_limit_window_sec,
+                max_requests=resolved_settings.rate_limit_max_requests,
+            ),
+            store=rate_limit_store,
         )
 
     register_http_security(
         app,
-        rate_limit_policy_factory=rate_limit_policy_factory,
-        rate_limit_store=rate_limit_store,
+        rate_limiter_factory=rate_limiter_factory,
     )
 
     app.include_router(models.router, prefix="/api", tags=["models"])

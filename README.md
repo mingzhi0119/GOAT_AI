@@ -230,6 +230,13 @@ Default directory ownership lives in [`.github/CODEOWNERS`](.github/CODEOWNERS).
 
 Merges to `main` should be gated by GitHub branch protection, required checks, and code owner review. Lead/Platform gives the final merge recommendation after the relevant owner lanes review the change. Operational details for Codex threads live in [AGENTS.md](AGENTS.md), with repo-wide standards in [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md).
 
+P1 governance assets now live in-repo too:
+
+- release workflow and approval policy: [docs/RELEASE_GOVERNANCE.md](docs/RELEASE_GOVERNANCE.md)
+- observability assets: [ops/observability/README.md](ops/observability/README.md)
+- incident response starter runbook: [docs/INCIDENT_TRIAGE.md](docs/INCIDENT_TRIAGE.md)
+- scheduled performance smoke: [`.github/workflows/performance-nightly.yml`](.github/workflows/performance-nightly.yml)
+
 ## Docs
 
 - [AGENTS.md](AGENTS.md): short index for agents; **canonical rules:** [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md)
@@ -241,9 +248,12 @@ Merges to `main` should be gated by GitHub branch protection, required checks, a
 - [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md): SQLite backup/restore drill
 - [docs/ROLLBACK.md](docs/ROLLBACK.md): rollback procedure for shared-host deploys
 - [docs/SECURITY.md](docs/SECURITY.md): upload/API threat notes and CI security posture
+- [docs/RELEASE_GOVERNANCE.md](docs/RELEASE_GOVERNANCE.md): staged release and production approval policy
+- [docs/INCIDENT_TRIAGE.md](docs/INCIDENT_TRIAGE.md): first-response runbook for readiness, latency, retrieval, and feature-gate failures
 - [docs/ROADMAP.md](docs/ROADMAP.md): unfinished backlog and priority queue
 - [docs/ROADMAP_ARCHIVE.md](docs/ROADMAP_ARCHIVE.md): historical roadmap content and phase closeouts
 - [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md): coding and process standards (single source of truth)
+- [ops/observability/README.md](ops/observability/README.md): versioned scrape config, alert rules, and dashboards
 - [`examples/`](examples): demo/example assets kept out of canonical docs
 
 Capacity/load validation:

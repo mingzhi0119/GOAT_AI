@@ -23,6 +23,17 @@ class RunSample:
     first_token_ms: float | None
 
 
+@dataclass(frozen=True)
+class SmokeSummary:
+    runs: int
+    total_avg_ms: float
+    total_p50_ms: float
+    total_p95_ms: float
+    first_token_avg_ms: float | None
+    first_token_p50_ms: float | None
+    first_token_p95_ms: float | None
+
+
 def _percentile(values: list[float], q: float) -> float:
     if not values:
         return 0.0
@@ -81,18 +92,43 @@ def _read_sse_sample(
     return RunSample(total_ms=total_ms, first_token_ms=first_token_ms)
 
 
-def _print_summary(samples: list[RunSample]) -> None:
+def _build_summary(samples: list[RunSample]) -> SmokeSummary:
     total = [item.total_ms for item in samples]
     first = [item.first_token_ms for item in samples if item.first_token_ms is not None]
+    return SmokeSummary(
+        runs=len(samples),
+        total_avg_ms=statistics.fmean(total),
+        total_p50_ms=_percentile(total, 0.50),
+        total_p95_ms=_percentile(total, 0.95),
+        first_token_avg_ms=statistics.fmean(first) if first else None,
+        first_token_p50_ms=_percentile(first, 0.50) if first else None,
+        first_token_p95_ms=_percentile(first, 0.95) if first else None,
+    )
+
+
+def _print_summary(summary: SmokeSummary) -> None:
     print("load_chat_smoke summary")
-    print(f"- runs: {len(samples)}")
-    print(f"- total avg_ms: {statistics.fmean(total):.1f}")
-    print(f"- total p50_ms: {_percentile(total, 0.50):.1f}")
-    print(f"- total p95_ms: {_percentile(total, 0.95):.1f}")
-    if first:
-        print(f"- first_token avg_ms: {statistics.fmean(first):.1f}")
-        print(f"- first_token p50_ms: {_percentile(first, 0.50):.1f}")
-        print(f"- first_token p95_ms: {_percentile(first, 0.95):.1f}")
+    print(f"- runs: {summary.runs}")
+    print(f"- total avg_ms: {summary.total_avg_ms:.1f}")
+    print(f"- total p50_ms: {summary.total_p50_ms:.1f}")
+    print(f"- total p95_ms: {summary.total_p95_ms:.1f}")
+    if summary.first_token_avg_ms is not None:
+        print(f"- first_token avg_ms: {summary.first_token_avg_ms:.1f}")
+        print(f"- first_token p50_ms: {summary.first_token_p50_ms:.1f}")
+        print(f"- first_token p95_ms: {summary.first_token_p95_ms:.1f}")
+
+
+def _check_threshold(
+    *,
+    label: str,
+    measured_ms: float | None,
+    max_allowed_ms: float | None,
+) -> str | None:
+    if measured_ms is None or max_allowed_ms is None:
+        return None
+    if measured_ms <= max_allowed_ms:
+        return None
+    return f"{label} exceeded budget: {measured_ms:.1f} ms > {max_allowed_ms:.1f} ms"
 
 
 def _print_system_inference(*, base_url: str, api_key: str, timeout_sec: int) -> None:
@@ -120,6 +156,8 @@ def main() -> int:
     parser.add_argument("--timeout-sec", type=int, default=180)
     parser.add_argument("--api-key", default="")
     parser.add_argument("--show-system-inference", action="store_true")
+    parser.add_argument("--max-total-p95-ms", type=float, default=0.0)
+    parser.add_argument("--max-first-token-p95-ms", type=float, default=0.0)
     args = parser.parse_args()
 
     if args.runs < 1:
@@ -136,7 +174,27 @@ def main() -> int:
         )
         samples.append(sample)
 
-    _print_summary(samples)
+    summary = _build_summary(samples)
+    _print_summary(summary)
+
+    failures = [
+        _check_threshold(
+            label="total p95",
+            measured_ms=summary.total_p95_ms,
+            max_allowed_ms=args.max_total_p95_ms or None,
+        ),
+        _check_threshold(
+            label="first-token p95",
+            measured_ms=summary.first_token_p95_ms,
+            max_allowed_ms=args.max_first_token_p95_ms or None,
+        ),
+    ]
+    failures = [item for item in failures if item]
+    if failures:
+        for failure in failures:
+            print(f"LOAD_CHAT_SMOKE_FAILED: {failure}")
+        return 1
+
     if args.show_system_inference:
         _print_system_inference(
             base_url=args.base_url,

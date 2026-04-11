@@ -6,7 +6,7 @@ import json
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Iterable, Protocol
 
 from backend.services.exceptions import PersistenceReadError, PersistenceWriteError
 
@@ -135,6 +135,8 @@ class WorkbenchTaskRepository(Protocol):
     ) -> None: ...
 
     def get_task(self, task_id: str) -> WorkbenchTaskRecord | None: ...
+
+    def list_task_ids_by_status(self, statuses: Iterable[str]) -> list[str]: ...
 
     def list_task_events(self, task_id: str) -> list[WorkbenchTaskEventRecord]: ...
 
@@ -406,6 +408,26 @@ class SQLiteWorkbenchTaskRepository:
             tenant_id=str(row["tenant_id"] or "tenant:default"),
             principal_id=str(row["principal_id"] or ""),
         )
+
+    def list_task_ids_by_status(self, statuses: Iterable[str]) -> list[str]:
+        normalized = [str(status).strip() for status in statuses if str(status).strip()]
+        if not normalized:
+            return []
+        placeholders = ", ".join("?" for _ in normalized)
+        try:
+            with sqlite3.connect(self._db_path) as conn:
+                rows = conn.execute(
+                    f"""
+                    SELECT id
+                    FROM workbench_tasks
+                    WHERE status IN ({placeholders})
+                    ORDER BY created_at ASC, id ASC
+                    """,
+                    tuple(normalized),
+                ).fetchall()
+        except Exception as exc:
+            _raise_read_error("workbench_task_ids_list", exc)
+        return [str(row[0]) for row in rows]
 
     def list_task_events(self, task_id: str) -> list[WorkbenchTaskEventRecord]:
         try:

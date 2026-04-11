@@ -5,8 +5,6 @@ Import these in routers; never instantiate services directly in route handlers.
 
 from __future__ import annotations
 
-import threading
-
 from fastapi import BackgroundTasks, Depends, HTTPException, Request
 
 from backend.domain.authz_types import AuthorizationContext
@@ -36,6 +34,11 @@ from backend.services.code_sandbox_provider import (
 )
 from backend.services.code_sandbox_execution_service import (
     execute_code_sandbox_execution,
+)
+from backend.services.background_jobs import (
+    BackgroundJobRunner,
+    FastAPIBackgroundJobRunner,
+    ThreadBackgroundJobRunner,
 )
 from backend.services.workbench_execution_service import execute_workbench_task
 from backend.services.tabular_context import (
@@ -104,24 +107,27 @@ class _BackgroundWorkbenchTaskDispatcher:
     def __init__(
         self,
         *,
-        background_tasks: BackgroundTasks,
+        runner: BackgroundJobRunner,
         repository: WorkbenchTaskRepository,
         llm: LLMClient,
         settings: Settings,
     ) -> None:
-        self._background_tasks = background_tasks
+        self._runner = runner
         self._repository = repository
         self._llm = llm
         self._settings = settings
 
     def dispatch_task(self, *, task_id: str, request_id: str = "") -> None:
-        self._background_tasks.add_task(
-            execute_workbench_task,
-            task_id=task_id,
-            repository=self._repository,
-            llm=self._llm,
-            settings=self._settings,
-            request_id=request_id,
+        self._runner.submit(
+            name="workbench-task-dispatch",
+            target=execute_workbench_task,
+            kwargs={
+                "task_id": task_id,
+                "repository": self._repository,
+                "llm": self._llm,
+                "settings": self._settings,
+                "request_id": request_id,
+            },
         )
 
 
@@ -129,17 +135,19 @@ class _BackgroundCodeSandboxExecutionDispatcher:
     def __init__(
         self,
         *,
+        runner: BackgroundJobRunner,
         repository: CodeSandboxExecutionRepository,
         provider: SandboxProvider,
         settings: Settings,
     ) -> None:
+        self._runner = runner
         self._repository = repository
         self._provider = provider
         self._settings = settings
 
     def dispatch_execution(self, *, execution_id: str, request_id: str = "") -> None:
-        _ = request_id
-        thread = threading.Thread(
+        self._runner.submit(
+            name="code-sandbox-execution-dispatch",
             target=execute_code_sandbox_execution,
             kwargs={
                 "execution_id": execution_id,
@@ -147,9 +155,7 @@ class _BackgroundCodeSandboxExecutionDispatcher:
                 "provider": self._provider,
                 "settings": self._settings,
             },
-            daemon=True,
         )
-        thread.start()
 
 
 def get_workbench_task_dispatcher(
@@ -160,7 +166,7 @@ def get_workbench_task_dispatcher(
 ) -> WorkbenchTaskDispatcher:
     """Return the scheduler that hands accepted workbench tasks to the runtime."""
     return _BackgroundWorkbenchTaskDispatcher(
-        background_tasks=background_tasks,
+        runner=FastAPIBackgroundJobRunner(background_tasks=background_tasks),
         repository=repository,
         llm=llm,
         settings=settings,
@@ -176,6 +182,7 @@ def get_code_sandbox_execution_dispatcher(
 ) -> CodeSandboxExecutionDispatcher:
     """Return the scheduler that hands accepted sandbox runs to the runtime."""
     return _BackgroundCodeSandboxExecutionDispatcher(
+        runner=ThreadBackgroundJobRunner(),
         repository=repository,
         provider=provider,
         settings=settings,

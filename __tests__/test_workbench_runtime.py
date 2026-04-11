@@ -121,6 +121,37 @@ class WorkbenchRuntimeTests(unittest.TestCase):
         )
         self.assertEqual("AI backend unavailable.", events[-1].message)
 
+    def test_list_task_ids_by_status_returns_created_order(self) -> None:
+        for task_id, status, created_at in [
+            ("wb-queued-1", "queued", "2026-04-10T18:00:01+00:00"),
+            ("wb-running-1", "running", "2026-04-10T18:00:02+00:00"),
+            ("wb-queued-2", "queued", "2026-04-10T18:00:03+00:00"),
+        ]:
+            self.repository.create_task(
+                WorkbenchTaskCreatePayload(
+                    task_id=task_id,
+                    task_kind="plan",
+                    prompt="Draft a plan",
+                    session_id=None,
+                    project_id=None,
+                    knowledge_document_ids=[],
+                    connector_ids=[],
+                    source_ids=[],
+                    created_at=created_at,
+                    updated_at=created_at,
+                    status=status,
+                )
+            )
+
+        self.assertEqual(
+            ["wb-queued-1", "wb-queued-2"],
+            self.repository.list_task_ids_by_status(["queued"]),
+        )
+        self.assertEqual(
+            ["wb-queued-1", "wb-running-1", "wb-queued-2"],
+            self.repository.list_task_ids_by_status(["queued", "running"]),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

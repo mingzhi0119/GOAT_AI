@@ -32,6 +32,29 @@ class _FakeLLM:
         return list(self._capabilities)
 
 
+class _FakeIdempotencyStore:
+    def claim(self, *, key: str, route: str, scope: str, request_hash: str):
+        raise AssertionError("claim should not be called in this test")
+
+    def store_completed(
+        self,
+        *,
+        key: str,
+        route: str,
+        scope: str,
+        request_hash: str,
+        status_code: int,
+        content_type: str,
+        body: str,
+    ) -> None:
+        raise AssertionError("store_completed should not be called in this test")
+
+    def release_pending(
+        self, *, key: str, route: str, scope: str, request_hash: str
+    ) -> None:
+        raise AssertionError("release_pending should not be called in this test")
+
+
 def _auth_context(
     *,
     owner_id: str = "owner-1",
@@ -207,6 +230,26 @@ class ApplicationChatTests(unittest.TestCase):
         )
         self.assertEqual("replay", replay.state)
         self.assertEqual("".join(source_stream()), replay.completed.body)
+
+    def test_build_idempotency_context_uses_injected_store_factory(self) -> None:
+        req = ChatRequest(
+            model="test-model",
+            messages=[ChatMessage(role="user", content="Hello")],
+            session_id="sess-2",
+        )
+        fake_store = _FakeIdempotencyStore()
+
+        context = _build_idempotency_context(
+            req=req,
+            user_name="Simon",
+            settings=self.settings,
+            idempotency_key="idem-injected",
+            idempotency_store_factory=lambda _: fake_store,
+        )
+
+        self.assertIsNotNone(context)
+        assert context is not None
+        self.assertIs(context.store, fake_store)
 
 
 if __name__ == "__main__":
