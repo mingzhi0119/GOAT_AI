@@ -1,29 +1,29 @@
-# WSL-First Development on Windows
+# WSL Workflows on Windows
 
-This repository now treats **WSL + a repository stored inside the WSL filesystem** as the default development baseline for Windows-hosted contributors.
+Windows-native development remains supported for this repository. Use WSL when you specifically need Linux semantics that should match Ubuntu CI or production behavior.
 
-Why:
+Why WSL is still useful:
 
 - CI runs on Ubuntu
 - production is Ubuntu-oriented
-- Linux shell behavior, Python packaging, Node tooling, and Linux-targeted desktop validation are more predictable in WSL than in native PowerShell
-- Codex on Windows can work with WSL-hosted projects directly: <https://developers.openai.com/codex/app/windows>
+- Linux shell behavior, Python packaging, Node tooling, and Linux-targeted desktop validation are sometimes more predictable in WSL than in native PowerShell
+- Codex on Windows can work with WSL-hosted paths directly: <https://developers.openai.com/codex/app/windows>
 
-## Default baseline
+## When to use WSL
 
-If you develop on a Windows machine, prefer:
+Use WSL on a Windows machine for tasks such as:
 
-- distro: `Ubuntu`
-- repo path: `~/dev/GOAT_AI`
-- shell: WSL Bash/Zsh for day-to-day backend, scripts, tests, and Linux-targeted validation
+- Linux-targeted compile or package checks
+- shell-script validation
+- Ubuntu CI parity checks
+- Linux desktop sidecar builds or Linux `cargo test`
+- cases where a dependency or wheel is awkward on Windows but straightforward in Linux
 
-Do **not** treat `/mnt/<drive>/...` as the recommended active working copy for this repo. Keep the main checkout inside the Linux filesystem.
+Do not treat WSL as mandatory for the ordinary Windows-native inner loop unless the task actually needs Linux behavior.
 
-## One-time migration
+## Optional WSL checkout
 
-### 1. Prepare the WSL workspace
-
-Inside WSL:
+If you want a Linux-native copy of the repo for those tasks, a clean clone is the safest path:
 
 ```bash
 mkdir -p ~/dev
@@ -32,11 +32,11 @@ git clone https://github.com/mingzhi0119/GOAT_AI.git
 cd GOAT_AI
 ```
 
-If you already have a Windows checkout, prefer a fresh clone inside WSL over editing the Windows copy from Linux.
+This is optional. It is a convenience path for Linux-targeted work, not the required default.
 
-### 2. Install the baseline toolchain in WSL
+## Optional WSL toolchain
 
-Recommended baseline:
+Recommended tooling when you do use WSL:
 
 - Python `3.14`
 - `uv`
@@ -44,7 +44,7 @@ Recommended baseline:
 - Rust stable
 - `cargo-audit`
 
-Representative Ubuntu setup:
+Representative Ubuntu packages:
 
 ```bash
 sudo apt-get update
@@ -63,54 +63,19 @@ sudo apt-get install -y \
   wget
 ```
 
-Install Python, Node, Rust, and `uv` using your team's preferred package manager or version manager, but keep the versions aligned with CI and [`README.md`](../README.md).
-
-### 3. Recreate local environments inside WSL
-
-Do not reuse Windows-owned development environments.
-
-Examples:
-
-```bash
-python3.14 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements-ci.txt
-```
-
-```bash
-cd frontend
-npm ci
-```
-
-Rust build artifacts and Python environments should also be recreated inside WSL instead of being shared from a Windows checkout.
-
 ## Codex usage on Windows
 
-If you use the Codex app on Windows, open the WSL-hosted repo via:
+If you use the Codex app on Windows and want to run a Linux-targeted workflow through WSL, you can open a WSL-hosted copy via:
 
 - `\\wsl$\Ubuntu\home\<your-user>\dev\GOAT_AI`
 
-Default expectation:
+Use the repo-local skills under [`.agents/skills`](../.agents/skills) when you want WSL-backed validation for Linux-targeted work.
 
-- use the WSL-hosted repo as the main working copy
-- prefer running the agent in WSL for backend, scripts, CI parity, and Linux-targeted artifact work
-- use the repo-local skills under [`.agents/skills`](../.agents/skills) for Linux-targeted validation from Windows-hosted Codex sessions
+## Windows-native stays primary
 
-## Daily development loop
+The following remain normal Windows-native flows:
 
-Run these from WSL unless the task is explicitly a Windows-only exception:
-
-- backend work
-- `python -m tools.*`
-- `pytest`
-- `npm ci`, `npm test -- --run`, `npm run build`
-- shell scripts such as `deploy.sh`, `watchdog.sh`, and `healthcheck.sh`
-- Linux desktop sidecar builds and Linux `cargo test` validation
-
-## Windows-native exceptions
-
-Use native Windows only when it is required or materially more reliable:
-
+- ordinary day-to-day editing and local development
 - Windows installer generation and verification
 - `scripts/install_desktop_prereqs.ps1`
 - `deploy.ps1`
@@ -118,20 +83,17 @@ Use native Windows only when it is required or materially more reliable:
 - MSVC / Visual Studio Build Tools flows
 - Windows shell integration and packaged-installer behavior checks
 
-These are exceptions, not the default inner loop.
-
 ## Validation expectations
 
 From a Windows machine:
 
 - Linux-targeted compile, package, shell-script, and Ubuntu CI-parity checks should run from WSL
-- PowerShell-only results are not enough evidence for Linux correctness
-- if a change affects both Linux and Windows packaging behavior, validate the Linux path in WSL first, then run the required Windows-native exception flow
+- PowerShell-only results are not enough evidence for Linux correctness when the target behavior is Linux-specific
+- if a change affects both Linux and Windows packaging behavior, validate the Linux path in WSL first, then run the required Windows-native flow
 
 ## Related docs
 
 - [README.md](../README.md)
 - [OPERATIONS.md](OPERATIONS.md)
 - [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md)
-- [ROADMAP.md](ROADMAP.md)
 - [AGENTS.md](../AGENTS.md)

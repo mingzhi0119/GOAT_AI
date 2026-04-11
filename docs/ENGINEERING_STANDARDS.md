@@ -105,7 +105,6 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 - No hardcoded OS-specific paths or separators.
 - Defaults should work in development and production without edits.
 - Prefer startup validation over runtime surprises.
-- For Windows-hosted contributors, the default active working copy should live inside the WSL filesystem rather than under `/mnt/<drive>/...`.
 - On Windows development hosts, run Linux-targeted compile, package, shell-script, and Ubuntu CI-parity checks through WSL rather than plain PowerShell.
 - Treat PowerShell-only results as insufficient evidence for Linux correctness when the target artifact or runtime is Linux-specific.
 

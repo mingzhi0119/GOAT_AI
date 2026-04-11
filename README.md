@@ -13,16 +13,15 @@ Strategic Intelligence assistant for Simon Business School, University of Roches
 - **Portable by design:** the same repo is meant to run on **Windows, macOS, and Linux** for development, and on **various Linux (or container) server layouts** for production, not tied to a single school-owned Ubuntu image. Paths, ports, GPU selection, and secrets are **environment-driven** (see `.env.example` and [docs/OPERATIONS.md](docs/OPERATIONS.md)); avoid hardcoding host-specific assumptions in code.
 - **Reference vs local:** a documented production URL in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) is a **reference deployment**, not a constraint on where you may install or develop.
 
-### Windows development baseline
+### Windows development
 
-For Windows-hosted contributors, the default local development environment is now **WSL + a repository stored inside the WSL filesystem**, not an active checkout under `/mnt/<drive>` and not PowerShell-first development.
+Windows-native development remains a supported and normal path for this repository.
 
-- Recommended distro: `Ubuntu`
-- Recommended repo path: `~/dev/GOAT_AI`
-- Open the WSL-hosted repo in Codex or other Windows UI tools via `\\wsl$\<distro>\home\<user>\dev\GOAT_AI`
-- Keep native Windows development for the short list of Windows-only or materially Windows-friendlier flows such as installer generation, `deploy.ps1`, `install_desktop_prereqs.ps1`, WebView2 checks, and MSVC/Visual Studio build-tool integration
+- Use native Windows tooling for the usual local inner loop when that is the most comfortable setup for you.
+- Use WSL selectively when you need Linux semantics that must match Ubuntu CI or production behavior.
+- Typical WSL-only or WSL-preferred cases are Linux-targeted compile/package checks, shell-script validation, Linux desktop validation, or dependency/tooling gaps on Windows.
 
-See [docs/WSL_DEVELOPMENT.md](docs/WSL_DEVELOPMENT.md) for the migration guide and exception list.
+See [docs/WSL_DEVELOPMENT.md](docs/WSL_DEVELOPMENT.md) for the selective WSL workflow guidance and exception list.
 
 ### Capability-based / high-risk features
 
@@ -116,7 +115,7 @@ Core API surface:
 
 ## Quick Start
 
-Development from Linux or WSL:
+Development:
 
 ```bash
 python3.14 -m venv .venv   # or any `python3` that matches CI (see `.github/workflows/ci.yml`)
@@ -128,7 +127,7 @@ python3 -m uvicorn server:app --host 0.0.0.0 --port 62606 --reload
 
 Use **Python 3.14** for the venv when you can so `python -m tools.check_api_contract_sync` matches the CI backend job.
 
-If you develop on Windows, run the commands above from a WSL-hosted checkout. See [docs/WSL_DEVELOPMENT.md](docs/WSL_DEVELOPMENT.md).
+If you are on Windows and hit a Linux-targeted validation or packaging path, use the WSL guidance in [docs/WSL_DEVELOPMENT.md](docs/WSL_DEVELOPMENT.md).
 
 Frontend dev server:
 
@@ -253,7 +252,7 @@ P1 governance assets now live in-repo too:
 ## Docs
 
 - [AGENTS.md](AGENTS.md): short index for agents; **canonical rules:** [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md)
-- [docs/WSL_DEVELOPMENT.md](docs/WSL_DEVELOPMENT.md): WSL-first Windows development baseline, migration steps, and Windows-native exception list
+- [docs/WSL_DEVELOPMENT.md](docs/WSL_DEVELOPMENT.md): selective WSL workflows for Linux-targeted validation on Windows
 - [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md): current shipped state
 - [docs/APPEARANCE.md](docs/APPEARANCE.md): appearance/theme architecture, controls, and extension rules
 - [docs/API_REFERENCE.md](docs/API_REFERENCE.md): endpoint contract
