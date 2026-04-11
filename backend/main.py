@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import threading
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -26,6 +28,11 @@ from backend.routers import (
     workbench,
 )
 from backend.services import log_service
+from backend.services.code_sandbox_execution_service import (
+    recover_queued_code_sandbox_executions,
+)
+from backend.services.code_sandbox_provider import DockerSandboxProvider, LocalHostProvider
+from backend.services.code_sandbox_runtime import SQLiteCodeSandboxExecutionRepository
 from backend.services.rate_limit_store import InMemorySlidingWindowRateLimitStore
 from goat_ai.config import Settings
 from goat_ai.latency_metrics import init_latency_metrics
@@ -38,12 +45,35 @@ logger = logging.getLogger(__name__)
 DIST = Path(__file__).parent.parent / "frontend" / "dist"
 
 
+def _build_code_sandbox_provider(settings: Settings) -> DockerSandboxProvider | LocalHostProvider:
+    if settings.code_sandbox_provider == "localhost":
+        return LocalHostProvider(settings)
+    return DockerSandboxProvider(settings)
+
+
 def create_app() -> FastAPI:
     """Build and return the configured FastAPI application."""
+    settings = get_settings()
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        def run_recovery() -> None:
+            repository = SQLiteCodeSandboxExecutionRepository(settings.log_db_path)
+            provider = _build_code_sandbox_provider(settings)
+            recover_queued_code_sandbox_executions(
+                repository=repository,
+                provider=provider,
+                settings=settings,
+            )
+
+        threading.Thread(target=run_recovery, daemon=True).start()
+        yield
+
     app = FastAPI(
         title="GOAT AI",
         version="1.2.0",
         description="Simon Business School Strategic Intelligence API",
+        lifespan=lifespan,
         openapi_tags=[
             {"name": "system", "description": "Health and server telemetry endpoints."},
             {
@@ -80,7 +110,6 @@ def create_app() -> FastAPI:
     )
     app.openapi_version = "3.2.0"
 
-    settings = get_settings()
     log_service.init_db(settings.log_db_path)
     init_latency_metrics(settings.latency_rolling_max_samples)
     init_otel_if_enabled()

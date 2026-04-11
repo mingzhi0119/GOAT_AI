@@ -46,6 +46,7 @@ class DbMigrationsTests(unittest.TestCase):
                         "016_workbench_task_result_citations",
                         "017_workbench_task_source_and_auth_state",
                         "018_code_sandbox_executions",
+                        "019_code_sandbox_async_and_logs",
                     ],
                 )
                 cols = [
@@ -144,6 +145,10 @@ class DbMigrationsTests(unittest.TestCase):
                 ]
                 self.assertIn("runtime_preset", sandbox_cols)
                 self.assertIn("network_policy", sandbox_cols)
+                self.assertIn("execution_mode", sandbox_cols)
+                self.assertIn("queued_at", sandbox_cols)
+                self.assertIn("timeout_sec", sandbox_cols)
+                self.assertIn("last_log_seq", sandbox_cols)
                 self.assertIn("stdout", sandbox_cols)
                 self.assertIn("stderr", sandbox_cols)
                 self.assertIn("output_files_json", sandbox_cols)
@@ -160,6 +165,16 @@ class DbMigrationsTests(unittest.TestCase):
                 self.assertIn("seq", sandbox_event_cols)
                 self.assertIn("event_type", sandbox_event_cols)
                 self.assertIn("metadata_json", sandbox_event_cols)
+                sandbox_log_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(code_sandbox_execution_logs)"
+                    ).fetchall()
+                ]
+                self.assertIn("execution_id", sandbox_log_cols)
+                self.assertIn("seq", sandbox_log_cols)
+                self.assertIn("stream_name", sandbox_log_cols)
+                self.assertIn("chunk_text", sandbox_log_cols)
             finally:
                 conn.close()
 
@@ -199,7 +214,7 @@ class DbMigrationsTests(unittest.TestCase):
             conn = sqlite3.connect(db_path)
             try:
                 n = conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]
-                self.assertEqual(n, 18)
+                self.assertEqual(n, 19)
                 cols = [
                     r[1]
                     for r in conn.execute("PRAGMA table_info(conversations)").fetchall()
@@ -275,6 +290,10 @@ class DbMigrationsTests(unittest.TestCase):
                 ]
                 self.assertIn("runtime_preset", sandbox_cols)
                 self.assertIn("network_policy", sandbox_cols)
+                self.assertIn("execution_mode", sandbox_cols)
+                self.assertIn("queued_at", sandbox_cols)
+                self.assertIn("timeout_sec", sandbox_cols)
+                self.assertIn("last_log_seq", sandbox_cols)
                 self.assertIn("stdout", sandbox_cols)
                 self.assertIn("stderr", sandbox_cols)
                 self.assertIn("output_files_json", sandbox_cols)
@@ -288,6 +307,16 @@ class DbMigrationsTests(unittest.TestCase):
                 self.assertIn("seq", sandbox_event_cols)
                 self.assertIn("event_type", sandbox_event_cols)
                 self.assertIn("metadata_json", sandbox_event_cols)
+                sandbox_log_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(code_sandbox_execution_logs)"
+                    ).fetchall()
+                ]
+                self.assertIn("execution_id", sandbox_log_cols)
+                self.assertIn("seq", sandbox_log_cols)
+                self.assertIn("stream_name", sandbox_log_cols)
+                self.assertIn("chunk_text", sandbox_log_cols)
             finally:
                 conn.close()
 

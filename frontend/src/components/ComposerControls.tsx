@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react'
+import { type RefObject, useState, type CSSProperties } from 'react'
 import type { GPUStatus, InferenceLatency } from '../api/system'
 import type { ChatLayoutDecisions } from '../utils/chatLayout'
 import GpuStatusDot from './GpuStatusDot'
@@ -29,6 +29,7 @@ interface ComposerControlsProps {
   gpuStatus: GPUStatus | null
   gpuError: string | null
   inferenceLatency: InferenceLatency | null
+  plusButtonRef?: RefObject<HTMLButtonElement | null>
   onTogglePlusMenu: () => void
   onToggleModelMenu: () => void
   onToggleReasoningMenu: () => void
@@ -62,6 +63,7 @@ export default function ComposerControls({
   gpuStatus,
   gpuError,
   inferenceLatency,
+  plusButtonRef,
   onTogglePlusMenu,
   onToggleModelMenu,
   onToggleReasoningMenu,
@@ -85,6 +87,7 @@ export default function ComposerControls({
         }}
       >
         <button
+          ref={plusButtonRef}
           type="button"
           disabled={isStreaming || attachmentUploading}
           onClick={onTogglePlusMenu}

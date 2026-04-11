@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,6 +9,7 @@ from unittest.mock import MagicMock, patch
 from backend.services.code_sandbox_provider import (
     DockerException,
     DockerSandboxProvider,
+    LocalHostProvider,
     SandboxProviderRequest,
 )
 from backend.services.exceptions import FeatureNotAvailable
@@ -47,18 +49,21 @@ class DockerSandboxProviderTests(unittest.TestCase):
                 "backend.services.code_sandbox_provider.docker.DockerClient",
                 return_value=client,
             ):
-                result = provider.run(
-                    SandboxProviderRequest(
-                        execution_id="cs-1",
-                        runtime_preset="shell",
-                        code="echo ok",
-                        command=None,
-                        stdin="hello",
-                        inline_files=[],
-                        timeout_sec=2,
-                        network_policy="disabled",
+                events = list(
+                    provider.run_stream(
+                        SandboxProviderRequest(
+                            execution_id="cs-1",
+                            runtime_preset="shell",
+                            code="echo ok",
+                            command=None,
+                            stdin="hello",
+                            inline_files=[],
+                            timeout_sec=2,
+                            network_policy="disabled",
+                        )
                     )
                 )
+                result = events[-1]
 
             self.assertEqual("docker", result.provider_name)
             self.assertEqual(0, result.exit_code)
@@ -78,9 +83,82 @@ class DockerSandboxProviderTests(unittest.TestCase):
                 side_effect=DockerException("daemon unavailable"),
             ):
                 with self.assertRaises(FeatureNotAvailable) as exc_info:
-                    provider.run(
+                    list(
+                        provider.run_stream(
+                            SandboxProviderRequest(
+                                execution_id="cs-1",
+                                runtime_preset="shell",
+                                code="echo ok",
+                                command=None,
+                                stdin=None,
+                                inline_files=[],
+                                timeout_sec=2,
+                                network_policy="disabled",
+                            )
+                        )
+                    )
+        self.assertEqual("runtime", exc_info.exception.gate_kind)
+        self.assertEqual("docker_unavailable", exc_info.exception.deny_reason)
+
+
+class LocalHostProviderTests(unittest.TestCase):
+    def test_provider_executes_on_host_and_collects_outputs(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            settings = _settings(Path(tmp))
+            provider = LocalHostProvider(settings)
+            if os.name == "nt":
+                code = (
+                    "Write-Output 'sandbox ok'\n"
+                    "New-Item -ItemType Directory -Force -Path outputs | Out-Null\n"
+                    "[System.IO.File]::WriteAllText('outputs/report.txt', 'report-ready')\n"
+                )
+            else:
+                code = "printf 'sandbox ok\\n'\nprintf 'report-ready' > outputs/report.txt\n"
+
+            events = list(
+                provider.run_stream(
+                    SandboxProviderRequest(
+                        execution_id="cs-local-1",
+                        runtime_preset="shell",
+                        code=code,
+                        command=None,
+                        stdin=None,
+                        inline_files=[],
+                        timeout_sec=2,
+                        network_policy="disabled",
+                    )
+                )
+            )
+            result = events[-1]
+
+            self.assertEqual("localhost", result.provider_name)
+            self.assertEqual(0, result.exit_code)
+            stdout = "".join(
+                event.text
+                for event in events[:-1]
+                if getattr(event, "stream_name", "") == "stdout"
+            )
+            self.assertIn("sandbox ok", stdout)
+            self.assertEqual(1, len(result.output_files))
+            self.assertEqual("report.txt", result.output_files[0]["path"])
+            self.assertEqual(12, result.output_files[0]["byte_size"])
+
+    @patch(
+        "backend.services.code_sandbox_provider._resolve_localhost_shell",
+        return_value=None,
+    )
+    def test_provider_maps_missing_shell_to_feature_unavailable(
+        self, _mock: object
+    ) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            settings = _settings(Path(tmp))
+            provider = LocalHostProvider(settings)
+
+            with self.assertRaises(FeatureNotAvailable) as exc_info:
+                list(
+                    provider.run_stream(
                         SandboxProviderRequest(
-                            execution_id="cs-1",
+                            execution_id="cs-local-1",
                             runtime_preset="shell",
                             code="echo ok",
                             command=None,
@@ -90,8 +168,9 @@ class DockerSandboxProviderTests(unittest.TestCase):
                             network_policy="disabled",
                         )
                     )
+                )
         self.assertEqual("runtime", exc_info.exception.gate_kind)
-        self.assertEqual("docker_unavailable", exc_info.exception.deny_reason)
+        self.assertEqual("localhost_unavailable", exc_info.exception.deny_reason)
 
 
 if __name__ == "__main__":

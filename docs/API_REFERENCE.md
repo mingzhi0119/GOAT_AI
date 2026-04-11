@@ -48,9 +48,10 @@ Base path: `/api`
 | `GET` | `/api/system/inference` | Rolling chat latency |
 | `GET` | `/api/system/runtime-target` | Runtime target resolution |
 | `GET` | `/api/system/features` | Capability-gated feature flags (config + host probe) |
-| `POST` | `/api/code-sandbox/exec` | Execute one short synchronous sandbox run |
+| `POST` | `/api/code-sandbox/exec` | Execute one sandbox run in `sync` or `async` mode |
 | `GET` | `/api/code-sandbox/executions/{execution_id}` | Read one persisted sandbox execution |
 | `GET` | `/api/code-sandbox/executions/{execution_id}/events` | Read one persisted sandbox execution timeline |
+| `GET` | `/api/code-sandbox/executions/{execution_id}/logs` | Stream replayable sandbox logs over SSE |
 | `POST` | `/api/workbench/tasks` | Create and enqueue a durable workbench task |
 | `GET` | `/api/workbench/sources` | List declarative workbench retrieval sources |
 | `GET` | `/api/workbench/tasks/{task_id}` | Read one durable workbench task status |
@@ -85,10 +86,13 @@ Example:
 {
   "code_sandbox": {
     "policy_allowed": true,
-    "allowed_by_config": false,
-    "available_on_host": false,
-    "effective_enabled": false,
-    "deny_reason": "disabled_by_operator"
+    "allowed_by_config": true,
+    "available_on_host": true,
+    "effective_enabled": true,
+    "provider_name": "docker",
+    "isolation_level": "container",
+    "network_policy_enforced": true,
+    "deny_reason": null
   },
   "workbench": {
     "agent_tasks": {
@@ -140,6 +144,7 @@ Example:
 Notes:
 
 - `code_sandbox.policy_allowed` remains caller-specific and separate from runtime readiness
+- `code_sandbox.provider_name`, `isolation_level`, and `network_policy_enforced` describe the currently selected backend contract; `localhost` is a weaker trusted-dev fallback than Docker
 - `workbench.*` is reported per capability; workbench can be enabled overall while specific surfaces still remain unavailable
 - frontend UI should use this endpoint to hide or disable unavailable surfaces instead of assuming that a visible button implies runtime support
 
@@ -723,21 +728,23 @@ Returns machine-readable flags for optional high-risk features (see `docs/ENGINE
 }
 ```
 
-`policy_allowed` is evaluated per caller from the current request's authorization context; for `code_sandbox`, the scope is `sandbox:execute`. `deny_reason` when the **runtime** gate is closed is one of: `disabled_by_operator`, `docker_unavailable` (controlled enum; not raw exception text).
+`policy_allowed` is evaluated per caller from the current request's authorization context; for `code_sandbox`, the scope is `sandbox:execute`. `deny_reason` when the **runtime** gate is closed is one of: `disabled_by_operator`, `docker_unavailable`, or `localhost_unavailable` (controlled enum; not raw exception text).
 
 ## `POST /api/code-sandbox/exec`
 
-Executes one short synchronous shell run in a Docker-backed sandbox. The MVP uses:
+Executes one shell run through the configured sandbox provider. Phase 18A uses:
 
 - one shell-capable runtime preset: `shell`
 - an ephemeral workspace
-- Docker isolation with **network disabled by default**
-- durable execution and event rows in SQLite for later reads
+- Docker isolation with **network disabled by default**, or a localhost dev fallback when `GOAT_CODE_SANDBOX_PROVIDER=localhost`
+- durable execution, event, and log rows in SQLite for later reads
+- `sync` by default, with optional in-process durable `async` dispatch plus queued-execution recovery on startup
 
 Request body:
 
 ```json
 {
+  "execution_mode": "sync",
   "runtime_preset": "shell",
   "code": "echo \"hello from the sandbox\" > outputs/report.txt",
   "command": "sh ./snippet.sh",
@@ -760,17 +767,25 @@ Behavior:
 - inline files must use relative workspace paths only
 - files created under `outputs/` are reported back as metadata in the response
 - `network_policy` currently only allows `disabled`; other values return `422`
+- Docker enforces that policy. The `localhost` provider reports `network_policy_enforced: false` and should be treated as a trusted development fallback rather than a strong-isolation sandbox
+- `execution_mode` defaults to `sync`; `async` returns immediately after durable acceptance and continues in a background dispatcher
 
-Success response (`200`):
+Success response (`200` for `sync`, `202` for accepted `async`):
 
 ```json
 {
   "execution_id": "cs-123",
   "status": "completed",
+  "execution_mode": "sync",
   "runtime_preset": "shell",
   "network_policy": "disabled",
   "created_at": "2026-04-10T00:00:00Z",
   "updated_at": "2026-04-10T00:00:01Z",
+  "started_at": "2026-04-10T00:00:00Z",
+  "finished_at": "2026-04-10T00:00:01Z",
+  "provider_name": "docker",
+  "isolation_level": "container",
+  "network_policy_enforced": true,
   "exit_code": 0,
   "stdout": "hello from sandbox\n",
   "stderr": "",
@@ -788,12 +803,12 @@ Success response (`200`):
 Error semantics:
 
 - **`403 FEATURE_DISABLED`** when the caller lacks `sandbox:execute`
-- **`503 FEATURE_UNAVAILABLE`** when runtime gating fails or Docker is unavailable
+- **`503 FEATURE_UNAVAILABLE`** when runtime gating fails or the selected provider is unavailable
 - **`422 REQUEST_VALIDATION_ERROR`** for invalid request shape, unsupported network mode, path traversal, oversized payloads, or timeout beyond the configured cap
 
 ## `GET /api/code-sandbox/executions/{execution_id}`
 
-Returns the same durable execution shape as `POST /api/code-sandbox/exec` after the run is persisted. Owner/tenant/principal visibility rules apply; non-visible records resolve as `404`.
+Returns the same durable execution shape as `POST /api/code-sandbox/exec` after the run is persisted. Owner/tenant/principal visibility rules apply; non-visible records resolve as `404`. During `async` execution the record progresses through `queued` and `running` before reaching a terminal state.
 
 ## `GET /api/code-sandbox/executions/{execution_id}/events`
 
@@ -826,6 +841,18 @@ Returns the durable execution timeline:
     },
     {
       "sequence": 3,
+      "event_type": "execution.log.stdout",
+      "created_at": "2026-04-10T00:00:00Z",
+      "status": "running",
+      "message": null,
+      "metadata": {
+        "stream_name": "stdout",
+        "log_sequence": 1,
+        "byte_size": 18
+      }
+    },
+    {
+      "sequence": 4,
       "event_type": "execution.completed",
       "created_at": "2026-04-10T00:00:01Z",
       "status": "completed",
@@ -838,6 +865,30 @@ Returns the durable execution timeline:
   ]
 }
 ```
+
+## `GET /api/code-sandbox/executions/{execution_id}/logs`
+
+Streams replayable stdout/stderr chunks plus status updates as SSE. Use the optional `after_seq` query parameter to resume from the next unseen log chunk sequence after reconnect.
+
+SSE frame examples:
+
+```text
+data: {"type":"status","execution_id":"cs-123","status":"running","provider_name":"docker","updated_at":"2026-04-10T00:00:00Z","timed_out":false}
+```
+
+```text
+data: {"type":"stdout","execution_id":"cs-123","sequence":1,"created_at":"2026-04-10T00:00:00Z","chunk":"hello from sandbox\n"}
+```
+
+```text
+data: {"type":"done"}
+```
+
+Notes:
+
+- `GET /events` remains the canonical audit timeline
+- `GET /logs` is for live/replayable process output, not lifecycle history
+- clients should fall back to `GET /api/code-sandbox/executions/{execution_id}` if the SSE stream disconnects
 
 ## Canonical sources
 

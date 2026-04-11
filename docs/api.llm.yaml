@@ -75,6 +75,7 @@ schemas:
   CodeSandboxExecRequest:
     type: object
     properties:
+      execution_mode: sync|async
       runtime_preset: string
       code: string|null
       command: string|null
@@ -108,6 +109,7 @@ schemas:
     required:
       - execution_id
       - status
+      - execution_mode
       - runtime_preset
       - network_policy
       - created_at
@@ -115,10 +117,16 @@ schemas:
     properties:
       execution_id: string
       status: queued|running|completed|failed|denied
+      execution_mode: sync|async
       runtime_preset: string
       network_policy: disabled|allowlist|enabled
       created_at: string
       updated_at: string
+      started_at: string|null
+      finished_at: string|null
+      provider_name: string
+      isolation_level: container|host
+      network_policy_enforced: boolean
       exit_code: integer|null
       stdout: string
       stderr: string
@@ -132,11 +140,17 @@ schemas:
       - allowed_by_config
       - available_on_host
       - effective_enabled
+      - provider_name
+      - isolation_level
+      - network_policy_enforced
     properties:
       policy_allowed: boolean
       allowed_by_config: boolean
       available_on_host: boolean
       effective_enabled: boolean
+      provider_name: string
+      isolation_level: string
+      network_policy_enforced: boolean
       deny_reason: string|null
   CodeSandboxInlineFile:
     type: object
@@ -921,6 +935,7 @@ endpoints:
     content_type: application/json
     response:
       200: CodeSandboxExecutionResponse
+      202: CodeSandboxExecutionResponse
       errors:
         - 401
         - 403
@@ -948,6 +963,46 @@ endpoints:
       execution_id: string
     response:
       200: CodeSandboxExecutionEventsResponse
+      errors:
+        - 401
+        - 403
+        - 404
+        - 422
+        - 429
+        - 503
+  - op: get_code_sandbox_execution_logs_route
+    method: GET
+    path: /code-sandbox/executions/{execution_id}/logs
+    path_params:
+      execution_id: string
+    response:
+      200:
+        content_type: text/event-stream
+        stream:
+          - status:
+              type: status
+              execution_id: string
+              status: queued|running|completed|failed|denied
+              provider_name: string
+              updated_at: string
+              timed_out: boolean
+          - stdout:
+              type: stdout
+              execution_id: string
+              sequence: integer
+              created_at: string
+              chunk: string
+          - stderr:
+              type: stderr
+              execution_id: string
+              sequence: integer
+              created_at: string
+              chunk: string
+          - done:
+              type: done
+          - error_frame:
+              type: error
+              message: string
       errors:
         - 401
         - 403

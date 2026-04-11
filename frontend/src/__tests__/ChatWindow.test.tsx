@@ -1,7 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { executeCodeSandbox } from '../api/codeSandbox'
+import {
+  executeCodeSandbox,
+  fetchCodeSandboxExecution,
+  openCodeSandboxLogStream,
+} from '../api/codeSandbox'
 import ChatWindow from '../components/ChatWindow'
 import type { GPUStatus, InferenceLatency } from '../api/system'
 import { getChatLayoutDecisions } from '../utils/chatLayout'
@@ -20,6 +24,8 @@ vi.mock('../api/upload', () => ({
 
 vi.mock('../api/codeSandbox', () => ({
   executeCodeSandbox: vi.fn(),
+  fetchCodeSandboxExecution: vi.fn(),
+  openCodeSandboxLogStream: vi.fn(),
 }))
 
 const baseGpuStatus: GPUStatus = {
@@ -77,6 +83,9 @@ function renderChatWindow(overrides: Partial<ComponentProps<typeof ChatWindow>> 
         allowed_by_config: true,
         available_on_host: true,
         effective_enabled: true,
+        provider_name: 'docker',
+        isolation_level: 'container',
+        network_policy_enforced: true,
         deny_reason: null,
       }}
       planModeEnabled={false}
@@ -310,6 +319,9 @@ describe('ChatWindow composer', () => {
         allowed_by_config: true,
         available_on_host: true,
         effective_enabled: false,
+        provider_name: 'docker',
+        isolation_level: 'container',
+        network_policy_enforced: true,
         deny_reason: 'disabled_by_operator',
       },
     })
@@ -324,10 +336,16 @@ describe('ChatWindow composer', () => {
     vi.mocked(executeCodeSandbox).mockResolvedValue({
       execution_id: 'cs-1',
       status: 'completed',
+      execution_mode: 'sync',
       runtime_preset: 'shell',
       network_policy: 'disabled',
       created_at: '2026-04-10T00:00:00Z',
       updated_at: '2026-04-10T00:00:01Z',
+      started_at: '2026-04-10T00:00:00Z',
+      finished_at: '2026-04-10T00:00:01Z',
+      provider_name: 'docker',
+      isolation_level: 'container',
+      network_policy_enforced: true,
       exit_code: 0,
       stdout: 'hello from sandbox',
       stderr: '',
@@ -347,5 +365,160 @@ describe('ChatWindow composer', () => {
     await waitFor(() => {
       expect(screen.getByText('hello from sandbox')).toBeInTheDocument()
     })
+  })
+
+  it('starts async sandbox monitoring and shows live logs', async () => {
+    const stop = vi.fn()
+    vi.mocked(executeCodeSandbox).mockResolvedValue({
+      execution_id: 'cs-async',
+      status: 'queued',
+      execution_mode: 'async',
+      runtime_preset: 'shell',
+      network_policy: 'disabled',
+      created_at: '2026-04-10T00:00:00Z',
+      updated_at: '2026-04-10T00:00:00Z',
+      started_at: null,
+      finished_at: null,
+      provider_name: '',
+      isolation_level: 'container',
+      network_policy_enforced: true,
+      exit_code: null,
+      stdout: '',
+      stderr: '',
+      timed_out: false,
+      error_detail: null,
+      output_files: [],
+    })
+    vi.mocked(fetchCodeSandboxExecution).mockResolvedValue({
+      execution_id: 'cs-async',
+      status: 'completed',
+      execution_mode: 'async',
+      runtime_preset: 'shell',
+      network_policy: 'disabled',
+      created_at: '2026-04-10T00:00:00Z',
+      updated_at: '2026-04-10T00:00:01Z',
+      started_at: '2026-04-10T00:00:00Z',
+      finished_at: '2026-04-10T00:00:01Z',
+      provider_name: 'docker',
+      isolation_level: 'container',
+      network_policy_enforced: true,
+      exit_code: 0,
+      stdout: 'async log line\n',
+      stderr: '',
+      timed_out: false,
+      error_detail: null,
+      output_files: [],
+    })
+    vi.mocked(openCodeSandboxLogStream).mockImplementation((_id, options) => {
+      options.onEvent({ type: 'status', status: 'running' })
+      options.onEvent({ type: 'stdout', sequence: 1, chunk: 'async log line\n' })
+      options.onEvent({ type: 'done' })
+      return stop
+    })
+
+    renderChatWindow()
+
+    fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
+    fireEvent.click(screen.getByRole('button', { name: /open code sandbox/i }))
+    fireEvent.change(screen.getByRole('combobox', { name: /execution mode/i }), {
+      target: { value: 'async' },
+    })
+    fireEvent.change(screen.getByPlaceholderText("echo 'hello from the sandbox'"), {
+      target: { value: "echo 'hello from sandbox'" },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }))
+
+    await waitFor(() => {
+      expect(screen.getAllByText('async log line').length).toBeGreaterThan(0)
+    })
+    expect(openCodeSandboxLogStream).toHaveBeenCalledWith(
+      'cs-async',
+      expect.objectContaining({ afterSequence: 0 }),
+    )
+    expect(fetchCodeSandboxExecution).toHaveBeenCalledWith('cs-async')
+  })
+
+  it('falls back to polling only after the async sandbox stream disconnects', async () => {
+    const setIntervalSpy = vi.spyOn(window, 'setInterval')
+    vi.mocked(executeCodeSandbox).mockResolvedValue({
+      execution_id: 'cs-async-fallback',
+      status: 'queued',
+      execution_mode: 'async',
+      runtime_preset: 'shell',
+      network_policy: 'disabled',
+      created_at: '2026-04-10T00:00:00Z',
+      updated_at: '2026-04-10T00:00:00Z',
+      started_at: null,
+      finished_at: null,
+      provider_name: 'docker',
+      isolation_level: 'container',
+      network_policy_enforced: true,
+      exit_code: null,
+      stdout: '',
+      stderr: '',
+      timed_out: false,
+      error_detail: null,
+      output_files: [],
+    })
+    vi.mocked(openCodeSandboxLogStream).mockImplementation((_id, options) => {
+      options.onEvent({ type: 'status', status: 'running' })
+      return () => undefined
+    })
+
+    renderChatWindow()
+
+    fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
+    fireEvent.click(screen.getByRole('button', { name: /open code sandbox/i }))
+    fireEvent.change(screen.getByRole('combobox', { name: /execution mode/i }), {
+      target: { value: 'async' },
+    })
+    fireEvent.change(screen.getByPlaceholderText("echo 'hello from the sandbox'"), {
+      target: { value: "echo 'hello from sandbox'" },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }))
+
+    await waitFor(() => {
+      expect(openCodeSandboxLogStream).toHaveBeenCalled()
+    })
+    const intervalCallsBeforeError = setIntervalSpy.mock.calls.length
+
+    const streamOptions = vi.mocked(openCodeSandboxLogStream).mock.calls[0]?.[1]
+    streamOptions?.onError()
+
+    expect(setIntervalSpy.mock.calls.length).toBeGreaterThan(intervalCallsBeforeError)
+  })
+
+  it('describes localhost execution as a trusted local fallback instead of an isolated sandbox', () => {
+    renderChatWindow({
+      codeSandboxFeature: {
+        policy_allowed: true,
+        allowed_by_config: true,
+        available_on_host: true,
+        effective_enabled: true,
+        provider_name: 'localhost',
+        isolation_level: 'host',
+        network_policy_enforced: false,
+        deny_reason: null,
+      },
+    })
+
+    fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
+    expect(screen.getByText(/trusted-dev fallback/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /open code sandbox/i }))
+    expect(screen.getByText(/does not provide full sandbox isolation/i)).toBeInTheDocument()
+  })
+
+  it('adds modal semantics and Escape close for the code sandbox panel', async () => {
+    renderChatWindow()
+
+    fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
+    fireEvent.click(screen.getByRole('button', { name: /open code sandbox/i }))
+
+    const dialog = screen.getByRole('dialog', { name: /code sandbox/i })
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: /code sandbox/i })).not.toBeInTheDocument()
   })
 })

@@ -15,7 +15,7 @@ Strategic Intelligence assistant for Simon Business School, University of Roches
 
 ### Capability-based / high-risk features
 
-Some capabilities (for example a future **model-driven code execution sandbox**) require **strong isolation** (typically **Docker** or an equivalent approved container runtime). Separate concerns:
+Some capabilities (for example the shipped **provider-backed code execution runtime**) require explicit runtime declarations and operator review. Separate concerns:
 
 | Concern | What it answers | Typical outcome when blocked |
 |--------|-----------------|------------------------------|
@@ -24,8 +24,9 @@ Some capabilities (for example a future **model-driven code execution sandbox**)
 
 | Host situation | Expected behavior |
 |----------------|-------------------|
-| Docker (or approved runtime) available and operators enable the feature | Code-execution sandbox **may** be turned on after configuration and review ([docs/OPERATIONS.md](docs/OPERATIONS.md)). |
-| No Docker / no isolation / operator opts out | **Disable** code execution; the rest of the app (chat, RAG, uploads, downloads of **non-executed** generated files) continues to work within normal limits. |
+| Docker (or approved runtime) available and operators enable the feature | Code sandbox runs with container isolation and enforced `network_policy=disabled` by default. |
+| `localhost` provider enabled for trusted local development | Code execution is available as a host-shell fallback, but it is **not** a fully isolated sandbox and does **not** enforce the same network guarantees as Docker. |
+| Operators opt out entirely | **Disable** code execution; the rest of the app (chat, RAG, uploads, downloads of **non-executed** generated files) continues to work within normal limits. |
 
 This is now the shipped model for the Phase 18 Docker-first sandbox MVP: **high-risk operations are gated by explicit configuration and runtime readiness**, not on by default; **per-caller policy** remains separate from deployment/runtime readiness.
 
@@ -75,9 +76,10 @@ Core API surface:
 - `GET /api/system/inference`
 - `GET /api/system/runtime-target`
 - `GET /api/system/features` (capability-gated features: config + host probe)
-- `POST /api/code-sandbox/exec` (run one short synchronous shell sandbox execution)
+- `POST /api/code-sandbox/exec` (run one durable shell sandbox execution in `sync` or `async` mode)
 - `GET /api/code-sandbox/executions/{execution_id}` (read one persisted sandbox execution)
 - `GET /api/code-sandbox/executions/{execution_id}/events` (read one persisted sandbox execution timeline)
+- `GET /api/code-sandbox/executions/{execution_id}/logs` (stream replayable sandbox logs over SSE)
 - `POST /api/workbench/tasks` (create and enqueue a durable workbench task)
 - `GET /api/workbench/sources` (list declarative retrieval sources for workbench tasks)
 - `GET /api/workbench/tasks/{task_id}` (poll durable task status)
@@ -97,7 +99,7 @@ Core API surface:
 - Shared-host operations now include documented graceful shutdown, rollback, backup/restore, and post-deploy checks
 - RAG-0 is complete, and the first RAG-1/2 slice is live: `csv/xlsx` uploads now route through real ingestion/search/answer, `pdf/docx/md/txt` normalize into the same knowledge pipeline, and chat can use `knowledge_document_ids` for retrieval-backed generation instead of raw snippet dumps
 - Generated non-executed chat files now download through persisted artifact ids under `/api/artifacts/{artifact_id}`
-- Code sandbox execution is now a real gated capability: `POST /api/code-sandbox/exec` runs short synchronous shell work in an isolated Docker-backed sandbox with network disabled by default, while durable execution records remain readable via `GET /api/code-sandbox/executions/{execution_id}` and `/events`
+- Code sandbox execution is now a real gated capability: `POST /api/code-sandbox/exec` runs provider-backed shell work in `sync` or `async` mode, `GET /api/code-sandbox/executions/{execution_id}` and `/events` expose durable state/auditability, and `GET /api/code-sandbox/executions/{execution_id}/logs` streams replayable stdout/stderr over SSE. Docker is the default isolated backend; `localhost` is a trusted-dev fallback with weaker isolation.
 - Workbench tasks now persist durable task rows, support polling and event timelines, and provide minimal execution for `plan`, `browse`, and `deep_research`; `canvas` remains unimplemented
 - **RAG-ready gate:** the product may be described as **RAG-ready** only when `python -m tools.run_rag_eval` exits 0 (checked-in `evaldata/rag_eval_cases.jsonl`; see [evaldata/README.md](evaldata/README.md)) and retrieval quality notes in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) stay aligned with that runner. CI runs the same command on every backend build.
 
@@ -122,6 +124,52 @@ cd frontend
 npm ci
 npm run dev
 ```
+
+Desktop shell scaffold (Phase 19A):
+
+```bash
+cd frontend
+npm ci
+npm run desktop:dev
+```
+
+Notes:
+
+- the desktop shell now uses a **Tauri 2** scaffold under [frontend/src-tauri](/E:/simonbb/GOAT_AI/frontend/src-tauri)
+- in dev mode it launches the existing FastAPI backend as a local child process and waits for `/api/health` before showing the main window
+
+Packaged backend sidecar (Phase 19B):
+
+```bash
+pip install -r requirements-desktop-build.txt
+python -m tools.build_desktop_sidecar
+cd frontend
+npm run desktop:build
+```
+
+Notes:
+
+- `python -m tools.build_desktop_sidecar` freezes the backend entrypoint with **PyInstaller** and places the per-platform binary under [frontend/src-tauri/binaries](/E:/simonbb/GOAT_AI/frontend/src-tauri/binaries)
+- `npm run desktop:build` now rebuilds the frozen sidecar before the Tauri packaging step
+- packaged desktop builds launch the bundled backend sidecar locally and store SQLite/data files in the platform app-data directory instead of the repository root
+
+Packaged desktop runtime configuration:
+
+- Desktop builds inherit runtime configuration from the parent OS environment rather than a repo-local `.env`.
+- Common knobs include `OLLAMA_BASE_URL`, `GOAT_FEATURE_CODE_SANDBOX`, `GOAT_CODE_SANDBOX_PROVIDER`, and `GOAT_DESKTOP_BACKEND_PORT`.
+- Docker remains the default sandbox provider for packaged builds; `localhost` should be treated as a trusted development fallback, not a strong-isolation production path.
+
+Windows desktop prerequisites can be bootstrapped with:
+
+```powershell
+.\scripts\install_desktop_prereqs.ps1 -Profile Dev
+```
+
+Profiles:
+
+- `Runtime`: installs end-user runtimes for the packaged desktop app baseline (`WebView2`, plus `Ollama` by default)
+- `Dev`: installs desktop build prerequisites (`Rustup`, `cargo` / `rustc`, Visual Studio Build Tools 2022 with the C++ workload) plus `WebView2`
+- `All`: installs both runtime and development prerequisites
 
 Production-style deploy:
 

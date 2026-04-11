@@ -127,6 +127,9 @@ export interface CodeSandboxFeature {
   allowed_by_config: boolean
   available_on_host: boolean
   effective_enabled: boolean
+  provider_name: string
+  isolation_level: 'container' | 'host'
+  network_policy_enforced: boolean
   deny_reason: string | null
 }
 
@@ -154,6 +157,7 @@ export interface SystemFeatures {
 
 export type CodeSandboxRuntimePreset = 'shell'
 export type CodeSandboxExecutionStatus = 'queued' | 'running' | 'completed' | 'failed' | 'denied'
+export type CodeSandboxExecutionMode = 'sync' | 'async'
 export type CodeSandboxNetworkPolicy = 'disabled' | 'allowlist' | 'enabled'
 
 export interface CodeSandboxInlineFile {
@@ -167,6 +171,7 @@ export interface CodeSandboxOutputFile {
 }
 
 export interface CodeSandboxExecRequest {
+  execution_mode?: CodeSandboxExecutionMode
   runtime_preset?: CodeSandboxRuntimePreset
   code?: string
   command?: string
@@ -179,10 +184,16 @@ export interface CodeSandboxExecRequest {
 export interface CodeSandboxExecutionResponse {
   execution_id: string
   status: CodeSandboxExecutionStatus
+  execution_mode: CodeSandboxExecutionMode
   runtime_preset: CodeSandboxRuntimePreset
   network_policy: CodeSandboxNetworkPolicy
   created_at: string
   updated_at: string
+  started_at: string | null
+  finished_at: string | null
+  provider_name: string
+  isolation_level: 'container' | 'host'
+  network_policy_enforced: boolean
   exit_code: number | null
   stdout: string
   stderr: string
@@ -203,6 +214,18 @@ export interface CodeSandboxExecutionEvent {
 export interface CodeSandboxExecutionEventsResponse {
   execution_id: string
   events: CodeSandboxExecutionEvent[]
+}
+
+export interface CodeSandboxLogStreamEvent {
+  type: 'stdout' | 'stderr' | 'status' | 'done'
+  execution_id?: string
+  sequence?: number
+  created_at?: string
+  chunk?: string
+  status?: CodeSandboxExecutionStatus
+  provider_name?: string
+  updated_at?: string
+  timed_out?: boolean
 }
 
 /** Ollama sampling options (Advanced settings); maps to backend ChatRequest fields. */

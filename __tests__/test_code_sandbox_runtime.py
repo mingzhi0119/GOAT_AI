@@ -21,14 +21,18 @@ class CodeSandboxRuntimeTests(unittest.TestCase):
             created = repository.create_execution(
                 CodeSandboxExecutionCreatePayload(
                     execution_id="cs-1",
+                    execution_mode="sync",
                     runtime_preset="shell",
                     network_policy="disabled",
+                    timeout_sec=8,
                     code="echo hi",
                     command=None,
                     stdin=None,
                     inline_files=[],
                     created_at="2026-04-10T00:00:00Z",
+                    queued_at="2026-04-10T00:00:00Z",
                     updated_at="2026-04-10T00:00:00Z",
+                    provider_name="docker",
                     owner_id="alice",
                     tenant_id="tenant:default",
                     principal_id="principal:alice",
@@ -46,6 +50,15 @@ class CodeSandboxRuntimeTests(unittest.TestCase):
             )
             assert started is not None
             self.assertEqual("running", started.status)
+            self.assertEqual("sync", started.execution_mode)
+
+            seq = repository.append_log_chunk(
+                "cs-1",
+                created_at="2026-04-10T00:00:01Z",
+                stream_name="stdout",
+                chunk_text="streaming...\n",
+            )
+            self.assertEqual(1, seq)
 
             repository.mark_execution_completed(
                 "cs-1",
@@ -64,13 +77,22 @@ class CodeSandboxRuntimeTests(unittest.TestCase):
             self.assertEqual("completed", record.status)
             self.assertEqual("ok", record.stdout)
             self.assertEqual("docker", record.provider_name)
+            self.assertEqual(1, record.last_log_seq)
             self.assertEqual(
                 [{"path": "report.txt", "byte_size": 12}], record.output_files
             )
 
+            logs = repository.list_log_chunks("cs-1")
+            self.assertEqual(["streaming...\n"], [item.chunk_text for item in logs])
+
             events = repository.list_execution_events("cs-1")
             self.assertEqual(
-                ["execution.queued", "execution.started", "execution.completed"],
+                [
+                    "execution.queued",
+                    "execution.started",
+                    "execution.log.stdout",
+                    "execution.completed",
+                ],
                 [event.event_type for event in events],
             )
 

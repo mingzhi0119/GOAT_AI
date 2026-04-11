@@ -8,8 +8,10 @@ from pydantic import BaseModel, Field
 
 
 CodeSandboxStatus = Literal["queued", "running", "completed", "failed", "denied"]
+CodeSandboxExecutionMode = Literal["sync", "async"]
 CodeSandboxNetworkPolicy = Literal["disabled", "allowlist", "enabled"]
 CodeSandboxRuntimePreset = Literal["shell"]
+CodeSandboxIsolationLevel = Literal["container", "host"]
 
 
 class CodeSandboxInlineFile(BaseModel):
@@ -24,7 +26,12 @@ class CodeSandboxInlineFile(BaseModel):
 
 
 class CodeSandboxExecRequest(BaseModel):
-    """Request body for one short synchronous sandbox execution."""
+    """Request body for one code sandbox execution."""
+
+    execution_mode: CodeSandboxExecutionMode = Field(
+        default="sync",
+        description="Execution mode. Phase 18A supports synchronous and in-process async runs.",
+    )
 
     runtime_preset: CodeSandboxRuntimePreset = Field(
         default="shell",
@@ -66,14 +73,20 @@ class CodeSandboxOutputFilePayload(BaseModel):
 
 
 class CodeSandboxExecutionResponse(BaseModel):
-    """Synchronous result body and durable read model for one execution."""
+    """Durable read model for one code sandbox execution."""
 
     execution_id: str
     status: CodeSandboxStatus
+    execution_mode: CodeSandboxExecutionMode
     runtime_preset: CodeSandboxRuntimePreset
     network_policy: CodeSandboxNetworkPolicy
     created_at: str
     updated_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    provider_name: str = ""
+    isolation_level: CodeSandboxIsolationLevel = "container"
+    network_policy_enforced: bool = True
     exit_code: int | None = None
     stdout: str = ""
     stderr: str = ""

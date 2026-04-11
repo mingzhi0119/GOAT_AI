@@ -6,9 +6,11 @@ import json
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 
 from backend.services.exceptions import PersistenceReadError, PersistenceWriteError
+
+LogStreamName = Literal["stdout", "stderr"]
 
 
 def _raise_read_error(operation: str, exc: Exception) -> None:
@@ -53,13 +55,16 @@ class CodeSandboxExecutionRecord:
 
     id: str
     status: str
+    execution_mode: str
     runtime_preset: str
     network_policy: str
+    timeout_sec: int
     code: str | None
     command: str | None
     stdin: str | None
     inline_files: list[dict[str, object]]
     created_at: str
+    queued_at: str
     updated_at: str
     started_at: str | None = None
     finished_at: str | None = None
@@ -70,6 +75,7 @@ class CodeSandboxExecutionRecord:
     error_detail: str | None = None
     output_files: list[dict[str, object]] | None = None
     provider_name: str = ""
+    last_log_seq: int = 0
     owner_id: str = ""
     tenant_id: str = "tenant:default"
     principal_id: str = ""
@@ -92,18 +98,33 @@ class CodeSandboxExecutionEventRecord:
 
 
 @dataclass(frozen=True, kw_only=True)
+class CodeSandboxLogChunkRecord:
+    """One persisted stdout/stderr chunk for an execution."""
+
+    execution_id: str
+    sequence: int
+    stream_name: LogStreamName
+    created_at: str
+    chunk_text: str
+
+
+@dataclass(frozen=True, kw_only=True)
 class CodeSandboxExecutionCreatePayload:
     """Initial persisted state for one accepted execution."""
 
     execution_id: str
+    execution_mode: str
     runtime_preset: str
     network_policy: str
+    timeout_sec: int
     code: str | None
     command: str | None
     stdin: str | None
     inline_files: list[dict[str, object]]
     created_at: str
+    queued_at: str
     updated_at: str
+    provider_name: str
     owner_id: str = ""
     tenant_id: str = "tenant:default"
     principal_id: str = ""
@@ -182,6 +203,23 @@ class CodeSandboxExecutionRepository(Protocol):
         metadata: dict[str, object] | None,
     ) -> None: ...
 
+    def append_log_chunk(
+        self,
+        execution_id: str,
+        *,
+        created_at: str,
+        stream_name: LogStreamName,
+        chunk_text: str,
+    ) -> int: ...
+
+    def list_log_chunks(
+        self, execution_id: str, *, after_sequence: int = 0
+    ) -> list[CodeSandboxLogChunkRecord]: ...
+
+    def list_execution_ids_by_status(
+        self, *statuses: str
+    ) -> list[str]: ...
+
 
 class SQLiteCodeSandboxExecutionRepository:
     """SQLite-backed persistence for code sandbox executions."""
@@ -200,13 +238,16 @@ class SQLiteCodeSandboxExecutionRepository:
                     INSERT INTO code_sandbox_executions (
                         id,
                         status,
+                        execution_mode,
                         runtime_preset,
                         network_policy,
+                        timeout_sec,
                         code,
                         command,
                         stdin_text,
                         inline_files_json,
                         created_at,
+                        queued_at,
                         updated_at,
                         started_at,
                         finished_at,
@@ -217,25 +258,30 @@ class SQLiteCodeSandboxExecutionRepository:
                         error_detail,
                         output_files_json,
                         provider_name,
+                        last_log_seq,
                         owner_id,
                         tenant_id,
                         principal_id,
                         auth_scopes_json,
                         credential_id,
                         auth_mode
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, '', '', 0, NULL, NULL, '', ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, '', '', 0, NULL, NULL, ?, 0, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         payload.execution_id,
                         payload.status,
+                        payload.execution_mode,
                         payload.runtime_preset,
                         payload.network_policy,
+                        payload.timeout_sec,
                         payload.code,
                         payload.command,
                         payload.stdin,
                         json.dumps(payload.inline_files, ensure_ascii=False),
                         payload.created_at,
+                        payload.queued_at,
                         payload.updated_at,
+                        payload.provider_name,
                         payload.owner_id,
                         payload.tenant_id,
                         payload.principal_id,
@@ -248,10 +294,11 @@ class SQLiteCodeSandboxExecutionRepository:
                     conn,
                     execution_id=payload.execution_id,
                     event_type="execution.queued",
-                    created_at=payload.created_at,
+                    created_at=payload.queued_at,
                     status=payload.status,
                     message="Execution accepted.",
                     metadata={
+                        "execution_mode": payload.execution_mode,
                         "network_policy": payload.network_policy,
                         "runtime_preset": payload.runtime_preset,
                     },
@@ -262,14 +309,18 @@ class SQLiteCodeSandboxExecutionRepository:
         return self.get_execution(payload.execution_id) or CodeSandboxExecutionRecord(
             id=payload.execution_id,
             status=payload.status,
+            execution_mode=payload.execution_mode,
             runtime_preset=payload.runtime_preset,
             network_policy=payload.network_policy,
+            timeout_sec=payload.timeout_sec,
             code=payload.code,
             command=payload.command,
             stdin=payload.stdin,
             inline_files=list(payload.inline_files),
             created_at=payload.created_at,
+            queued_at=payload.queued_at,
             updated_at=payload.updated_at,
+            provider_name=payload.provider_name,
             owner_id=payload.owner_id,
             tenant_id=payload.tenant_id,
             principal_id=payload.principal_id,
@@ -549,6 +600,109 @@ class SQLiteCodeSandboxExecutionRepository:
         except Exception as exc:
             _raise_write_error("code_sandbox_execution_event_append", exc)
 
+    def append_log_chunk(
+        self,
+        execution_id: str,
+        *,
+        created_at: str,
+        stream_name: LogStreamName,
+        chunk_text: str,
+    ) -> int:
+        try:
+            with sqlite3.connect(self._db_path) as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                seq_row = conn.execute(
+                    "SELECT COALESCE(MAX(seq), 0) + 1 FROM code_sandbox_execution_logs WHERE execution_id = ?",
+                    (execution_id,),
+                ).fetchone()
+                next_seq = int(seq_row[0]) if seq_row is not None else 1
+                conn.execute(
+                    """
+                    INSERT INTO code_sandbox_execution_logs (
+                        execution_id,
+                        seq,
+                        stream_name,
+                        created_at,
+                        chunk_text
+                    ) VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (execution_id, next_seq, stream_name, created_at, chunk_text),
+                )
+                conn.execute(
+                    f"""
+                    UPDATE code_sandbox_executions
+                    SET updated_at = ?,
+                        last_log_seq = ?,
+                        {stream_name} = COALESCE({stream_name}, '') || ?
+                    WHERE id = ?
+                    """,
+                    (created_at, next_seq, chunk_text, execution_id),
+                )
+                self._append_event(
+                    conn,
+                    execution_id=execution_id,
+                    event_type=f"execution.log.{stream_name}",
+                    created_at=created_at,
+                    status="running",
+                    message=None,
+                    metadata={
+                        "log_sequence": next_seq,
+                        "stream_name": stream_name,
+                        "byte_size": len(chunk_text.encode("utf-8")),
+                    },
+                )
+                conn.commit()
+                return next_seq
+        except Exception as exc:
+            _raise_write_error("code_sandbox_log_chunk_append", exc)
+
+    def list_log_chunks(
+        self, execution_id: str, *, after_sequence: int = 0
+    ) -> list[CodeSandboxLogChunkRecord]:
+        try:
+            with sqlite3.connect(self._db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    """
+                    SELECT execution_id, seq, stream_name, created_at, chunk_text
+                    FROM code_sandbox_execution_logs
+                    WHERE execution_id = ? AND seq > ?
+                    ORDER BY seq ASC
+                    """,
+                    (execution_id, after_sequence),
+                ).fetchall()
+        except Exception as exc:
+            _raise_read_error("code_sandbox_log_chunks_list", exc)
+        return [
+            CodeSandboxLogChunkRecord(
+                execution_id=str(row["execution_id"]),
+                sequence=int(row["seq"]),
+                stream_name=str(row["stream_name"]),
+                created_at=str(row["created_at"]),
+                chunk_text=str(row["chunk_text"]),
+            )
+            for row in rows
+        ]
+
+    def list_execution_ids_by_status(self, *statuses: str) -> list[str]:
+        if not statuses:
+            return []
+        placeholders = ", ".join("?" for _ in statuses)
+        try:
+            with sqlite3.connect(self._db_path) as conn:
+                rows = conn.execute(
+                    f"""
+                    SELECT id
+                    FROM code_sandbox_executions
+                    WHERE status IN ({placeholders})
+                    ORDER BY queued_at ASC, created_at ASC, id ASC
+                    """,
+                    statuses,
+                ).fetchall()
+        except Exception as exc:
+            _raise_read_error("code_sandbox_execution_status_list", exc)
+        return [str(row[0]) for row in rows]
+
     def _append_event(
         self,
         conn: sqlite3.Connection,
@@ -601,13 +755,16 @@ class SQLiteCodeSandboxExecutionRepository:
             SELECT
                 id,
                 status,
+                execution_mode,
                 runtime_preset,
                 network_policy,
+                timeout_sec,
                 code,
                 command,
                 stdin_text,
                 inline_files_json,
                 created_at,
+                queued_at,
                 updated_at,
                 started_at,
                 finished_at,
@@ -618,6 +775,7 @@ class SQLiteCodeSandboxExecutionRepository:
                 error_detail,
                 output_files_json,
                 provider_name,
+                last_log_seq,
                 owner_id,
                 tenant_id,
                 principal_id,
@@ -634,13 +792,16 @@ class SQLiteCodeSandboxExecutionRepository:
         return CodeSandboxExecutionRecord(
             id=str(row["id"]),
             status=str(row["status"]),
+            execution_mode=str(row["execution_mode"]),
             runtime_preset=str(row["runtime_preset"]),
             network_policy=str(row["network_policy"]),
+            timeout_sec=int(row["timeout_sec"]),
             code=str(row["code"]) if row["code"] is not None else None,
             command=str(row["command"]) if row["command"] is not None else None,
             stdin=str(row["stdin_text"]) if row["stdin_text"] is not None else None,
             inline_files=_decode_files(row["inline_files_json"]),
             created_at=str(row["created_at"]),
+            queued_at=str(row["queued_at"]),
             updated_at=str(row["updated_at"]),
             started_at=str(row["started_at"])
             if row["started_at"] is not None
@@ -657,6 +818,7 @@ class SQLiteCodeSandboxExecutionRepository:
             ),
             output_files=_decode_files(row["output_files_json"]),
             provider_name=str(row["provider_name"] or ""),
+            last_log_seq=int(row["last_log_seq"] or 0),
             owner_id=str(row["owner_id"] or ""),
             tenant_id=str(row["tenant_id"] or "tenant:default"),
             principal_id=str(row["principal_id"] or ""),

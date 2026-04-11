@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Literal, cast
@@ -13,6 +14,7 @@ LOCAL_OLLAMA_RUNTIME_DIR = WORKSPACE_ROOT / "ollama-local"
 LOCAL_OLLAMA_DEFAULT_URL = "http://127.0.0.1:11435"
 
 ThemeStyleId = Literal["classic", "urochester", "thu"]
+CodeSandboxProviderId = Literal["docker", "localhost"]
 
 _DEFAULT_SYSTEM_PROMPTS: Final[dict[ThemeStyleId, str]] = {
     "classic": """You are GOAT AI, a helpful general-purpose assistant.
@@ -143,8 +145,10 @@ class Settings:
     rag_rerank_mode: Literal["passthrough", "lexical"] = "passthrough"
     feature_code_sandbox_enabled: bool = False
     feature_agent_workbench_enabled: bool = False
+    code_sandbox_provider: CodeSandboxProviderId = "docker"
     docker_socket_path: str = ""
     code_sandbox_default_image: str = "python:3.12-slim"
+    code_sandbox_localhost_shell: str = ""
     code_sandbox_default_timeout_sec: int = 8
     code_sandbox_max_timeout_sec: int = 15
     code_sandbox_max_code_bytes: int = 32 * 1024
@@ -163,6 +167,17 @@ class Settings:
     @property
     def user_facing_error(self) -> str:
         return USER_FACING_ERROR
+
+
+def resolve_localhost_sandbox_shell(settings: Settings) -> str | None:
+    configured = settings.code_sandbox_localhost_shell.strip()
+    if configured:
+        return shutil.which(configured) or (
+            configured if Path(configured).is_file() else None
+        )
+    if os.name == "nt":
+        return shutil.which("pwsh.exe") or shutil.which("powershell.exe")
+    return shutil.which("sh") or ("/bin/sh" if Path("/bin/sh").is_file() else None)
 
 
 def load_settings() -> Settings:
@@ -240,9 +255,15 @@ def load_settings() -> Settings:
         raise ValueError("GOAT_RAG_RERANK_MODE must be one of: passthrough, lexical")
     _feature_sandbox = _env_bool("GOAT_FEATURE_CODE_SANDBOX", "false")
     _feature_agent_workbench = _env_bool("GOAT_FEATURE_AGENT_WORKBENCH", "false")
+    _sandbox_provider = (
+        os.environ.get("GOAT_CODE_SANDBOX_PROVIDER", "docker").strip().lower()
+    )
     _docker_sock = os.environ.get("GOAT_DOCKER_SOCKET", "").strip()
     _sandbox_image = os.environ.get(
         "GOAT_CODE_SANDBOX_DEFAULT_IMAGE", "python:3.12-slim"
+    ).strip()
+    _sandbox_localhost_shell = os.environ.get(
+        "GOAT_CODE_SANDBOX_LOCALHOST_SHELL", ""
     ).strip()
     _sandbox_default_timeout = int(
         os.environ.get("GOAT_CODE_SANDBOX_DEFAULT_TIMEOUT_SEC", "8")
@@ -272,6 +293,8 @@ def load_settings() -> Settings:
     _sandbox_memory_mb = int(os.environ.get("GOAT_CODE_SANDBOX_MEMORY_MB", "256"))
     if not _sandbox_image:
         raise ValueError("GOAT_CODE_SANDBOX_DEFAULT_IMAGE must not be empty")
+    if _sandbox_provider not in {"docker", "localhost"}:
+        raise ValueError("GOAT_CODE_SANDBOX_PROVIDER must be one of: docker, localhost")
     if _sandbox_default_timeout < 1:
         raise ValueError("GOAT_CODE_SANDBOX_DEFAULT_TIMEOUT_SEC must be >= 1")
     if _sandbox_max_timeout < _sandbox_default_timeout:
@@ -348,8 +371,10 @@ def load_settings() -> Settings:
         rag_rerank_mode=cast(Literal["passthrough", "lexical"], _rag_rerank),
         feature_code_sandbox_enabled=_feature_sandbox,
         feature_agent_workbench_enabled=_feature_agent_workbench,
+        code_sandbox_provider=cast(CodeSandboxProviderId, _sandbox_provider),
         docker_socket_path=_docker_sock,
         code_sandbox_default_image=_sandbox_image,
+        code_sandbox_localhost_shell=_sandbox_localhost_shell,
         code_sandbox_default_timeout_sec=_sandbox_default_timeout,
         code_sandbox_max_timeout_sec=_sandbox_max_timeout,
         code_sandbox_max_code_bytes=_sandbox_max_code_bytes,

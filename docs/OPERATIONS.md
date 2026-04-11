@@ -40,6 +40,67 @@ npm ci
 npm run dev
 ```
 
+### Windows desktop prerequisites
+
+For the Tauri-based desktop shell and future packaged Windows app flow, use the bootstrap script instead of manually clicking through installers:
+
+```powershell
+.\scripts\install_desktop_prereqs.ps1 -Profile Runtime
+.\scripts\install_desktop_prereqs.ps1 -Profile Dev
+```
+
+Profiles:
+
+- `Runtime`
+  - installs `Microsoft Edge WebView2 Runtime`
+  - installs `Ollama` by default so the packaged app can use the local inference runtime
+- `Dev`
+  - installs `Rustlang.Rustup`
+  - installs `Visual Studio Build Tools 2022` with the C++ workload
+  - installs `Microsoft Edge WebView2 Runtime`
+- `All`
+  - installs both runtime and development prerequisites
+
+Current package ids used by the bootstrap script:
+
+- `Microsoft.EdgeWebView2Runtime`
+- `Ollama.Ollama`
+- `Rustlang.Rustup`
+- `Microsoft.VisualStudio.2022.BuildTools`
+
+### Desktop backend sidecar packaging
+
+Phase 19B uses a frozen Python sidecar instead of requiring end users to install Python manually.
+
+Build flow:
+
+```bash
+pip install -r requirements-desktop-build.txt
+python -m tools.build_desktop_sidecar
+cd frontend
+npm run desktop:build
+```
+
+Important notes:
+
+- `python -m tools.build_desktop_sidecar` builds a per-platform executable with **PyInstaller**
+- the output is copied to `frontend/src-tauri/binaries/goat-backend-$TARGET_TRIPLE[.exe]`
+- `npm run desktop:build` triggers the same sidecar build automatically through Tauri's `beforeBuildCommand`
+- PyInstaller is **not** a cross-compiler; build each platform's sidecar on that platform (or an equivalent CI runner / VM)
+- packaged desktop builds move app-owned writable state out of the repository and into the platform app-local-data directory
+
+Desktop sidecar writable paths:
+
+- SQLite DB: `<app_local_data_dir>/chat_logs.db`
+- persisted app data: `<app_local_data_dir>/data`
+- desktop shell stdout/stderr are not yet persisted to a dedicated file sink; use backend SQLite/data plus the installer-run process logs for diagnostics today
+
+Packaged desktop runtime config:
+
+- The packaged desktop app inherits runtime configuration from the parent OS environment rather than a repo-local `.env`.
+- Common runtime knobs for packaged installs are `OLLAMA_BASE_URL`, `GOAT_FEATURE_CODE_SANDBOX`, `GOAT_CODE_SANDBOX_PROVIDER`, and `GOAT_DESKTOP_BACKEND_PORT`.
+- Docker is the default sandbox backend for strong isolation. `localhost` is a trusted-dev fallback only and does not enforce the same network guarantees.
+
 ## Deploy
 
 Linux:
@@ -87,7 +148,7 @@ Many production installs match an **unprivileged** server (e.g. JupyterHub-style
 
 ### Other environments
 
-Self-managed VMs, Docker Compose, Kubernetes, or developer laptops use the same codebase with **env-driven** ports and paths. Features that need **strong isolation** (e.g. a future **code-execution sandbox**) must be **off** unless Docker (or an approved runtime) is available and explicitly enabled-see **`docs/ENGINEERING_STANDARDS.md` Section 15** and `README.md` **Capability-based / high-risk features**.
+Self-managed VMs, Docker Compose, Kubernetes, or developer laptops use the same codebase with **env-driven** ports and paths. Features that need **strong isolation** (for example Docker-backed code sandbox execution) must stay tied to explicit operator enablement and runtime probes; the shipped `localhost` provider is a weaker trusted-dev fallback, not a like-for-like isolation substitute.
 
 ## Key environment variables
 
@@ -126,10 +187,12 @@ Self-managed VMs, Docker Compose, Kubernetes, or developer laptops use the same 
 | `GOAT_IDEMPOTENCY_TTL_SEC` | Idempotency record TTL (seconds) for upload analyze + chat session append | `300` |
 | `GOAT_MAX_CHAT_MESSAGES` | Max message count accepted by `POST /api/chat` (422 if exceeded) | `120` |
 | `GOAT_MAX_CHAT_PAYLOAD_BYTES` | Max UTF-8 request payload bytes accepted by `POST /api/chat` (422 if exceeded) | `512000` |
-| `GOAT_FEATURE_CODE_SANDBOX` | Operator allows code-sandbox feature (`0`/`1`); `effective_enabled` still requires Docker probe | `0` |
+| `GOAT_FEATURE_CODE_SANDBOX` | Operator allows code-sandbox feature (`0`/`1`); `effective_enabled` still requires the selected provider runtime probe | `0` |
 | `GOAT_FEATURE_AGENT_WORKBENCH` | Operator exposes the shared workbench feature family; actual sub-capability readiness still depends on runtime support (`plan`, `browse`, and `deep_research` are partially implemented, while `canvas`, project memory, and connectors are not) | `0` |
+| `GOAT_CODE_SANDBOX_PROVIDER` | Sandbox runtime backend: `docker` (default) or `localhost` (dev fallback) | `docker` |
 | `GOAT_DOCKER_SOCKET` | Override Docker socket/pipe path (empty = defaults: Unix `/var/run/docker.sock`, Windows `\\.\pipe\docker_engine`) | empty |
-| `GOAT_CODE_SANDBOX_DEFAULT_IMAGE` | Docker image used for the short synchronous sandbox MVP | `python:3.12-slim` |
+| `GOAT_CODE_SANDBOX_LOCALHOST_SHELL` | Optional shell executable/path override for `localhost` provider | empty |
+| `GOAT_CODE_SANDBOX_DEFAULT_IMAGE` | Docker image used for the Phase 18 sandbox runtime | `python:3.12-slim` |
 | `GOAT_CODE_SANDBOX_DEFAULT_TIMEOUT_SEC` | Default sandbox execution timeout | `8` |
 | `GOAT_CODE_SANDBOX_MAX_TIMEOUT_SEC` | Maximum sandbox timeout accepted from requests | `15` |
 | `GOAT_CODE_SANDBOX_MAX_CODE_BYTES` | Max UTF-8 bytes for inline `code` | `32768` |
@@ -143,19 +206,22 @@ Self-managed VMs, Docker Compose, Kubernetes, or developer laptops use the same 
 
 ### Code sandbox operations (Phase 18)
 
-- `POST /api/code-sandbox/exec` now performs real Docker-backed execution when:
+- `POST /api/code-sandbox/exec` now performs real provider-backed execution when:
   - `GOAT_FEATURE_CODE_SANDBOX=1`
-  - the Docker socket/pipe probe succeeds
+  - the selected provider probe succeeds
   - the caller credential includes `sandbox:execute`
-- The Phase 18 MVP is intentionally conservative:
-  - synchronous, short-lived execution only
+- Phase 18A remains intentionally conservative:
+  - `sync` is the default; `async` uses in-process dispatch plus queued-execution recovery on startup
+  - short-lived execution only
   - one shell-capable preset
-  - network disabled by default
-  - no privileged mode
-  - no host Docker socket mounted into the sandbox container
-- The execution contract persists durable rows and event timelines in SQLite:
+  - Docker enforces `network_policy=disabled` by default; `localhost` reports a degraded contract and does not enforce the same network boundary
+  - `docker`: no privileged mode and no host Docker socket mounted into the sandbox container
+  - `localhost`: intended for trusted local development only; it does not provide Docker-grade isolation
+- The execution contract persists durable rows, event timelines, and replayable log chunks in SQLite:
   - `GET /api/code-sandbox/executions/{execution_id}`
   - `GET /api/code-sandbox/executions/{execution_id}/events`
+  - `GET /api/code-sandbox/executions/{execution_id}/logs`
+- `GET /api/code-sandbox/executions/{execution_id}/logs` is an SSE stream for stdout/stderr replay plus status updates; clients may reconnect with `after_seq=<last_seen_log_sequence>`
 - Files written under `outputs/` are surfaced as metadata in the API response, but they are not yet promoted into the artifact workspace model.
 
 ### OpenTelemetry (optional, Phase 15.6)

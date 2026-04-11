@@ -90,6 +90,9 @@ def build_system_features_response(
             allowed_by_config=snap.allowed_by_config,
             available_on_host=snap.available_on_host,
             effective_enabled=snap.effective_enabled,
+            provider_name=snap.provider_name,
+            isolation_level=snap.isolation_level,
+            network_policy_enforced=snap.network_policy_enforced,
             deny_reason=snap.deny_reason,
         ),
         workbench=WorkbenchFeaturePayload(

@@ -1,0 +1,3 @@
+-r requirements-ci.txt
+
+PyInstaller==6.16.0

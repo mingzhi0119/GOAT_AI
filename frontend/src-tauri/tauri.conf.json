@@ -1,0 +1,35 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "GOAT AI",
+  "version": "1.2.0",
+  "identifier": "com.simonbb.goatai",
+  "build": {
+    "beforeDevCommand": "npm run dev -- --mode tauri --host 127.0.0.1 --port 3000",
+    "beforeBuildCommand": "npm run desktop:sidecar:build && npm run build",
+    "devUrl": "http://127.0.0.1:3000",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "GOAT AI",
+        "width": 1440,
+        "height": 960,
+        "minWidth": 1100,
+        "minHeight": 720,
+        "visible": false,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' asset: http://127.0.0.1:3000 http://localhost:3000 http://127.0.0.1:62606 http://localhost:62606; connect-src 'self' asset: http://127.0.0.1:3000 http://localhost:3000 ws://127.0.0.1:3000 ws://localhost:3000 http://127.0.0.1:62606 http://localhost:62606 ws://127.0.0.1:62606 ws://localhost:62606; img-src 'self' asset: data: blob: http://127.0.0.1:3000 http://localhost:3000 http://127.0.0.1:62606 http://localhost:62606; style-src 'self' 'unsafe-inline'; font-src 'self' data: asset:; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval';"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "icon": ["icons/icon.ico", "icons/icon.png"],
+    "externalBin": ["binaries/goat-backend"],
+    "targets": "all"
+  }
+}

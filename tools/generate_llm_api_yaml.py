@@ -171,6 +171,43 @@ def _response_schema(operation: dict[str, Any], status_code: str) -> Any:
 
     content = response.get("content", {})
     if "text/event-stream" in content:
+        path_hint = str(operation.get("x-goat-path", ""))
+        if path_hint.endswith("/code-sandbox/executions/{execution_id}/logs"):
+            return {
+                "content_type": "text/event-stream",
+                "stream": [
+                    {
+                        "status": {
+                            "type": "status",
+                            "execution_id": "string",
+                            "status": "queued|running|completed|failed|denied",
+                            "provider_name": "string",
+                            "updated_at": "string",
+                            "timed_out": "boolean",
+                        }
+                    },
+                    {
+                        "stdout": {
+                            "type": "stdout",
+                            "execution_id": "string",
+                            "sequence": "integer",
+                            "created_at": "string",
+                            "chunk": "string",
+                        }
+                    },
+                    {
+                        "stderr": {
+                            "type": "stderr",
+                            "execution_id": "string",
+                            "sequence": "integer",
+                            "created_at": "string",
+                            "chunk": "string",
+                        }
+                    },
+                    {"done": {"type": "done"}},
+                    {"error_frame": {"type": "error", "message": "string"}},
+                ],
+            }
         path = operation.get("operationId", "")
         if "chat" in path:
             return {
@@ -320,6 +357,8 @@ def _build_compact_spec(openapi: dict[str, Any]) -> dict[str, Any]:
                 "method": method.upper(),
                 "path": _path_without_prefix(path, base_path),
             }
+            operation = dict(operation)
+            operation["x-goat-path"] = path
 
             if path == f"{base_path}/health":
                 endpoint["auth"] = "none"

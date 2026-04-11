@@ -47,9 +47,9 @@ if TestClient is not None:
 class AuthzFakeCodeSandboxProvider:
     provider_name = "fake-docker"
 
-    def run(self, request: SandboxProviderRequest) -> SandboxProviderResult:
+    def run_stream(self, request: SandboxProviderRequest):
         _ = request
-        return SandboxProviderResult(
+        yield SandboxProviderResult(
             provider_name=self.provider_name,
             exit_code=0,
             stdout="sandbox ok",
@@ -273,7 +273,7 @@ class ApiAuthzTests(unittest.TestCase):
         self.assertFalse(workbench["deep_research"]["effective_enabled"])
         self.assertFalse(workbench["connectors"]["effective_enabled"])
 
-    @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=True)
+    @patch("goat_ai.feature_gates.probe_docker_available", return_value=True)
     def test_system_features_resolve_policy_gate_per_credential(
         self, _mock: object
     ) -> None:
@@ -294,7 +294,7 @@ class ApiAuthzTests(unittest.TestCase):
         self.assertTrue(write_features.json()["code_sandbox"]["policy_allowed"])
         self.assertTrue(write_features.json()["code_sandbox"]["effective_enabled"])
 
-    @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=True)
+    @patch("goat_ai.feature_gates.probe_docker_available", return_value=True)
     def test_code_sandbox_exec_policy_denial_returns_403(self, _mock: object) -> None:
         self.settings = replace(
             self.settings,
@@ -325,7 +325,7 @@ class ApiAuthzTests(unittest.TestCase):
         body = response.json()
         self.assertEqual(FEATURE_DISABLED, body["code"])
 
-    @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=False)
+    @patch("goat_ai.feature_gates.probe_docker_available", return_value=False)
     def test_code_sandbox_exec_runtime_denial_returns_503_even_for_write_key(
         self, _mock: object
     ) -> None:
@@ -341,7 +341,7 @@ class ApiAuthzTests(unittest.TestCase):
         body = response.json()
         self.assertEqual(FEATURE_UNAVAILABLE, body["code"])
 
-    @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=True)
+    @patch("goat_ai.feature_gates.probe_docker_available", return_value=True)
     def test_code_sandbox_execution_read_owner_mismatch_returns_404(
         self, _mock: object
     ) -> None:

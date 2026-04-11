@@ -43,6 +43,7 @@ if TestClient is not None:
     from backend.models.system import GPUStatusResponse
     from backend.services import log_service
     from backend.services.code_sandbox_provider import (
+        SandboxProviderLogChunk,
         SandboxProviderRequest,
         SandboxProviderResult,
     )
@@ -82,12 +83,18 @@ class FakeTitleGenerator:
 class FakeCodeSandboxProvider:
     provider_name = "fake-docker"
 
-    def run(self, request: SandboxProviderRequest) -> SandboxProviderResult:
+    def run_stream(self, request: SandboxProviderRequest):
         output_files: list[dict[str, object]] = []
         if request.command == "touch outputs/report.txt":
             output_files.append({"path": "report.txt", "byte_size": 12})
+        if request.command == "printf async":
+            yield SandboxProviderLogChunk(
+                stream_name="stdout",
+                created_at="2026-04-10T00:00:00Z",
+                text="async log line\n",
+            )
         if request.command == "sleep-forever":
-            return SandboxProviderResult(
+            yield SandboxProviderResult(
                 provider_name=self.provider_name,
                 exit_code=None,
                 stdout="",
@@ -96,8 +103,9 @@ class FakeCodeSandboxProvider:
                 error_detail="Execution timed out.",
                 output_files=[],
             )
+            return
         if request.command == "exit 2":
-            return SandboxProviderResult(
+            yield SandboxProviderResult(
                 provider_name=self.provider_name,
                 exit_code=2,
                 stdout="",
@@ -106,7 +114,8 @@ class FakeCodeSandboxProvider:
                 error_detail="Execution exited with a non-zero status.",
                 output_files=[],
             )
-        return SandboxProviderResult(
+            return
+        yield SandboxProviderResult(
             provider_name=self.provider_name,
             exit_code=0,
             stdout="sandbox ok",
@@ -1299,7 +1308,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(404, missing.status_code)
         self.assertEqual("Workbench task not found", missing.json()["detail"])
 
-    @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=True)
+    @patch("goat_ai.feature_gates.probe_docker_available", return_value=True)
     def test_code_sandbox_enabled_executes_and_reads_durable_record(
         self, _mock: object
     ) -> None:
@@ -1325,8 +1334,10 @@ class ApiBlackboxContractTests(unittest.TestCase):
         body = response.json()
         self.assertTrue(body["execution_id"].startswith("cs-"))
         self.assertEqual("completed", body["status"])
+        self.assertEqual("sync", body["execution_mode"])
         self.assertEqual(0, body["exit_code"])
         self.assertEqual("sandbox ok", body["stdout"])
+        self.assertEqual("fake-docker", body["provider_name"])
         self.assertEqual(
             [{"path": "report.txt", "byte_size": 12}], body["output_files"]
         )
@@ -1341,11 +1352,56 @@ class ApiBlackboxContractTests(unittest.TestCase):
         )
         self.assertEqual(200, events.status_code)
         self.assertEqual(
-            ["execution.queued", "execution.started", "execution.completed"],
+            [
+                "execution.queued",
+                "execution.started",
+                "execution.log.stdout",
+                "execution.completed",
+            ],
             [event["event_type"] for event in events.json()["events"]],
         )
 
-    @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=True)
+    @patch("goat_ai.feature_gates.probe_docker_available", return_value=True)
+    def test_code_sandbox_async_exec_returns_accepted_and_streams_logs(
+        self, _mock: object
+    ) -> None:
+        self.settings = replace(self.settings, feature_code_sandbox_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+        self.client.app.dependency_overrides[get_code_sandbox_provider] = lambda: (
+            FakeCodeSandboxProvider()
+        )
+
+        response = self.client.post(
+            "/api/code-sandbox/exec",
+            json={
+                "execution_mode": "async",
+                "code": "echo sandbox ok",
+                "command": "printf async",
+            },
+        )
+        self.assertEqual(202, response.status_code)
+        body = response.json()
+        self.assertEqual("async", body["execution_mode"])
+        self.assertIn(body["status"], {"queued", "running", "completed"})
+
+        logs = self.client.get(
+            f"/api/code-sandbox/executions/{body['execution_id']}/logs"
+        )
+        self.assertEqual(200, logs.status_code)
+        payloads = parse_sse_payloads(logs.text)
+        event_types = [item.get("type") for item in payloads]
+        self.assertIn("status", event_types)
+        self.assertIn("stdout", event_types)
+        self.assertIn("done", event_types)
+
+        final_status = self.client.get(
+            f"/api/code-sandbox/executions/{body['execution_id']}"
+        )
+        self.assertEqual(200, final_status.status_code)
+        self.assertEqual("completed", final_status.json()["status"])
+        self.assertIn("async log line", final_status.json()["stdout"])
+
+    @patch("goat_ai.feature_gates.probe_docker_available", return_value=True)
     def test_code_sandbox_exec_rejects_invalid_network_policy(
         self, _mock: object
     ) -> None:

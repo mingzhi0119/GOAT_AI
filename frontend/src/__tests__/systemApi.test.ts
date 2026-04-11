@@ -55,6 +55,9 @@ describe('system api', () => {
           allowed_by_config: true,
           available_on_host: true,
           effective_enabled: true,
+          provider_name: 'docker',
+          isolation_level: 'container',
+          network_policy_enforced: true,
           deny_reason: null,
         },
         workbench: {

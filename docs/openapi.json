@@ -1573,7 +1573,7 @@
           "code_sandbox"
         ],
         "summary": "Execute code in an isolated sandbox",
-        "description": "Execute one short synchronous code sandbox request and persist the result.",
+        "description": "Execute one durable code sandbox request and persist the result.",
         "operationId": "post_code_sandbox_exec_api_code_sandbox_exec_post",
         "requestBody": {
           "content": {
@@ -1602,6 +1602,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Execution accepted for async processing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSandboxExecutionResponse"
                 }
               }
             }
@@ -1770,6 +1780,109 @@
                   "$ref": "#/components/schemas/CodeSandboxExecutionEventsResponse"
                 }
               }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "description": "Runtime gate closed or sandbox provider unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code-sandbox/executions/{execution_id}/logs": {
+      "get": {
+        "tags": [
+          "code_sandbox"
+        ],
+        "summary": "Stream one code sandbox execution log timeline",
+        "description": "Stream replayable stdout/stderr chunks and status updates for one execution.",
+        "operationId": "get_code_sandbox_execution_logs_route_api_code_sandbox_executions__execution_id__logs_get",
+        "parameters": [
+          {
+            "name": "execution_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Execution Id"
+            }
+          },
+          {
+            "name": "after_seq",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "After Seq"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/event-stream": {}
             }
           },
           "401": {
@@ -2449,6 +2562,16 @@
       },
       "CodeSandboxExecRequest": {
         "properties": {
+          "execution_mode": {
+            "type": "string",
+            "enum": [
+              "sync",
+              "async"
+            ],
+            "title": "Execution Mode",
+            "description": "Execution mode. Phase 18A supports synchronous and in-process async runs.",
+            "default": "sync"
+          },
           "runtime_preset": {
             "type": "string",
             "const": "shell",
@@ -2532,7 +2655,7 @@
         },
         "type": "object",
         "title": "CodeSandboxExecRequest",
-        "description": "Request body for one short synchronous sandbox execution."
+        "description": "Request body for one code sandbox execution."
       },
       "CodeSandboxExecutionEventPayload": {
         "properties": {
@@ -2631,6 +2754,14 @@
             ],
             "title": "Status"
           },
+          "execution_mode": {
+            "type": "string",
+            "enum": [
+              "sync",
+              "async"
+            ],
+            "title": "Execution Mode"
+          },
           "runtime_preset": {
             "type": "string",
             "const": "shell",
@@ -2652,6 +2783,47 @@
           "updated_at": {
             "type": "string",
             "title": "Updated At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "provider_name": {
+            "type": "string",
+            "title": "Provider Name",
+            "default": ""
+          },
+          "isolation_level": {
+            "type": "string",
+            "enum": [
+              "container",
+              "host"
+            ],
+            "title": "Isolation Level",
+            "default": "container"
+          },
+          "network_policy_enforced": {
+            "type": "boolean",
+            "title": "Network Policy Enforced",
+            "default": true
           },
           "exit_code": {
             "anyOf": [
@@ -2702,13 +2874,14 @@
         "required": [
           "execution_id",
           "status",
+          "execution_mode",
           "runtime_preset",
           "network_policy",
           "created_at",
           "updated_at"
         ],
         "title": "CodeSandboxExecutionResponse",
-        "description": "Synchronous result body and durable read model for one execution."
+        "description": "Durable read model for one code sandbox execution."
       },
       "CodeSandboxFeaturePayload": {
         "properties": {
@@ -2732,6 +2905,21 @@
             "title": "Effective Enabled",
             "description": "Both config and probe satisfied."
           },
+          "provider_name": {
+            "type": "string",
+            "title": "Provider Name",
+            "description": "Selected runtime provider for code sandbox execution."
+          },
+          "isolation_level": {
+            "type": "string",
+            "title": "Isolation Level",
+            "description": "Isolation tier for the active provider: container or host."
+          },
+          "network_policy_enforced": {
+            "type": "boolean",
+            "title": "Network Policy Enforced",
+            "description": "Whether the selected provider can actually enforce the declared network policy."
+          },
           "deny_reason": {
             "anyOf": [
               {
@@ -2750,7 +2938,10 @@
           "policy_allowed",
           "allowed_by_config",
           "available_on_host",
-          "effective_enabled"
+          "effective_enabled",
+          "provider_name",
+          "isolation_level",
+          "network_policy_enforced"
         ],
         "title": "CodeSandboxFeaturePayload",
         "description": "Runtime / dependency readiness for the code sandbox (§15).\n\n``policy_allowed`` is evaluated from the current request's authorization context.\nRuntime availability remains separate and must not be conflated with policy denial."

@@ -1,6 +1,7 @@
 import type {
   CodeSandboxExecRequest,
   CodeSandboxExecutionEventsResponse,
+  CodeSandboxLogStreamEvent,
   CodeSandboxExecutionResponse,
 } from './types'
 
@@ -47,4 +48,33 @@ export async function fetchCodeSandboxExecutionEvents(
   const resp = await fetch(`./api/code-sandbox/executions/${executionId}/events`)
   if (!resp.ok) throw new Error(await parseErrorResponse(resp))
   return (await resp.json()) as CodeSandboxExecutionEventsResponse
+}
+
+interface CodeSandboxLogStreamOptions {
+  afterSequence?: number
+  onEvent: (event: CodeSandboxLogStreamEvent) => void
+  onError?: () => void
+}
+
+export function openCodeSandboxLogStream(
+  executionId: string,
+  options: CodeSandboxLogStreamOptions,
+): () => void {
+  const url = new URL(`./api/code-sandbox/executions/${executionId}/logs`, window.location.href)
+  if (options.afterSequence && options.afterSequence > 0) {
+    url.searchParams.set('after_seq', String(options.afterSequence))
+  }
+  const source = new EventSource(url.toString())
+  source.onmessage = event => {
+    try {
+      options.onEvent(JSON.parse(event.data) as CodeSandboxLogStreamEvent)
+    } catch {
+      // Ignore malformed SSE frames and keep the stream alive.
+    }
+  }
+  source.onerror = () => {
+    source.close()
+    options.onError?.()
+  }
+  return () => source.close()
 }

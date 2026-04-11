@@ -9,10 +9,20 @@ import {
   type KeyboardEvent,
 } from 'react'
 import { uploadMediaImage } from '../api/media'
-import { executeCodeSandbox } from '../api/codeSandbox'
+import {
+  executeCodeSandbox,
+  fetchCodeSandboxExecution,
+  openCodeSandboxLogStream,
+} from '../api/codeSandbox'
 import { streamUpload, type UploadStreamEvent } from '../api/upload'
 import type { GPUStatus, InferenceLatency } from '../api/system'
-import type { ChartSpec, CodeSandboxExecutionResponse, CodeSandboxFeature, Message } from '../api/types'
+import type {
+  ChartSpec,
+  CodeSandboxExecutionMode,
+  CodeSandboxExecutionResponse,
+  CodeSandboxFeature,
+  Message,
+} from '../api/types'
 import type { FileBindingMode, FileContextItem } from '../hooks/useFileContext'
 import ComposerControls from './ComposerControls'
 import CodeSandboxPanel from './CodeSandboxPanel'
@@ -148,17 +158,25 @@ const ChatWindow: FC<Props> = ({
   const [attachmentUploadError, setAttachmentUploadError] = useState<string | null>(null)
   const [attachmentUploading, setAttachmentUploading] = useState(false)
   const [activePanel, setActivePanel] = useState<ComposerPanel>(null)
+  const [sandboxExecutionMode, setSandboxExecutionMode] = useState<CodeSandboxExecutionMode>('sync')
   const [sandboxCode, setSandboxCode] = useState('')
   const [sandboxCommand, setSandboxCommand] = useState('')
   const [sandboxStdin, setSandboxStdin] = useState('')
   const [sandboxPending, setSandboxPending] = useState(false)
   const [sandboxError, setSandboxError] = useState<string | null>(null)
   const [sandboxResult, setSandboxResult] = useState<CodeSandboxExecutionResponse | null>(null)
+  const [sandboxLiveLogs, setSandboxLiveLogs] = useState<string[]>([])
+  const [sandboxStreamDisconnected, setSandboxStreamDisconnected] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const composerRef = useRef<HTMLDivElement>(null)
   const panelBoundaryRef = useRef<HTMLDivElement>(null)
+  const plusButtonRef = useRef<HTMLButtonElement | null>(null)
+  const sandboxLogCloseRef = useRef<(() => void) | null>(null)
+  const sandboxPollRef = useRef<number | null>(null)
+  const sandboxLogCursorRef = useRef(0)
+  const previousCodeSandboxOpenRef = useRef(false)
 
   const starterPrompts = useMemo<EmptyChatPrompt[]>(() => {
     const basePrompts = pickRandomPromptTexts(
@@ -209,6 +227,17 @@ const ChatWindow: FC<Props> = ({
     document.addEventListener('pointerdown', handlePointerDown)
     return () => document.removeEventListener('pointerdown', handlePointerDown)
   }, [activePanel])
+
+  useEffect(() => {
+    return () => {
+      sandboxLogCloseRef.current?.()
+      sandboxLogCloseRef.current = null
+      if (sandboxPollRef.current !== null) {
+        window.clearInterval(sandboxPollRef.current)
+        sandboxPollRef.current = null
+      }
+    }
+  }, [])
 
   useEffect(() => {
     const textarea = textareaRef.current
@@ -303,20 +332,116 @@ const ChatWindow: FC<Props> = ({
   const codeSandboxEnabled =
     !!codeSandboxFeature?.policy_allowed && !!codeSandboxFeature?.effective_enabled
 
+  useEffect(() => {
+    if (!codeSandboxOpen && previousCodeSandboxOpenRef.current) {
+      plusButtonRef.current?.focus()
+    }
+    previousCodeSandboxOpenRef.current = codeSandboxOpen
+  }, [codeSandboxOpen])
+
+  const stopSandboxPolling = () => {
+    if (sandboxPollRef.current !== null) {
+      window.clearInterval(sandboxPollRef.current)
+      sandboxPollRef.current = null
+    }
+  }
+
+  const stopSandboxLogStream = () => {
+    sandboxLogCloseRef.current?.()
+    sandboxLogCloseRef.current = null
+  }
+
+  const refreshSandboxExecution = async (executionId: string) => {
+    const execution = await fetchCodeSandboxExecution(executionId)
+    setSandboxResult(current => {
+      if (!current || current.execution_id !== executionId) return execution
+      return execution
+    })
+    if (
+      execution.status === 'completed' ||
+      execution.status === 'failed' ||
+      execution.status === 'denied'
+    ) {
+      stopSandboxPolling()
+      stopSandboxLogStream()
+    }
+  }
+
+  const startSandboxPolling = (executionId: string) => {
+    stopSandboxPolling()
+    sandboxPollRef.current = window.setInterval(() => {
+      void refreshSandboxExecution(executionId).catch(() => {
+        // Keep polling; the inline status copy is enough here.
+      })
+    }, 1000)
+  }
+
+  const startSandboxLogStream = (executionId: string) => {
+    stopSandboxLogStream()
+    setSandboxStreamDisconnected(false)
+    sandboxLogCloseRef.current = openCodeSandboxLogStream(executionId, {
+      afterSequence: sandboxLogCursorRef.current,
+      onEvent: event => {
+        if (event.type === 'stdout' || event.type === 'stderr') {
+          if (typeof event.sequence === 'number') {
+            sandboxLogCursorRef.current = Math.max(sandboxLogCursorRef.current, event.sequence)
+          }
+          const chunk = event.chunk
+          if (typeof chunk === 'string' && chunk.length > 0) {
+            setSandboxLiveLogs(prev => [...prev, chunk])
+          }
+          return
+        }
+        if (event.type === 'status') {
+          setSandboxResult(current => {
+            if (!current || current.execution_id !== executionId) return current
+            return {
+              ...current,
+              status: event.status ?? current.status,
+              provider_name: event.provider_name ?? current.provider_name,
+              updated_at: event.updated_at ?? current.updated_at,
+              timed_out: event.timed_out ?? current.timed_out,
+            }
+          })
+          return
+        }
+        if (event.type === 'done') {
+          stopSandboxLogStream()
+          void refreshSandboxExecution(executionId).catch(() => {
+            startSandboxPolling(executionId)
+          })
+        }
+      },
+      onError: () => {
+        setSandboxStreamDisconnected(true)
+        startSandboxPolling(executionId)
+      },
+    })
+  }
+
   const handleRunCodeSandbox = async () => {
     if ((!sandboxCode.trim() && !sandboxCommand.trim()) || sandboxPending || !codeSandboxEnabled) {
       return
     }
     setSandboxPending(true)
     setSandboxError(null)
+    setSandboxLiveLogs([])
+    setSandboxStreamDisconnected(false)
+    sandboxLogCursorRef.current = 0
+    stopSandboxPolling()
+    stopSandboxLogStream()
     try {
       const result = await executeCodeSandbox({
+        execution_mode: sandboxExecutionMode,
         runtime_preset: 'shell',
         ...(sandboxCode.trim() ? { code: sandboxCode } : {}),
         ...(sandboxCommand.trim() ? { command: sandboxCommand.trim() } : {}),
         ...(sandboxStdin ? { stdin: sandboxStdin } : {}),
       })
       setSandboxResult(result)
+      if (result.execution_mode === 'async' && (result.status === 'queued' || result.status === 'running')) {
+        startSandboxLogStream(result.execution_id)
+      }
     } catch (err) {
       setSandboxError(err instanceof Error ? err.message : 'Code sandbox execution failed')
       setSandboxResult(null)
@@ -443,14 +568,19 @@ const ChatWindow: FC<Props> = ({
               />
               <CodeSandboxPanel
                 isOpen={codeSandboxOpen}
+                feature={codeSandboxFeature}
                 runtimeEnabled={codeSandboxEnabled}
                 runPending={sandboxPending}
+                executionMode={sandboxExecutionMode}
                 code={sandboxCode}
                 command={sandboxCommand}
                 stdin={sandboxStdin}
                 error={sandboxError}
                 result={sandboxResult}
+                liveLogs={sandboxLiveLogs}
+                streamDisconnected={sandboxStreamDisconnected}
                 onClose={() => setActivePanel(null)}
+                onExecutionModeChange={setSandboxExecutionMode}
                 onCodeChange={setSandboxCode}
                 onCommandChange={setSandboxCommand}
                 onStdinChange={setSandboxStdin}
@@ -552,6 +682,7 @@ const ChatWindow: FC<Props> = ({
                 gpuStatus={gpuStatus}
                 gpuError={gpuError}
                 inferenceLatency={inferenceLatency}
+                plusButtonRef={plusButtonRef}
                 onTogglePlusMenu={() => {
                   setActivePanel(prev => (prev === 'plus' ? null : 'plus'))
                 }}

@@ -7,7 +7,10 @@
     "dev": "vite --port 3000",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "desktop:sidecar:build": "node ./scripts/run-python.mjs ../tools/build_desktop_sidecar.py",
+    "desktop:dev": "node ./scripts/run-tauri.mjs dev --config src-tauri/tauri.conf.json",
+    "desktop:build": "node ./scripts/run-tauri.mjs build --config src-tauri/tauri.conf.json"
   },
   "dependencies": {
     "autoprefixer": "^10.4.27",
@@ -26,8 +29,10 @@
     "tslib": "^2.8.1"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.10.1",
     "@testing-library/jest-dom": "^6.4.6",
     "@testing-library/react": "^16.0.0",
+    "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",

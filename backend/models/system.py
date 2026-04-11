@@ -69,6 +69,15 @@ class CodeSandboxFeaturePayload(BaseModel):
         description="Probed runtime dependency (e.g. Docker) appears usable."
     )
     effective_enabled: bool = Field(description="Both config and probe satisfied.")
+    provider_name: str = Field(
+        description="Selected runtime provider for code sandbox execution."
+    )
+    isolation_level: str = Field(
+        description="Isolation tier for the active provider: container or host."
+    )
+    network_policy_enforced: bool = Field(
+        description="Whether the selected provider can actually enforce the declared network policy."
+    )
     deny_reason: str | None = Field(
         default=None,
         description="Controlled enum for runtime gate only; never raw exception text.",

@@ -5,6 +5,8 @@ Import these in routers; never instantiate services directly in route handlers.
 
 from __future__ import annotations
 
+import threading
+
 from fastapi import BackgroundTasks, Depends, HTTPException, Request
 
 from backend.domain.authz_types import AuthorizationContext
@@ -29,7 +31,11 @@ from backend.services.code_sandbox_runtime import (
 )
 from backend.services.code_sandbox_provider import (
     DockerSandboxProvider,
+    LocalHostProvider,
     SandboxProvider,
+)
+from backend.services.code_sandbox_execution_service import (
+    execute_code_sandbox_execution,
 )
 from backend.services.workbench_execution_service import execute_workbench_task
 from backend.services.tabular_context import (
@@ -40,7 +46,10 @@ from backend.services.safeguard_service import (
     ModeScopedSafeguardService,
     SafeguardService,
 )
-from backend.application.ports import WorkbenchTaskDispatcher
+from backend.application.ports import (
+    CodeSandboxExecutionDispatcher,
+    WorkbenchTaskDispatcher,
+)
 from backend.types import LLMClient, Settings
 from goat_ai.ollama_client import OllamaService
 
@@ -86,6 +95,8 @@ def get_code_sandbox_provider(
     settings: Settings = Depends(get_settings),
 ) -> SandboxProvider:
     """Return the current code sandbox execution provider."""
+    if settings.code_sandbox_provider == "localhost":
+        return LocalHostProvider(settings)
     return DockerSandboxProvider(settings)
 
 
@@ -114,6 +125,33 @@ class _BackgroundWorkbenchTaskDispatcher:
         )
 
 
+class _BackgroundCodeSandboxExecutionDispatcher:
+    def __init__(
+        self,
+        *,
+        repository: CodeSandboxExecutionRepository,
+        provider: SandboxProvider,
+        settings: Settings,
+    ) -> None:
+        self._repository = repository
+        self._provider = provider
+        self._settings = settings
+
+    def dispatch_execution(self, *, execution_id: str, request_id: str = "") -> None:
+        _ = request_id
+        thread = threading.Thread(
+            target=execute_code_sandbox_execution,
+            kwargs={
+                "execution_id": execution_id,
+                "repository": self._repository,
+                "provider": self._provider,
+                "settings": self._settings,
+            },
+            daemon=True,
+        )
+        thread.start()
+
+
 def get_workbench_task_dispatcher(
     background_tasks: BackgroundTasks,
     repository: WorkbenchTaskRepository = Depends(get_workbench_task_repository),
@@ -125,6 +163,21 @@ def get_workbench_task_dispatcher(
         background_tasks=background_tasks,
         repository=repository,
         llm=llm,
+        settings=settings,
+    )
+
+
+def get_code_sandbox_execution_dispatcher(
+    repository: CodeSandboxExecutionRepository = Depends(
+        get_code_sandbox_execution_repository
+    ),
+    provider: SandboxProvider = Depends(get_code_sandbox_provider),
+    settings: Settings = Depends(get_settings),
+) -> CodeSandboxExecutionDispatcher:
+    """Return the scheduler that hands accepted sandbox runs to the runtime."""
+    return _BackgroundCodeSandboxExecutionDispatcher(
+        repository=repository,
+        provider=provider,
         settings=settings,
     )
 

@@ -42,8 +42,17 @@ class WorkbenchTaskDispatcher(Protocol):
     def dispatch_task(self, *, task_id: str, request_id: str = "") -> None: ...
 
 
+class CodeSandboxExecutionDispatcher(Protocol):
+    """Application-facing boundary for scheduling durable sandbox execution."""
+
+    def dispatch_execution(
+        self, *, execution_id: str, request_id: str = ""
+    ) -> None: ...
+
+
 __all__ = [
     "ChatCapacityError",
+    "CodeSandboxExecutionDispatcher",
     "ConversationLogger",
     "ArtifactNotFound",
     "CodeSandboxExecutionRepository",

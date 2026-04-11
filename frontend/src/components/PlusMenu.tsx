@@ -47,6 +47,7 @@ export default function PlusMenu({
 
   const codeSandboxEnabled =
     !!codeSandboxFeature?.policy_allowed && !!codeSandboxFeature?.effective_enabled
+  const localhostFallback = codeSandboxFeature?.provider_name === 'localhost'
   const codeSandboxReason = !codeSandboxFeature
     ? 'Checking availability'
     : !codeSandboxFeature.policy_allowed
@@ -54,10 +55,14 @@ export default function PlusMenu({
       : !codeSandboxFeature.effective_enabled
         ? codeSandboxFeature.deny_reason === 'docker_unavailable'
           ? 'Docker runtime is not ready on this deployment'
+          : codeSandboxFeature.deny_reason === 'localhost_unavailable'
+            ? 'Local shell runtime is not ready on this deployment'
           : codeSandboxFeature.deny_reason === 'disabled_by_operator'
             ? 'Disabled by the operator on this deployment'
             : 'Runtime is not available on this deployment'
-        : 'Run a short shell snippet in an isolated sandbox'
+        : localhostFallback
+          ? 'Run a short shell snippet on the local host shell (trusted-dev fallback)'
+          : 'Run a short shell snippet in an isolated, no-network sandbox'
 
   return (
     <div

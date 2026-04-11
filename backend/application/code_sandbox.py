@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
+import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
+from typing import Generator
 from uuid import uuid4
+
+from fastapi.responses import StreamingResponse
 
 from backend.application.exceptions import (
     CodeSandboxExecutionNotFoundError,
     CodeSandboxValidationError,
 )
 from backend.application.ports import (
+    CodeSandboxExecutionDispatcher,
     CodeSandboxExecutionRepository,
     SandboxProvider,
     Settings,
@@ -24,17 +30,38 @@ from backend.models.code_sandbox import (
     CodeSandboxOutputFilePayload,
 )
 from backend.services.authorizer import authorize_code_sandbox_execution_read
+from backend.services.code_sandbox_execution_service import (
+    execute_code_sandbox_execution,
+)
 from backend.services.code_sandbox_provider import SandboxProviderRequest
+from backend.services.code_sandbox_provider import (
+    sandbox_provider_enforces_network_policy,
+    sandbox_provider_isolation_level,
+)
 from backend.services.code_sandbox_runtime import (
     CodeSandboxExecutionCreatePayload,
     CodeSandboxExecutionEventRecord,
+    CodeSandboxLogChunkRecord,
     CodeSandboxExecutionRecord,
 )
 from backend.services.feature_gate_service import require_code_sandbox_enabled
+from backend.services.sse import sse_done_event, sse_event
+
+_SSE_HEADERS = {
+    "Cache-Control": "no-cache",
+    "X-Accel-Buffering": "no",
+    "Connection": "keep-alive",
+}
 
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+@dataclass(frozen=True, kw_only=True)
+class _NormalizedSandboxRequest:
+    execution_mode: str
+    provider_request: SandboxProviderRequest
 
 
 def ensure_code_sandbox_enabled(
@@ -64,7 +91,7 @@ def _normalize_request(
     request: CodeSandboxExecRequest,
     settings: Settings,
     execution_id: str,
-) -> SandboxProviderRequest:
+) -> _NormalizedSandboxRequest:
     code = request.code.strip() if request.code is not None else None
     command = request.command.strip() if request.command is not None else None
     stdin = request.stdin if request.stdin is not None else None
@@ -89,8 +116,10 @@ def _normalize_request(
         raise CodeSandboxValidationError("Too many inline files were provided.")
     if request.network_policy not in (None, "disabled"):
         raise CodeSandboxValidationError(
-            "Phase 18 only supports `network_policy = disabled`."
+            "Phase 18A only supports `network_policy = disabled`."
         )
+    if request.execution_mode not in {"sync", "async"}:
+        raise CodeSandboxValidationError("Unsupported execution mode.")
     timeout_sec = request.timeout_sec or settings.code_sandbox_default_timeout_sec
     if timeout_sec < 1 or timeout_sec > settings.code_sandbox_max_timeout_sec:
         raise CodeSandboxValidationError(
@@ -109,28 +138,38 @@ def _normalize_request(
                 "content": item.content,
             }
         )
-    return SandboxProviderRequest(
-        execution_id=execution_id,
-        runtime_preset=request.runtime_preset,
-        code=code,
-        command=command,
-        stdin=stdin,
-        inline_files=inline_files,
-        timeout_sec=timeout_sec,
-        network_policy="disabled",
+    return _NormalizedSandboxRequest(
+        execution_mode=request.execution_mode,
+        provider_request=SandboxProviderRequest(
+            execution_id=execution_id,
+            runtime_preset=request.runtime_preset,
+            code=code,
+            command=command,
+            stdin=stdin,
+            inline_files=inline_files,
+            timeout_sec=timeout_sec,
+            network_policy="disabled",
+        ),
     )
 
 
 def _to_execution_response(
     record: CodeSandboxExecutionRecord,
 ) -> CodeSandboxExecutionResponse:
+    provider_name = record.provider_name or "docker"
     return CodeSandboxExecutionResponse(
         execution_id=record.id,
         status=record.status,
+        execution_mode=record.execution_mode,
         runtime_preset=record.runtime_preset,
         network_policy=record.network_policy,
         created_at=record.created_at,
         updated_at=record.updated_at,
+        started_at=record.started_at,
+        finished_at=record.finished_at,
+        provider_name=provider_name,
+        isolation_level=sandbox_provider_isolation_level(provider_name),
+        network_policy_enforced=sandbox_provider_enforces_network_policy(provider_name),
         exit_code=record.exit_code,
         stdout=record.stdout,
         stderr=record.stderr,
@@ -156,34 +195,60 @@ def _to_event_payload(
     )
 
 
+def _load_visible_execution(
+    *,
+    execution_id: str,
+    repository: CodeSandboxExecutionRepository,
+    settings: Settings,
+    auth_context: AuthorizationContext,
+) -> CodeSandboxExecutionRecord:
+    ensure_code_sandbox_enabled(settings, auth_context)
+    record = repository.get_execution(execution_id)
+    if record is None:
+        raise CodeSandboxExecutionNotFoundError("Code sandbox execution not found")
+    decision = authorize_code_sandbox_execution_read(
+        ctx=auth_context,
+        execution=record,
+        require_owner_header=settings.require_session_owner,
+    )
+    if not decision.allowed:
+        raise CodeSandboxExecutionNotFoundError("Code sandbox execution not found")
+    return record
+
+
 def execute_code_sandbox_request(
     *,
     request: CodeSandboxExecRequest,
     repository: CodeSandboxExecutionRepository,
     provider: SandboxProvider,
+    dispatcher: CodeSandboxExecutionDispatcher,
     settings: Settings,
     auth_context: AuthorizationContext,
 ) -> CodeSandboxExecutionResponse:
-    """Validate, persist, execute, and return one short synchronous sandbox run."""
+    """Validate, persist, execute, and return one sandbox run."""
     ensure_code_sandbox_enabled(settings, auth_context)
     execution_id = f"cs-{uuid4().hex}"
-    now = _utc_now()
-    provider_request = _normalize_request(
+    normalized = _normalize_request(
         request=request,
         settings=settings,
         execution_id=execution_id,
     )
+    now = _utc_now()
     repository.create_execution(
         CodeSandboxExecutionCreatePayload(
             execution_id=execution_id,
-            runtime_preset=provider_request.runtime_preset,
-            network_policy=provider_request.network_policy,
-            code=provider_request.code,
-            command=provider_request.command,
-            stdin=provider_request.stdin,
-            inline_files=list(provider_request.inline_files),
+            execution_mode=normalized.execution_mode,
+            runtime_preset=normalized.provider_request.runtime_preset,
+            network_policy=normalized.provider_request.network_policy,
+            timeout_sec=normalized.provider_request.timeout_sec,
+            code=normalized.provider_request.code,
+            command=normalized.provider_request.command,
+            stdin=normalized.provider_request.stdin,
+            inline_files=list(normalized.provider_request.inline_files),
             created_at=now,
+            queued_at=now,
             updated_at=now,
+            provider_name=provider.provider_name,
             owner_id=auth_context.legacy_owner_id,
             tenant_id=auth_context.tenant_id.value,
             principal_id=auth_context.principal_id.value,
@@ -192,53 +257,19 @@ def execute_code_sandbox_request(
             auth_mode=auth_context.auth_mode,
         )
     )
-    repository.mark_execution_started(
-        execution_id,
-        updated_at=now,
-        provider_name=provider.provider_name,
-    )
-    result = provider.run(provider_request)
-    finished_at = _utc_now()
-    output_files = [dict(item) for item in result.output_files]
-    if result.timed_out or result.exit_code not in (0, None):
-        repository.mark_execution_failed(
-            execution_id,
-            updated_at=finished_at,
-            finished_at=finished_at,
-            stdout=result.stdout,
-            stderr=result.stderr,
-            timed_out=result.timed_out,
-            error_detail=result.error_detail or "Execution failed.",
-            output_files=output_files,
-            exit_code=result.exit_code,
-        )
-    elif result.error_detail:
-        repository.mark_execution_failed(
-            execution_id,
-            updated_at=finished_at,
-            finished_at=finished_at,
-            stdout=result.stdout,
-            stderr=result.stderr,
-            timed_out=False,
-            error_detail=result.error_detail,
-            output_files=output_files,
-            exit_code=result.exit_code,
-        )
+    if normalized.execution_mode == "async":
+        dispatcher.dispatch_execution(execution_id=execution_id)
     else:
-        repository.mark_execution_completed(
-            execution_id,
-            updated_at=finished_at,
-            finished_at=finished_at,
-            exit_code=result.exit_code or 0,
-            stdout=result.stdout,
-            stderr=result.stderr,
-            timed_out=False,
-            error_detail=None,
-            output_files=output_files,
+        execute_code_sandbox_execution(
+            execution_id=execution_id,
+            repository=repository,
+            provider=provider,
+            settings=settings,
+            raise_errors=True,
         )
     record = repository.get_execution(execution_id)
     if record is None:
-        raise RuntimeError("Code sandbox execution disappeared after completion.")
+        raise RuntimeError("Code sandbox execution disappeared after submission.")
     return _to_execution_response(record)
 
 
@@ -250,18 +281,14 @@ def get_code_sandbox_execution(
     auth_context: AuthorizationContext,
 ) -> CodeSandboxExecutionResponse:
     """Return one visible durable code sandbox execution."""
-    ensure_code_sandbox_enabled(settings, auth_context)
-    record = repository.get_execution(execution_id)
-    if record is None:
-        raise CodeSandboxExecutionNotFoundError("Code sandbox execution not found")
-    decision = authorize_code_sandbox_execution_read(
-        ctx=auth_context,
-        execution=record,
-        require_owner_header=settings.require_session_owner,
+    return _to_execution_response(
+        _load_visible_execution(
+            execution_id=execution_id,
+            repository=repository,
+            settings=settings,
+            auth_context=auth_context,
+        )
     )
-    if not decision.allowed:
-        raise CodeSandboxExecutionNotFoundError("Code sandbox execution not found")
-    return _to_execution_response(record)
 
 
 def get_code_sandbox_execution_events(
@@ -271,22 +298,89 @@ def get_code_sandbox_execution_events(
     settings: Settings,
     auth_context: AuthorizationContext,
 ) -> CodeSandboxExecutionEventsResponse:
-    """Return the durable event timeline for one visible sandbox execution."""
-    ensure_code_sandbox_enabled(settings, auth_context)
-    record = repository.get_execution(execution_id)
-    if record is None:
-        raise CodeSandboxExecutionNotFoundError("Code sandbox execution not found")
-    decision = authorize_code_sandbox_execution_read(
-        ctx=auth_context,
-        execution=record,
-        require_owner_header=settings.require_session_owner,
+    """Return the durable event timeline for one visible execution."""
+    record = _load_visible_execution(
+        execution_id=execution_id,
+        repository=repository,
+        settings=settings,
+        auth_context=auth_context,
     )
-    if not decision.allowed:
-        raise CodeSandboxExecutionNotFoundError("Code sandbox execution not found")
     return CodeSandboxExecutionEventsResponse(
         execution_id=record.id,
         events=[
             _to_event_payload(event)
-            for event in repository.list_execution_events(record.id)
+            for event in repository.list_execution_events(execution_id)
         ],
+    )
+
+
+def stream_code_sandbox_execution_logs(
+    *,
+    execution_id: str,
+    after_sequence: int,
+    repository: CodeSandboxExecutionRepository,
+    settings: Settings,
+    auth_context: AuthorizationContext,
+) -> StreamingResponse:
+    """Return an SSE log stream for one visible durable execution."""
+    _load_visible_execution(
+        execution_id=execution_id,
+        repository=repository,
+        settings=settings,
+        auth_context=auth_context,
+    )
+
+    def generate() -> Generator[str, None, None]:
+        last_seq = max(after_sequence, 0)
+        last_status: str | None = None
+        while True:
+            record = _load_visible_execution(
+                execution_id=execution_id,
+                repository=repository,
+                settings=settings,
+                auth_context=auth_context,
+            )
+            if record.status != last_status:
+                last_status = record.status
+                yield sse_event(
+                    {
+                        "type": "status",
+                        "execution_id": record.id,
+                        "status": record.status,
+                        "provider_name": record.provider_name,
+                        "updated_at": record.updated_at,
+                        "timed_out": record.timed_out,
+                    }
+                )
+
+            chunks = repository.list_log_chunks(
+                execution_id,
+                after_sequence=last_seq,
+            )
+            for chunk in chunks:
+                last_seq = max(last_seq, chunk.sequence)
+                yield _log_chunk_sse(chunk)
+
+            if record.status in {"completed", "failed", "denied"}:
+                yield sse_done_event()
+                return
+
+            time.sleep(0.2)
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers=_SSE_HEADERS,
+    )
+
+
+def _log_chunk_sse(chunk: CodeSandboxLogChunkRecord) -> str:
+    return sse_event(
+        {
+            "type": chunk.stream_name,
+            "execution_id": chunk.execution_id,
+            "sequence": chunk.sequence,
+            "created_at": chunk.created_at,
+            "chunk": chunk.chunk_text,
+        }
     )

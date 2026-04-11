@@ -126,18 +126,110 @@ Use the same runtime primitives across 17C/17D/17E instead of building isolated 
 
 ### Phase 18 follow-ons: code sandbox beyond the MVP
 
-- Goal: extend the landed Docker-first synchronous sandbox without weakening the current operator/safety posture
+- Goal: extend the landed Docker-first sync+async sandbox without weakening the current operator/safety posture
 - Current landed slice:
-  - `POST /api/code-sandbox/exec` now executes short synchronous shell runs
-  - durable execution and event rows are persisted in SQLite
-  - `GET /api/code-sandbox/executions/{execution_id}` and `/events` expose auditability
-  - network remains disabled by default
+  - `POST /api/code-sandbox/exec` now executes provider-backed shell runs in `sync` and `async` modes
+  - durable execution, event, and log rows are persisted in SQLite
+  - `GET /api/code-sandbox/executions/{execution_id}`, `/events`, and `/logs` expose status, auditability, and replayable stdout/stderr
+  - Docker remains the default isolated backend; `localhost` is available as a trusted-dev fallback with weaker isolation
 - Remaining priority items:
-  - async run envelope for long-lived or queued executions
-  - SSE log streaming for richer user feedback
+  - cancel / retry semantics for async runs
   - multi-file workspace ergonomics beyond inline text seeding
   - allowlisted egress modes instead of all-or-nothing network disablement
   - alternate providers behind the same sandbox boundary (for example E2B/Daytona-style adapters)
+  - richer terminal / PTY UX beyond replayable chunked logs
+
+### Phase 19: desktop app packaging and native distribution
+
+- Goal: turn GOAT AI into a first-class desktop app for Windows, macOS, and Linux instead of relying on "open localhost in a browser" as the primary local experience.
+- Chosen implementation route: **Tauri 2 desktop shell + bundled Python sidecar backend**.
+- Why this route:
+  - the current frontend already uses **React + Vite**, which Tauri explicitly supports as an existing web stack
+  - Tauri 2 has first-class packaging/distribution for **Windows, macOS, and Linux**
+  - Tauri supports bundling **external binaries / sidecars**, and its docs explicitly call out **Python CLI applications or API servers bundled using PyInstaller**
+  - this keeps the existing FastAPI/Ollama/runtime architecture largely intact instead of rewriting the backend into Rust or Electron/Node-only process code
+- Why this is preferred over alternatives:
+  - **plain PyInstaller only** is not enough for the desired product shape because it can freeze a Python process, but it does not give us the modern native desktop shell, updater story, permissions model, or polished installer UX by itself
+  - **Electron Forge** remains a viable fallback, but it adds a heavier runtime and is not the preferred first route unless Tauri sidecar integration or WebView constraints become blockers
+- Official reference implementations:
+  - Tauri 2 homepage and positioning: [Tauri 2](https://tauri.app/)
+  - Tauri sidecars / bundled external binaries: [Embedding External Binaries](https://tauri.app/develop/sidecar/)
+  - Tauri distribution targets: [Distribute](https://v2.tauri.app/distribute/)
+  - Tauri updater plugin: [Updater](https://v2.tauri.app/plugin/updater/)
+  - PyInstaller packaging constraints for Python sidecars: [PyInstaller Manual](https://pyinstaller.org/en/stable/)
+  - Electron Forge as fallback desktop shell: [Packaging Your Application](https://www.electronjs.org/docs/latest/tutorial/tutorial-packaging), [Makers](https://www.electronforge.io/config/makers)
+
+### Phase 19A: desktop shell scaffold
+
+- Goal: add a native desktop shell around the existing SPA without changing the API contract first.
+- Planned route:
+  - create a `desktop/` or `src-tauri/` application shell using **Tauri 2**
+  - load the existing Vite frontend in dev and the built frontend bundle in release
+  - start the backend as a managed sidecar process instead of asking the user to run `uvicorn` manually
+  - define an app bootstrap handshake:
+    - launch sidecar
+    - wait for `/api/health`
+    - then show the main window
+- Exit criteria:
+  - dev mode launches one native window instead of requiring a browser tab
+  - desktop shell can start and stop the local backend reliably
+
+### Phase 19B: packaged backend sidecar
+
+- Goal: bundle the Python backend so end users do not need to install Python manually.
+- Landed:
+  - `goat_ai.desktop_sidecar` now provides a desktop-friendly backend entrypoint
+  - `python -m tools.build_desktop_sidecar` builds a per-platform frozen sidecar with **PyInstaller**
+  - Tauri packaging now bundles that binary via `externalBin`
+  - release-mode desktop builds launch the bundled sidecar and wait for `/api/health` before showing the main window
+  - packaged desktop launches now move SQLite/data writes into the platform app-local-data directory instead of the repository root
+- Current Windows packaging output:
+  - `npm run desktop:build` now produces both a `.msi` installer and an NSIS `setup.exe`
+- Follow-on work:
+  - validate and ship the same frozen-sidecar path on macOS and Linux
+  - improve first-run diagnostics for missing Ollama or misconfigured local runtimes
+  - harden release build automation around signed installer pipelines
+- Important packaging constraint:
+  - **PyInstaller is not a cross-compiler**, so Windows, macOS, and Linux artifacts must each be built on the target OS (or an equivalent VM/runner for that OS)
+- Exit criteria:
+  - Windows, macOS, and Linux each produce a working packaged app that can launch the frozen backend sidecar locally
+  - first-run failure states are explicit when Ollama is missing or unreachable
+
+### Phase 19C: platform installers, signing, and updates
+
+- Goal: ship real installable desktop artifacts instead of ad hoc zips or developer-only bundles.
+- Planned distribution targets:
+  - **Windows**: NSIS or MSI installer
+  - **macOS**: DMG for direct download
+  - **Linux**: AppImage first, then `.deb` / `.rpm` as needed
+- Planned route:
+  - add platform icons, bundle metadata, and installer branding
+  - add **code signing** for Windows and macOS before public distribution
+  - add Tauri updater only after signed installer flow is stable
+  - decide whether offline WebView2 embedding is needed for Windows deployments that cannot assume internet access
+  - ship and maintain a documented prerequisite/bootstrap story instead of relying on tribal knowledge:
+    - **end-user runtime bootstrap** for `WebView2` and external local inference runtime (`Ollama` for the current architecture)
+    - **developer bootstrap** for Rust toolchain + Windows build tools
+    - one-click scripts for Windows and equivalent documented flows for macOS/Linux
+- Exit criteria:
+  - signed installers are produced in CI/release workflows
+  - updater strategy is documented and wired for the signed desktop build only
+  - prerequisite installation paths are explicit enough that new users can complete setup without manual package hunting
+
+### Phase 19D: desktop-native UX and local-runtime operations
+
+- Goal: make the packaged app behave like a real desktop product rather than a wrapped website.
+- Planned route:
+  - add desktop-native status for backend/Ollama readiness
+  - add durable desktop shell log sinks and log viewing instead of relying on transient process stdout/stderr
+  - keep workbench outputs and future desktop-native artifacts discoverable from the per-user app data directory
+  - add basic desktop settings for:
+      - Ollama endpoint selection
+      - model/runtime diagnostics
+      - local data directory reveal/open
+  - keep code sandbox disabled by default in packaged builds unless the selected provider/runtime is explicitly available and documented
+- Exit criteria:
+  - desktop app can be installed, launched, updated, and diagnosed without dropping users into raw terminal workflows
 
 ### UI surfaces waiting on backend/runtime
 
