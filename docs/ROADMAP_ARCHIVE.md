@@ -2,6 +2,18 @@
 
 This file preserves historical roadmap content that was removed from [ROADMAP.md](ROADMAP.md) on 2026-04-09. The active roadmap now tracks only unfinished work.
 
+## 2026-04-11 roadmap cleanup
+
+The live roadmap was reduced again on 2026-04-11 so it only tracks open work.
+
+The following landed or completed content was removed from the active roadmap and is preserved here or in [PROJECT_STATUS.md](PROJECT_STATUS.md):
+
+- engineering quality uplift `P0` and `P1`
+- landed slices from Phase 17A / 17B / 17C that had been described inline next to unfinished work
+- landed Phase 18A sandbox baseline details
+- landed desktop foundation phases 19 / 19A / 19B
+- previously completed rationale blocks and "landed slice" notes that no longer belonged in an unfinished-work file
+
 ## Shipped v1.2.0
 
 Phases 11-15 are complete and documented. The shipped release also includes the frontend control-surface polish landed on `main`.
@@ -41,6 +53,15 @@ Phase 16 was re-sequenced so credential-backed authorization and tenancy context
 - 16A: production-safe capability gates built on the 16C authz context.
 - 16B: storage evolution after authz and resource boundaries are explicit.
 
+### Phase 16B closeout
+
+Phase 16B closed without a datastore-shape migration. The landed work standardized
+persisted-resource ownership at repository boundaries and brought `knowledge` and
+`media` onto explicit repository contracts, while preserving the SQLite-first,
+single-writer deployment model. Any future schema or datastore change now requires a
+new migration/compatibility/rollback decision package instead of extending Phase 16B
+in place.
+
 The historical 16C checklist covered:
 
 - credential compatibility for `GOAT_API_KEY`, `GOAT_API_KEY_WRITE`, and `X-GOAT-Owner-Id`
@@ -78,4 +99,3 @@ The following topics were kept in the live docs and are no longer repeated in th
 - shipped state and release inventory: [PROJECT_STATUS.md](PROJECT_STATUS.md)
 - deployment and operational constraints: [OPERATIONS.md](OPERATIONS.md)
 - ubiquitous language and domain semantics: [DOMAIN.md](DOMAIN.md)
-

@@ -8,6 +8,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Protocol
 
+from backend.domain.resource_ownership import (
+    PersistedResourceOwnership,
+    ownership_from_fields,
+)
 from backend.services.exceptions import PersistenceReadError, PersistenceWriteError
 
 LogStreamName = Literal["stdout", "stderr"]
@@ -83,6 +87,14 @@ class CodeSandboxExecutionRecord:
     credential_id: str = ""
     auth_mode: str = ""
 
+    @property
+    def ownership(self) -> PersistedResourceOwnership:
+        return ownership_from_fields(
+            owner_id=self.owner_id,
+            tenant_id=self.tenant_id,
+            principal_id=self.principal_id,
+        )
+
 
 @dataclass(frozen=True, kw_only=True)
 class CodeSandboxExecutionEventRecord:
@@ -132,6 +144,14 @@ class CodeSandboxExecutionCreatePayload:
     credential_id: str = ""
     auth_mode: str = ""
     status: str = "queued"
+
+    @property
+    def ownership(self) -> PersistedResourceOwnership:
+        return ownership_from_fields(
+            owner_id=self.owner_id,
+            tenant_id=self.tenant_id,
+            principal_id=self.principal_id,
+        )
 
 
 class CodeSandboxExecutionRepository(Protocol):
@@ -216,9 +236,7 @@ class CodeSandboxExecutionRepository(Protocol):
         self, execution_id: str, *, after_sequence: int = 0
     ) -> list[CodeSandboxLogChunkRecord]: ...
 
-    def list_execution_ids_by_status(
-        self, *statuses: str
-    ) -> list[str]: ...
+    def list_execution_ids_by_status(self, *statuses: str) -> list[str]: ...
 
 
 class SQLiteCodeSandboxExecutionRepository:

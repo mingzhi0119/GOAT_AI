@@ -18,6 +18,8 @@ from backend.services.workbench_runtime import WorkbenchTaskRepository  # noqa: 
 from backend.services.code_sandbox_runtime import (  # noqa: F401
     CodeSandboxExecutionRepository,
 )
+from backend.services.knowledge_repository import KnowledgeRepository  # noqa: F401
+from backend.services.media_service import MediaRepository  # noqa: F401
 from backend.services.code_sandbox_provider import SandboxProvider  # noqa: F401
 from backend.services.exceptions import (  # noqa: F401
     PersistenceReadError,
@@ -61,8 +63,10 @@ __all__ = [
     "InferenceBackendUnavailable",
     "IdempotencyStore",
     "KnowledgeDocumentNotFound",
+    "KnowledgeRepository",
     "KnowledgeValidationError",
     "LLMClient",
+    "MediaRepository",
     "MediaNotFound",
     "MediaValidationError",
     "PersistenceReadError",

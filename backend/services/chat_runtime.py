@@ -6,6 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+from backend.domain.resource_ownership import (
+    PersistedResourceOwnership,
+    ownership_from_fields,
+)
 from backend.services.artifact_service import PersistedArtifactRecord
 from backend.services import log_service
 from backend.services.session_message_codec import decode_session_payload
@@ -25,6 +29,14 @@ class SessionSummaryRecord:
     owner_id: str
     tenant_id: str = "tenant:default"
     principal_id: str = ""
+
+    @property
+    def ownership(self) -> PersistedResourceOwnership:
+        return ownership_from_fields(
+            owner_id=self.owner_id,
+            tenant_id=self.tenant_id,
+            principal_id=self.principal_id,
+        )
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -52,6 +64,14 @@ class SessionUpsertPayload:
     owner_id: str = ""
     tenant_id: str = "tenant:default"
     principal_id: str = ""
+
+    @property
+    def ownership(self) -> PersistedResourceOwnership:
+        return ownership_from_fields(
+            owner_id=self.owner_id,
+            tenant_id=self.tenant_id,
+            principal_id=self.principal_id,
+        )
 
 
 @dataclass(frozen=True)

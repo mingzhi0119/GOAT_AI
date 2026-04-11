@@ -11,6 +11,10 @@ from pathlib import Path
 from typing import Callable
 from uuid import uuid4
 
+from backend.domain.resource_ownership import (
+    PersistedResourceOwnership,
+    ownership_from_fields,
+)
 from docx import Document as DocxDocument
 from openpyxl import Workbook
 from openpyxl.styles import Alignment
@@ -39,6 +43,14 @@ class PersistedArtifactRecord:
     created_at: str
     tenant_id: str = "tenant:default"
     principal_id: str = ""
+
+    @property
+    def ownership(self) -> PersistedResourceOwnership:
+        return ownership_from_fields(
+            owner_id=self.owner_id,
+            tenant_id=self.tenant_id,
+            principal_id=self.principal_id,
+        )
 
 
 @dataclass(frozen=True)

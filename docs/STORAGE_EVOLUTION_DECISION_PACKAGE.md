@@ -1,12 +1,22 @@
 # Storage Evolution Decision Package
 
-Last updated: 2026-04-10
+Last updated: 2026-04-11
 
 ## Purpose
 
 This document captures the design boundary for **Phase 16B**. It is intentionally a
 decision package, not an implementation approval. No datastore migration, dual-write,
 or contract change should start until the questions below are explicitly resolved.
+
+## Phase 16B closeout
+
+Phase 16B is complete with a conservative outcome:
+
+- persisted resource records now expose an explicit resource-ownership abstraction at the repository boundary
+- repository contracts are explicit across sessions, artifacts, knowledge, media, workbench, and code sandbox persistence
+- `knowledge` and `media` now follow the same injectable repository pattern already used by other runtime persistence seams
+- Phase 16B intentionally did **not** change schema, read/write semantics, deployment shape, or public API behavior
+- any future datastore-shape change still requires a new migration, compatibility, and rollback decision package before implementation starts
 
 ## Fixed constraints
 
@@ -23,7 +33,7 @@ or contract change should start until the questions below are explicitly resolve
 - `media_uploads`: tenant-scoped; vision access follows the same authorization envelope.
 - Supporting records such as session messages and ingestion/chunk metadata inherit resource boundaries indirectly and should not drift from their parent resource.
 
-## Decision topics
+## Future decision topics
 
 ### 1. Resource ownership model
 
@@ -56,7 +66,7 @@ or contract change should start until the questions below are explicitly resolve
   - a broader consistency-model change
 - Until that decision is explicit, Phase 16B must assume the current single-instance write contract remains authoritative.
 
-## Recommended implementation sequence after approval
+## Required sequence before any future storage-shape change
 
 1. Approve the target storage shape and ownership story.
 2. Document compatibility and rollback in `docs/OPERATIONS.md`.

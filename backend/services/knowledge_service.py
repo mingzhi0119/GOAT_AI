@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from backend.domain.authz_types import AuthorizationContext
+from backend.domain.resource_ownership import PersistedResourceOwnership
 from backend.services.authorizer import (
     authorize_knowledge_document_read,
     authorize_knowledge_document_write,
@@ -50,6 +51,7 @@ from backend.services.knowledge_repository import (
     KnowledgeChunkRow,
     KnowledgeDocumentRecord,
     KnowledgeIngestionRecord,
+    KnowledgeRepository,
     SQLiteKnowledgeRepository,
 )
 from backend.services.knowledge_storage import (
@@ -72,12 +74,19 @@ class KnowledgeChatContext:
     citations: list[KnowledgeCitation]
 
 
+def _resolve_repository(
+    *, settings: Settings, repository: KnowledgeRepository | None
+) -> KnowledgeRepository:
+    return repository or SQLiteKnowledgeRepository(settings.log_db_path)
+
+
 def create_knowledge_upload(
     *,
     file: AsyncUploadReader,
     settings: Settings,
     auth_context: AuthorizationContext,
     request_id: str = "",
+    repository: KnowledgeRepository | None = None,
 ) -> KnowledgeUploadResponse:
     """Persist a knowledge upload and register document metadata."""
     return create_knowledge_upload_from_bytes(
@@ -86,6 +95,7 @@ def create_knowledge_upload(
         settings=settings,
         auth_context=auth_context,
         request_id=request_id,
+        repository=repository,
         content=_run_async_read(file=file),
     )
 
@@ -98,6 +108,7 @@ def create_knowledge_upload_from_bytes(
     settings: Settings,
     auth_context: AuthorizationContext,
     request_id: str = "",
+    repository: KnowledgeRepository | None = None,
 ) -> KnowledgeUploadResponse:
     """Persist a knowledge upload from already-read bytes and register document metadata."""
     document_id = f"doc-{uuid4().hex}"
@@ -114,7 +125,8 @@ def create_knowledge_upload_from_bytes(
         raise KnowledgeValidationError(str(exc)) from exc
 
     now = _now_iso()
-    repository = SQLiteKnowledgeRepository(settings.log_db_path)
+    repository = _resolve_repository(settings=settings, repository=repository)
+    ownership = PersistedResourceOwnership.from_auth_context(auth_context)
     repository.create_document(
         KnowledgeDocumentRecord(
             id=document_id,
@@ -128,9 +140,9 @@ def create_knowledge_upload_from_bytes(
             created_at=now,
             updated_at=now,
             deleted_at=None,
-            owner_id=auth_context.legacy_owner_id,
-            tenant_id=auth_context.tenant_id.value,
-            principal_id=auth_context.principal_id.value,
+            owner_id=ownership.owner_id,
+            tenant_id=ownership.tenant_id,
+            principal_id=ownership.principal_id,
         )
     )
     emit_authorization_audit(
@@ -154,9 +166,9 @@ def create_knowledge_upload_from_bytes(
                 created_at=now,
                 updated_at=now,
                 deleted_at=None,
-                owner_id=auth_context.legacy_owner_id,
-                tenant_id=auth_context.tenant_id.value,
-                principal_id=auth_context.principal_id.value,
+                owner_id=ownership.owner_id,
+                tenant_id=ownership.tenant_id,
+                principal_id=ownership.principal_id,
             ),
             require_owner_header=settings.require_session_owner,
         ),
@@ -178,9 +190,10 @@ def get_knowledge_upload(
     settings: Settings,
     auth_context: AuthorizationContext,
     request_id: str = "",
+    repository: KnowledgeRepository | None = None,
 ) -> KnowledgeUploadStatusResponse:
     """Lookup one persisted uploaded knowledge document."""
-    repository = SQLiteKnowledgeRepository(settings.log_db_path)
+    repository = _resolve_repository(settings=settings, repository=repository)
     document = repository.get_document(document_id)
     if document is None:
         raise KnowledgeDocumentNotFound("Knowledge document not found.")
@@ -202,7 +215,11 @@ def get_knowledge_upload(
         raise KnowledgeDocumentNotFound("Knowledge document not found.")
     status = (
         "indexed"
-        if _document_has_completed_ingestion(document_id=document_id, settings=settings)
+        if _document_has_completed_ingestion(
+            document_id=document_id,
+            settings=settings,
+            repository=repository,
+        )
         else "uploaded"
     )
     return KnowledgeUploadStatusResponse(
@@ -221,9 +238,10 @@ def start_knowledge_ingestion(
     settings: Settings,
     auth_context: AuthorizationContext,
     request_id: str = "",
+    repository: KnowledgeRepository | None = None,
 ) -> KnowledgeIngestionResponse:
     """Normalize, chunk, and index one persisted knowledge document."""
-    repository = SQLiteKnowledgeRepository(settings.log_db_path)
+    repository = _resolve_repository(settings=settings, repository=repository)
     document = repository.get_document(request.document_id)
     if document is None:
         raise KnowledgeDocumentNotFound("Knowledge document not found.")
@@ -332,9 +350,10 @@ def get_knowledge_ingestion_status(
     settings: Settings,
     auth_context: AuthorizationContext,
     request_id: str = "",
+    repository: KnowledgeRepository | None = None,
 ) -> KnowledgeIngestionStatusResponse:
     """Lookup one ingestion attempt."""
-    repository = SQLiteKnowledgeRepository(settings.log_db_path)
+    repository = _resolve_repository(settings=settings, repository=repository)
     ingestion = repository.get_ingestion(ingestion_id)
     if ingestion is None:
         raise KnowledgeDocumentNotFound("Knowledge ingestion not found.")
@@ -373,6 +392,7 @@ def search_knowledge(
     settings: Settings,
     auth_context: AuthorizationContext,
     request_id: str = "",
+    repository: KnowledgeRepository | None = None,
 ) -> KnowledgeSearchResponse:
     """Search indexed chunks using the local simple vector backend."""
     rewrite_enabled = resolve_query_rewrite_enabled(
@@ -390,6 +410,7 @@ def search_knowledge(
         auth_context=auth_context,
         request_id=request_id,
         action="knowledge.search",
+        repository=repository,
     )
     hits = search_vector_index(
         settings=settings,
@@ -430,6 +451,7 @@ def answer_with_knowledge(
     settings: Settings,
     auth_context: AuthorizationContext,
     request_id: str = "",
+    repository: KnowledgeRepository | None = None,
 ) -> KnowledgeAnswerResponse:
     """Return a deterministic retrieval-backed answer with citations."""
     search_response = search_knowledge(
@@ -442,6 +464,7 @@ def answer_with_knowledge(
         settings=settings,
         auth_context=auth_context,
         request_id=request_id,
+        repository=repository,
     )
     if not search_response.hits and request.document_ids:
         search_response = _fallback_answer_scope(
@@ -451,6 +474,7 @@ def answer_with_knowledge(
             settings=settings,
             auth_context=auth_context,
             request_id=request_id,
+            repository=repository,
         )
     if not search_response.hits:
         return KnowledgeAnswerResponse(
@@ -474,6 +498,7 @@ def build_chat_knowledge_context(
     settings: Settings,
     auth_context: AuthorizationContext,
     request_id: str = "",
+    repository: KnowledgeRepository | None = None,
 ) -> KnowledgeChatContext:
     """Build a bounded retrieval context block for RAG chat."""
     search_response = search_knowledge(
@@ -486,6 +511,7 @@ def build_chat_knowledge_context(
         settings=settings,
         auth_context=auth_context,
         request_id=request_id,
+        repository=repository,
     )
     if not search_response.hits and document_ids:
         search_response = _fallback_answer_scope(
@@ -495,6 +521,7 @@ def build_chat_knowledge_context(
             settings=settings,
             auth_context=auth_context,
             request_id=request_id,
+            repository=repository,
         )
     if not search_response.hits:
         return KnowledgeChatContext(context_block="", citations=[])
@@ -530,11 +557,12 @@ def resolve_knowledge_documents(
     settings: Settings,
     auth_context: AuthorizationContext,
     request_id: str = "",
+    repository: KnowledgeRepository | None = None,
 ) -> list[KnowledgeDocumentRecord]:
     """Return persisted knowledge documents in caller order or raise when any are missing."""
     if not document_ids:
         return []
-    repository = SQLiteKnowledgeRepository(settings.log_db_path)
+    repository = _resolve_repository(settings=settings, repository=repository)
     deduped_ids = list(dict.fromkeys(document_ids))
     documents = repository.list_documents(deduped_ids)
     documents_by_id = {document.id: document for document in documents}
@@ -572,6 +600,7 @@ def _fallback_answer_scope(
     settings: Settings,
     auth_context: AuthorizationContext,
     request_id: str = "",
+    repository: KnowledgeRepository | None = None,
 ) -> KnowledgeSearchResponse:
     """Fallback to attached-document leading chunks when lexical retrieval finds nothing."""
     documents = resolve_knowledge_documents(
@@ -579,8 +608,9 @@ def _fallback_answer_scope(
         settings=settings,
         auth_context=auth_context,
         request_id=request_id,
+        repository=repository,
     )
-    repository = SQLiteKnowledgeRepository(settings.log_db_path)
+    repository = _resolve_repository(settings=settings, repository=repository)
     chunks = repository.get_chunks_for_documents(document_ids)
     chunks_by_document: dict[str, KnowledgeChunkRow] = {}
     for chunk in chunks:
@@ -610,8 +640,13 @@ def _run_async_read(*, file: AsyncUploadReader) -> bytes:
     return asyncio.run(file.read(_MAX_READ_BYTES))
 
 
-def _document_has_completed_ingestion(*, document_id: str, settings: Settings) -> bool:
-    repository = SQLiteKnowledgeRepository(settings.log_db_path)
+def _document_has_completed_ingestion(
+    *,
+    document_id: str,
+    settings: Settings,
+    repository: KnowledgeRepository | None = None,
+) -> bool:
+    repository = _resolve_repository(settings=settings, repository=repository)
     chunks = repository.get_chunks_for_documents([document_id])
     return bool(chunks)
 
@@ -623,8 +658,9 @@ def _authorized_document_ids_for_request(
     auth_context: AuthorizationContext,
     request_id: str,
     action: str,
+    repository: KnowledgeRepository | None = None,
 ) -> list[str]:
-    repository = SQLiteKnowledgeRepository(settings.log_db_path)
+    repository = _resolve_repository(settings=settings, repository=repository)
     if requested_document_ids:
         documents = repository.list_documents(
             list(dict.fromkeys(requested_document_ids))

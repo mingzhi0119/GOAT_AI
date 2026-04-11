@@ -16,6 +16,7 @@ from backend.services import knowledge_service, log_service
 from backend.services.knowledge_repository import (
     KnowledgeChunkRow,
     KnowledgeDocumentRecord,
+    KnowledgeIngestionRecord,
     SQLiteKnowledgeRepository,
 )
 from goat_ai.config import Settings
@@ -80,6 +81,157 @@ class KnowledgeServiceTests(unittest.TestCase):
                 principal_id="principal-1",
             )
         )
+
+    def test_get_knowledge_upload_accepts_injected_repository(self) -> None:
+        now = "2026-04-11T00:00:00+00:00"
+        root = self.root
+
+        class FakeKnowledgeRepository:
+            def __init__(self) -> None:
+                self.document = KnowledgeDocumentRecord(
+                    id="doc-injected",
+                    source_type="upload",
+                    original_filename="doc-injected.md",
+                    mime_type="text/markdown",
+                    sha256="abc",
+                    storage_path=str(root / "doc-injected.md"),
+                    byte_size=64,
+                    status="uploaded",
+                    created_at=now,
+                    updated_at=now,
+                    deleted_at=None,
+                    owner_id="owner-1",
+                    tenant_id="tenant-1",
+                    principal_id="principal-1",
+                )
+
+            def get_document(self, document_id: str) -> KnowledgeDocumentRecord | None:
+                return self.document if document_id == self.document.id else None
+
+            def get_chunks_for_documents(
+                self, document_ids: list[str] | None = None
+            ) -> list[KnowledgeChunkRow]:
+                if document_ids == [self.document.id]:
+                    return [
+                        KnowledgeChunkRow(
+                            id="chunk-1",
+                            ingestion_id="ing-1",
+                            document_id=self.document.id,
+                            chunk_index=0,
+                            text_content="Indexed content.",
+                            text_hash="hash",
+                            token_count=2,
+                            char_start=0,
+                            char_end=15,
+                            vector_ref="doc-injected:0",
+                            created_at=now,
+                        )
+                    ]
+                return []
+
+            def list_documents(
+                self, document_ids: list[str]
+            ) -> list[KnowledgeDocumentRecord]:
+                return [
+                    self.document
+                    for document_id in document_ids
+                    if document_id == self.document.id
+                ]
+
+            def list_documents_for_tenant(
+                self, tenant_id: str
+            ) -> list[KnowledgeDocumentRecord]:
+                return [self.document] if tenant_id == "tenant-1" else []
+
+            def create_document(self, record: KnowledgeDocumentRecord) -> None:
+                self.document = record
+
+            def create_ingestion(self, record: KnowledgeIngestionRecord) -> None:
+                return None
+
+            def update_ingestion_status(self, **_: object) -> None:
+                return None
+
+            def get_ingestion(
+                self, ingestion_id: str
+            ) -> KnowledgeIngestionRecord | None:
+                return None
+
+            def replace_chunks(
+                self,
+                *,
+                ingestion_id: str,
+                document_id: str,
+                chunks: list[KnowledgeChunkRow],
+            ) -> None:
+                return None
+
+        repository = FakeKnowledgeRepository()
+
+        response = knowledge_service.get_knowledge_upload(
+            document_id="doc-injected",
+            settings=self.settings,
+            auth_context=_auth_context(),
+            repository=repository,
+        )
+
+        self.assertEqual("indexed", response.status)
+        self.assertEqual("doc-injected", response.document_id)
+
+    def test_resolve_knowledge_documents_preserves_order_with_injected_repository(
+        self,
+    ) -> None:
+        now = "2026-04-11T00:00:00+00:00"
+        documents = {
+            "doc-a": KnowledgeDocumentRecord(
+                id="doc-a",
+                source_type="upload",
+                original_filename="a.md",
+                mime_type="text/markdown",
+                sha256="a",
+                storage_path=str(self.root / "a.md"),
+                byte_size=10,
+                status="uploaded",
+                created_at=now,
+                updated_at=now,
+                deleted_at=None,
+                owner_id="owner-1",
+                tenant_id="tenant-1",
+                principal_id="principal-1",
+            ),
+            "doc-b": KnowledgeDocumentRecord(
+                id="doc-b",
+                source_type="upload",
+                original_filename="b.md",
+                mime_type="text/markdown",
+                sha256="b",
+                storage_path=str(self.root / "b.md"),
+                byte_size=10,
+                status="uploaded",
+                created_at=now,
+                updated_at=now,
+                deleted_at=None,
+                owner_id="owner-1",
+                tenant_id="tenant-1",
+                principal_id="principal-1",
+            ),
+        }
+
+        class FakeKnowledgeRepository:
+            def list_documents(
+                self, document_ids: list[str]
+            ) -> list[KnowledgeDocumentRecord]:
+                # Intentionally return out of order to prove service reorders.
+                return [documents["doc-b"], documents["doc-a"]]
+
+        resolved = knowledge_service.resolve_knowledge_documents(
+            document_ids=["doc-a", "doc-b", "doc-a"],
+            settings=self.settings,
+            auth_context=_auth_context(),
+            repository=FakeKnowledgeRepository(),
+        )
+
+        self.assertEqual(["doc-a", "doc-b"], [document.id for document in resolved])
 
     def test_build_chat_context_falls_back_to_attached_document_chunks(self) -> None:
         self._create_document("doc-1")

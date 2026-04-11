@@ -8,6 +8,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Protocol
 
+from backend.domain.resource_ownership import (
+    PersistedResourceOwnership,
+    ownership_from_fields,
+)
 from backend.services.exceptions import PersistenceReadError, PersistenceWriteError
 
 
@@ -72,6 +76,14 @@ class WorkbenchTaskRecord:
     tenant_id: str = "tenant:default"
     principal_id: str = ""
 
+    @property
+    def ownership(self) -> PersistedResourceOwnership:
+        return ownership_from_fields(
+            owner_id=self.owner_id,
+            tenant_id=self.tenant_id,
+            principal_id=self.principal_id,
+        )
+
 
 @dataclass(frozen=True, kw_only=True)
 class WorkbenchTaskEventRecord:
@@ -108,6 +120,14 @@ class WorkbenchTaskCreatePayload:
     auth_mode: str = ""
     status: str = "queued"
     error_detail: str | None = None
+
+    @property
+    def ownership(self) -> PersistedResourceOwnership:
+        return ownership_from_fields(
+            owner_id=self.owner_id,
+            tenant_id=self.tenant_id,
+            principal_id=self.principal_id,
+        )
 
 
 class WorkbenchTaskRepository(Protocol):

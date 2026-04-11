@@ -1,146 +1,87 @@
 # GOAT AI Project Status
 
-Last updated: 2026-04-10
+Last updated: 2026-04-11
 
-## Release
+## Release snapshot
 
 - **Current release:** `v1.2.0`
-- **Shipped release milestone:** Phases 11-15 are complete and documented; Phase 16 sequencing is next.
-- **Main-branch status:** Phase 13 closeout work is landed across migrations, error semantics, readiness/liveness split, metrics, idempotency, rollback/backup runbooks, and CI hardening. See [ROADMAP.md](ROADMAP.md).
-- **Phase 14 status:** RAG-0 through **RAG-3** are complete on main: persisted uploads, SQLite metadata, local `simple_local_v1` vector index, retrieval-backed chat, optional **lexical rerank** and **conservative query rewrite** via `retrieval_profile` (`default` / `rag3_lexical` / `rag3_quality`), plus `python -m tools.run_rag_eval` over `evaldata/rag_eval_cases.jsonl`. **Vision MVP** (`POST /api/media/uploads`, `image_attachment_ids` on chat when the model reports vision) is landed.
-- **Phase 14.7 (RAG quality closure):** CI runs `python -m tools.run_rag_eval` on every backend pipeline; `GOAT_RAG_RERANK_MODE` and `retrieval_profile` are documented in [OPERATIONS.md](OPERATIONS.md); golden-set process in [evaldata/README.md](../evaldata/README.md); Prometheus exposes `knowledge_retrieval_requests_total` and `knowledge_query_rewrite_applied_total` at `GET /api/system/metrics`.
-- **Phase 15.1 (domain semantics):** [DOMAIN.md](DOMAIN.md) defines ubiquitous language; `backend.domain` holds safeguard policy, chart provenance helpers, and chart-spec version invariant; [.github/pull_request_template.md](../.github/pull_request_template.md) links DOMAIN + contract regen.
-- **Phase 15 structural closeout:** `backend.application` now owns history, knowledge, media, models, system, upload/analyze, chat preflight, and code-sandbox gating so routers stay thin while public API shapes remain unchanged; `backend.application.ports` is the shared contract face for `Settings`, Protocols, and stable exception re-exports.
-- **Phase 15.4-15.6:** `session_messages` table (dual-read/write with legacy JSON blob); optional `sessions.owner_id`; read/write API keys and optional `X-GOAT-Owner-Id` for session scoping; lazy OpenTelemetry (`GOAT_OTEL_ENABLED`) with `traceparent` middleware and Ollama spans. See [SESSION_MESSAGES_MIGRATION.md](SESSION_MESSAGES_MIGRATION.md), [OPERATIONS.md](OPERATIONS.md), [test_api_authz.py](../__tests__/test_api_authz.py).
-- **Phase 15.8 status:** complete. `Clock` is injected into `register_http_security`, and the title/session-persist path now accepts injected `Clock` as well; tests cover deterministic timestamps without wall-clock sleeps.
-- **Phase 15.9 status:** complete. Router/application boundary audit is closed: history, knowledge, upload, chat, system, models, media, artifacts, and code-sandbox routes are thin adapters over `backend.application`, and [DEPENDENCY_GRAPH.md](DEPENDENCY_GRAPH.md) reflects the audited wiring.
-- **Phase 15.10 status:** complete. Integration tests now cover session history round-trips (`test_session_history.py`), knowledge upload→ingest→search and `/api/knowledge/answers` contract (`test_knowledge_flow.py`), plus retrieval-backed chat prompt injection and persistence (`test_chat_with_knowledge.py`).
-- **Phase 15.11 status:** complete. `RateLimitSubject`, `RateLimitDecision`, and `RateLimitPolicy` now live in `backend.domain.rate_limit_policy`, `backend.http_security` delegates rate limiting through a policy/store pair, [DOMAIN.md](DOMAIN.md) documents the terms, and `decode_session_payload` now raises `SessionSchemaError` for unsupported future payload versions while preserving older payload compatibility.
-- **Phase 15 overall:** complete on main. Remaining roadmap work is now Phase 16 planning and decision-log sequencing.
-- **Frontend shell status:** composer control-surface polish, responsive `wide/narrow` chat-shell baseline, and the integrated manual UI verification workflow are landed on `main`.
-- **Frontend appearance status:** a Codex-like appearance system is landed on `main`: dedicated Appearance panel, `light/dark/system` mode, `classic/urochester/thu` styles, accent color, UI/code font selection, contrast tuning, translucent sidebar control, root-token theming, local preference persistence, style-specific footer logos, denser sidebar history layout, and theme-card alignment polish. Architecture hand-off: [APPEARANCE.md](APPEARANCE.md).
-- **Phase 16A status:** complete. `code_sandbox` now enforces separate policy and runtime gates on top of request-scoped `AuthorizationContext`: `GET /api/system/features` returns caller-specific `policy_allowed`, `POST /api/code-sandbox/exec` returns **503** + `FEATURE_UNAVAILABLE` for runtime denial and **403** + `FEATURE_DISABLED` for policy denial (`sandbox:execute`), and Prometheus exposes `feature_gate_denials_total{feature,gate_kind,reason}`.
-- **Phase 17A status:** durable workbench task skeleton is landed. `POST /api/workbench/tasks` creates a SQLite-backed queued task record, `GET /api/workbench/tasks/{task_id}` polls status, and the shared runtime gate still returns **503** + `FEATURE_UNAVAILABLE` when the feature family is disabled.
-- **Phase 17B status:** partial MVP is landed for `task_kind = plan`. Accepted workbench tasks now transition through durable `queued/running/completed/failed` states, completed plan tasks expose an inline markdown result on `GET /api/workbench/tasks/{task_id}`, and `GET /api/workbench/tasks/{task_id}/events` now exposes a durable lifecycle timeline.
-- **Phase 17C status:** first retrieval runtime slice is landed. `GET /api/workbench/sources` exposes a declarative source registry, task creation validates requested source ids through that registry, `knowledge` is runtime-ready for reuse, and `web` is registered but still marked not implemented. `browse` / `deep_research` now execute a minimal source-resolution -> retrieval-step-events -> citations path over runtime-ready sources; `canvas` is still not implemented.
-- **Phase 18 status:** Phase 18A is landed. `POST /api/code-sandbox/exec` now supports provider-backed shell execution in `sync` and `async` modes, persists durable execution/event/log records in SQLite, and exposes read APIs at `GET /api/code-sandbox/executions/{execution_id}`, `/events`, and `/logs`. Docker remains the default isolation backend, while `localhost` is available as an explicit developer fallback provider. Runtime and policy gates remain separate: runtime denial returns **503** + `FEATURE_UNAVAILABLE`, and missing `sandbox:execute` still returns **403** + `FEATURE_DISABLED`.
-- **Phase 19 status:** Phase 19B is landed on Windows. The repo now includes a Tauri 2 desktop shell, a PyInstaller-based backend sidecar build step (`python -m tools.build_desktop_sidecar`), release-mode sidecar launch through Tauri `externalBin`, desktop-specific writable paths rooted in the platform app-local-data directory, and a working Windows packaging path that produces both `.msi` and NSIS installers. Cross-platform packaged validation and signed installers remain follow-on work.
-- **P1 governance status:** staged release governance now has a workflow and runbook (`.github/workflows/release-governance.yml`, [RELEASE_GOVERNANCE.md](RELEASE_GOVERNANCE.md)); observability assets are versioned under [`../ops/observability/`](../ops/observability/README.md); nightly performance smoke now uses `python -m tools.load_chat_smoke` with explicit latency budgets.
-- **RAG-ready wording:** use the term **RAG-ready** in release notes or marketing only after `python -m tools.run_rag_eval` passes in CI or pre-release checks and this file still documents the same threshold.
+- **Shipped baseline:** phases 11-15 are complete and documented
+- **Current planning horizon:** deeper workbench/runtime completion, sandbox follow-ons, desktop distribution maturity, and P2 operating-model hardening
 
-## What is shipped
+## Shipped platform summary
 
-- React SPA + FastAPI backend; reference deployment behind nginx at `https://ai.simonbb.com/mingzhi/` (the codebase targets multiple environments; see README **Environments**)
-- Production bind target `:62606`, with runtime-target introspection at `GET /api/system/runtime-target`
-- Split health model with liveness at `GET /api/health` and readiness at `GET /api/ready`
-- Prometheus-style metrics at `GET /api/system/metrics`
-- Ollama-backed chat via `POST /api/chat`
-- Knowledge-file ingestion via:
-  - `POST /api/upload` as SSE
-  - `POST /api/upload/analyze` as JSON
-- Contract-first knowledge API skeleton via:
-  - `POST /api/knowledge/uploads`
-  - `GET /api/knowledge/uploads/{document_id}`
-  - `POST /api/knowledge/ingestions`
-  - `GET /api/knowledge/ingestions/{ingestion_id}`
-  - `POST /api/knowledge/search`
-  - `POST /api/knowledge/answers`
-- Session history via `GET /api/history`, `GET /api/history/{session_id}`, `PATCH /api/history/{session_id}`, `DELETE /api/history`, and `DELETE /api/history/{session_id}`
-- Generated chat artifact download via `GET /api/artifacts/{artifact_id}`
-- Durable workbench task creation and polling via `POST /api/workbench/tasks`, `GET /api/workbench/tasks/{task_id}`, `GET /api/workbench/tasks/{task_id}/events`, and `GET /api/workbench/sources`, with minimal `plan`, `browse`, and `deep_research` execution
-- Durable code sandbox execution via `POST /api/code-sandbox/exec`, `GET /api/code-sandbox/executions/{execution_id}`, `GET /api/code-sandbox/executions/{execution_id}/events`, and `GET /api/code-sandbox/executions/{execution_id}/logs`
-- GPU telemetry and rolling inference latency APIs, including first-token latency telemetry
-- Latency telemetry includes p50/p95 and model-scoped buckets for completion and first-token metrics
-- Model capability detection via `GET /api/models/capabilities`
-- Native chart-tool path: charts are emitted only from real Ollama tool calls, never pre-rendered before the LLM responds
-- Vision images: `POST /api/media/uploads` stores PNG/JPEG/WebP for use with `image_attachment_ids` on `POST /api/chat` when the selected model reports vision capability
-- Typed SSE protocol: `thinking`, `token`, `chart_spec`, `artifact`, `error`, `done`
-- Black-box API contract coverage through `__tests__/test_api_blackbox_contract.py`
-- Architecture guard suite (`__tests__/test_architecture_boundaries.py`) included in standard `unittest discover` runs
-- Lightweight safeguard layer for clearly unsafe sexual or violent misuse requests in chat
-- Post-deploy contract verification script integrated into Linux and Windows deploy flows
-- Model capability probing includes in-process TTL caching
-- Stable JSON error envelope now uses `detail`, `code`, and `request_id` across exception handlers and protected middleware paths
-- Knowledge uploads now persist to `GOAT_DATA_DIR`, normalize `csv`, `xlsx`, `txt`, `md`, `pdf`, and `docx`, and write retrieval metadata into SQLite plus a local `simple_local_v1` vector index
-- Ollama idempotent-read resilience: retry with backoff+jitter and circuit-breaker states for `/api/tags` and `/api/show`
-- Optional `Idempotency-Key` support for `POST /api/upload/analyze` and chat session append path (`POST /api/chat` with `session_id`)
-- SQLite-backed idempotency TTL table for duplicate request replay and write dedupe
-- Capacity guardrails on `POST /api/chat` enforce max message count and max payload size (`422` on overflow)
-- Load smoke utility (`python -m tools.load_chat_smoke`) provides one-command p50/p95 validation against chat SSE plus optional `/api/system/inference` snapshot
-- Session history contract includes `schema_version` audit field; `updated_at` remains part of list/detail APIs
-- SQLite backup/restore runbook published at [BACKUP_RESTORE.md](BACKUP_RESTORE.md) and linked from OPERATIONS
-- Security/tooling baseline includes [SECURITY.md](SECURITY.md), `ruff check` in CI, `pip-audit` in CI, and changed-file `ruff format` gating for Python edits
-- Operations baseline includes graceful shutdown, ref-aware rollback via `deploy.sh` / `deploy.ps1`, and documented Phase 13 risk triggers in OPERATIONS
-- Sidebar history optimistic insertion now makes the active conversation appear immediately before the post-stream refresh lands
-- UI hides Thinking disclosures unless the message was sent with thinking enabled, even if the backend stream still includes reasoning events
+### Core app
 
-## Current API surface
+- React SPA + FastAPI backend
+- Ollama-backed chat with typed SSE events: `thinking`, `token`, `chart_spec`, `artifact`, `error`, `done`
+- split liveness/readiness probes at `GET /api/health` and `GET /api/ready`
+- Prometheus metrics at `GET /api/system/metrics`
+- stable JSON error envelope using `detail`, `code`, and `request_id`
 
-| Method | Path |
-|--------|------|
-| GET | `/api/health` |
-| GET | `/api/ready` |
-| GET | `/api/system/metrics` |
-| GET | `/api/models` |
-| GET | `/api/models/capabilities` |
-| POST | `/api/chat` |
-| POST | `/api/upload` |
-| POST | `/api/upload/analyze` |
-| POST | `/api/knowledge/uploads` |
-| GET | `/api/knowledge/uploads/{document_id}` |
-| POST | `/api/knowledge/ingestions` |
-| GET | `/api/knowledge/ingestions/{ingestion_id}` |
-| POST | `/api/knowledge/search` |
-| POST | `/api/knowledge/answers` |
-| POST | `/api/media/uploads` |
-| GET | `/api/artifacts/{artifact_id}` |
-| GET | `/api/history` |
-| GET | `/api/history/{session_id}` |
-| PATCH | `/api/history/{session_id}` |
-| DELETE | `/api/history` |
-| DELETE | `/api/history/{session_id}` |
-| GET | `/api/system/gpu` |
-| GET | `/api/system/inference` |
-| GET | `/api/system/runtime-target` |
-| GET | `/api/system/features` |
-| POST | `/api/code-sandbox/exec` |
-| GET | `/api/code-sandbox/executions/{execution_id}` |
-| GET | `/api/code-sandbox/executions/{execution_id}/events` |
-| GET | `/api/code-sandbox/executions/{execution_id}/logs` |
-| POST | `/api/workbench/tasks` |
-| GET | `/api/workbench/sources` |
-| GET | `/api/workbench/tasks/{task_id}` |
-| GET | `/api/workbench/tasks/{task_id}/events` |
+### Knowledge and media
 
-## Important behavior notes
+- persisted upload and ingestion pipeline for `csv`, `xlsx`, `txt`, `md`, `pdf`, and `docx`
+- retrieval-backed chat and `/api/knowledge/*` contract family
+- local `simple_local_v1` vector index with optional lexical rerank and conservative query rewrite
+- image uploads for vision-capable chat via `POST /api/media/uploads`
+- RAG quality regression runner in CI via `python -m tools.run_rag_eval`
 
-- `/api/chat` streams typed JSON SSE objects, not legacy string sentinels (`thinking` and `token` are distinct streams for reasoning vs answer text)
-- `/api/upload` now emits `knowledge_ready` then `done`; it ingests the file into the knowledge subsystem instead of returning prompt-injection `file_context`
-- `/api/upload/analyze` now returns `document_id`, `ingestion_id`, `status`, and `retrieval_mode`; `chart: null` remains only for backward compatibility
-- `/api/chat` accepts `knowledge_document_ids` and uses retrieval-backed generation when indexed documents are attached
-- Chat can emit persisted downloadable artifacts over SSE and serve them from `GET /api/artifacts/{artifact_id}`
-- `/api/knowledge/*` routes now support persisted upload, synchronous ingestion, retrieval, retrieval-backed answers, and attached-document fallback when lexical retrieval misses
-- `/api/workbench/tasks` now persists a queued durable task to SQLite and workbench execution covers `plan`, `browse`, and `deep_research`; polling returns `queued/running/completed/failed`, completed browse/research tasks include citations in `result`, and `GET /api/workbench/tasks/{task_id}/events` exposes both lifecycle and retrieval-step events
-- `/api/workbench/sources` now exposes the caller-visible retrieval-source registry; current built-ins are `knowledge` (runtime-ready) and `web` (registered for future browse/research work, not implemented yet)
-- `/api/code-sandbox/exec` now runs a real provider-backed shell execution path in `sync` or `async` mode, stores durable execution rows/events/logs in SQLite, returns immediate results for sync runs, and exposes replayable stdout/stderr over `/logs`; the runtime defaults to Docker-backed isolation, with `localhost` available as an explicit trusted-dev fallback
-- `/api/health` is liveness only; `/api/ready` is the deploy/readiness probe and returns `503` when SQLite or the optional Ollama probe is not ready
-- History reads are normalized at the backend boundary: `/api/history/{session_id}` returns standard chat roles plus structured `chart_spec`, legacy `file_context`, and `knowledge_documents`, while legacy stored payloads remain readable through a dedicated compatibility codec
-- When `GOAT_API_KEY` is configured, every API except `/api/health` and `/api/ready` requires `X-GOAT-API-Key`
-- When `GOAT_API_KEY_WRITE` is configured, mutating routes require the write credential or an equivalent write-scoped registry credential
+### Sessions, artifacts, and authorization
 
-## Operational notes
+- persisted session history with `session_messages` normalization and legacy compatibility
+- generated chat artifacts served from persisted artifact ids
+- credential-backed authorization context with tenant/principal scoping
+- explicit persisted-resource ownership envelopes at storage boundaries
+- capability gates that distinguish policy denial from runtime unavailability
 
-- Shared host constraints still apply: no root, no nginx reloads, and `systemctl --user` may be unavailable
-- `deploy.sh` defaults to deploying the current checkout; `SYNC_GIT=1` is opt-in
-- Preferred GPU is the A100 via `GOAT_GPU_UUID=GPU-fb2cf8f7-e9bf-f136-a3bb-e150426598e8`
+### Workbench and sandbox
 
-## Recommended reference docs
+- durable workbench tasks with polling and event timelines
+- minimal runtime execution for `plan`, `browse`, and `deep_research`
+- declarative workbench source registry with `knowledge` ready and `web` still runtime-incomplete
+- durable code sandbox execution with persisted events and replayable logs
+- Docker-first isolation with `localhost` as an explicit trusted-dev fallback
 
-- [AGENTS.md](../AGENTS.md) (agent memory and collaboration guide) - [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) (canonical rules)
+### Desktop
+
+- Tauri 2 desktop shell
+- PyInstaller-built backend sidecar
+- working Windows packaging flow producing `.msi` and NSIS installers
+- desktop smoke coverage for sidecar boot and startup diagnostics
+
+### Governance and operations
+
+- staged release governance workflow and approval gate
+- versioned observability assets in-repo
+- nightly performance smoke with explicit budgets
+- backup, restore, rollback, and recovery-drill coverage
+- CI gates for lint, tests, build, contract sync, dependency audit, secret scan, and desktop supply chain
+
+## Current known boundaries
+
+- `canvas` remains in the public task enum but is not implemented yet
+- workbench `web` retrieval is still declared before it is truly runtime-ready
+- project memory and connectors are not implemented yet
+- storage remains SQLite-first and single-writer by design
+- future storage-shape changes require a new migration/compatibility/rollback decision log
+- Windows desktop packaging is ahead of macOS/Linux packaged validation and signing
+
+## Status by active roadmap area
+
+- **16B storage evolution:** complete; repository ownership boundaries are explicit across sessions, artifacts, knowledge, media, workbench, and sandbox, and future datastore-shape changes require a separate decision package
+- **17 runtime platform:** partial workbench runtime is landed; canvas, real web retrieval, project memory, and connectors remain open
+- **18 sandbox follow-ons:** MVP is landed; richer async control, egress policy, and Rust supervisor work remain open
+- **19 desktop maturity:** Windows packaging is landed; cross-platform packaged validation, signing, updater readiness, and deeper native runtime operations remain open
+- **engineering quality uplift:** P0 and P1 are complete; P2 operating-model work remains
+
+## Recommended live references
+
+- [ROADMAP.md](ROADMAP.md)
 - [OPERATIONS.md](OPERATIONS.md)
 - [API_REFERENCE.md](API_REFERENCE.md)
 - [API_ERRORS.md](API_ERRORS.md)
+- [SECURITY.md](SECURITY.md)
 - [BACKUP_RESTORE.md](BACKUP_RESTORE.md)
 - [ROLLBACK.md](ROLLBACK.md)
-- [SECURITY.md](SECURITY.md)
-- [ROADMAP.md](ROADMAP.md)
+- [RELEASE_GOVERNANCE.md](RELEASE_GOVERNANCE.md)
+- [AGENTS.md](../AGENTS.md)

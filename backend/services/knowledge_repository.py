@@ -3,6 +3,12 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
+
+from backend.domain.resource_ownership import (
+    PersistedResourceOwnership,
+    ownership_from_fields,
+)
 
 
 @dataclass(frozen=True)
@@ -21,6 +27,14 @@ class KnowledgeDocumentRecord:
     owner_id: str = ""
     tenant_id: str = "tenant:default"
     principal_id: str = ""
+
+    @property
+    def ownership(self) -> PersistedResourceOwnership:
+        return ownership_from_fields(
+            owner_id=self.owner_id,
+            tenant_id=self.tenant_id,
+            principal_id=self.principal_id,
+        )
 
 
 @dataclass(frozen=True)
@@ -54,6 +68,44 @@ class KnowledgeChunkRow:
     char_end: int
     vector_ref: str
     created_at: str
+
+
+class KnowledgeRepository(Protocol):
+    def create_document(self, record: KnowledgeDocumentRecord) -> None: ...
+
+    def get_document(self, document_id: str) -> KnowledgeDocumentRecord | None: ...
+
+    def list_documents(
+        self, document_ids: list[str]
+    ) -> list[KnowledgeDocumentRecord]: ...
+
+    def list_documents_for_tenant(
+        self, tenant_id: str
+    ) -> list[KnowledgeDocumentRecord]: ...
+
+    def create_ingestion(self, record: KnowledgeIngestionRecord) -> None: ...
+
+    def update_ingestion_status(
+        self,
+        *,
+        ingestion_id: str,
+        status: str,
+        updated_at: str,
+        chunk_count: int = 0,
+        completed_at: str | None = None,
+        error_code: str | None = None,
+        error_detail: str | None = None,
+    ) -> None: ...
+
+    def get_ingestion(self, ingestion_id: str) -> KnowledgeIngestionRecord | None: ...
+
+    def replace_chunks(
+        self, *, ingestion_id: str, document_id: str, chunks: list[KnowledgeChunkRow]
+    ) -> None: ...
+
+    def get_chunks_for_documents(
+        self, document_ids: list[str] | None = None
+    ) -> list[KnowledgeChunkRow]: ...
 
 
 class SQLiteKnowledgeRepository:

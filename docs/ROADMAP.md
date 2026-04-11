@@ -4,72 +4,45 @@
 > Current release tag: **v1.2.0**
 > Shipped status: [PROJECT_STATUS.md](PROJECT_STATUS.md)
 
-This roadmap only tracks **unfinished work**. Completed phases and archived closeout notes live in [PROJECT_STATUS.md](PROJECT_STATUS.md), [OPERATIONS.md](OPERATIONS.md), [DOMAIN.md](DOMAIN.md), and [ROADMAP_ARCHIVE.md](ROADMAP_ARCHIVE.md).
+This file tracks **unfinished work only**.
+
+Completed phases, landed slices, and historical closeout notes live in:
+
+- [PROJECT_STATUS.md](PROJECT_STATUS.md)
+- [OPERATIONS.md](OPERATIONS.md)
+- [DOMAIN.md](DOMAIN.md)
+- [ROADMAP_ARCHIVE.md](ROADMAP_ARCHIVE.md)
 
 ---
 
 ## Open Work
 
-### Engineering quality uplift plan (`7/10 -> 9/10`)
+### Active priorities
 
-This track is about preventing score regressions while raising the repo from "solid and reviewable" to "industrial-grade and continuously provable." Product work must not bypass these gates.
+1. **Canvas and artifact workspace**
+   - `task_kind = canvas` is already in the public contract and should not stay a known value that deterministically fails
+   - first-class workspace outputs are also the missing bridge between plan/research tasks and durable user-visible artifacts
 
-#### P0: stop score leaks and restore release confidence
+2. **Real web retrieval for workbench**
+   - `/api/workbench/sources` already exposes `web`
+   - the source remains declarative but runtime-unready
+   - browse/deep-research should not remain permanently partial behind a fake-ready public source
 
-Ship these before taking on net-new product promises that widen the runtime surface.
+3. **Project memory and connectors**
+   - both are already advertised as future capability slots
+   - they should not grow UI promises until the runtime, tenancy, and connector boundaries are real
 
-- [x] Fix any red CI-equivalent local gate before merge, especially frontend build failures.
-- [x] Add and enforce coverage reporting plus fail-under thresholds for backend and frontend.
-- [x] Close direct-test gaps for core decision-heavy modules:
-  - `backend/services/knowledge_service.py`
-  - `backend/services/workbench_execution_service.py`
-  - history/workbench application paths
-  - frontend persistence/layout/error-boundary and menu hooks/components
-- [x] Eliminate visible encoding/garbled-text defects in user-facing or operator-facing paths.
-- [x] Tighten credential handling:
-  - stop relying on plain string equality for secrets
-  - move toward hashed or otherwise non-reversible credential storage
-  - require constant-time comparison where raw comparisons still exist
-- [x] Add supply-chain gates for desktop/frontend dependencies:
-  - CI-blocking `npm audit --audit-level=high`
-  - CI-blocking `cargo audit` for `frontend/src-tauri/Cargo.lock`
-  - a documented desktop artifact trust model that keeps unsigned packages internal/test-only until signing is in place
-- [x] Reduce the highest-risk large-file hotspots by extracting focused submodules instead of adding more logic inline.
-- [x] Add direct automated tests for delivery-critical scripts and desktop wrappers.
-- Keep Rust migration work scoped to stable, systems-oriented boundaries during P0; do not begin broad business-logic rewrites before the quality gates above are green.
+4. **Desktop distribution maturity**
+   - Windows packaging is landed
+   - signed release, cross-platform packaged validation, updater readiness, and stronger native runtime operations are still open
 
-P0 exit criteria:
+5. **Industrial operating model completion**
+   - P0 and P1 governance work is landed
+   - the remaining uplift is the P2 operating-model work: signed artifacts, security cadence, fault injection, architectural drift control, and quality trend tracking
 
-- `lint + format + test + build + contract + security` are all green for touched layers
-- coverage is reported in CI and enforced by threshold
-- core release flows no longer rely on "tests pass even though build is red"
-- the worst correctness and security footguns are removed rather than documented away
+### Engineering quality uplift (`7/10 -> 9/10`)
 
-#### P1: turn quality checks into durable release controls
-
-- [x] Add staged release automation for at least a reproducible staging deploy and a documented production approval gate.
-- [x] Turn `.github/CODEOWNERS` into real path ownership rather than bootstrap placeholders.
-- [x] Version and store observability assets in-repo:
-  - dashboards
-  - alert rules
-  - scrape config or equivalent metrics wiring
-  - failure triage notes for common incidents
-- [x] Introduce performance regression checks:
-  - nightly or pre-release smoke/load validation
-  - explicit budgets for first-token latency, full response latency, and desktop startup where relevant
-- [x] Upgrade single-process reliability assumptions behind replaceable interfaces where scaling may grow:
-  - rate limiting
-  - idempotency
-  - durable background execution
-- [x] Add desktop smoke coverage for sidecar boot, health-wait handshake, and first-run diagnostics.
-- [x] Exercise backup, restore, and rollback paths rather than treating them as documentation-only flows.
-
-P1 exit criteria:
-
-- releases are reproducible and reviewable
-- operational alerts and dashboards exist for critical user-facing paths
-- performance and deployment regressions are detectable before production
-- ownership, release, and rollback paths are explicit enough to survive team hand-offs
+P0 and P1 are complete and archived. The remaining work is the operating-model finish line.
 
 #### P2: finish the move from mature codebase to industrial operating model
 
@@ -104,272 +77,120 @@ Score target by end of this uplift track:
 - Observability: `>= 9/10`
 - Delivery Maturity: `>= 9/10`
 
-### Immediate priority queue
+### Runtime platform
 
-These are already-visible or already-contracted capabilities that still have missing runtime implementation. Prioritize them before adding new product surfaces.
+#### Phase 17 shared runtime foundations
 
-1. **Canvas task/runtime**
-   - Public contract already accepts `task_kind = canvas`
-   - Current state: task is accepted, then deterministically fails as not implemented
-   - Why next: this is already in the durable task enum and should not remain a "known value that always fails" indefinitely
-2. **Workbench web retrieval**
-   - Public contract already exposes the `web` source in `/api/workbench/sources`
-   - Current state: declarative source exists, but `runtime_ready = false` and no executor is attached
-   - Why next: browse/deep-research semantics will remain partial until public-web retrieval is real
-3. **Artifact workspace**
-   - Public capability slot already exists in `/api/system/features`
-   - Current state: no first-class workspace-output model beyond inline task results and chat artifacts
-4. **Project memory**
-   - Public capability slot already exists in `/api/system/features`
-   - Current state: no project-scoped memory model or API surface is implemented
-5. **Connectors**
-   - Public capability slot already exists in `/api/system/features`
-   - Current state: no runtime-ready connector-backed retrieval source is implemented
-
-Sequencing rule:
-
-- finish or explicitly narrow already-open capability surfaces first
-- do not add new UI promises on top of these incomplete runtime seams
-
-### Phase 16B: storage evolution
-
-Revisit datastore changes only after authorization and resource boundaries are explicit.
-
-- Goal: define the next storage shape without weakening current single-instance guarantees.
-- Exit criteria: migration strategy, compatibility strategy, and rollback strategy are all defined before implementation.
-- Dependencies: must wait on the Phase 16 authz envelope and any resulting resource scoping rules.
-- Planning artifact: [`STORAGE_EVOLUTION_DECISION_PACKAGE.md`](STORAGE_EVOLUTION_DECISION_PACKAGE.md)
-
-### Phase 17: agent/workbench runtime scaffolding
-
-Prioritize the backend/runtime seams for the next frontend surfaces before exposing them in the SPA.
-
-- Goal: ship a capability-discovered workbench/task envelope that can safely back future Plan Mode, Browse, Deep Research, Canvas, project memory, and connectors.
-- Why this shape: modern coding/research products converge on capability discovery, long-running task envelopes, memory/context layers, and connector/tool registries instead of hard-wiring isolated UI buttons.
-- Reference implementations:
-  - OpenAI Codex product notes emphasize a threaded/task-oriented runtime, approvals, artifacts, and integrations rather than one-off pages: [Unlocking the Codex Harness](https://openai.com/index/unlocking-the-codex-harness/)
-  - Claude Code docs expose slash commands, hierarchical `CLAUDE.md` memory, MCP-based connectors/tools, and custom subagents as first-class runtime concepts: [Claude Code overview](https://docs.anthropic.com/en/docs/claude-code/overview), [MCP](https://docs.anthropic.com/en/docs/claude-code/mcp), [Slash commands](https://docs.anthropic.com/en/docs/claude-code/slash-commands)
-- Exit criteria:
-  - `GET /api/system/features` advertises the workbench capability family without claiming unavailable runtime support
-  - one stable task-entry contract exists for future long-running agent work
-  - docs and error semantics make clear that unavailable runtime returns `503` / `FEATURE_UNAVAILABLE`
-
-### Phase 17B: Plan Mode runtime integration
-
-- Goal: server-side plan/task orchestration beyond the now-landed durable task skeleton (`POST /api/workbench/tasks` + `GET /api/workbench/tasks/{task_id}`)
-- Current landed slice:
-  - `task_kind = plan` now executes through a minimal in-process runner
-  - polling returns durable `queued/running/completed/failed`
-  - completed plan tasks expose a minimal inline markdown result on `GET`
-  - `GET /api/workbench/tasks/{task_id}/events` now exposes a durable lifecycle timeline (`task.queued`, `task.started`, `task.completed`, `task.failed`)
-- Backend prerequisites:
-  - safe cancellation / retry semantics
-  - execution beyond `plan`
-
-### Phase 17 shared runtime foundations
-
-Use the same runtime primitives across 17C/17D/17E instead of building isolated feature-specific endpoints.
-
-- Why this shape:
-  - OpenAI deep research uses background execution plus tool-driven retrieval (`web search`, `file search`, remote MCP) rather than a single request/response search route: [Deep research guide](https://developers.openai.com/api/docs/guides/deep-research)
-  - MCP standardizes external data sources, tools, and workflows behind one connector surface instead of one-off app integrations: [MCP introduction](https://modelcontextprotocol.io/docs/getting-started/intro)
-  - LangGraph durable execution guidance emphasizes persisted progress, replay safety, and side-effect boundaries for long-running workflows: [Durable execution](https://docs.langchain.com/oss/javascript/langgraph/durable-execution)
-- Required shared primitives:
-  - durable task timeline / checkpoints, not status-only rows
-  - source registry abstraction for web, knowledge, and future connector-backed retrieval
-  - typed workspace outputs that stay distinct from the task row itself
+- Goal: finish the shared task/runtime primitives that Browse, Deep Research, Canvas, project memory, and connectors should all build on.
+- Remaining work:
+  - durable checkpoints beyond status-only task rows
+  - clearer task cancellation and retry semantics
+  - typed workspace outputs distinct from task rows
+  - source registry extensions for real web and future connector-backed retrieval
 - Sequencing rule:
-  - land shared runtime foundations first
-  - then expose Browse / Deep Research / Canvas / project memory behaviors on top of them
+  - finish shared runtime foundations before widening frontend promises
 
-### Phase 17C: Browse and Deep Research runtime
+#### Phase 17B: plan-mode follow-ons
 
-- Goal: add retrieval/browse execution primitives before exposing real Search/Browse and Deep Research in the UI
-- Current landed slice:
-  - `GET /api/workbench/sources` exposes a declarative source registry
-  - current visible sources are `web` and `knowledge`
-  - `web` is registered for future browse/deep-research work but remains runtime-unready
-  - `knowledge` is runtime-ready and already reuses existing retrieval/authz boundaries
-  - task creation now validates requested source ids through the shared registry instead of treating `connector_ids` as opaque strings
-  - `task_kind = browse` and `task_kind = deep_research` now execute a minimal retrieval pipeline
-  - execution writes `retrieval.sources_resolved`, `retrieval.step.completed`, and `retrieval.step.skipped` events into the durable task timeline
-  - completed browse/research tasks return markdown plus citations gathered from runtime-ready sources
-- Backend prerequisites:
-  - bounded multi-step task execution backed by durable task events instead of direct request/response only
-  - staged safety boundaries for public-web research vs private-source retrieval
-  - actual web execution and remote-connector adapters behind the new registry
+- Goal: move beyond the current minimal `task_kind = plan` runner.
+- Remaining work:
+  - safe cancellation
+  - retry semantics
+  - richer execution beyond a minimal inline markdown result
 
-### Phase 17D: canvas and artifact workspace
+#### Phase 17C: browse and deep-research runtime
 
-- Goal: make artifacts/work products first-class so research and planning outputs can be revisited and iterated
-- Priority: highest remaining workbench runtime gap after code sandbox because `canvas` is already present in the public task-kind contract
-- Backend prerequisites:
-  - typed workspace-output metadata beyond chat-only downloadable files
-  - task-to-output linkage (artifact and future canvas document refs)
-  - history/session restoration rules for workbench outputs
+- Goal: replace the currently partial retrieval runtime with real web execution and stronger multi-step research behavior.
+- Remaining work:
+  - actual public-web execution behind the `web` source
+  - staged safety boundaries for public web vs private retrieval
+  - remote connector adapters behind the shared source registry
 
-### Phase 17E: project memory and connectors
+#### Phase 17D: canvas and artifact workspace
 
-- Goal: add project-scoped memory and external source plumbing after task/runtime contracts exist
-- Priority: after canvas and real web retrieval because these capabilities are already advertised as slots but do not yet have runnable backends
-- Backend prerequisites:
+- Goal: make work products first-class and close the highest-priority remaining task-contract gap.
+- Remaining work:
+  - implement `task_kind = canvas`
+  - add typed workspace-output metadata beyond chat-only downloadable files
+  - link tasks to durable outputs
+  - define history/session restoration rules for workbench outputs
+
+#### Phase 17E: project memory and connectors
+
+- Goal: add project-scoped memory and external source plumbing once runtime foundations are ready.
+- Remaining work:
   - explicit project scope and tenancy rules
-  - connector registry / capability metadata
-  - memory write/read boundaries that do not bypass existing authz/resource rules
-  - read-only retrieval contracts for browse/research connectors before any write-capable integration is enabled
+  - connector registry and capability metadata
+  - memory write/read boundaries that do not bypass authz/resource rules
+  - read-only retrieval contracts before any write-capable connector path is enabled
 
-### Phase 18 follow-ons: code sandbox beyond the MVP
+### Code sandbox follow-ons
 
-- Goal: extend the landed Docker-first sync+async sandbox without weakening the current operator/safety posture
-- Current landed slice:
-  - `POST /api/code-sandbox/exec` now executes provider-backed shell runs in `sync` and `async` modes
-  - durable execution, event, and log rows are persisted in SQLite
-  - `GET /api/code-sandbox/executions/{execution_id}`, `/events`, and `/logs` expose status, auditability, and replayable stdout/stderr
-  - Docker remains the default isolated backend; `localhost` is available as a trusted-dev fallback with weaker isolation
-- Remaining priority items:
+#### Phase 18: sandbox beyond the MVP
+
+- Goal: extend the landed Docker-first sandbox without weakening the current operator/safety posture.
+- Remaining work:
   - cancel / retry semantics for async runs
   - multi-file workspace ergonomics beyond inline text seeding
-  - allowlisted egress modes instead of all-or-nothing network disablement
-  - alternate providers behind the same sandbox boundary (for example E2B/Daytona-style adapters)
+  - allowlisted egress modes instead of all-or-nothing disablement
+  - alternate providers behind the same sandbox boundary
   - richer terminal / PTY UX beyond replayable chunked logs
 
-### Phase 18B: Rust sandbox supervisor
+#### Phase 18B: Rust sandbox supervisor
 
-- Goal: move the most systems-heavy sandbox supervision responsibilities into a Rust runtime component while preserving the existing HTTP/API contract.
-- Why this route:
-  - process lifecycle control, timeout enforcement, cancellation, log streaming, and resource-boundary enforcement are a better fit for a memory-safe systems language than for growing Python orchestration code
-  - the sandbox boundary is already a separable runtime seam, so it is a safer migration target than higher-level chat or domain logic
+- Goal: move the most systems-heavy sandbox supervision responsibilities into a Rust runtime component while preserving the HTTP/API contract.
 - Planned scope:
-  - execution supervisor process or library written in Rust
   - child-process lifecycle management
   - timeout and cancellation enforcement
   - stdout/stderr event streaming and bounded buffering
   - workspace and egress policy enforcement at the supervisor boundary
-- Non-goals for this phase:
-  - no rewrite of chat, knowledge, authz, or other application/domain logic into Rust
-  - no public API contract expansion solely because the runtime implementation changed
-- Sequencing:
-  - begin after P0 engineering gates are green enough to prove parity
-  - keep the existing Python-facing adapter thin and contract-stable during rollout
+- Non-goals:
+  - no rewrite of chat, knowledge, authz, or higher-level domain logic into Rust
+  - no public API expansion solely because the runtime implementation changed
 - Exit criteria:
   - the Rust supervisor can back the existing execution contract without changing API semantics
-  - parity tests cover success, failure, timeout, cancellation, and log replay behavior
-  - rollout can be feature-gated so the Python path remains a fallback until the Rust path is proven
+  - parity tests cover success, failure, timeout, cancellation, and log replay
+  - rollout remains feature-gated until proven
 
-### Phase 19: desktop app packaging and native distribution
+### Desktop distribution and native runtime
 
-- Goal: turn GOAT AI into a first-class desktop app for Windows, macOS, and Linux instead of relying on "open localhost in a browser" as the primary local experience.
-- Chosen implementation route: **Tauri 2 desktop shell + bundled Python sidecar backend**.
-- Why this route:
-  - the current frontend already uses **React + Vite**, which Tauri explicitly supports as an existing web stack
-  - Tauri 2 has first-class packaging/distribution for **Windows, macOS, and Linux**
-  - Tauri supports bundling **external binaries / sidecars**, and its docs explicitly call out **Python CLI applications or API servers bundled using PyInstaller**
-  - this keeps the existing FastAPI/Ollama/runtime architecture largely intact instead of rewriting the backend into Rust or Electron/Node-only process code
-- Why this is preferred over alternatives:
-  - **plain PyInstaller only** is not enough for the desired product shape because it can freeze a Python process, but it does not give us the modern native desktop shell, updater story, permissions model, or polished installer UX by itself
-  - **Electron Forge** remains a viable fallback, but it adds a heavier runtime and is not the preferred first route unless Tauri sidecar integration or WebView constraints become blockers
-- Official reference implementations:
-  - Tauri 2 homepage and positioning: [Tauri 2](https://tauri.app/)
-  - Tauri sidecars / bundled external binaries: [Embedding External Binaries](https://tauri.app/develop/sidecar/)
-  - Tauri distribution targets: [Distribute](https://v2.tauri.app/distribute/)
-  - Tauri updater plugin: [Updater](https://v2.tauri.app/plugin/updater/)
-  - PyInstaller packaging constraints for Python sidecars: [PyInstaller Manual](https://pyinstaller.org/en/stable/)
-  - Electron Forge as fallback desktop shell: [Packaging Your Application](https://www.electronjs.org/docs/latest/tutorial/tutorial-packaging), [Makers](https://www.electronforge.io/config/makers)
+Desktop shell scaffolding and packaged backend sidecar are already landed and archived. Remaining work starts at distribution maturity.
 
-### Phase 19A: desktop shell scaffold
+#### Phase 19C: platform installers, signing, and updates
 
-- Goal: add a native desktop shell around the existing SPA without changing the API contract first.
-- Planned route:
-  - create a `desktop/` or `src-tauri/` application shell using **Tauri 2**
-  - load the existing Vite frontend in dev and the built frontend bundle in release
-  - start the backend as a managed sidecar process instead of asking the user to run `uvicorn` manually
-  - define an app bootstrap handshake:
-    - launch sidecar
-    - wait for `/api/health`
-    - then show the main window
-- Exit criteria:
-  - dev mode launches one native window instead of requiring a browser tab
-  - desktop shell can start and stop the local backend reliably
-
-### Phase 19B: packaged backend sidecar
-
-- Goal: bundle the Python backend so end users do not need to install Python manually.
-- Landed:
-  - `goat_ai.desktop_sidecar` now provides a desktop-friendly backend entrypoint
-  - `python -m tools.build_desktop_sidecar` builds a per-platform frozen sidecar with **PyInstaller**
-  - Tauri packaging now bundles that binary via `externalBin`
-  - release-mode desktop builds launch the bundled sidecar and wait for `/api/health` before showing the main window
-  - packaged desktop launches now move SQLite/data writes into the platform app-local-data directory instead of the repository root
-- Current Windows packaging output:
-  - `npm run desktop:build` now produces both a `.msi` installer and an NSIS `setup.exe`
-- Follow-on work:
-  - validate and ship the same frozen-sidecar path on macOS and Linux
-  - improve first-run diagnostics for missing Ollama or misconfigured local runtimes
-  - harden release build automation around signed installer pipelines
-- Important packaging constraint:
-  - **PyInstaller is not a cross-compiler**, so Windows, macOS, and Linux artifacts must each be built on the target OS (or an equivalent VM/runner for that OS)
-- Exit criteria:
-  - Windows, macOS, and Linux each produce a working packaged app that can launch the frozen backend sidecar locally
-  - first-run failure states are explicit when Ollama is missing or unreachable
-
-### Phase 19C: platform installers, signing, and updates
-
-- Goal: ship real installable desktop artifacts instead of ad hoc zips or developer-only bundles.
-- Planned distribution targets:
-  - **Windows**: NSIS or MSI installer
-  - **macOS**: DMG for direct download
-  - **Linux**: AppImage first, then `.deb` / `.rpm` as needed
-- Planned route:
-  - add platform icons, bundle metadata, and installer branding
-  - add **code signing** for Windows and macOS before public distribution
-  - add Tauri updater only after signed installer flow is stable
-  - decide whether offline WebView2 embedding is needed for Windows deployments that cannot assume internet access
-  - ship and maintain a documented prerequisite/bootstrap story instead of relying on tribal knowledge:
-    - **end-user runtime bootstrap** for `WebView2` and external local inference runtime (`Ollama` for the current architecture)
-    - **developer bootstrap** for Rust toolchain + Windows build tools
-    - one-click scripts for Windows and equivalent documented flows for macOS/Linux
+- Goal: ship real installable desktop artifacts instead of developer-only bundles.
+- Remaining work:
+  - Windows/macOS signing
+  - Linux packaged validation and release shape
+  - updater readiness after signing is stable
+  - explicit prerequisite/bootstrap story for end users and developers
 - Exit criteria:
   - signed installers are produced in CI/release workflows
-  - updater strategy is documented and wired for the signed desktop build only
-  - prerequisite installation paths are explicit enough that new users can complete setup without manual package hunting
+  - updater strategy is documented and wired only after signed release flow is stable
+  - prerequisite installation paths are explicit enough for new users
 
-### Phase 19D: desktop-native UX and local-runtime operations
+#### Phase 19D: desktop-native UX and local-runtime operations
 
 - Goal: make the packaged app behave like a real desktop product rather than a wrapped website.
-- Planned route:
-  - add desktop-native status for backend/Ollama readiness
-  - add durable desktop shell log sinks and log viewing instead of relying on transient process stdout/stderr
-  - keep workbench outputs and future desktop-native artifacts discoverable from the per-user app data directory
-  - add basic desktop settings for:
-      - Ollama endpoint selection
-      - model/runtime diagnostics
-      - local data directory reveal/open
-  - keep code sandbox disabled by default in packaged builds unless the selected provider/runtime is explicitly available and documented
-- Exit criteria:
-  - desktop app can be installed, launched, updated, and diagnosed without dropping users into raw terminal workflows
+- Remaining work:
+  - desktop-native readiness status
+  - durable log sinks and log viewing
+  - app-data discoverability for outputs
+  - desktop settings for endpoint/runtime diagnostics
+  - clear packaged-build behavior for risky capability gates such as code sandbox
 
-### Phase 19E: Rust desktop runtime bridge
+#### Phase 19E: Rust desktop runtime bridge
 
-- Goal: harden packaged-app startup and local-runtime operations by moving desktop process supervision deeper into the native Rust layer that already exists in the Tauri shell.
-- Why this route:
-  - sidecar lifecycle management, startup handshake, restart/backoff behavior, log sinks, and first-run diagnostics are desktop/runtime concerns rather than frontend concerns
-  - the Tauri shell already provides a natural Rust host boundary, so this improves reliability without forcing a rewrite of the SPA or backend API semantics
+- Goal: harden packaged-app startup and local-runtime operations by moving process supervision deeper into the native Rust layer in the Tauri shell.
 - Planned scope:
   - native sidecar boot coordination
-  - `/api/health` and readiness handshake before window reveal
-  - native log sink wiring for shell and sidecar diagnostics
+  - readiness handshake before window reveal
+  - native log sink wiring
   - restart/backoff and clearer first-run failure reporting
-  - desktop-safe local data and path handling at the Rust boundary
-- Non-goals for this phase:
-  - no rewrite of the SPA into Rust
-  - no rewrite of backend business logic solely for desktop packaging
-- Sequencing:
-  - start only after P0 release-confidence work is in place
-  - prefer incremental migration of startup/diagnostic responsibilities instead of replacing the entire desktop flow at once
-- Exit criteria:
-  - packaged desktop launches remain contract-compatible with the current backend sidecar
-  - first-run diagnostics, startup timing, and failure recovery are measurably better than the current shell-managed flow
-  - desktop startup, shutdown, and recovery paths are covered by repeatable smoke checks
+  - desktop-safe local data and path handling
+- Non-goals:
+  - no SPA rewrite into Rust
+  - no backend business-logic rewrite solely for desktop packaging
 
 ### UI surfaces waiting on backend/runtime
 
@@ -384,21 +205,21 @@ These items should remain roadmap-only in the frontend until the corresponding b
 
 ---
 
-## Dependencies / Constraints
+## Dependencies and constraints
 
-- Phase 16A capability gates now build on the completed credential-backed authorization context and tenancy envelope from Phase 16C.
-- Capability gates should continue to separate runtime unavailability from policy denial.
-- Storage evolution must preserve the current single-writer / SQLite-first operational contract unless a separate decision log changes that assumption.
+- Capability gates must continue to separate runtime unavailability from policy denial.
+- Storage evolution must preserve the current SQLite-first / single-writer operational contract unless a separate decision log changes that assumption.
 - Search, research, canvas, connector UI, and future cloud model selection should not expose fake capabilities before the backend/runtime can actually support them.
+- Shared runtime foundations should land before feature-specific frontend promises widen.
 
 ---
 
-## Decision Pending
+## Decision pending
 
 ### `/api/knowledge/answers` semantic alignment
 
-The product still needs a decision on whether `/api/knowledge/answers` should keep returning a raw retrieved snippet summary or move to the same LLM synthesis behavior used by chat with `knowledge_document_ids`.
+The product still needs a decision on whether `/api/knowledge/answers` should keep returning a raw retrieved snippet summary or move to the same LLM-synthesis behavior used by chat with `knowledge_document_ids`.
 
-- Current state: chat synthesizes retrieved context; `/api/knowledge/answers` returns a snippet-dump style response.
-- Decision needed: keep the divergence and document it, or unify the answer semantics across both endpoints.
-- Impact: this affects user expectations, API documentation, and the long-term shape of the retrieval UX.
+- Current state: chat synthesizes retrieved context; `/api/knowledge/answers` returns a snippet-style response
+- Decision needed: keep the divergence and document it, or unify the answer semantics
+- Impact: user expectations, API documentation, and the long-term retrieval UX

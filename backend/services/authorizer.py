@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from backend.domain.authz_types import AuthorizationContext
 from backend.domain.authorization import AuthorizationDecision, Scope
+from backend.domain.resource_ownership import ownership_from_resource
 from backend.services.artifact_service import PersistedArtifactRecord
 from backend.services.chat_runtime import SessionDetailRecord, SessionSummaryRecord
 from backend.services.code_sandbox_runtime import CodeSandboxExecutionRecord
@@ -36,14 +37,15 @@ def authorize_session_read(
 ) -> AuthorizationDecision:
     if not _has_scope(ctx, "history:read"):
         return AuthorizationDecision(False, "scope_missing")
-    if session.tenant_id and session.tenant_id != ctx.tenant_id.value:
+    ownership = ownership_from_resource(session)
+    if ownership.tenant_id and ownership.tenant_id != ctx.tenant_id.value:
         return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
-    if session.principal_id and session.principal_id != ctx.principal_id.value:
+    if ownership.principal_id and ownership.principal_id != ctx.principal_id.value:
         return AuthorizationDecision(
             False, "principal_mismatch", conceal_existence=True
         )
     if not _owner_visible(
-        resource_owner_id=session.owner_id,
+        resource_owner_id=ownership.owner_id,
         legacy_owner_id=ctx.legacy_owner_id,
         require_owner_header=require_owner_header,
     ):
@@ -74,14 +76,15 @@ def authorize_artifact_read(
 ) -> AuthorizationDecision:
     if not _has_scope(ctx, "artifact:read"):
         return AuthorizationDecision(False, "scope_missing")
-    if artifact.tenant_id and artifact.tenant_id != ctx.tenant_id.value:
+    ownership = ownership_from_resource(artifact)
+    if ownership.tenant_id and ownership.tenant_id != ctx.tenant_id.value:
         return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
-    if artifact.principal_id and artifact.principal_id != ctx.principal_id.value:
+    if ownership.principal_id and ownership.principal_id != ctx.principal_id.value:
         return AuthorizationDecision(
             False, "principal_mismatch", conceal_existence=True
         )
     if not _owner_visible(
-        resource_owner_id=artifact.owner_id,
+        resource_owner_id=ownership.owner_id,
         legacy_owner_id=ctx.legacy_owner_id,
         require_owner_header=require_owner_header,
     ):
@@ -97,14 +100,15 @@ def authorize_knowledge_document_read(
 ) -> AuthorizationDecision:
     if not _has_scope(ctx, "knowledge:read"):
         return AuthorizationDecision(False, "scope_missing")
-    if document.tenant_id and document.tenant_id != ctx.tenant_id.value:
+    ownership = ownership_from_resource(document)
+    if ownership.tenant_id and ownership.tenant_id != ctx.tenant_id.value:
         return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
-    if document.principal_id and document.principal_id != ctx.principal_id.value:
+    if ownership.principal_id and ownership.principal_id != ctx.principal_id.value:
         return AuthorizationDecision(
             False, "principal_mismatch", conceal_existence=True
         )
     if not _owner_visible(
-        resource_owner_id=document.owner_id,
+        resource_owner_id=ownership.owner_id,
         legacy_owner_id=ctx.legacy_owner_id,
         require_owner_header=require_owner_header,
     ):
@@ -135,17 +139,15 @@ def authorize_media_read(
 ) -> AuthorizationDecision:
     if not _has_scope(ctx, "media:read"):
         return AuthorizationDecision(False, "scope_missing")
-    tenant_id = str(getattr(media, "tenant_id", ""))
-    principal_id = str(getattr(media, "principal_id", ""))
-    owner_id = str(getattr(media, "owner_id", ""))
-    if tenant_id and tenant_id != ctx.tenant_id.value:
+    ownership = ownership_from_resource(media)
+    if ownership.tenant_id and ownership.tenant_id != ctx.tenant_id.value:
         return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
-    if principal_id and principal_id != ctx.principal_id.value:
+    if ownership.principal_id and ownership.principal_id != ctx.principal_id.value:
         return AuthorizationDecision(
             False, "principal_mismatch", conceal_existence=True
         )
     if not _owner_visible(
-        resource_owner_id=owner_id,
+        resource_owner_id=ownership.owner_id,
         legacy_owner_id=ctx.legacy_owner_id,
         require_owner_header=require_owner_header,
     ):
@@ -165,14 +167,15 @@ def authorize_workbench_task_read(
     initial status-polling contract enforces tenant/principal/legacy-owner
     boundaries without introducing new credential scope strings.
     """
-    if task.tenant_id and task.tenant_id != ctx.tenant_id.value:
+    ownership = ownership_from_resource(task)
+    if ownership.tenant_id and ownership.tenant_id != ctx.tenant_id.value:
         return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
-    if task.principal_id and task.principal_id != ctx.principal_id.value:
+    if ownership.principal_id and ownership.principal_id != ctx.principal_id.value:
         return AuthorizationDecision(
             False, "principal_mismatch", conceal_existence=True
         )
     if not _owner_visible(
-        resource_owner_id=task.owner_id,
+        resource_owner_id=ownership.owner_id,
         legacy_owner_id=ctx.legacy_owner_id,
         require_owner_header=require_owner_header,
     ):
@@ -187,14 +190,15 @@ def authorize_code_sandbox_execution_read(
     require_owner_header: bool,
 ) -> AuthorizationDecision:
     """Authorize visibility for one persisted code sandbox execution."""
-    if execution.tenant_id and execution.tenant_id != ctx.tenant_id.value:
+    ownership = ownership_from_resource(execution)
+    if ownership.tenant_id and ownership.tenant_id != ctx.tenant_id.value:
         return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
-    if execution.principal_id and execution.principal_id != ctx.principal_id.value:
+    if ownership.principal_id and ownership.principal_id != ctx.principal_id.value:
         return AuthorizationDecision(
             False, "principal_mismatch", conceal_existence=True
         )
     if not _owner_visible(
-        resource_owner_id=execution.owner_id,
+        resource_owner_id=ownership.owner_id,
         legacy_owner_id=ctx.legacy_owner_id,
         require_owner_header=require_owner_header,
     ):

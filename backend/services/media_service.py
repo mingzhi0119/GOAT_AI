@@ -12,9 +12,14 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import struct
 from pathlib import Path
+from typing import Protocol
 from uuid import uuid4
 
 from backend.domain.authz_types import AuthorizationContext
+from backend.domain.resource_ownership import (
+    PersistedResourceOwnership,
+    ownership_from_fields,
+)
 from backend.services.authorizer import authorize_media_read
 from backend.domain.authorization import ResourceRef
 from backend.models.media import MediaUploadResponse
@@ -39,9 +44,70 @@ class MediaUploadRecord:
     height_px: int | None
     created_at: str
 
+    @property
+    def ownership(self) -> PersistedResourceOwnership:
+        return ownership_from_fields(
+            owner_id=self.owner_id,
+            tenant_id=self.tenant_id,
+            principal_id=self.principal_id,
+        )
+
+
+class MediaRepository(Protocol):
+    def create_media_upload(self, record: MediaUploadRecord) -> None: ...
+
+    def get_media_upload(self, attachment_id: str) -> MediaUploadRecord | None: ...
+
+
+class SQLiteMediaRepository:
+    def __init__(self, db_path: Path) -> None:
+        self._db_path = db_path
+
+    def create_media_upload(self, record: MediaUploadRecord) -> None:
+        with sqlite3.connect(self._db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO media_uploads
+                    (id, owner_id, tenant_id, principal_id, filename, mime_type, byte_size, storage_path, width_px, height_px, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record.id,
+                    record.owner_id,
+                    record.tenant_id,
+                    record.principal_id,
+                    record.filename,
+                    record.mime_type,
+                    record.byte_size,
+                    record.storage_path,
+                    record.width_px,
+                    record.height_px,
+                    record.created_at,
+                ),
+            )
+
+    def get_media_upload(self, attachment_id: str) -> MediaUploadRecord | None:
+        with sqlite3.connect(self._db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                """
+                SELECT id, owner_id, tenant_id, principal_id, filename, mime_type, byte_size, storage_path, width_px, height_px, created_at
+                FROM media_uploads
+                WHERE id = ?
+                """,
+                (attachment_id,),
+            ).fetchone()
+        return MediaUploadRecord(**dict(row)) if row is not None else None
+
 
 def _attachment_dir(settings: Settings, attachment_id: str) -> Path:
     return settings.data_dir / "uploads" / "media" / attachment_id
+
+
+def _resolve_repository(
+    *, settings: Settings, repository: MediaRepository | None
+) -> MediaRepository:
+    return repository or SQLiteMediaRepository(settings.log_db_path)
 
 
 def _sniff_image_kind(data: bytes) -> str | None:
@@ -71,6 +137,7 @@ def create_media_upload_from_bytes(
     settings: Settings,
     auth_context: AuthorizationContext,
     request_id: str = "",
+    repository: MediaRepository | None = None,
 ) -> MediaUploadResponse:
     """Validate, persist, and register one image for later vision chat."""
     if not content:
@@ -117,7 +184,8 @@ def create_media_upload_from_bytes(
         height_px=height_px,
         created_at=_now_iso(),
     )
-    _create_media_upload_record(db_path=settings.log_db_path, record=record)
+    repository = _resolve_repository(settings=settings, repository=repository)
+    repository.create_media_upload(record)
     emit_authorization_audit(
         ctx=auth_context,
         action="media.upload.create",
@@ -146,14 +214,13 @@ def load_normalized_base64_for_ollama(
     settings: Settings,
     auth_context: AuthorizationContext,
     request_id: str = "",
+    repository: MediaRepository | None = None,
 ) -> str:
     """Return base64-encoded image bytes for one attachment (Ollama ``images`` field)."""
     if not _ATT_ID_RE.match(attachment_id):
         raise MediaNotFound("Image attachment not found.")
-    record = _get_media_upload_record(
-        db_path=settings.log_db_path,
-        attachment_id=attachment_id,
-    )
+    repository = _resolve_repository(settings=settings, repository=repository)
+    record = repository.get_media_upload(attachment_id)
     if record is None:
         raise MediaNotFound("Image attachment not found.")
     decision = authorize_media_read(
@@ -183,6 +250,7 @@ def load_images_base64_for_chat(
     settings: Settings,
     auth_context: AuthorizationContext,
     request_id: str = "",
+    repository: MediaRepository | None = None,
 ) -> list[str]:
     """Load multiple attachments in request order."""
     out: list[str] = []
@@ -193,49 +261,10 @@ def load_images_base64_for_chat(
                 settings=settings,
                 auth_context=auth_context,
                 request_id=request_id,
+                repository=repository,
             )
         )
     return out
-
-
-def _create_media_upload_record(*, db_path: Path, record: MediaUploadRecord) -> None:
-    with sqlite3.connect(db_path) as conn:
-        conn.execute(
-            """
-            INSERT INTO media_uploads
-                (id, owner_id, tenant_id, principal_id, filename, mime_type, byte_size, storage_path, width_px, height_px, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                record.id,
-                record.owner_id,
-                record.tenant_id,
-                record.principal_id,
-                record.filename,
-                record.mime_type,
-                record.byte_size,
-                record.storage_path,
-                record.width_px,
-                record.height_px,
-                record.created_at,
-            ),
-        )
-
-
-def _get_media_upload_record(
-    *, db_path: Path, attachment_id: str
-) -> MediaUploadRecord | None:
-    with sqlite3.connect(db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            """
-            SELECT id, owner_id, tenant_id, principal_id, filename, mime_type, byte_size, storage_path, width_px, height_px, created_at
-            FROM media_uploads
-            WHERE id = ?
-            """,
-            (attachment_id,),
-        ).fetchone()
-    return MediaUploadRecord(**dict(row)) if row is not None else None
 
 
 def _now_iso() -> str:

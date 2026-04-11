@@ -10,7 +10,9 @@ from backend.domain.authorization import PrincipalId, TenantId
 from backend.services import log_service
 from backend.services.exceptions import MediaNotFound, MediaValidationError
 from backend.services.media_service import (
+    MediaUploadRecord,
     create_media_upload_from_bytes,
+    load_images_base64_for_chat,
     load_normalized_base64_for_ollama,
 )
 from goat_ai.config import Settings
@@ -113,6 +115,45 @@ class MediaServiceTests(unittest.TestCase):
                 settings=self.settings,
                 auth_context=_auth_context(principal_id="principal-2"),
             )
+
+    def test_media_service_accepts_injected_repository(self) -> None:
+        content = base64.b64decode(PNG_1X1_BASE64)
+        root = self.settings.data_dir
+
+        class FakeMediaRepository:
+            def __init__(self) -> None:
+                self.records: dict[str, MediaUploadRecord] = {}
+
+            def create_media_upload(self, record: MediaUploadRecord) -> None:
+                self.records[record.id] = record
+
+            def get_media_upload(self, attachment_id: str) -> MediaUploadRecord | None:
+                return self.records.get(attachment_id)
+
+        repository = FakeMediaRepository()
+
+        response = create_media_upload_from_bytes(
+            content=content,
+            filename="pixel.png",
+            settings=self.settings,
+            auth_context=_auth_context(),
+            repository=repository,
+        )
+
+        stored = repository.get_media_upload(response.attachment_id)
+        self.assertIsNotNone(stored)
+        assert stored is not None
+        self.assertTrue(Path(stored.storage_path).is_file())
+        self.assertTrue(str(Path(stored.storage_path)).startswith(str(root)))
+
+        encoded_images = load_images_base64_for_chat(
+            attachment_ids=[response.attachment_id],
+            settings=self.settings,
+            auth_context=_auth_context(),
+            repository=repository,
+        )
+
+        self.assertEqual([content], [base64.b64decode(item) for item in encoded_images])
 
 
 if __name__ == "__main__":
