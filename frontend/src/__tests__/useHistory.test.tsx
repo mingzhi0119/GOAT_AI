@@ -9,6 +9,7 @@ import {
   fetchSession,
   renameSession,
 } from '../api/history'
+import type { HistorySessionDetail } from '../api/history'
 
 vi.mock('../api/history', () => ({
   fetchHistory: vi.fn(),
@@ -51,7 +52,7 @@ describe('useHistory', () => {
 
     await waitFor(() => expect(result.current.sessions).toHaveLength(1))
 
-    let detail
+    let detail: HistorySessionDetail | undefined
     await act(async () => {
       detail = await result.current.loadSession('sess-1')
     })

@@ -60,10 +60,9 @@ def main() -> None:
     )
     configure_desktop_environment(data_root, args.port)
 
-    from backend.main import create_app
-
     uvicorn.run(
-        create_app(),
+        "backend.main:create_app",
+        factory=True,
         host=args.host,
         port=args.port,
         log_level=args.log_level,

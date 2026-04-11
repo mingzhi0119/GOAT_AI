@@ -10,12 +10,12 @@ from backend.application.code_sandbox import execute_code_sandbox_request
 from backend.application.ports import (
     CodeSandboxExecutionDispatcher,
     CodeSandboxExecutionRepository,
+    FeatureNotAvailable,
     SandboxProvider,
     Settings,
 )
 from backend.domain.authz_types import AuthorizationContext
 from backend.models.code_sandbox import CodeSandboxExecRequest
-from backend.services.exceptions import FeatureNotAvailable
 from backend.services.feature_gate_service import (
     code_sandbox_policy_allowed,
     get_code_sandbox_snapshot,

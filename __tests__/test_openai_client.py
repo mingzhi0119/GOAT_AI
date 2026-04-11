@@ -1,19 +1,16 @@
 from __future__ import annotations
 
 import unittest
-from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from goat_ai.config import Settings
 from goat_ai.openai_client import OpenAIService
 from goat_ai.ollama_client import StreamTextPart
 from goat_ai.types import ChatTurn
 
 
-def _settings() -> Settings:
-    return Settings(
-        llm_provider="openai",
-        ollama_base_url="http://127.0.0.1:11434",
+def _settings() -> SimpleNamespace:
+    return SimpleNamespace(
         openai_base_url="https://api.openai.com/v1",
         openai_api_key="test-key",
         openai_models=("gpt-4.1-mini",),
@@ -21,14 +18,6 @@ def _settings() -> Settings:
         openai_thinking_models=("gpt-4.1-mini",),
         openai_tool_models=("gpt-4.1-mini",),
         generate_timeout=30,
-        max_upload_mb=20,
-        max_upload_bytes=20 * 1024 * 1024,
-        max_dataframe_rows=50000,
-        use_chat_api=True,
-        system_prompt="test",
-        app_root=Path("."),
-        logo_svg=Path("logo.svg"),
-        log_db_path=Path("chat_logs.db"),
     )
 
 

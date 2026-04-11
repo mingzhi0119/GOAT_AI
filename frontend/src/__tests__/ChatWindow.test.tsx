@@ -483,7 +483,8 @@ describe('ChatWindow composer', () => {
     const intervalCallsBeforeError = setIntervalSpy.mock.calls.length
 
     const streamOptions = vi.mocked(openCodeSandboxLogStream).mock.calls[0]?.[1]
-    streamOptions?.onError()
+    expect(streamOptions?.onError).toBeTypeOf('function')
+    streamOptions!.onError!()
 
     expect(setIntervalSpy.mock.calls.length).toBeGreaterThan(intervalCallsBeforeError)
   })

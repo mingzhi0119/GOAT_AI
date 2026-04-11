@@ -11,6 +11,10 @@ class OllamaUnavailable(GoatAIError):
     """Raised when Ollama cannot be reached or returns an unexpected HTTP error."""
 
 
+class LLMBackendUnavailable(OllamaUnavailable):
+    """Raised when the configured inference backend cannot be reached."""
+
+
 class UploadParseError(GoatAIError):
     """Raised when a CSV/XLSX file cannot be parsed."""
 
