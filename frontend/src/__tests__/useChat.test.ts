@@ -70,6 +70,7 @@ describe('useChat', () => {
         undefined,
         undefined,
         undefined,
+        undefined,
         { temperature: 0.8, max_tokens: 64, top_p: 0.9, think: 'medium' },
       )
     })
@@ -77,5 +78,33 @@ describe('useChat', () => {
     expect(result.current.messages).toHaveLength(2)
     expect(result.current.messages[1]?.showThinking).toBe(true)
     expect(result.current.messages[1]?.thinkingContent).toBe('Reasoning trace')
+  })
+
+  it('passes the active theme style to the chat request', async () => {
+    vi.mocked(streamChat).mockImplementation(async function* () {
+      yield { type: 'done' as const }
+    })
+
+    const { result } = renderHook(() => useChat())
+
+    await act(async () => {
+      await result.current.sendMessage(
+        'Hello',
+        'test-model',
+        undefined,
+        undefined,
+        false,
+        '',
+        'thu',
+      )
+    })
+
+    expect(streamChat).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'test-model',
+        theme_style: 'thu',
+      }),
+      expect.any(Object),
+    )
   })
 })

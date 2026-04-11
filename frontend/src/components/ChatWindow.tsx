@@ -9,11 +9,13 @@ import {
   type KeyboardEvent,
 } from 'react'
 import { uploadMediaImage } from '../api/media'
+import { executeCodeSandbox } from '../api/codeSandbox'
 import { streamUpload, type UploadStreamEvent } from '../api/upload'
 import type { GPUStatus, InferenceLatency } from '../api/system'
-import type { ChartSpec, Message } from '../api/types'
+import type { ChartSpec, CodeSandboxExecutionResponse, CodeSandboxFeature, Message } from '../api/types'
 import type { FileBindingMode, FileContextItem } from '../hooks/useFileContext'
 import ComposerControls from './ComposerControls'
+import CodeSandboxPanel from './CodeSandboxPanel'
 import EmptyChatState, { type EmptyChatPrompt } from './EmptyChatState'
 import ManageUploadsPanel from './ManageUploadsPanel'
 import ModelMenu from './ModelMenu'
@@ -24,6 +26,7 @@ import {
   getSuffixPrompt,
   getTemplateFallbackPrompt,
 } from '../utils/uploadPrompts'
+import { pickRandomPromptTexts, STARTER_PROMPT_POOL } from '../utils/starterPrompts'
 import type { ChatLayoutDecisions } from '../utils/chatLayout'
 import MessageBubble from './MessageBubble'
 import type { ReasoningLevel } from './chatComposerPrimitives'
@@ -37,13 +40,6 @@ import { brandingConfig } from '../config/branding'
 
 const LazyChartCard = lazy(() => import('./ChartCard'))
 
-const BASE_PROMPTS = [
-  'Summarize key trends in consumer behavior',
-  'What are the top strategic risks for 2026?',
-  "Explain Porter's Five Forces briefly",
-  'Draft an executive summary template',
-]
-
 const KNOWLEDGE_FILE_EXTENSIONS = new Set(['csv', 'xlsx', 'pdf', 'docx', 'md', 'txt'])
 const IMAGE_FILE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp'])
 const TEXTAREA_MAX_HEIGHT_PX = 144
@@ -54,7 +50,7 @@ interface PendingImageAttachment {
   filename: string
 }
 
-type ComposerPanel = 'plus' | 'manage-uploads' | 'model' | 'reasoning' | null
+type ComposerPanel = 'plus' | 'manage-uploads' | 'model' | 'reasoning' | 'code-sandbox' | null
 
 interface Props {
   messages: Message[]
@@ -76,6 +72,7 @@ interface Props {
   gpuStatus: GPUStatus | null
   gpuError: string | null
   inferenceLatency: InferenceLatency | null
+  codeSandboxFeature: CodeSandboxFeature | null
   planModeEnabled: boolean
   onPlanModeChange: (enabled: boolean) => void
   reasoningLevel: ReasoningLevel
@@ -138,6 +135,7 @@ const ChatWindow: FC<Props> = ({
   gpuStatus,
   gpuError,
   inferenceLatency,
+  codeSandboxFeature,
   planModeEnabled,
   onPlanModeChange,
   reasoningLevel,
@@ -150,6 +148,12 @@ const ChatWindow: FC<Props> = ({
   const [attachmentUploadError, setAttachmentUploadError] = useState<string | null>(null)
   const [attachmentUploading, setAttachmentUploading] = useState(false)
   const [activePanel, setActivePanel] = useState<ComposerPanel>(null)
+  const [sandboxCode, setSandboxCode] = useState('')
+  const [sandboxCommand, setSandboxCommand] = useState('')
+  const [sandboxStdin, setSandboxStdin] = useState('')
+  const [sandboxPending, setSandboxPending] = useState(false)
+  const [sandboxError, setSandboxError] = useState<string | null>(null)
+  const [sandboxResult, setSandboxResult] = useState<CodeSandboxExecutionResponse | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -157,20 +161,28 @@ const ChatWindow: FC<Props> = ({
   const panelBoundaryRef = useRef<HTMLDivElement>(null)
 
   const starterPrompts = useMemo<EmptyChatPrompt[]>(() => {
+    const basePrompts = pickRandomPromptTexts(
+      STARTER_PROMPT_POOL,
+      activeFileContext ? 2 : 4,
+    ).map((text): EmptyChatPrompt => ({ text, kind: 'base' }))
     if (!activeFileContext) {
-      return BASE_PROMPTS.map((text: string): EmptyChatPrompt => ({ text, kind: 'base' }))
+      return basePrompts
     }
     const filename = activeFileContext.filename
     return [
-      { text: BASE_PROMPTS[0]!, kind: 'base' },
-      { text: BASE_PROMPTS[1]!, kind: 'base' },
+      ...basePrompts,
       { text: activeFileContext.suffixPrompt ?? getSuffixPrompt(filename), kind: 'suffix' },
       {
         text: activeFileContext.templatePrompt ?? getTemplateFallbackPrompt(filename),
         kind: 'template',
       },
     ]
-  }, [activeFileContext])
+  }, [
+    activeFileContext?.filename,
+    activeFileContext?.id,
+    activeFileContext?.suffixPrompt,
+    activeFileContext?.templatePrompt,
+  ])
 
   const visibleMessages = useMemo(() => messages.filter(message => !message.hidden), [messages])
   const sessionHasFileContext = fileContexts.length > 0 || messages.some(message => message.hidden)
@@ -286,7 +298,32 @@ const ChatWindow: FC<Props> = ({
   const manageUploadsOpen = activePanel === 'manage-uploads'
   const modelMenuOpen = activePanel === 'model'
   const reasoningMenuOpen = activePanel === 'reasoning'
+  const codeSandboxOpen = activePanel === 'code-sandbox'
   const isNarrow = layoutDecisions.layoutMode === 'narrow'
+  const codeSandboxEnabled =
+    !!codeSandboxFeature?.policy_allowed && !!codeSandboxFeature?.effective_enabled
+
+  const handleRunCodeSandbox = async () => {
+    if ((!sandboxCode.trim() && !sandboxCommand.trim()) || sandboxPending || !codeSandboxEnabled) {
+      return
+    }
+    setSandboxPending(true)
+    setSandboxError(null)
+    try {
+      const result = await executeCodeSandbox({
+        runtime_preset: 'shell',
+        ...(sandboxCode.trim() ? { code: sandboxCode } : {}),
+        ...(sandboxCommand.trim() ? { command: sandboxCommand.trim() } : {}),
+        ...(sandboxStdin ? { stdin: sandboxStdin } : {}),
+      })
+      setSandboxResult(result)
+    } catch (err) {
+      setSandboxError(err instanceof Error ? err.message : 'Code sandbox execution failed')
+      setSandboxResult(null)
+    } finally {
+      setSandboxPending(false)
+    }
+  }
 
   return (
     <div
@@ -326,7 +363,6 @@ const ChatWindow: FC<Props> = ({
           <EmptyChatState
             starterPrompts={starterPrompts}
             selectedModel={selectedModel}
-            supportsVision={supportsVision}
             layoutDecisions={layoutDecisions}
             onSendMessage={text => onSendMessage(text, undefined)}
           />
@@ -361,9 +397,15 @@ const ChatWindow: FC<Props> = ({
               <PlusMenu
                 isOpen={plusMenuOpen}
                 isNarrow={isNarrow}
+                codeSandboxFeature={codeSandboxFeature}
                 planModeEnabled={planModeEnabled}
                 supportsThinking={supportsThinking ?? false}
                 thinkingEnabled={thinkingEnabled}
+                onOpenCodeSandbox={() => {
+                  if (!codeSandboxEnabled) return
+                  setSandboxError(null)
+                  setActivePanel('code-sandbox')
+                }}
                 onUploadFiles={() => fileInputRef.current?.click()}
                 onOpenManageUploads={() => setActivePanel('manage-uploads')}
                 onTogglePlanMode={() => onPlanModeChange(!planModeEnabled)}
@@ -398,6 +440,23 @@ const ChatWindow: FC<Props> = ({
                 onRemovePendingImage={id =>
                   setPendingImages(prev => prev.filter(item => item.id !== id))
                 }
+              />
+              <CodeSandboxPanel
+                isOpen={codeSandboxOpen}
+                runtimeEnabled={codeSandboxEnabled}
+                runPending={sandboxPending}
+                code={sandboxCode}
+                command={sandboxCommand}
+                stdin={sandboxStdin}
+                error={sandboxError}
+                result={sandboxResult}
+                onClose={() => setActivePanel(null)}
+                onCodeChange={setSandboxCode}
+                onCommandChange={setSandboxCommand}
+                onStdinChange={setSandboxStdin}
+                onRun={() => {
+                  void handleRunCodeSandbox()
+                }}
               />
               <div className="flex flex-col gap-2">
               <input

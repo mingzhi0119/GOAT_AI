@@ -155,7 +155,9 @@ def test_rename_history_session_updates_title(app_client: object) -> None:
     assert detail.json()["title"] == "Renamed Title"
 
 
-def test_rename_history_session_rejects_whitespace_only_title(app_client: object) -> None:
+def test_rename_history_session_rejects_whitespace_only_title(
+    app_client: object,
+) -> None:
     from fastapi.testclient import TestClient
     from backend.config import get_settings
 

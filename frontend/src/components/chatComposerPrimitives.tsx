@@ -7,6 +7,7 @@ export {
   CheckIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  CodeSandboxIcon,
   CloseIcon,
   CopiedIcon,
   CopyIcon,

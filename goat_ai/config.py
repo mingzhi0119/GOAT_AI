@@ -12,10 +12,23 @@ LOCAL_OLLAMA_INSTALL_DIR = WORKSPACE_ROOT / "ollama"
 LOCAL_OLLAMA_RUNTIME_DIR = WORKSPACE_ROOT / "ollama-local"
 LOCAL_OLLAMA_DEFAULT_URL = "http://127.0.0.1:11435"
 
-_DEFAULT_SYSTEM_PROMPT = """You are GOAT AI, a helpful assistant for students and faculty at the University of Rochester Simon Business School.
-You give clear, professional business-oriented analysis. Be precise and cite specific figures when data is available, but do not invent numbers or impose tabular structure on non-tabular topics.
+ThemeStyleId = Literal["classic", "urochester", "thu"]
+
+_DEFAULT_SYSTEM_PROMPTS: Final[dict[ThemeStyleId, str]] = {
+    "classic": """You are GOAT AI, a helpful general-purpose assistant.
+Give clear, accurate, well-structured answers across a wide range of topics. Be precise and practical, but do not invent facts, figures, or citations.
 Stay neutral, educational, and policy-safe: no harmful, discriminatory, or non-academic misuse of content.
-If you are unsure, say so briefly."""
+If you are unsure, say so briefly.""",
+    "urochester": """You are GOAT AI, a helpful business-oriented assistant from the University of Rochester Simon Business School.
+Favor clear, professional business analysis and decision support while staying useful on general questions. Be precise and cite specific figures when data is available, but do not invent numbers or impose tabular structure on non-tabular topics.
+Stay neutral, educational, and policy-safe: no harmful, discriminatory, or non-academic misuse of content.
+If you are unsure, say so briefly.""",
+    "thu": """You are GOAT AI, a helpful research-oriented assistant from Tsinghua University.
+Favor scientific, technical, and engineering rigor while remaining clear and practical on general questions. Explain assumptions, methods, and tradeoffs carefully, and do not invent facts, figures, or citations.
+Stay neutral, educational, and policy-safe: no harmful, discriminatory, or non-academic misuse of content.
+If you are unsure, say so briefly.""",
+}
+_DEFAULT_SYSTEM_PROMPT = _DEFAULT_SYSTEM_PROMPTS["classic"]
 
 USER_FACING_ERROR = "Sorry, the AI service is temporarily unavailable. Please try again or check that Ollama is running."
 _DOTENV_QUOTES: Final[tuple[str, str]] = ("'", '"')
@@ -59,6 +72,17 @@ def _read_system_prompt() -> str:
     return text
 
 
+def default_system_prompt_for_theme(theme_style: ThemeStyleId) -> str:
+    return _DEFAULT_SYSTEM_PROMPTS[theme_style]
+
+
+def is_system_prompt_override_configured() -> bool:
+    return bool(
+        os.environ.get("GOAT_SYSTEM_PROMPT", "").strip()
+        or os.environ.get("GOAT_SYSTEM_PROMPT_FILE", "").strip()
+    )
+
+
 def _env_bool(name: str, default: str) -> bool:
     return os.environ.get(name, default).lower() in ("1", "true", "yes")
 
@@ -89,6 +113,7 @@ class Settings:
     app_root: Path
     logo_svg: Path
     log_db_path: Path
+    system_prompt_overridden: bool = False
     data_dir: Path = APP_ROOT / "data"
     api_key: str = ""
     api_key_write: str = ""
@@ -119,6 +144,17 @@ class Settings:
     feature_code_sandbox_enabled: bool = False
     feature_agent_workbench_enabled: bool = False
     docker_socket_path: str = ""
+    code_sandbox_default_image: str = "python:3.12-slim"
+    code_sandbox_default_timeout_sec: int = 8
+    code_sandbox_max_timeout_sec: int = 15
+    code_sandbox_max_code_bytes: int = 32 * 1024
+    code_sandbox_max_command_bytes: int = 8 * 1024
+    code_sandbox_max_stdin_bytes: int = 16 * 1024
+    code_sandbox_max_inline_files: int = 8
+    code_sandbox_max_inline_file_bytes: int = 16 * 1024
+    code_sandbox_max_output_bytes: int = 64 * 1024
+    code_sandbox_cpu_limit: float = 0.5
+    code_sandbox_memory_mb: int = 256
     # Safeguard (content moderation) configuration.
     # safeguard_enabled=False or safeguard_mode="off" → no safeguard, None injected downstream.
     safeguard_enabled: bool = True
@@ -205,6 +241,59 @@ def load_settings() -> Settings:
     _feature_sandbox = _env_bool("GOAT_FEATURE_CODE_SANDBOX", "false")
     _feature_agent_workbench = _env_bool("GOAT_FEATURE_AGENT_WORKBENCH", "false")
     _docker_sock = os.environ.get("GOAT_DOCKER_SOCKET", "").strip()
+    _sandbox_image = os.environ.get(
+        "GOAT_CODE_SANDBOX_DEFAULT_IMAGE", "python:3.12-slim"
+    ).strip()
+    _sandbox_default_timeout = int(
+        os.environ.get("GOAT_CODE_SANDBOX_DEFAULT_TIMEOUT_SEC", "8")
+    )
+    _sandbox_max_timeout = int(
+        os.environ.get("GOAT_CODE_SANDBOX_MAX_TIMEOUT_SEC", "15")
+    )
+    _sandbox_max_code_bytes = int(
+        os.environ.get("GOAT_CODE_SANDBOX_MAX_CODE_BYTES", str(32 * 1024))
+    )
+    _sandbox_max_command_bytes = int(
+        os.environ.get("GOAT_CODE_SANDBOX_MAX_COMMAND_BYTES", str(8 * 1024))
+    )
+    _sandbox_max_stdin_bytes = int(
+        os.environ.get("GOAT_CODE_SANDBOX_MAX_STDIN_BYTES", str(16 * 1024))
+    )
+    _sandbox_max_inline_files = int(
+        os.environ.get("GOAT_CODE_SANDBOX_MAX_INLINE_FILES", "8")
+    )
+    _sandbox_max_inline_file_bytes = int(
+        os.environ.get("GOAT_CODE_SANDBOX_MAX_INLINE_FILE_BYTES", str(16 * 1024))
+    )
+    _sandbox_max_output_bytes = int(
+        os.environ.get("GOAT_CODE_SANDBOX_MAX_OUTPUT_BYTES", str(64 * 1024))
+    )
+    _sandbox_cpu_limit = float(os.environ.get("GOAT_CODE_SANDBOX_CPU_LIMIT", "0.5"))
+    _sandbox_memory_mb = int(os.environ.get("GOAT_CODE_SANDBOX_MEMORY_MB", "256"))
+    if not _sandbox_image:
+        raise ValueError("GOAT_CODE_SANDBOX_DEFAULT_IMAGE must not be empty")
+    if _sandbox_default_timeout < 1:
+        raise ValueError("GOAT_CODE_SANDBOX_DEFAULT_TIMEOUT_SEC must be >= 1")
+    if _sandbox_max_timeout < _sandbox_default_timeout:
+        raise ValueError(
+            "GOAT_CODE_SANDBOX_MAX_TIMEOUT_SEC must be >= GOAT_CODE_SANDBOX_DEFAULT_TIMEOUT_SEC"
+        )
+    if _sandbox_max_code_bytes < 256:
+        raise ValueError("GOAT_CODE_SANDBOX_MAX_CODE_BYTES must be >= 256")
+    if _sandbox_max_command_bytes < 64:
+        raise ValueError("GOAT_CODE_SANDBOX_MAX_COMMAND_BYTES must be >= 64")
+    if _sandbox_max_stdin_bytes < 0:
+        raise ValueError("GOAT_CODE_SANDBOX_MAX_STDIN_BYTES must be >= 0")
+    if _sandbox_max_inline_files < 0:
+        raise ValueError("GOAT_CODE_SANDBOX_MAX_INLINE_FILES must be >= 0")
+    if _sandbox_max_inline_file_bytes < 0:
+        raise ValueError("GOAT_CODE_SANDBOX_MAX_INLINE_FILE_BYTES must be >= 0")
+    if _sandbox_max_output_bytes < 1024:
+        raise ValueError("GOAT_CODE_SANDBOX_MAX_OUTPUT_BYTES must be >= 1024")
+    if _sandbox_cpu_limit <= 0:
+        raise ValueError("GOAT_CODE_SANDBOX_CPU_LIMIT must be > 0")
+    if _sandbox_memory_mb < 64:
+        raise ValueError("GOAT_CODE_SANDBOX_MEMORY_MB must be >= 64")
     _safeguard_enabled = _env_bool("GOAT_SAFEGUARD_ENABLED", "true")
     _safeguard_mode = os.environ.get("GOAT_SAFEGUARD_MODE", "full").strip().lower()
     if _safeguard_mode not in ("off", "input_only", "output_only", "full"):
@@ -226,6 +315,7 @@ def load_settings() -> Settings:
         max_dataframe_rows=int(os.environ.get("GOAT_MAX_DATAFRAME_ROWS", "50000")),
         use_chat_api=_env_bool("GOAT_USE_CHAT_API", "true"),
         system_prompt=_read_system_prompt(),
+        system_prompt_overridden=is_system_prompt_override_configured(),
         app_root=APP_ROOT,
         logo_svg=APP_ROOT / "static" / "urochester_simon_business_horizontal.svg",
         log_db_path=Path(os.environ.get("GOAT_LOG_PATH", _default_log_db)),
@@ -259,6 +349,17 @@ def load_settings() -> Settings:
         feature_code_sandbox_enabled=_feature_sandbox,
         feature_agent_workbench_enabled=_feature_agent_workbench,
         docker_socket_path=_docker_sock,
+        code_sandbox_default_image=_sandbox_image,
+        code_sandbox_default_timeout_sec=_sandbox_default_timeout,
+        code_sandbox_max_timeout_sec=_sandbox_max_timeout,
+        code_sandbox_max_code_bytes=_sandbox_max_code_bytes,
+        code_sandbox_max_command_bytes=_sandbox_max_command_bytes,
+        code_sandbox_max_stdin_bytes=_sandbox_max_stdin_bytes,
+        code_sandbox_max_inline_files=_sandbox_max_inline_files,
+        code_sandbox_max_inline_file_bytes=_sandbox_max_inline_file_bytes,
+        code_sandbox_max_output_bytes=_sandbox_max_output_bytes,
+        code_sandbox_cpu_limit=_sandbox_cpu_limit,
+        code_sandbox_memory_mb=_sandbox_memory_mb,
         safeguard_enabled=_safeguard_enabled,
         safeguard_mode=cast(
             Literal["off", "input_only", "output_only", "full"], _safeguard_mode

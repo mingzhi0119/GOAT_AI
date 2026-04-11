@@ -82,7 +82,7 @@ class SystemRouterIntegrationTests(unittest.TestCase):
         app.include_router(code_sandbox.router, prefix="/api")
         app.dependency_overrides[get_settings] = lambda: self.settings
         client = TestClient(app)
-        r = client.post("/api/code-sandbox/exec")
+        r = client.post("/api/code-sandbox/exec", json={})
         self.assertEqual(503, r.status_code)
         self.assertEqual("FEATURE_UNAVAILABLE", r.json()["code"])
 

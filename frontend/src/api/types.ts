@@ -1,6 +1,7 @@
 /** API types - mirror the backend Pydantic models exactly. */
 
 export type ReasoningLevel = 'low' | 'medium' | 'high'
+export type ThemeStyle = 'classic' | 'urochester' | 'thu'
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
@@ -29,6 +30,8 @@ export interface ChatRequest {
   system_instruction?: string
   /** Planner-style prompt layer that asks the model to plan before answering. */
   plan_mode?: boolean
+  /** Current UI theme style; used by the backend to choose the default assistant persona. */
+  theme_style?: ThemeStyle
   /** Ollama sampling options (optional; sent when set from Advanced settings). */
   temperature?: number
   max_tokens?: number
@@ -147,6 +150,59 @@ export interface WorkbenchFeatures {
 export interface SystemFeatures {
   code_sandbox: CodeSandboxFeature
   workbench: WorkbenchFeatures
+}
+
+export type CodeSandboxRuntimePreset = 'shell'
+export type CodeSandboxExecutionStatus = 'queued' | 'running' | 'completed' | 'failed' | 'denied'
+export type CodeSandboxNetworkPolicy = 'disabled' | 'allowlist' | 'enabled'
+
+export interface CodeSandboxInlineFile {
+  filename: string
+  content: string
+}
+
+export interface CodeSandboxOutputFile {
+  path: string
+  byte_size: number
+}
+
+export interface CodeSandboxExecRequest {
+  runtime_preset?: CodeSandboxRuntimePreset
+  code?: string
+  command?: string
+  stdin?: string
+  timeout_sec?: number
+  network_policy?: CodeSandboxNetworkPolicy
+  files?: CodeSandboxInlineFile[]
+}
+
+export interface CodeSandboxExecutionResponse {
+  execution_id: string
+  status: CodeSandboxExecutionStatus
+  runtime_preset: CodeSandboxRuntimePreset
+  network_policy: CodeSandboxNetworkPolicy
+  created_at: string
+  updated_at: string
+  exit_code: number | null
+  stdout: string
+  stderr: string
+  timed_out: boolean
+  error_detail: string | null
+  output_files: CodeSandboxOutputFile[]
+}
+
+export interface CodeSandboxExecutionEvent {
+  sequence: number
+  event_type: string
+  created_at: string
+  status: CodeSandboxExecutionStatus | null
+  message: string | null
+  metadata: Record<string, unknown>
+}
+
+export interface CodeSandboxExecutionEventsResponse {
+  execution_id: string
+  events: CodeSandboxExecutionEvent[]
 }
 
 /** Ollama sampling options (Advanced settings); maps to backend ChatRequest fields. */

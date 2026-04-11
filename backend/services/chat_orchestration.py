@@ -70,7 +70,8 @@ def _compose_system_prompt(
     extra = system_instruction.strip()
     if extra:
         parts.append(
-            "Additional instructions from the user (apply consistently):\n" + extra
+            "Additional instructions from the user (lower priority than the base "
+            "system instructions; follow them when they do not conflict):\n" + extra
         )
     return "\n\n".join(parts)
 

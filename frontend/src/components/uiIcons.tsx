@@ -18,6 +18,7 @@ import {
   Settings,
   Square,
   SquarePen,
+  SquareTerminal,
   SunMedium,
   Trash2,
   Upload,
@@ -47,6 +48,9 @@ export const StopIcon = (props: SVGProps<SVGSVGElement>) => <Square {...iconProp
 export const UploadIcon = (props: SVGProps<SVGSVGElement>) => <Upload {...iconProps(16, props)} />
 export const ManageIcon = (props: SVGProps<SVGSVGElement>) => <List {...iconProps(16, props)} />
 export const PlanModeIcon = (props: SVGProps<SVGSVGElement>) => <Route {...iconProps(16, props)} />
+export const CodeSandboxIcon = (props: SVGProps<SVGSVGElement>) => (
+  <SquareTerminal {...iconProps(16, props)} />
+)
 export const ThinkingModeIcon = (props: SVGProps<SVGSVGElement>) => (
   <Brain {...iconProps(16, props)} />
 )

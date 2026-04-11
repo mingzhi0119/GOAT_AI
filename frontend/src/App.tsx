@@ -7,6 +7,7 @@ import { useChatSession } from './hooks/useChatSession'
 import { useGpuStatus } from './hooks/useGpuStatus'
 import { useModels } from './hooks/useModels'
 import { useSystemInstruction } from './hooks/useSystemInstruction'
+import { useSystemFeatures } from './hooks/useSystemFeatures'
 import { useUserName } from './hooks/useUserName'
 import { getChatLayoutDecisions } from './utils/chatLayout'
 import { downloadChatAsMarkdown } from './utils/exportChatMarkdown'
@@ -43,9 +44,11 @@ export default function App() {
     userName,
     systemInstruction,
     planModeEnabled,
+    themeStyle: appearance.themeStyle,
     ollamaOptions,
   })
   const gpu = useGpuStatus(session.isStreaming)
+  const systemFeatures = useSystemFeatures()
   const { refreshNow } = gpu
   const wasStreamingRef = useRef(session.isStreaming)
 
@@ -207,6 +210,7 @@ export default function App() {
             gpuStatus={gpu.status}
             gpuError={gpu.error}
             inferenceLatency={gpu.inference}
+            codeSandboxFeature={systemFeatures.features?.code_sandbox ?? null}
             planModeEnabled={planModeEnabled}
             onPlanModeChange={setPlanModeEnabled}
             reasoningLevel={reasoningLevel}

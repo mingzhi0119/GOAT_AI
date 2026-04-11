@@ -45,6 +45,7 @@ class DbMigrationsTests(unittest.TestCase):
                         "015_workbench_task_events",
                         "016_workbench_task_result_citations",
                         "017_workbench_task_source_and_auth_state",
+                        "018_code_sandbox_executions",
                     ],
                 )
                 cols = [
@@ -135,6 +136,30 @@ class DbMigrationsTests(unittest.TestCase):
                 self.assertIn("seq", workbench_event_cols)
                 self.assertIn("event_type", workbench_event_cols)
                 self.assertIn("metadata_json", workbench_event_cols)
+                sandbox_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(code_sandbox_executions)"
+                    ).fetchall()
+                ]
+                self.assertIn("runtime_preset", sandbox_cols)
+                self.assertIn("network_policy", sandbox_cols)
+                self.assertIn("stdout", sandbox_cols)
+                self.assertIn("stderr", sandbox_cols)
+                self.assertIn("output_files_json", sandbox_cols)
+                self.assertIn("owner_id", sandbox_cols)
+                self.assertIn("tenant_id", sandbox_cols)
+                self.assertIn("principal_id", sandbox_cols)
+                sandbox_event_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(code_sandbox_execution_events)"
+                    ).fetchall()
+                ]
+                self.assertIn("execution_id", sandbox_event_cols)
+                self.assertIn("seq", sandbox_event_cols)
+                self.assertIn("event_type", sandbox_event_cols)
+                self.assertIn("metadata_json", sandbox_event_cols)
             finally:
                 conn.close()
 
@@ -174,7 +199,7 @@ class DbMigrationsTests(unittest.TestCase):
             conn = sqlite3.connect(db_path)
             try:
                 n = conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]
-                self.assertEqual(n, 17)
+                self.assertEqual(n, 18)
                 cols = [
                     r[1]
                     for r in conn.execute("PRAGMA table_info(conversations)").fetchall()
@@ -242,6 +267,27 @@ class DbMigrationsTests(unittest.TestCase):
                 self.assertIn("seq", workbench_event_cols)
                 self.assertIn("event_type", workbench_event_cols)
                 self.assertIn("metadata_json", workbench_event_cols)
+                sandbox_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(code_sandbox_executions)"
+                    ).fetchall()
+                ]
+                self.assertIn("runtime_preset", sandbox_cols)
+                self.assertIn("network_policy", sandbox_cols)
+                self.assertIn("stdout", sandbox_cols)
+                self.assertIn("stderr", sandbox_cols)
+                self.assertIn("output_files_json", sandbox_cols)
+                sandbox_event_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(code_sandbox_execution_events)"
+                    ).fetchall()
+                ]
+                self.assertIn("execution_id", sandbox_event_cols)
+                self.assertIn("seq", sandbox_event_cols)
+                self.assertIn("event_type", sandbox_event_cols)
+                self.assertIn("metadata_json", sandbox_event_cols)
             finally:
                 conn.close()
 

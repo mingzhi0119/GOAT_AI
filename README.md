@@ -27,7 +27,7 @@ Some capabilities (for example a future **model-driven code execution sandbox**)
 | Docker (or approved runtime) available and operators enable the feature | Code-execution sandbox **may** be turned on after configuration and review ([docs/OPERATIONS.md](docs/OPERATIONS.md)). |
 | No Docker / no isolation / operator opts out | **Disable** code execution; the rest of the app (chat, RAG, uploads, downloads of **non-executed** generated files) continues to work within normal limits. |
 
-Until such a feature ships, this table documents the **intended** model: **high-risk operations are gated by explicit configuration and runtime readiness**, not on by default; **per-caller policy** is documented separately in the AuthZ roadmap.
+This is now the shipped model for the Phase 18 Docker-first sandbox MVP: **high-risk operations are gated by explicit configuration and runtime readiness**, not on by default; **per-caller policy** remains separate from deployment/runtime readiness.
 
 **Industrial implementation pattern** (config + probe + API + service enforcement + tests): see [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md) **Section 15 Feature enable/disable and gating**.
 
@@ -75,8 +75,13 @@ Core API surface:
 - `GET /api/system/inference`
 - `GET /api/system/runtime-target`
 - `GET /api/system/features` (capability-gated features: config + host probe)
-- `POST /api/code-sandbox/exec` (scaffold; policy-gated `403 FEATURE_DISABLED`, runtime-gated `503 FEATURE_UNAVAILABLE`, `501` when enabled but not implemented)
-- `POST /api/workbench/tasks` (scaffold for future Plan/Browse/Research/Canvas task entry; 503 when runtime gate is closed, 501 when enabled but not implemented)
+- `POST /api/code-sandbox/exec` (run one short synchronous shell sandbox execution)
+- `GET /api/code-sandbox/executions/{execution_id}` (read one persisted sandbox execution)
+- `GET /api/code-sandbox/executions/{execution_id}/events` (read one persisted sandbox execution timeline)
+- `POST /api/workbench/tasks` (create and enqueue a durable workbench task)
+- `GET /api/workbench/sources` (list declarative retrieval sources for workbench tasks)
+- `GET /api/workbench/tasks/{task_id}` (poll durable task status)
+- `GET /api/workbench/tasks/{task_id}/events` (read durable task event timeline)
 
 ## Current behavior
 
@@ -92,6 +97,8 @@ Core API surface:
 - Shared-host operations now include documented graceful shutdown, rollback, backup/restore, and post-deploy checks
 - RAG-0 is complete, and the first RAG-1/2 slice is live: `csv/xlsx` uploads now route through real ingestion/search/answer, `pdf/docx/md/txt` normalize into the same knowledge pipeline, and chat can use `knowledge_document_ids` for retrieval-backed generation instead of raw snippet dumps
 - Generated non-executed chat files now download through persisted artifact ids under `/api/artifacts/{artifact_id}`
+- Code sandbox execution is now a real gated capability: `POST /api/code-sandbox/exec` runs short synchronous shell work in an isolated Docker-backed sandbox with network disabled by default, while durable execution records remain readable via `GET /api/code-sandbox/executions/{execution_id}` and `/events`
+- Workbench tasks now persist durable task rows, support polling and event timelines, and provide minimal execution for `plan`, `browse`, and `deep_research`; `canvas` remains unimplemented
 - **RAG-ready gate:** the product may be described as **RAG-ready** only when `python -m tools.run_rag_eval` exits 0 (checked-in `evaldata/rag_eval_cases.jsonl`; see [evaldata/README.md](evaldata/README.md)) and retrieval quality notes in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) stay aligned with that runner. CI runs the same command on every backend build.
 
 ## Quick Start
@@ -186,9 +193,10 @@ Merges to `main` should be gated by GitHub branch protection, required checks, a
 - [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md): SQLite backup/restore drill
 - [docs/ROLLBACK.md](docs/ROLLBACK.md): rollback procedure for shared-host deploys
 - [docs/SECURITY.md](docs/SECURITY.md): upload/API threat notes and CI security posture
-- [docs/ROADMAP.md](docs/ROADMAP.md): shipped phases and refactor roadmap
+- [docs/ROADMAP.md](docs/ROADMAP.md): unfinished backlog and priority queue
 - [docs/ROADMAP_ARCHIVE.md](docs/ROADMAP_ARCHIVE.md): historical roadmap content and phase closeouts
 - [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md): coding and process standards (single source of truth)
+- [`examples/`](examples): demo/example assets kept out of canonical docs
 
 Capacity/load validation:
 

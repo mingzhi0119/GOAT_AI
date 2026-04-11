@@ -14,6 +14,10 @@ from backend.services.chat_runtime import (
     TitleGenerator,
 )  # noqa: F401
 from backend.services.workbench_runtime import WorkbenchTaskRepository  # noqa: F401
+from backend.services.code_sandbox_runtime import (  # noqa: F401
+    CodeSandboxExecutionRepository,
+)
+from backend.services.code_sandbox_provider import SandboxProvider  # noqa: F401
 from backend.services.exceptions import (  # noqa: F401
     PersistenceReadError,
     PersistenceWriteError,
@@ -42,6 +46,7 @@ __all__ = [
     "ChatCapacityError",
     "ConversationLogger",
     "ArtifactNotFound",
+    "CodeSandboxExecutionRepository",
     "FeatureNotAvailable",
     "InferenceBackendUnavailable",
     "KnowledgeDocumentNotFound",
@@ -55,6 +60,7 @@ __all__ = [
     "SessionNotFoundError",
     "SessionRepository",
     "Settings",
+    "SandboxProvider",
     "TabularContextExtractor",
     "TitleGenerator",
     "validate_chat_capacity",

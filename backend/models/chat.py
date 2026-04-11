@@ -70,6 +70,13 @@ class ChatRequest(BaseModel):
         default=False,
         description="When true, the system prompt asks the model to plan before answering.",
     )
+    theme_style: Literal["classic", "urochester", "thu"] = Field(
+        default="classic",
+        description=(
+            "Appearance theme style used to select the default assistant persona "
+            "when no explicit system prompt override is configured."
+        ),
+    )
 
 
 class ModelsResponse(BaseModel):

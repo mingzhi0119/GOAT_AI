@@ -129,6 +129,34 @@ Self-managed VMs, Docker Compose, Kubernetes, or developer laptops use the same 
 | `GOAT_FEATURE_CODE_SANDBOX` | Operator allows code-sandbox feature (`0`/`1`); `effective_enabled` still requires Docker probe | `0` |
 | `GOAT_FEATURE_AGENT_WORKBENCH` | Operator exposes the shared workbench feature family; actual sub-capability readiness still depends on runtime support (`plan`, `browse`, and `deep_research` are partially implemented, while `canvas`, project memory, and connectors are not) | `0` |
 | `GOAT_DOCKER_SOCKET` | Override Docker socket/pipe path (empty = defaults: Unix `/var/run/docker.sock`, Windows `\\.\pipe\docker_engine`) | empty |
+| `GOAT_CODE_SANDBOX_DEFAULT_IMAGE` | Docker image used for the short synchronous sandbox MVP | `python:3.12-slim` |
+| `GOAT_CODE_SANDBOX_DEFAULT_TIMEOUT_SEC` | Default sandbox execution timeout | `8` |
+| `GOAT_CODE_SANDBOX_MAX_TIMEOUT_SEC` | Maximum sandbox timeout accepted from requests | `15` |
+| `GOAT_CODE_SANDBOX_MAX_CODE_BYTES` | Max UTF-8 bytes for inline `code` | `32768` |
+| `GOAT_CODE_SANDBOX_MAX_COMMAND_BYTES` | Max UTF-8 bytes for inline `command` | `8192` |
+| `GOAT_CODE_SANDBOX_MAX_STDIN_BYTES` | Max UTF-8 bytes for inline `stdin` | `16384` |
+| `GOAT_CODE_SANDBOX_MAX_INLINE_FILES` | Max seeded inline text files per execution | `8` |
+| `GOAT_CODE_SANDBOX_MAX_INLINE_FILE_BYTES` | Max UTF-8 bytes per inline seeded file | `16384` |
+| `GOAT_CODE_SANDBOX_MAX_OUTPUT_BYTES` | Max captured stdout/stderr bytes per stream before truncation | `65536` |
+| `GOAT_CODE_SANDBOX_CPU_LIMIT` | Docker CPU quota for each sandbox container | `0.5` |
+| `GOAT_CODE_SANDBOX_MEMORY_MB` | Docker memory limit (MB) for each sandbox container | `256` |
+
+### Code sandbox operations (Phase 18)
+
+- `POST /api/code-sandbox/exec` now performs real Docker-backed execution when:
+  - `GOAT_FEATURE_CODE_SANDBOX=1`
+  - the Docker socket/pipe probe succeeds
+  - the caller credential includes `sandbox:execute`
+- The Phase 18 MVP is intentionally conservative:
+  - synchronous, short-lived execution only
+  - one shell-capable preset
+  - network disabled by default
+  - no privileged mode
+  - no host Docker socket mounted into the sandbox container
+- The execution contract persists durable rows and event timelines in SQLite:
+  - `GET /api/code-sandbox/executions/{execution_id}`
+  - `GET /api/code-sandbox/executions/{execution_id}/events`
+- Files written under `outputs/` are surfaced as metadata in the API response, but they are not yet promoted into the artifact workspace model.
 
 ### OpenTelemetry (optional, Phase 15.6)
 

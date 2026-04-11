@@ -25,15 +25,39 @@ from goat_ai.config import Settings
 
 if TestClient is not None:
     from backend.config import get_settings
-    from backend.dependencies import get_llm_client, get_title_generator
+    from backend.dependencies import (
+        get_code_sandbox_provider,
+        get_llm_client,
+        get_title_generator,
+    )
     from backend.main import create_app
     from backend.models.chat import ChatMessage
+    from backend.services.code_sandbox_provider import (
+        SandboxProviderRequest,
+        SandboxProviderResult,
+    )
     from backend.services import log_service
     from backend.services.session_message_codec import (
         SESSION_PAYLOAD_VERSION,
         build_session_payload,
     )
     from test_api_blackbox_contract import ContractFakeLLM, FakeTitleGenerator
+
+
+class AuthzFakeCodeSandboxProvider:
+    provider_name = "fake-docker"
+
+    def run(self, request: SandboxProviderRequest) -> SandboxProviderResult:
+        _ = request
+        return SandboxProviderResult(
+            provider_name=self.provider_name,
+            exit_code=0,
+            stdout="sandbox ok",
+            stderr="",
+            timed_out=False,
+            error_detail=None,
+            output_files=[],
+        )
 
 
 @unittest.skipUnless(TestClient is not None, "fastapi not installed")
@@ -295,6 +319,7 @@ class ApiAuthzTests(unittest.TestCase):
         response = self.client.post(
             "/api/code-sandbox/exec",
             headers={"X-GOAT-API-Key": "limited-write"},
+            json={},
         )
         self.assertEqual(403, response.status_code)
         body = response.json()
@@ -310,10 +335,39 @@ class ApiAuthzTests(unittest.TestCase):
         response = self.client.post(
             "/api/code-sandbox/exec",
             headers={"X-GOAT-API-Key": "write-key"},
+            json={},
         )
         self.assertEqual(503, response.status_code)
         body = response.json()
         self.assertEqual(FEATURE_UNAVAILABLE, body["code"])
+
+    @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=True)
+    def test_code_sandbox_execution_read_owner_mismatch_returns_404(
+        self, _mock: object
+    ) -> None:
+        self.settings = replace(
+            self.settings,
+            feature_code_sandbox_enabled=True,
+            require_session_owner=True,
+        )
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+        self.client.app.dependency_overrides[get_code_sandbox_provider] = lambda: (
+            AuthzFakeCodeSandboxProvider()
+        )
+
+        create_response = self.client.post(
+            "/api/code-sandbox/exec",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+            json={"code": "echo sandbox ok"},
+        )
+        self.assertEqual(200, create_response.status_code)
+        execution_id = create_response.json()["execution_id"]
+
+        read_response = self.client.get(
+            f"/api/code-sandbox/executions/{execution_id}",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "bob"},
+        )
+        self.assertEqual(404, read_response.status_code)
 
 
 if __name__ == "__main__":

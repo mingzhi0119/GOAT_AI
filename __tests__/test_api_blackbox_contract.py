@@ -34,10 +34,18 @@ from goat_ai.types import ChatTurn
 
 if TestClient is not None:
     from backend.config import get_settings
-    from backend.dependencies import get_llm_client, get_title_generator
+    from backend.dependencies import (
+        get_code_sandbox_provider,
+        get_llm_client,
+        get_title_generator,
+    )
     from backend.main import create_app
     from backend.models.system import GPUStatusResponse
     from backend.services import log_service
+    from backend.services.code_sandbox_provider import (
+        SandboxProviderRequest,
+        SandboxProviderResult,
+    )
     from backend.services.exceptions import PersistenceWriteError
     from backend.services.session_message_codec import SESSION_PAYLOAD_VERSION
     from backend.services.safeguard_service import (
@@ -69,6 +77,44 @@ class FakeTitleGenerator:
         assistant_text: str,
     ) -> str | None:
         return self._title
+
+
+class FakeCodeSandboxProvider:
+    provider_name = "fake-docker"
+
+    def run(self, request: SandboxProviderRequest) -> SandboxProviderResult:
+        output_files: list[dict[str, object]] = []
+        if request.command == "touch outputs/report.txt":
+            output_files.append({"path": "report.txt", "byte_size": 12})
+        if request.command == "sleep-forever":
+            return SandboxProviderResult(
+                provider_name=self.provider_name,
+                exit_code=None,
+                stdout="",
+                stderr="",
+                timed_out=True,
+                error_detail="Execution timed out.",
+                output_files=[],
+            )
+        if request.command == "exit 2":
+            return SandboxProviderResult(
+                provider_name=self.provider_name,
+                exit_code=2,
+                stdout="",
+                stderr="bad exit",
+                timed_out=False,
+                error_detail="Execution exited with a non-zero status.",
+                output_files=[],
+            )
+        return SandboxProviderResult(
+            provider_name=self.provider_name,
+            exit_code=0,
+            stdout="sandbox ok",
+            stderr="",
+            timed_out=False,
+            error_detail=None,
+            output_files=output_files,
+        )
 
 
 class ContractFakeLLM:
@@ -1068,7 +1114,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertFalse(feat_body["workbench"]["plan_mode"]["effective_enabled"])
         self.assertFalse(feat_body["workbench"]["browse"]["effective_enabled"])
 
-        exec_stub = self.client.post("/api/code-sandbox/exec")
+        exec_stub = self.client.post("/api/code-sandbox/exec", json={})
         self.assertEqual(503, exec_stub.status_code)
         ej = exec_stub.json()
         self.assertEqual(FEATURE_UNAVAILABLE, ej["code"])
@@ -1252,6 +1298,69 @@ class ApiBlackboxContractTests(unittest.TestCase):
         missing = self.client.get("/api/workbench/tasks/wb-missing")
         self.assertEqual(404, missing.status_code)
         self.assertEqual("Workbench task not found", missing.json()["detail"])
+
+    @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=True)
+    def test_code_sandbox_enabled_executes_and_reads_durable_record(
+        self, _mock: object
+    ) -> None:
+        self.settings = replace(self.settings, feature_code_sandbox_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+        self.client.app.dependency_overrides[get_code_sandbox_provider] = lambda: (
+            FakeCodeSandboxProvider()
+        )
+
+        features = self.client.get("/api/system/features")
+        self.assertEqual(200, features.status_code)
+        self.assertTrue(features.json()["code_sandbox"]["effective_enabled"])
+
+        response = self.client.post(
+            "/api/code-sandbox/exec",
+            json={
+                "runtime_preset": "shell",
+                "code": "echo sandbox ok",
+                "command": "touch outputs/report.txt",
+            },
+        )
+        self.assertEqual(200, response.status_code)
+        body = response.json()
+        self.assertTrue(body["execution_id"].startswith("cs-"))
+        self.assertEqual("completed", body["status"])
+        self.assertEqual(0, body["exit_code"])
+        self.assertEqual("sandbox ok", body["stdout"])
+        self.assertEqual(
+            [{"path": "report.txt", "byte_size": 12}], body["output_files"]
+        )
+
+        status = self.client.get(f"/api/code-sandbox/executions/{body['execution_id']}")
+        self.assertEqual(200, status.status_code)
+        self.assertEqual(body["execution_id"], status.json()["execution_id"])
+        self.assertEqual("completed", status.json()["status"])
+
+        events = self.client.get(
+            f"/api/code-sandbox/executions/{body['execution_id']}/events"
+        )
+        self.assertEqual(200, events.status_code)
+        self.assertEqual(
+            ["execution.queued", "execution.started", "execution.completed"],
+            [event["event_type"] for event in events.json()["events"]],
+        )
+
+    @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=True)
+    def test_code_sandbox_exec_rejects_invalid_network_policy(
+        self, _mock: object
+    ) -> None:
+        self.settings = replace(self.settings, feature_code_sandbox_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+        self.client.app.dependency_overrides[get_code_sandbox_provider] = lambda: (
+            FakeCodeSandboxProvider()
+        )
+
+        response = self.client.post(
+            "/api/code-sandbox/exec",
+            json={"code": "echo sandbox ok", "network_policy": "enabled"},
+        )
+        self.assertEqual(422, response.status_code)
+        self.assertEqual(REQUEST_VALIDATION_ERROR, response.json()["code"])
 
     def test_workbench_task_rejects_unknown_source_ids(self) -> None:
         self.settings = replace(self.settings, feature_agent_workbench_enabled=True)

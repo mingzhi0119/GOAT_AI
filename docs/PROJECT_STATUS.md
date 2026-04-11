@@ -23,6 +23,7 @@ Last updated: 2026-04-10
 - **Phase 17A status:** durable workbench task skeleton is landed. `POST /api/workbench/tasks` creates a SQLite-backed queued task record, `GET /api/workbench/tasks/{task_id}` polls status, and the shared runtime gate still returns **503** + `FEATURE_UNAVAILABLE` when the feature family is disabled.
 - **Phase 17B status:** partial MVP is landed for `task_kind = plan`. Accepted workbench tasks now transition through durable `queued/running/completed/failed` states, completed plan tasks expose an inline markdown result on `GET /api/workbench/tasks/{task_id}`, and `GET /api/workbench/tasks/{task_id}/events` now exposes a durable lifecycle timeline.
 - **Phase 17C status:** first retrieval runtime slice is landed. `GET /api/workbench/sources` exposes a declarative source registry, task creation validates requested source ids through that registry, `knowledge` is runtime-ready for reuse, and `web` is registered but still marked not implemented. `browse` / `deep_research` now execute a minimal source-resolution -> retrieval-step-events -> citations path over runtime-ready sources; `canvas` is still not implemented.
+- **Phase 18 status:** Docker-first code sandbox MVP is landed. `POST /api/code-sandbox/exec` now executes short synchronous shell runs in an isolated no-network sandbox, persists durable execution/event records in SQLite, and exposes read APIs at `GET /api/code-sandbox/executions/{execution_id}` and `/events`. Runtime and policy gates remain separate: runtime denial returns **503** + `FEATURE_UNAVAILABLE`, and missing `sandbox:execute` still returns **403** + `FEATURE_DISABLED`.
 - **RAG-ready wording:** use the term **RAG-ready** in release notes or marketing only after `python -m tools.run_rag_eval` passes in CI or pre-release checks and this file still documents the same threshold.
 
 ## What is shipped
@@ -45,6 +46,7 @@ Last updated: 2026-04-10
 - Session history via `GET /api/history`, `GET /api/history/{session_id}`, `PATCH /api/history/{session_id}`, `DELETE /api/history`, and `DELETE /api/history/{session_id}`
 - Generated chat artifact download via `GET /api/artifacts/{artifact_id}`
 - Durable workbench task creation and polling via `POST /api/workbench/tasks`, `GET /api/workbench/tasks/{task_id}`, `GET /api/workbench/tasks/{task_id}/events`, and `GET /api/workbench/sources`, with minimal `plan`, `browse`, and `deep_research` execution
+- Durable code sandbox execution via `POST /api/code-sandbox/exec`, `GET /api/code-sandbox/executions/{execution_id}`, and `GET /api/code-sandbox/executions/{execution_id}/events`
 - GPU telemetry and rolling inference latency APIs, including first-token latency telemetry
 - Latency telemetry includes p50/p95 and model-scoped buckets for completion and first-token metrics
 - Model capability detection via `GET /api/models/capabilities`
@@ -100,6 +102,8 @@ Last updated: 2026-04-10
 | GET | `/api/system/runtime-target` |
 | GET | `/api/system/features` |
 | POST | `/api/code-sandbox/exec` |
+| GET | `/api/code-sandbox/executions/{execution_id}` |
+| GET | `/api/code-sandbox/executions/{execution_id}/events` |
 | POST | `/api/workbench/tasks` |
 | GET | `/api/workbench/sources` |
 | GET | `/api/workbench/tasks/{task_id}` |
@@ -115,6 +119,7 @@ Last updated: 2026-04-10
 - `/api/knowledge/*` routes now support persisted upload, synchronous ingestion, retrieval, retrieval-backed answers, and attached-document fallback when lexical retrieval misses
 - `/api/workbench/tasks` now persists a queued durable task to SQLite and workbench execution covers `plan`, `browse`, and `deep_research`; polling returns `queued/running/completed/failed`, completed browse/research tasks include citations in `result`, and `GET /api/workbench/tasks/{task_id}/events` exposes both lifecycle and retrieval-step events
 - `/api/workbench/sources` now exposes the caller-visible retrieval-source registry; current built-ins are `knowledge` (runtime-ready) and `web` (registered for future browse/research work, not implemented yet)
+- `/api/code-sandbox/exec` now runs a real short synchronous shell execution path, stores durable execution rows/events in SQLite, returns stdout/stderr/exit status directly, and reports output files created under `outputs/`; the runtime still defaults to Docker-backed isolation with network disabled
 - `/api/health` is liveness only; `/api/ready` is the deploy/readiness probe and returns `503` when SQLite or the optional Ollama probe is not ready
 - History reads are normalized at the backend boundary: `/api/history/{session_id}` returns standard chat roles plus structured `chart_spec`, legacy `file_context`, and `knowledge_documents`, while legacy stored payloads remain readable through a dedicated compatibility codec
 - When `GOAT_API_KEY` is configured, every API except `/api/health` and `/api/ready` requires `X-GOAT-API-Key`

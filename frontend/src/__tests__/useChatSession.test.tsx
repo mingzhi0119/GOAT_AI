@@ -54,6 +54,7 @@ describe('useChatSession', () => {
       userName: 'Simon',
       systemInstruction: '',
       planModeEnabled: false,
+      themeStyle: 'urochester',
     }),
     )
 
@@ -77,6 +78,7 @@ describe('useChatSession', () => {
       ['doc-quiz-4'],
       false,
       '',
+      'urochester',
       undefined,
       expect.any(Function),
       undefined,
@@ -92,6 +94,7 @@ describe('useChatSession', () => {
       userName: 'Simon',
       systemInstruction: '',
       planModeEnabled: false,
+      themeStyle: 'urochester',
     }),
     )
 
@@ -114,6 +117,7 @@ describe('useChatSession', () => {
       undefined,
       false,
       '',
+      'urochester',
       undefined,
       expect.any(Function),
       undefined,

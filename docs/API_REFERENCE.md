@@ -48,7 +48,9 @@ Base path: `/api`
 | `GET` | `/api/system/inference` | Rolling chat latency |
 | `GET` | `/api/system/runtime-target` | Runtime target resolution |
 | `GET` | `/api/system/features` | Capability-gated feature flags (config + host probe) |
-| `POST` | `/api/code-sandbox/exec` | Code sandbox scaffold (503 when runtime gate closed; 403 when policy denies; 501 when enabled but not implemented) |
+| `POST` | `/api/code-sandbox/exec` | Execute one short synchronous sandbox run |
+| `GET` | `/api/code-sandbox/executions/{execution_id}` | Read one persisted sandbox execution |
+| `GET` | `/api/code-sandbox/executions/{execution_id}/events` | Read one persisted sandbox execution timeline |
 | `POST` | `/api/workbench/tasks` | Create and enqueue a durable workbench task |
 | `GET` | `/api/workbench/sources` | List declarative workbench retrieval sources |
 | `GET` | `/api/workbench/tasks/{task_id}` | Read one durable workbench task status |
@@ -195,6 +197,7 @@ Request body:
   "knowledge_document_ids": ["doc-123"],
   "session_id": "session-123",
   "system_instruction": "Answer in bullet points.",
+  "theme_style": "urochester",
   "temperature": 0.3,
   "max_tokens": 512,
   "top_p": 0.9,
@@ -208,6 +211,12 @@ Optional `knowledge_document_ids` binds the turn to already indexed knowledge do
 Optional **`think`** accepts `true`, `false`, or `"low" | "medium" | "high"` when the model supports Ollama thinking mode. Omit it to use model defaults.
 
 Optional boolean **`plan_mode`** asks the system prompt to plan before answering.
+
+Optional **`theme_style`** accepts `classic`, `urochester`, or `thu`. When no explicit `GOAT_SYSTEM_PROMPT` override is configured, the backend uses it to select the default assistant persona:
+
+- `classic`: standard general-purpose assistant
+- `urochester`: slightly business-oriented assistant from the University of Rochester Simon Business School
+- `thu`: slightly research/engineering-oriented assistant from Tsinghua University
 
 SSE event types:
 
@@ -718,7 +727,117 @@ Returns machine-readable flags for optional high-risk features (see `docs/ENGINE
 
 ## `POST /api/code-sandbox/exec`
 
-Scaffold endpoint: enforces the code-sandbox gate. When the **runtime** gate fails (operator off or Docker unavailable), returns **`503`** with `code: FEATURE_UNAVAILABLE` and a stable `detail` string mapped from `deny_reason`. When **policy** denies the caller (`sandbox:execute` missing), returns **`403`** with `code: FEATURE_DISABLED`. Returns **`501`** when the gate passes but execution is not implemented yet.
+Executes one short synchronous shell run in a Docker-backed sandbox. The MVP uses:
+
+- one shell-capable runtime preset: `shell`
+- an ephemeral workspace
+- Docker isolation with **network disabled by default**
+- durable execution and event rows in SQLite for later reads
+
+Request body:
+
+```json
+{
+  "runtime_preset": "shell",
+  "code": "echo \"hello from the sandbox\" > outputs/report.txt",
+  "command": "sh ./snippet.sh",
+  "stdin": "optional stdin text",
+  "timeout_sec": 8,
+  "network_policy": "disabled",
+  "files": [
+    {
+      "filename": "notes/input.txt",
+      "content": "seed file text"
+    }
+  ]
+}
+```
+
+Behavior:
+
+- `code` and/or `command` must be provided
+- when `command` is omitted, the server executes `code` as a shell script
+- inline files must use relative workspace paths only
+- files created under `outputs/` are reported back as metadata in the response
+- `network_policy` currently only allows `disabled`; other values return `422`
+
+Success response (`200`):
+
+```json
+{
+  "execution_id": "cs-123",
+  "status": "completed",
+  "runtime_preset": "shell",
+  "network_policy": "disabled",
+  "created_at": "2026-04-10T00:00:00Z",
+  "updated_at": "2026-04-10T00:00:01Z",
+  "exit_code": 0,
+  "stdout": "hello from sandbox\n",
+  "stderr": "",
+  "timed_out": false,
+  "error_detail": null,
+  "output_files": [
+    {
+      "path": "report.txt",
+      "byte_size": 21
+    }
+  ]
+}
+```
+
+Error semantics:
+
+- **`403 FEATURE_DISABLED`** when the caller lacks `sandbox:execute`
+- **`503 FEATURE_UNAVAILABLE`** when runtime gating fails or Docker is unavailable
+- **`422 REQUEST_VALIDATION_ERROR`** for invalid request shape, unsupported network mode, path traversal, oversized payloads, or timeout beyond the configured cap
+
+## `GET /api/code-sandbox/executions/{execution_id}`
+
+Returns the same durable execution shape as `POST /api/code-sandbox/exec` after the run is persisted. Owner/tenant/principal visibility rules apply; non-visible records resolve as `404`.
+
+## `GET /api/code-sandbox/executions/{execution_id}/events`
+
+Returns the durable execution timeline:
+
+```json
+{
+  "execution_id": "cs-123",
+  "events": [
+    {
+      "sequence": 1,
+      "event_type": "execution.queued",
+      "created_at": "2026-04-10T00:00:00Z",
+      "status": "queued",
+      "message": "Execution accepted.",
+      "metadata": {
+        "network_policy": "disabled",
+        "runtime_preset": "shell"
+      }
+    },
+    {
+      "sequence": 2,
+      "event_type": "execution.started",
+      "created_at": "2026-04-10T00:00:00Z",
+      "status": "running",
+      "message": "Execution started.",
+      "metadata": {
+        "provider_name": "docker"
+      }
+    },
+    {
+      "sequence": 3,
+      "event_type": "execution.completed",
+      "created_at": "2026-04-10T00:00:01Z",
+      "status": "completed",
+      "message": "Execution completed successfully.",
+      "metadata": {
+        "exit_code": 0,
+        "output_file_count": 1
+      }
+    }
+  ]
+}
+```
 
 ## Canonical sources
 

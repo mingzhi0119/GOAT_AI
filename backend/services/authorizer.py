@@ -4,6 +4,7 @@ from backend.domain.authz_types import AuthorizationContext
 from backend.domain.authorization import AuthorizationDecision, Scope
 from backend.services.artifact_service import PersistedArtifactRecord
 from backend.services.chat_runtime import SessionDetailRecord, SessionSummaryRecord
+from backend.services.code_sandbox_runtime import CodeSandboxExecutionRecord
 from backend.services.knowledge_repository import KnowledgeDocumentRecord
 from backend.services.workbench_runtime import WorkbenchTaskRecord
 
@@ -172,6 +173,28 @@ def authorize_workbench_task_read(
         )
     if not _owner_visible(
         resource_owner_id=task.owner_id,
+        legacy_owner_id=ctx.legacy_owner_id,
+        require_owner_header=require_owner_header,
+    ):
+        return AuthorizationDecision(False, "owner_mismatch", conceal_existence=True)
+    return AuthorizationDecision(True, "ok")
+
+
+def authorize_code_sandbox_execution_read(
+    *,
+    ctx: AuthorizationContext,
+    execution: CodeSandboxExecutionRecord,
+    require_owner_header: bool,
+) -> AuthorizationDecision:
+    """Authorize visibility for one persisted code sandbox execution."""
+    if execution.tenant_id and execution.tenant_id != ctx.tenant_id.value:
+        return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
+    if execution.principal_id and execution.principal_id != ctx.principal_id.value:
+        return AuthorizationDecision(
+            False, "principal_mismatch", conceal_existence=True
+        )
+    if not _owner_visible(
+        resource_owner_id=execution.owner_id,
         legacy_owner_id=ctx.legacy_owner_id,
         require_owner_header=require_owner_header,
     ):

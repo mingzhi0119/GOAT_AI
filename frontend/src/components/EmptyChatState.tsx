@@ -10,7 +10,6 @@ export interface EmptyChatPrompt {
 interface EmptyChatStateProps {
   starterPrompts: EmptyChatPrompt[]
   selectedModel: string
-  supportsVision: boolean
   layoutDecisions: ChatLayoutDecisions
   onSendMessage: (content: string) => void
 }
@@ -18,7 +17,6 @@ interface EmptyChatStateProps {
 export default function EmptyChatState({
   starterPrompts,
   selectedModel,
-  supportsVision,
   layoutDecisions,
   onSendMessage,
 }: EmptyChatStateProps) {
@@ -37,11 +35,6 @@ export default function EmptyChatState({
         {selectedModel && (
           <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
             Model: <span style={{ color: 'var(--gold)' }}>{selectedModel}</span>
-            {supportsVision && (
-              <span className="ml-2" title="This model reports vision support in Ollama">
-                vision
-              </span>
-            )}
           </p>
         )}
       </div>

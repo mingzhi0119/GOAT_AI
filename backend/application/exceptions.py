@@ -58,7 +58,17 @@ class WorkbenchSourceValidationError(ValueError):
     """Raised when a workbench task references unknown or unavailable sources."""
 
 
+class CodeSandboxExecutionNotFoundError(LookupError):
+    """Raised when a durable code sandbox execution cannot be found or is not visible."""
+
+
+class CodeSandboxValidationError(ValueError):
+    """Raised when a code sandbox request violates application-level validation."""
+
+
 __all__ = [
+    "CodeSandboxExecutionNotFoundError",
+    "CodeSandboxValidationError",
     "ChatCapacityError",
     "ChatIdempotencyConflictError",
     "ChatIdempotencyInProgressError",

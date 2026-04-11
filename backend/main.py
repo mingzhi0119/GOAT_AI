@@ -70,7 +70,7 @@ def create_app() -> FastAPI:
             {"name": "artifacts", "description": "Download generated chat files."},
             {
                 "name": "code_sandbox",
-                "description": "Capability-gated code execution (scaffold).",
+                "description": "Capability-gated isolated code execution.",
             },
             {
                 "name": "workbench",

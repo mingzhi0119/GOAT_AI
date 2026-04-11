@@ -12,6 +12,7 @@ pypdf==6.10.0
 # ── HTTP client ───────────────────────────────────────────────────────────────
 requests==2.33.0
 httpx==0.28.1
+docker==7.1.0
 
 # ── OpenTelemetry (optional; lazy-loaded when GOAT_OTEL_ENABLED=1) ───────────
 opentelemetry-api==1.28.2

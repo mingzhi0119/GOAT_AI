@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { executeCodeSandbox } from '../api/codeSandbox'
 import ChatWindow from '../components/ChatWindow'
 import type { GPUStatus, InferenceLatency } from '../api/system'
 import { getChatLayoutDecisions } from '../utils/chatLayout'
@@ -15,6 +16,10 @@ vi.mock('../api/media', () => ({
 
 vi.mock('../api/upload', () => ({
   streamUpload: (...args: unknown[]) => streamUploadMock(...args),
+}))
+
+vi.mock('../api/codeSandbox', () => ({
+  executeCodeSandbox: vi.fn(),
 }))
 
 const baseGpuStatus: GPUStatus = {
@@ -67,6 +72,13 @@ function renderChatWindow(overrides: Partial<ComponentProps<typeof ChatWindow>> 
       gpuStatus={baseGpuStatus}
       gpuError={null}
       inferenceLatency={baseLatency}
+      codeSandboxFeature={{
+        policy_allowed: true,
+        allowed_by_config: true,
+        available_on_host: true,
+        effective_enabled: true,
+        deny_reason: null,
+      }}
       planModeEnabled={false}
       onPlanModeChange={onPlanModeChange}
       reasoningLevel="medium"
@@ -144,6 +156,7 @@ describe('ChatWindow composer', () => {
     fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
 
     expect(screen.getByText('Upload Files')).toBeInTheDocument()
+    expect(screen.getByText('Run Code')).toBeInTheDocument()
     expect(screen.getByText('Manage Uploads')).toBeInTheDocument()
     expect(screen.getByText('Plan Mode')).toBeInTheDocument()
     expect(screen.getByText('Thinking Mode')).toBeInTheDocument()
@@ -277,6 +290,62 @@ describe('ChatWindow composer', () => {
           'Unsupported file type. Please upload a PNG, JPG, WEBP, CSV, XLSX, PDF, DOCX, MD, or TXT file.',
         ),
       ).toBeInTheDocument()
+    })
+  })
+
+  it('opens the code sandbox panel from the plus menu', () => {
+    renderChatWindow()
+
+    fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
+    fireEvent.click(screen.getByRole('button', { name: /open code sandbox/i }))
+
+    expect(screen.getByRole('dialog', { name: /code sandbox/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Run' })).toBeInTheDocument()
+  })
+
+  it('disables the code sandbox action when the feature is unavailable', () => {
+    renderChatWindow({
+      codeSandboxFeature: {
+        policy_allowed: false,
+        allowed_by_config: true,
+        available_on_host: true,
+        effective_enabled: false,
+        deny_reason: 'disabled_by_operator',
+      },
+    })
+
+    fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
+    expect(
+      screen.getByRole('button', { name: /code sandbox unavailable/i }),
+    ).toBeDisabled()
+  })
+
+  it('runs a code sandbox request and renders stdout', async () => {
+    vi.mocked(executeCodeSandbox).mockResolvedValue({
+      execution_id: 'cs-1',
+      status: 'completed',
+      runtime_preset: 'shell',
+      network_policy: 'disabled',
+      created_at: '2026-04-10T00:00:00Z',
+      updated_at: '2026-04-10T00:00:01Z',
+      exit_code: 0,
+      stdout: 'hello from sandbox',
+      stderr: '',
+      timed_out: false,
+      error_detail: null,
+      output_files: [],
+    })
+    renderChatWindow()
+
+    fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
+    fireEvent.click(screen.getByRole('button', { name: /open code sandbox/i }))
+    fireEvent.change(screen.getByPlaceholderText("echo 'hello from the sandbox'"), {
+      target: { value: "echo 'hello from sandbox'" },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('hello from sandbox')).toBeInTheDocument()
     })
   })
 })

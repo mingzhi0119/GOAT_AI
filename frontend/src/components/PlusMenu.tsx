@@ -1,6 +1,8 @@
 import type { CSSProperties } from 'react'
+import type { CodeSandboxFeature } from '../api/types'
 import {
   ChevronRightIcon,
+  CodeSandboxIcon,
   ManageIcon,
   PlanModeIcon,
   ThinkingModeIcon,
@@ -10,9 +12,11 @@ import {
 interface PlusMenuProps {
   isOpen: boolean
   isNarrow: boolean
+  codeSandboxFeature: CodeSandboxFeature | null
   planModeEnabled: boolean
   supportsThinking: boolean
   thinkingEnabled: boolean
+  onOpenCodeSandbox: () => void
   onUploadFiles: () => void
   onOpenManageUploads: () => void
   onTogglePlanMode: () => void
@@ -29,15 +33,31 @@ const menuStyle = {
 export default function PlusMenu({
   isOpen,
   isNarrow,
+  codeSandboxFeature,
   planModeEnabled,
   supportsThinking,
   thinkingEnabled,
+  onOpenCodeSandbox,
   onUploadFiles,
   onOpenManageUploads,
   onTogglePlanMode,
   onToggleThinkingMode,
 }: PlusMenuProps) {
   if (!isOpen) return null
+
+  const codeSandboxEnabled =
+    !!codeSandboxFeature?.policy_allowed && !!codeSandboxFeature?.effective_enabled
+  const codeSandboxReason = !codeSandboxFeature
+    ? 'Checking availability'
+    : !codeSandboxFeature.policy_allowed
+      ? 'Not available for this API key'
+      : !codeSandboxFeature.effective_enabled
+        ? codeSandboxFeature.deny_reason === 'docker_unavailable'
+          ? 'Docker runtime is not ready on this deployment'
+          : codeSandboxFeature.deny_reason === 'disabled_by_operator'
+            ? 'Disabled by the operator on this deployment'
+            : 'Runtime is not available on this deployment'
+        : 'Run a short shell snippet in an isolated sandbox'
 
   return (
     <div
@@ -61,6 +81,32 @@ export default function PlusMenu({
             </span>
           </span>
         </span>
+      </button>
+
+      <button
+        type="button"
+        onClick={onOpenCodeSandbox}
+        disabled={!codeSandboxEnabled}
+        className="mt-0.5 flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-slate-900/[0.04] disabled:cursor-not-allowed disabled:opacity-70"
+        style={{ color: 'var(--text-main)' }}
+        aria-label={
+          codeSandboxEnabled
+            ? 'Open code sandbox'
+            : `Code sandbox unavailable: ${codeSandboxReason}`
+        }
+      >
+        <span className="inline-flex items-center gap-2.5">
+          <span className="inline-flex h-4 w-4 items-center justify-center">
+            <CodeSandboxIcon />
+          </span>
+          <span>
+            <span className="block font-medium leading-none">Run Code</span>
+            <span className="block text-xs" style={{ color: 'var(--text-muted)' }}>
+              {codeSandboxReason}
+            </span>
+          </span>
+        </span>
+        <ChevronRightIcon />
       </button>
 
       <button

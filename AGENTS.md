@@ -22,6 +22,8 @@ Short index for coding agents. Canonical rules live in the docs below.
 
 - Follow the relevant checks from GitHub Actions in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) when practical.
 - Use Python 3.14 and `requirements-ci.txt` for backend work.
+- For Python changes, run `python -m ruff check` on the touched backend/shared/test files before pushing.
+- When formatting-sensitive Python files changed, also run `python -m ruff format --check` on the touched files.
 - For frontend changes, run `cd frontend && npm ci && npm test -- --run`.
 - CI also runs `cd frontend && npm run build`; run the local build when the task changes build tooling, packaging, or a failure would otherwise be invisible to tests.
 - Do not run manual visual verification unless the user asks.

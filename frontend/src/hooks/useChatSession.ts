@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import type { ChartSpec, OllamaOptionsPayload } from '../api/types'
+import type { ChartSpec, OllamaOptionsPayload, ThemeStyle } from '../api/types'
 import { useChat } from './useChat'
 import { useFileContext, type FileBindingMode, type FileContextItem } from './useFileContext'
 import { useHistory } from './useHistory'
@@ -11,6 +11,7 @@ interface UseChatSessionArgs {
   userName: string
   systemInstruction: string
   planModeEnabled: boolean
+  themeStyle: ThemeStyle
   ollamaOptions?: OllamaOptionsPayload
 }
 
@@ -54,6 +55,7 @@ export function useChatSession({
   userName,
   systemInstruction,
   planModeEnabled,
+  themeStyle,
   ollamaOptions,
 }: UseChatSessionArgs): UseChatSessionReturn {
   const chat = useChat()
@@ -143,6 +145,7 @@ export function useChatSession({
         shouldAttachKnowledge ? knowledgeDocumentIds : undefined,
         planModeEnabled,
         systemInstruction,
+        themeStyle,
         ollamaOptions,
         setChartSpec,
         imageAttachmentIds,
@@ -162,6 +165,7 @@ export function useChatSession({
       planModeEnabled,
       setFileContextMode,
       systemInstruction,
+      themeStyle,
       userName,
     ],
   )

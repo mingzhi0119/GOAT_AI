@@ -8,6 +8,7 @@ from collections.abc import Generator, Iterable
 
 from backend.domain.authz_types import AuthorizationContext
 from fastapi.responses import StreamingResponse
+from goat_ai.config import default_system_prompt_for_theme
 
 from backend.application.ports import (
     ConversationLogger,
@@ -41,6 +42,12 @@ _SSE_HEADERS = {
     "X-Accel-Buffering": "no",  # Disable nginx response buffering
     "Connection": "keep-alive",
 }
+
+
+def _resolve_base_system_prompt(req: ChatRequest, settings: Settings) -> str:
+    if settings.system_prompt_overridden:
+        return settings.system_prompt
+    return default_system_prompt_for_theme(req.theme_style)
 
 
 @dataclass(frozen=True)
@@ -171,7 +178,7 @@ def _build_source_stream(
         llm=llm,
         model=req.model,
         messages=prepared.merged_messages,
-        system_prompt=settings.system_prompt,
+        system_prompt=_resolve_base_system_prompt(req, settings),
         ip=client_ip,
         conversation_logger=conversation_logger,
         user_name=user_name,

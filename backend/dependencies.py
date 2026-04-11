@@ -23,6 +23,14 @@ from backend.services.workbench_runtime import (
     WorkbenchTaskRepository,
     SQLiteWorkbenchTaskRepository,
 )
+from backend.services.code_sandbox_runtime import (
+    CodeSandboxExecutionRepository,
+    SQLiteCodeSandboxExecutionRepository,
+)
+from backend.services.code_sandbox_provider import (
+    DockerSandboxProvider,
+    SandboxProvider,
+)
 from backend.services.workbench_execution_service import execute_workbench_task
 from backend.services.tabular_context import (
     EmbeddedCsvTabularExtractor,
@@ -65,6 +73,20 @@ def get_workbench_task_repository(
 ) -> WorkbenchTaskRepository:
     """Return the workbench task repository bound to current settings."""
     return SQLiteWorkbenchTaskRepository(settings.log_db_path)
+
+
+def get_code_sandbox_execution_repository(
+    settings: Settings = Depends(get_settings),
+) -> CodeSandboxExecutionRepository:
+    """Return the durable code sandbox execution repository."""
+    return SQLiteCodeSandboxExecutionRepository(settings.log_db_path)
+
+
+def get_code_sandbox_provider(
+    settings: Settings = Depends(get_settings),
+) -> SandboxProvider:
+    """Return the current code sandbox execution provider."""
+    return DockerSandboxProvider(settings)
 
 
 class _BackgroundWorkbenchTaskDispatcher:

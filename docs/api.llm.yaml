@@ -71,6 +71,60 @@ schemas:
       top_p: number|null
       think: boolean|low|medium|high|null
       plan_mode: boolean
+      theme_style: classic|urochester|thu
+  CodeSandboxExecRequest:
+    type: object
+    properties:
+      runtime_preset: string
+      code: string|null
+      command: string|null
+      stdin: string|null
+      timeout_sec: integer|null
+      network_policy: disabled|allowlist|enabled|null
+      files: CodeSandboxInlineFile[]
+  CodeSandboxExecutionEventPayload:
+    type: object
+    required:
+      - sequence
+      - event_type
+      - created_at
+    properties:
+      sequence: integer
+      event_type: string
+      created_at: string
+      status: queued|running|completed|failed|denied|null
+      message: string|null
+      metadata: object
+  CodeSandboxExecutionEventsResponse:
+    type: object
+    required:
+      - execution_id
+      - events
+    properties:
+      execution_id: string
+      events: CodeSandboxExecutionEventPayload[]
+  CodeSandboxExecutionResponse:
+    type: object
+    required:
+      - execution_id
+      - status
+      - runtime_preset
+      - network_policy
+      - created_at
+      - updated_at
+    properties:
+      execution_id: string
+      status: queued|running|completed|failed|denied
+      runtime_preset: string
+      network_policy: disabled|allowlist|enabled
+      created_at: string
+      updated_at: string
+      exit_code: integer|null
+      stdout: string
+      stderr: string
+      timed_out: boolean
+      error_detail: string|null
+      output_files: CodeSandboxOutputFilePayload[]
   CodeSandboxFeaturePayload:
     type: object
     required:
@@ -84,6 +138,22 @@ schemas:
       available_on_host: boolean
       effective_enabled: boolean
       deny_reason: string|null
+  CodeSandboxInlineFile:
+    type: object
+    required:
+      - filename
+      - content
+    properties:
+      filename: string
+      content: string
+  CodeSandboxOutputFilePayload:
+    type: object
+    required:
+      - path
+      - byte_size
+    properties:
+      path: string
+      byte_size: integer
   ErrorResponse:
     type: object
     required:
@@ -847,12 +917,43 @@ endpoints:
   - op: post_code_sandbox_exec
     method: POST
     path: /code-sandbox/exec
+    body: CodeSandboxExecRequest
+    content_type: application/json
     response:
+      200: CodeSandboxExecutionResponse
       errors:
         - 401
         - 403
+        - 422
         - 429
-        - 501
+        - 503
+  - op: get_code_sandbox_execution_route
+    method: GET
+    path: /code-sandbox/executions/{execution_id}
+    path_params:
+      execution_id: string
+    response:
+      200: CodeSandboxExecutionResponse
+      errors:
+        - 401
+        - 403
+        - 404
+        - 422
+        - 429
+        - 503
+  - op: get_code_sandbox_execution_events_route
+    method: GET
+    path: /code-sandbox/executions/{execution_id}/events
+    path_params:
+      execution_id: string
+    response:
+      200: CodeSandboxExecutionEventsResponse
+      errors:
+        - 401
+        - 403
+        - 404
+        - 422
+        - 429
         - 503
   - op: post_workbench_task
     method: POST

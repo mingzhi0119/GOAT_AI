@@ -7,6 +7,7 @@ import type {
   ChartSpec,
   Message,
   OllamaOptionsPayload,
+  ThemeStyle,
 } from '../api/types'
 import { hydrateHistorySession } from '../utils/sessionHistory'
 
@@ -40,6 +41,7 @@ export interface UseChatReturn {
     knowledgeDocumentIds?: string[],
     planModeEnabled?: boolean,
     systemInstruction?: string,
+    themeStyle?: ThemeStyle,
     ollamaOptions?: OllamaOptionsPayload,
     onChartSpec?: (spec: ChartSpec) => void,
     imageAttachmentIds?: string[],
@@ -185,6 +187,7 @@ export function useChat(): UseChatReturn {
       knowledgeDocumentIds?: string[],
       planModeEnabled?: boolean,
       systemInstruction?: string,
+      themeStyle?: ThemeStyle,
       ollamaOptions?: OllamaOptionsPayload,
       onChartSpec?: (spec: ChartSpec) => void,
       imageAttachmentIds?: string[],
@@ -235,6 +238,7 @@ export function useChat(): UseChatReturn {
                 ? { knowledge_document_ids: knowledgeDocumentIds }
                 : {}),
               ...(typeof planModeEnabled === 'boolean' ? { plan_mode: planModeEnabled } : {}),
+              ...(themeStyle ? { theme_style: themeStyle } : {}),
               ...(imageAttachmentIds && imageAttachmentIds.length > 0
                 ? { image_attachment_ids: imageAttachmentIds }
                 : {}),

@@ -10,6 +10,33 @@ This roadmap only tracks **unfinished work**. Completed phases and archived clos
 
 ## Open Work
 
+### Immediate priority queue
+
+These are already-visible or already-contracted capabilities that still have missing runtime implementation. Prioritize them before adding new product surfaces.
+
+1. **Canvas task/runtime**
+   - Public contract already accepts `task_kind = canvas`
+   - Current state: task is accepted, then deterministically fails as not implemented
+   - Why next: this is already in the durable task enum and should not remain a "known value that always fails" indefinitely
+2. **Workbench web retrieval**
+   - Public contract already exposes the `web` source in `/api/workbench/sources`
+   - Current state: declarative source exists, but `runtime_ready = false` and no executor is attached
+   - Why next: browse/deep-research semantics will remain partial until public-web retrieval is real
+3. **Artifact workspace**
+   - Public capability slot already exists in `/api/system/features`
+   - Current state: no first-class workspace-output model beyond inline task results and chat artifacts
+4. **Project memory**
+   - Public capability slot already exists in `/api/system/features`
+   - Current state: no project-scoped memory model or API surface is implemented
+5. **Connectors**
+   - Public capability slot already exists in `/api/system/features`
+   - Current state: no runtime-ready connector-backed retrieval source is implemented
+
+Sequencing rule:
+
+- finish or explicitly narrow already-open capability surfaces first
+- do not add new UI promises on top of these incomplete runtime seams
+
 ### Phase 16B: storage evolution
 
 Revisit datastore changes only after authorization and resource boundaries are explicit.
@@ -81,6 +108,7 @@ Use the same runtime primitives across 17C/17D/17E instead of building isolated 
 ### Phase 17D: canvas and artifact workspace
 
 - Goal: make artifacts/work products first-class so research and planning outputs can be revisited and iterated
+- Priority: highest remaining workbench runtime gap after code sandbox because `canvas` is already present in the public task-kind contract
 - Backend prerequisites:
   - typed workspace-output metadata beyond chat-only downloadable files
   - task-to-output linkage (artifact and future canvas document refs)
@@ -89,11 +117,27 @@ Use the same runtime primitives across 17C/17D/17E instead of building isolated 
 ### Phase 17E: project memory and connectors
 
 - Goal: add project-scoped memory and external source plumbing after task/runtime contracts exist
+- Priority: after canvas and real web retrieval because these capabilities are already advertised as slots but do not yet have runnable backends
 - Backend prerequisites:
   - explicit project scope and tenancy rules
   - connector registry / capability metadata
   - memory write/read boundaries that do not bypass existing authz/resource rules
   - read-only retrieval contracts for browse/research connectors before any write-capable integration is enabled
+
+### Phase 18 follow-ons: code sandbox beyond the MVP
+
+- Goal: extend the landed Docker-first synchronous sandbox without weakening the current operator/safety posture
+- Current landed slice:
+  - `POST /api/code-sandbox/exec` now executes short synchronous shell runs
+  - durable execution and event rows are persisted in SQLite
+  - `GET /api/code-sandbox/executions/{execution_id}` and `/events` expose auditability
+  - network remains disabled by default
+- Remaining priority items:
+  - async run envelope for long-lived or queued executions
+  - SSE log streaming for richer user feedback
+  - multi-file workspace ergonomics beyond inline text seeding
+  - allowlisted egress modes instead of all-or-nothing network disablement
+  - alternate providers behind the same sandbox boundary (for example E2B/Daytona-style adapters)
 
 ### UI surfaces waiting on backend/runtime
 

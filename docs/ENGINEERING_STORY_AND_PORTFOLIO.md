@@ -6,7 +6,7 @@ This document is a **durable narrative and checklist** for presenting GOAT AI on
 - **Shared, no-root host** - deployable where you do not own the machine.
 - **SQLite-first** - honest data posture for the current scale and ops model.
 - **Ollama-backed** - local inference boundary, not a thin wrapper around a hosted API only.
-- **Ten-axis industrial bar toward ~9/10 *for this codebase*** - as defined in [ROADMAP.md](ROADMAP.md) Phases 13-15 (Phase 13 operations hardening, Phase 14 RAG-first expansion, Phase 15 semantics-before-structure), with the current `v1.2.0` release also carrying the completed frontend control-surface polish that makes the product read like a maintained app instead of an internal prototype.
+- **Ten-axis industrial bar toward ~9/10 *for this codebase*** - as defined in [ROADMAP.md](ROADMAP.md) Phases 13-17, with `v1.2.0` now carrying not only Phases 13-15 hardening and frontend control-surface polish, but also the first real workbench/runtime slice: durable tasks, task events, source registry, and capability-gated retrieval execution.
 
 **Homepage signal:** you are not claiming "I called an LLM." You are claiming **you can run an AI product as an engineering system under real constraints**.
 
@@ -58,6 +58,12 @@ Use this arc on a homepage or case-study page. Dates and scores are **yours to f
 5. **From governable -> semantically stable** (Phase 15)  
    Policy objects and invariants **before** large `application/` / `domain/` moves; session schema contract and normalization when migrations are already a first-class artifact.
 
+6. **From semantically stable -> capability-gated runtime** (Phase 16A + Phase 17)
+   Optional features stopped pretending to be boolean toggles. Code sandbox moved to separate **policy** vs **runtime** gates; workbench stopped being a placeholder-only idea and became a real task runtime with durable task rows, event timelines, source discovery, and minimal `plan` / `browse` / `deep_research` execution.
+
+7. **From single-agent coding -> governed parallel change flow**
+   The repo now carries a more explicit engineering-process story too: `CODEOWNERS`, stricter CI intent, contract sync, and Lead/subagent coordination rules mean the system is being shaped for **multi-threaded development under review**, not only solo hacking.
+
 **Portfolio line:** *I did not optimize for demo screenshots; I optimized for the next engineer (often me in six months) to change the system safely.*
 
 ---
@@ -74,6 +80,9 @@ These are worth a **"Trade-offs"** subsection on a homepage. Align wording with 
 | **Error model before / alongside observability** | Stable `code`s feed metrics labels and retry policy; runbooks reference the same taxonomy. |
 | **Policies and invariants before big package split** | Semantic convergence reduces blast radius of directory refactors (Phase 15 ordering). |
 | **Single-tenant / shared API key** | Threat model documented honestly; authz roadmap separated from "looks secure" shortcuts. |
+| **Capability discovery before UI promises** | `/api/system/features` and `/api/workbench/sources` should say what is truly runnable today, not what is merely on the roadmap. |
+| **Durable task contract before autonomous workflows** | `task_id`, polling, events, and source registry came before richer browse/research/canvas UX so future work can extend one runtime instead of spawning incompatible endpoints. |
+| **Lead-integrated parallelism over uncontrolled agent edits** | Subagents are useful as auditors and analysts, but final patches and merge decisions stay centralized so architecture and contract drift do not accelerate with concurrency. |
 
 ---
 
@@ -100,6 +109,18 @@ Wave B evidence anchors in this repo:
 - `__tests__/test_upload_router.py` + `__tests__/test_api_blackbox_contract.py`
 - `docs/OPERATIONS.md` (multi-instance limitations + mitigations)
 
+Phase 16A / 17 evidence anchors in this repo:
+
+- `backend/services/system_telemetry_service.py` + `__tests__/test_feature_gates.py`
+- `backend/routers/workbench.py` + `backend/application/workbench.py`
+- `backend/services/workbench_runtime.py`
+- `backend/services/workbench_execution_service.py`
+- `backend/services/workbench_source_registry.py`
+- `__tests__/test_workbench_runtime.py`
+- `__tests__/test_workbench_source_registry.py`
+- `__tests__/test_api_blackbox_contract.py`
+- `docs/API_REFERENCE.md` + `docs/WORKBENCH_TERMINOLOGY_DECISION.md`
+
 ---
 
 ## 6. "Homepage-ready" bar (not tied to marketing-only version bumps)
@@ -113,6 +134,8 @@ Treat the project as **homepage-worthy** when **most** of the following are true
 - [ ] **Quantified** testing and CI story (what gates exist, what they protect).
 - [ ] **Operational evidence**: how logs and metrics are consumed; how readiness and rollback are run; how migrations are validated.
 - [ ] **Honest constraint paragraph**: shared host, no root, SQLite-first -and why that is **reasonable**, not accidental.
+- [ ] **Capability honesty**: task/runtime surfaces only claim what is actually runnable; docs and telemetry match real behavior.
+- [ ] **Reviewable engineering process**: CI, ownership, contract sync, and architecture gates show that parallel change does not mean uncontrolled change.
 
 **Optional stretch (strong portfolio):** one paragraph on **what you would do next** if the product gained ten times the traffic (without hand-waving -reference Phase 15 normalization, Postgres gate, etc.).
 
@@ -123,6 +146,7 @@ Treat the project as **homepage-worthy** when **most** of the following are true
 - **Full product shape** -SPA, streaming API, persistence, charts, access controls -not a single-script demo.
 - **Real constraints** -shared machine, no root, local inference -reads as production-adjacent engineering.
 - **Governance story** -boundaries, tests, observability, data migration, runbooks -reads as **systems thinking**, not feature churn.
+- **Runtime story** -the product now has the start of a real agent/workbench runtime rather than only a chat shell, which is a more senior systems signal than adding another front-end mode toggle.
 
 The differentiator is not the stack list; it is **the documented path from demo-quality to maintainable-quality** under constraints you did not choose.
 
@@ -144,14 +168,17 @@ The differentiator is not the stack list; it is **the documented path from demo-
 - completed backend industrialization and hardening across Phases 11-15
 - a real retrieval and media path rather than a chat-only shell
 - frontend control-surface polish that makes upload management, model controls, options, and dark-mode presentation look like a maintained product
+- the first credible workbench/runtime layer: durable task creation, polling, event timelines, source registry, and minimal retrieval-backed task execution
+- capability-gated feature reporting that separates "operator enabled" from "actually runnable right now"
+- clearer multi-thread development governance via ownership, review, and contract-sync discipline
 - supporting docs that explain not just what shipped, but why the sequencing and trade-offs were chosen
 
 That does **not** mean the story is "finished." The next senior-visible chapter is still Phase 16: authorization context, capability gates, and the storage decisions that follow from them.
 
+An honest homepage summary at this point is not "I built an AGI product." It is: **I turned an AI app into an increasingly governable system, then started building the runtime substrate that future agent workflows can safely stand on.**
+
 ---
 
-*Last updated: 2026-04-09 - aligned with **v1.2.0** to keep the portfolio narrative tied to shipped engineering outcomes, not version marketing.*
-
-
+*Last updated: 2026-04-10 - aligned with **v1.2.0** and the landed Phase 17 runtime slices so the portfolio narrative stays tied to shipped engineering outcomes, not version marketing.*
 
 

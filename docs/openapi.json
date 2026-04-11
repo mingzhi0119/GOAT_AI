@@ -1572,20 +1572,26 @@
         "tags": [
           "code_sandbox"
         ],
-        "summary": "Execute code in sandbox (not implemented)",
-        "description": "Scaffold: enforces the feature gate; returns 501 when the gate passes and execution is not built yet.",
+        "summary": "Execute code in an isolated sandbox",
+        "description": "Execute one short synchronous code sandbox request and persist the result.",
         "operationId": "post_code_sandbox_exec_api_code_sandbox_exec_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeSandboxExecRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
-          "501": {
-            "description": "Execution engine not implemented",
+          "200": {
+            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object",
-                  "title": "Response Post Code Sandbox Exec Api Code Sandbox Exec Post"
+                  "$ref": "#/components/schemas/CodeSandboxExecutionResponse"
                 }
               }
             }
@@ -1610,6 +1616,16 @@
               }
             }
           },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Too Many Requests",
             "content": {
@@ -1621,11 +1637,197 @@
             }
           },
           "503": {
-            "description": "Runtime gate closed (FEATURE_UNAVAILABLE)",
+            "description": "Runtime gate closed or sandbox provider unavailable.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code-sandbox/executions/{execution_id}": {
+      "get": {
+        "tags": [
+          "code_sandbox"
+        ],
+        "summary": "Read one persisted code sandbox execution",
+        "description": "Read one visible code sandbox execution record.",
+        "operationId": "get_code_sandbox_execution_route_api_code_sandbox_executions__execution_id__get",
+        "parameters": [
+          {
+            "name": "execution_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Execution Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSandboxExecutionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "description": "Runtime gate closed or sandbox provider unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code-sandbox/executions/{execution_id}/events": {
+      "get": {
+        "tags": [
+          "code_sandbox"
+        ],
+        "summary": "Read one code sandbox execution event timeline",
+        "description": "Read the durable event timeline for one visible execution.",
+        "operationId": "get_code_sandbox_execution_events_route_api_code_sandbox_executions__execution_id__events_get",
+        "parameters": [
+          {
+            "name": "execution_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Execution Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSandboxExecutionEventsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "description": "Runtime gate closed or sandbox provider unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -2225,6 +2427,17 @@
             "title": "Plan Mode",
             "description": "When true, the system prompt asks the model to plan before answering.",
             "default": false
+          },
+          "theme_style": {
+            "type": "string",
+            "enum": [
+              "classic",
+              "urochester",
+              "thu"
+            ],
+            "title": "Theme Style",
+            "description": "Appearance theme style used to select the default assistant persona when no explicit system prompt override is configured.",
+            "default": "classic"
           }
         },
         "type": "object",
@@ -2233,6 +2446,269 @@
         ],
         "title": "ChatRequest",
         "description": "Body for POST /api/chat."
+      },
+      "CodeSandboxExecRequest": {
+        "properties": {
+          "runtime_preset": {
+            "type": "string",
+            "const": "shell",
+            "title": "Runtime Preset",
+            "description": "Execution preset. Phase 18 supports a shell workspace only.",
+            "default": "shell"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code",
+            "description": "Shell script source. When command is omitted, the server executes this script."
+          },
+          "command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command",
+            "description": "Optional shell command executed inside the workspace."
+          },
+          "stdin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stdin",
+            "description": "Optional UTF-8 stdin content redirected into the entry command."
+          },
+          "timeout_sec": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout Sec",
+            "description": "Optional execution timeout override, capped by server policy."
+          },
+          "network_policy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "disabled",
+                  "allowlist",
+                  "enabled"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Network Policy",
+            "description": "Reserved for future policies. Phase 18 only allows `disabled`."
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/CodeSandboxInlineFile"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "Optional inline text files seeded into the temporary workspace."
+          }
+        },
+        "type": "object",
+        "title": "CodeSandboxExecRequest",
+        "description": "Request body for one short synchronous sandbox execution."
+      },
+      "CodeSandboxExecutionEventPayload": {
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "title": "Sequence"
+          },
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "running",
+                  "completed",
+                  "failed",
+                  "denied"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sequence",
+          "event_type",
+          "created_at"
+        ],
+        "title": "CodeSandboxExecutionEventPayload",
+        "description": "Durable sandbox execution timeline event."
+      },
+      "CodeSandboxExecutionEventsResponse": {
+        "properties": {
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/CodeSandboxExecutionEventPayload"
+            },
+            "type": "array",
+            "title": "Events"
+          }
+        },
+        "type": "object",
+        "required": [
+          "execution_id",
+          "events"
+        ],
+        "title": "CodeSandboxExecutionEventsResponse",
+        "description": "Durable sandbox execution timeline response."
+      },
+      "CodeSandboxExecutionResponse": {
+        "properties": {
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed",
+              "denied"
+            ],
+            "title": "Status"
+          },
+          "runtime_preset": {
+            "type": "string",
+            "const": "shell",
+            "title": "Runtime Preset"
+          },
+          "network_policy": {
+            "type": "string",
+            "enum": [
+              "disabled",
+              "allowlist",
+              "enabled"
+            ],
+            "title": "Network Policy"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          },
+          "exit_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Code"
+          },
+          "stdout": {
+            "type": "string",
+            "title": "Stdout",
+            "default": ""
+          },
+          "stderr": {
+            "type": "string",
+            "title": "Stderr",
+            "default": ""
+          },
+          "timed_out": {
+            "type": "boolean",
+            "title": "Timed Out",
+            "default": false
+          },
+          "error_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Detail"
+          },
+          "output_files": {
+            "items": {
+              "$ref": "#/components/schemas/CodeSandboxOutputFilePayload"
+            },
+            "type": "array",
+            "title": "Output Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "execution_id",
+          "status",
+          "runtime_preset",
+          "network_policy",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CodeSandboxExecutionResponse",
+        "description": "Synchronous result body and durable read model for one execution."
       },
       "CodeSandboxFeaturePayload": {
         "properties": {
@@ -2278,6 +2754,48 @@
         ],
         "title": "CodeSandboxFeaturePayload",
         "description": "Runtime / dependency readiness for the code sandbox (§15).\n\n``policy_allowed`` is evaluated from the current request's authorization context.\nRuntime availability remains separate and must not be conflated with policy denial."
+      },
+      "CodeSandboxInlineFile": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "description": "Relative workspace path for the seeded file."
+          },
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "description": "UTF-8 text content written into the workspace."
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename",
+          "content"
+        ],
+        "title": "CodeSandboxInlineFile",
+        "description": "One inline text file seeded into the ephemeral sandbox workspace."
+      },
+      "CodeSandboxOutputFilePayload": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Relative path under `outputs/` in the workspace."
+          },
+          "byte_size": {
+            "type": "integer",
+            "title": "Byte Size",
+            "description": "Output file size in bytes."
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "byte_size"
+        ],
+        "title": "CodeSandboxOutputFilePayload",
+        "description": "Metadata for one output file created under the sandbox outputs directory."
       },
       "ErrorResponse": {
         "properties": {
@@ -3971,7 +4489,7 @@
     },
     {
       "name": "code_sandbox",
-      "description": "Capability-gated code execution (scaffold)."
+      "description": "Capability-gated isolated code execution."
     },
     {
       "name": "workbench",
