@@ -21,9 +21,7 @@ class BackgroundJobRunner(Protocol):
 
 
 class SupportsAddTask(Protocol):
-    def add_task(
-        self, func: Callable[..., Any], *args: Any, **kwargs: Any
-    ) -> Any: ...
+    def add_task(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any: ...
 
 
 @dataclass
