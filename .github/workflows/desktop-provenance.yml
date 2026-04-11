@@ -1,0 +1,75 @@
+name: Desktop Provenance
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_ref:
+        description: "Git ref to build provenance assets from"
+        required: true
+        default: "main"
+        type: string
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  linux-desktop-provenance:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_ref || github.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install desktop sidecar build dependencies
+        run: python -m pip install -r requirements-desktop-build.txt
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build Linux desktop sidecar
+        run: python -m tools.build_desktop_sidecar --target-triple x86_64-unknown-linux-gnu --clean
+      - name: Write sidecar digest manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact="frontend/src-tauri/binaries/goat-backend-x86_64-unknown-linux-gnu"
+          sha="$(sha256sum "${artifact}" | awk '{print $1}')"
+          cat > desktop-provenance.json <<EOF
+          {
+            "release_ref": "${{ inputs.release_ref || github.ref_name }}",
+            "resolved_sha": "${GITHUB_SHA}",
+            "artifact_path": "${artifact}",
+            "sha256": "${sha}"
+          }
+          EOF
+      - name: Generate desktop sidecar SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          file: ./frontend/src-tauri/binaries/goat-backend-x86_64-unknown-linux-gnu
+          artifact-name: goat-backend-x86_64-unknown-linux-gnu.spdx.json
+          output-file: desktop-sidecar.spdx.json
+          upload-release-assets: false
+      - name: Upload provenance assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-provenance-assets
+          path: |
+            frontend/src-tauri/binaries/goat-backend-x86_64-unknown-linux-gnu
+            desktop-provenance.json
+            desktop-sidecar.spdx.json
+      - name: Generate build provenance attestation
+        if: ${{ !github.event.repository.private || vars.ENABLE_GITHUB_ATTESTATIONS == '1' }}
+        uses: actions/attest@v4
+        with:
+          subject-path: frontend/src-tauri/binaries/goat-backend-x86_64-unknown-linux-gnu
+      - name: Generate SBOM attestation
+        if: ${{ !github.event.repository.private || vars.ENABLE_GITHUB_ATTESTATIONS == '1' }}
+        uses: actions/attest@v4
+        with:
+          subject-path: frontend/src-tauri/binaries/goat-backend-x86_64-unknown-linux-gnu
+          sbom-path: desktop-sidecar.spdx.json

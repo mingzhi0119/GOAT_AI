@@ -103,4 +103,59 @@ describe('CodeSandboxPanel', () => {
     expect(screen.getByText(/Live stream disconnected/i)).toBeInTheDocument()
     expect(screen.getByText(/report.txt \(12 B\)/i)).toBeInTheDocument()
   })
+
+  it('keeps form inputs editable even when runtime execution is unavailable', () => {
+    const onCommandChange = vi.fn()
+    const onCodeChange = vi.fn()
+    const onStdinChange = vi.fn()
+
+    render(
+      <CodeSandboxPanel
+        isOpen={true}
+        feature={{
+          policy_allowed: true,
+          allowed_by_config: true,
+          available_on_host: false,
+          effective_enabled: false,
+          provider_name: 'docker',
+          isolation_level: 'container',
+          network_policy_enforced: true,
+          deny_reason: 'docker_unavailable',
+        }}
+        runtimeEnabled={false}
+        runPending={false}
+        executionMode="sync"
+        code=""
+        command=""
+        stdin=""
+        error={null}
+        result={null}
+        liveLogs={[]}
+        streamDisconnected={false}
+        onClose={vi.fn()}
+        onExecutionModeChange={vi.fn()}
+        onCodeChange={onCodeChange}
+        onCommandChange={onCommandChange}
+        onStdinChange={onStdinChange}
+        onRun={vi.fn()}
+      />,
+    )
+
+    const commandInput = screen.getByPlaceholderText(/optional: sh/i)
+    const codeArea = screen.getByPlaceholderText("echo 'hello from the sandbox'")
+    const stdinArea = screen.getByPlaceholderText(/optional stdin content/i)
+
+    expect(commandInput).toBeEnabled()
+    expect(codeArea).toBeEnabled()
+    expect(stdinArea).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Run' })).toBeDisabled()
+
+    fireEvent.change(commandInput, { target: { value: 'python app.py' } })
+    fireEvent.change(codeArea, { target: { value: 'print(1)' } })
+    fireEvent.change(stdinArea, { target: { value: 'payload' } })
+
+    expect(onCommandChange).toHaveBeenCalledWith('python app.py')
+    expect(onCodeChange).toHaveBeenCalledWith('print(1)')
+    expect(onStdinChange).toHaveBeenCalledWith('payload')
+  })
 })

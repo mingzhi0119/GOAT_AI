@@ -207,6 +207,39 @@ class WorkbenchExecutionServiceTests(unittest.TestCase):
         self.assertEqual("failed", stored.status)
         self.assertEqual("Knowledge document not found.", stored.error_detail)
 
+    def test_canvas_task_completes_with_workspace_output(self) -> None:
+        self._create_task(task_id="wb-canvas", task_kind="canvas")
+
+        execute_workbench_task(
+            task_id="wb-canvas",
+            repository=self.repository,
+            llm=_FakeLLM(),
+            settings=self.settings,
+        )
+
+        stored = self.repository.get_task("wb-canvas")
+        assert stored is not None
+        self.assertEqual("completed", stored.status)
+        self.assertTrue((stored.result_text or "").startswith("## Goal"))
+
+        outputs = self.repository.list_workspace_outputs("wb-canvas")
+        self.assertEqual(1, len(outputs))
+        self.assertEqual("canvas_document", outputs[0].output_kind)
+        self.assertEqual("markdown", outputs[0].content_format)
+        self.assertEqual(stored.result_text, outputs[0].content_text)
+
+        events = self.repository.list_task_events("wb-canvas")
+        self.assertEqual(
+            [
+                "task.queued",
+                "task.started",
+                "workspace_output.created",
+                "task.completed",
+            ],
+            [event.event_type for event in events],
+        )
+        self.assertEqual(1, events[-1].metadata["workspace_output_count"])
+
     def test_recover_workbench_tasks_replays_queued_and_fails_interrupted_running(
         self,
     ) -> None:

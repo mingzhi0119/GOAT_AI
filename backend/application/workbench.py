@@ -21,6 +21,7 @@ from backend.models.workbench import (
     WorkbenchTaskEventsResponse,
     WorkbenchTaskRequest,
     WorkbenchTaskResultPayload,
+    WorkbenchWorkspaceOutputPayload,
     WorkbenchSourcePayload,
     WorkbenchSourcesResponse,
     WorkbenchTaskStatusResponse,
@@ -32,6 +33,7 @@ from backend.services.workbench_runtime import (
     WorkbenchTaskCreatePayload,
     WorkbenchTaskEventRecord,
     WorkbenchTaskRecord,
+    WorkbenchWorkspaceOutputRecord,
 )
 from backend.services.workbench_source_registry import (
     WorkbenchSourceDescriptor,
@@ -78,6 +80,22 @@ def _to_status_response(task: WorkbenchTaskRecord) -> WorkbenchTaskStatusRespons
             if task.result_text is not None
             else None
         ),
+        workspace_outputs=[],
+    )
+
+
+def _to_workspace_output_payload(
+    output: WorkbenchWorkspaceOutputRecord,
+) -> WorkbenchWorkspaceOutputPayload:
+    return WorkbenchWorkspaceOutputPayload(
+        output_id=output.id,
+        output_kind=output.output_kind,
+        title=output.title,
+        content_format=output.content_format,
+        content=output.content_text,
+        created_at=output.created_at,
+        updated_at=output.updated_at,
+        metadata=dict(output.metadata or {}),
     )
 
 
@@ -198,7 +216,12 @@ def get_workbench_task(
     )
     if not decision.allowed:
         raise WorkbenchTaskNotFoundError("Workbench task not found")
-    return _to_status_response(task)
+    response = _to_status_response(task)
+    response.workspace_outputs = [
+        _to_workspace_output_payload(output)
+        for output in repository.list_workspace_outputs(task.id)
+    ]
+    return response
 
 
 def get_workbench_task_events(

@@ -54,6 +54,47 @@ describe('ComposerControls', () => {
     expect(onSubmit).toHaveBeenCalled()
   })
 
+  it('uses hover highlight for the thinking indicator without rendering a tooltip by default', () => {
+    render(
+      <ComposerControls
+        layoutDecisions={getChatLayoutDecisions('wide')}
+        selectedModel="gemma4:26b"
+        reasoningLevel="medium"
+        supportsThinking={true}
+        thinkingEnabled={true}
+        planModeEnabled={false}
+        onPlanModeChange={vi.fn()}
+        plusMenuOpen={false}
+        modelMenuOpen={false}
+        reasoningMenuOpen={false}
+        isStreaming={false}
+        attachmentUploading={false}
+        canSend={true}
+        gpuStatus={null}
+        gpuError={null}
+        inferenceLatency={null}
+        onTogglePlusMenu={vi.fn()}
+        onToggleModelMenu={vi.fn()}
+        onToggleReasoningMenu={vi.fn()}
+        onThinkingEnabledChange={vi.fn()}
+        onStop={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    )
+
+    const thinkingButton = screen.getByRole('button', { name: /thinking mode enabled/i })
+    expect(thinkingButton).toHaveStyle({
+      background: 'transparent',
+      boxShadow: 'none',
+    })
+
+    fireEvent.mouseEnter(thinkingButton)
+
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    expect(thinkingButton.style.background).not.toBe('transparent')
+    expect(thinkingButton.style.boxShadow).not.toBe('none')
+  })
+
   it('uses the stop action while streaming', () => {
     const onStop = vi.fn()
 

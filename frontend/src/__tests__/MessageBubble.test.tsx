@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import MessageBubble from '../components/MessageBubble'
 import { brandingConfig } from '../config/branding'
@@ -67,8 +67,10 @@ describe('MessageBubble', () => {
     expect(container.querySelector('.katex-display')).toBeInTheDocument()
     expect(container.querySelectorAll('.katex').length).toBeGreaterThan(0)
     expect(container.textContent).not.toContain('$$')
-    expect(screen.getByText('04:10')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Copy message' })).toBeInTheDocument()
+    expect(screen.queryByText('04:10')).not.toBeInTheDocument()
+    const footer = container.querySelector('.assistant-copy-footer')
+    expect(footer).toHaveClass('min-h-6')
   })
 
   it('keeps incomplete math as plain text while streaming', () => {
@@ -105,5 +107,26 @@ describe('MessageBubble', () => {
     expect(screen.getByText('Final answer.')).toBeInTheDocument()
     expect(screen.queryByLabelText('Thinking')).not.toBeInTheDocument()
     expect(screen.queryByText('Hidden reasoning trace')).not.toBeInTheDocument()
+  })
+
+  it('keeps the assistant copy footer height stable on hover', () => {
+    const { container } = render(
+      <MessageBubble
+        message={{
+          id: 'm7',
+          role: 'assistant',
+          content: 'Hover should not move me.',
+        }}
+      />,
+    )
+
+    const footer = container.querySelector('.assistant-copy-footer')
+    const card = container.querySelector('.assistant-document-card')
+    expect(footer).toHaveClass('min-h-6')
+    expect(footer?.className).not.toContain('h-0')
+
+    fireEvent.mouseEnter(card!)
+    expect(screen.getByRole('button', { name: 'Copy message' })).toBeInTheDocument()
+    expect(screen.queryByText(/\d{2}:\d{2}/)).not.toBeInTheDocument()
   })
 })

@@ -106,6 +106,7 @@ export default function CodeSandboxPanel({
       role="dialog"
       aria-modal="true"
       aria-label="Code sandbox"
+      onPointerDown={event => event.stopPropagation()}
       onKeyDown={handlePanelKeyDown}
     >
       <div className="flex items-start justify-between gap-3">
@@ -137,7 +138,7 @@ export default function CodeSandboxPanel({
             onChange={event => onExecutionModeChange(event.target.value as CodeSandboxExecutionMode)}
             className="rounded-2xl border px-3 py-2 text-sm"
             style={fieldStyle}
-            disabled={runPending || !runtimeEnabled}
+            disabled={runPending}
           >
             <option value="sync">Sync</option>
             <option value="async">Async</option>
@@ -164,7 +165,7 @@ export default function CodeSandboxPanel({
             placeholder="Optional: sh ./script.sh or python script.py"
             className="rounded-2xl border px-3 py-2 text-sm focus:outline-none"
             style={fieldStyle}
-            disabled={runPending || !runtimeEnabled}
+            disabled={runPending}
           />
         </label>
 
@@ -181,7 +182,7 @@ export default function CodeSandboxPanel({
               ...fieldStyle,
               fontFamily: 'Consolas, "SFMono-Regular", Menlo, monospace',
             }}
-            disabled={runPending || !runtimeEnabled}
+            disabled={runPending}
           />
         </label>
 
@@ -197,7 +198,7 @@ export default function CodeSandboxPanel({
               ...fieldStyle,
               fontFamily: 'Consolas, "SFMono-Regular", Menlo, monospace',
             }}
-            disabled={runPending || !runtimeEnabled}
+            disabled={runPending}
           />
         </label>
 

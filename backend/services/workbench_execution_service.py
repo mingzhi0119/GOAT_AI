@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from typing import cast
+from uuid import uuid4
 
 from backend.domain.authz_types import AuthorizationContext
 from backend.domain.authorization import PrincipalId, Scope, TenantId
@@ -17,6 +18,7 @@ from backend.services.exceptions import KnowledgeDocumentNotFound
 from backend.services.workbench_source_registry import resolve_requested_sources
 from backend.services.workbench_runtime import (
     WorkbenchTaskRecord,
+    WorkbenchWorkspaceOutputCreatePayload,
     WorkbenchTaskRepository,
 )
 from backend.types import LLMClient, Settings
@@ -32,6 +34,8 @@ _PLAN_AI_UNAVAILABLE = "AI backend unavailable."
 _PLAN_KNOWLEDGE_NOT_FOUND = "Knowledge document not found."
 _PLAN_KNOWLEDGE_FAILED = "Knowledge retrieval failed."
 _TASK_NOT_IMPLEMENTED = "Task kind is not implemented yet."
+_CANVAS_EMPTY_RESULT = "Canvas generation returned an empty result."
+_CANVAS_EXECUTION_FAILED = "Canvas generation failed."
 _RETRIEVAL_NO_RUNNABLE_SOURCES = (
     "No runnable retrieval sources are currently available."
 )
@@ -85,6 +89,37 @@ def _compose_plan_prompt(
         parts.append(
             "No relevant retrieved context was found in the attached knowledge documents. "
             "Acknowledge that constraint in the plan."
+        )
+    return "\n\n".join(parts)
+
+
+def _compose_canvas_prompt(
+    *,
+    task: WorkbenchTaskRecord,
+    context_block: str,
+    has_context: bool,
+) -> str:
+    parts = [
+        "You are drafting an initial editable canvas document for a long-running workbench task.",
+        "Return markdown only.",
+        "Start with a level-1 heading title.",
+        "Then include these sections in order: Objective, Working Draft, Open Questions, Next Steps.",
+        "Keep the document concise but useful as a starting point for later editing.",
+        f"User request:\n{task.prompt}",
+    ]
+    if task.project_id:
+        parts.append(f"Project scope: {task.project_id}")
+    if task.session_id:
+        parts.append(f"Session affinity: {task.session_id}")
+    if has_context:
+        parts.append(
+            "Use the retrieved context below as the primary evidence for the document.\n\n"
+            f"{context_block}"
+        )
+    elif task.knowledge_document_ids:
+        parts.append(
+            "No relevant retrieved context was found in the attached knowledge documents. "
+            "Acknowledge that constraint in the document."
         )
     return "\n\n".join(parts)
 
@@ -280,6 +315,7 @@ def _execute_retrieval_task(
         updated_at=_now_iso(),
         result_text=result_text,
         result_citations=[citation.model_dump(mode="python") for citation in deduped],
+        workspace_output_count=0,
     )
 
 
@@ -292,6 +328,97 @@ def _build_execution_auth_context(task: WorkbenchTaskRecord) -> AuthorizationCon
         credential_id=task.credential_id,
         legacy_owner_id=task.owner_id,
         auth_mode=task.auth_mode or "api_key",
+    )
+
+
+def _derive_canvas_title(*, task: WorkbenchTaskRecord, content: str) -> str:
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("# "):
+            title = stripped[2:].strip()
+            if title:
+                return title[:120]
+    prompt = task.prompt.strip()
+    if prompt:
+        return prompt[:120]
+    return "Untitled canvas"
+
+
+def _build_plan_or_canvas_context(
+    *,
+    task: WorkbenchTaskRecord,
+    settings: Settings,
+    auth_context: AuthorizationContext,
+    request_id: str,
+) -> tuple[str, bool]:
+    if not task.knowledge_document_ids:
+        return "", False
+    context = build_chat_knowledge_context(
+        query=task.prompt,
+        document_ids=task.knowledge_document_ids,
+        top_k=5,
+        settings=settings,
+        auth_context=auth_context,
+        request_id=request_id,
+    )
+    return context.context_block, bool(context.citations)
+
+
+def _execute_canvas_task(
+    *,
+    task: WorkbenchTaskRecord,
+    repository: WorkbenchTaskRepository,
+    llm: LLMClient,
+    settings: Settings,
+    auth_context: AuthorizationContext,
+    request_id: str,
+) -> None:
+    context_block, has_context = _build_plan_or_canvas_context(
+        task=task,
+        settings=settings,
+        auth_context=auth_context,
+        request_id=request_id,
+    )
+    prompt = _compose_canvas_prompt(
+        task=task,
+        context_block=context_block,
+        has_context=has_context,
+    )
+    content = llm.generate_completion(_resolve_plan_model(llm), prompt).strip()
+    if not content:
+        repository.mark_task_failed(
+            task.id,
+            updated_at=_now_iso(),
+            error_detail=_CANVAS_EMPTY_RESULT,
+        )
+        return
+    now = _now_iso()
+    repository.create_workspace_output(
+        WorkbenchWorkspaceOutputCreatePayload(
+            output_id=f"wbo-{uuid4().hex}",
+            task_id=task.id,
+            output_kind="canvas_document",
+            title=_derive_canvas_title(task=task, content=content),
+            content_format="markdown",
+            content_text=content,
+            created_at=now,
+            updated_at=now,
+            metadata={
+                "task_kind": task.task_kind,
+                "session_id": task.session_id,
+                "project_id": task.project_id,
+                "editable": True,
+            },
+            owner_id=task.owner_id,
+            tenant_id=task.tenant_id,
+            principal_id=task.principal_id,
+        )
+    )
+    repository.mark_task_completed(
+        task.id,
+        updated_at=_now_iso(),
+        result_text=content,
+        workspace_output_count=1,
     )
 
 
@@ -319,6 +446,16 @@ def execute_workbench_task(
                 request_id=request_id,
             )
             return
+        if claimed.task_kind == "canvas":
+            _execute_canvas_task(
+                task=claimed,
+                repository=repository,
+                llm=llm,
+                settings=settings,
+                auth_context=auth_context,
+                request_id=request_id,
+            )
+            return
         if claimed.task_kind != "plan":
             repository.mark_task_failed(
                 task_id,
@@ -326,19 +463,12 @@ def execute_workbench_task(
                 error_detail=_TASK_NOT_IMPLEMENTED,
             )
             return
-        context_block = ""
-        has_context = False
-        if claimed.knowledge_document_ids:
-            context = build_chat_knowledge_context(
-                query=claimed.prompt,
-                document_ids=claimed.knowledge_document_ids,
-                top_k=5,
-                settings=settings,
-                auth_context=auth_context,
-                request_id=request_id,
-            )
-            context_block = context.context_block
-            has_context = bool(context.citations)
+        context_block, has_context = _build_plan_or_canvas_context(
+            task=claimed,
+            settings=settings,
+            auth_context=auth_context,
+            request_id=request_id,
+        )
 
         prompt = _compose_plan_prompt(
             task=claimed,
@@ -357,6 +487,7 @@ def execute_workbench_task(
             task_id,
             updated_at=_now_iso(),
             result_text=result_text,
+            workspace_output_count=0,
         )
     except OllamaUnavailable:
         repository.mark_task_failed(
@@ -375,6 +506,8 @@ def execute_workbench_task(
         error_detail = _PLAN_EXECUTION_FAILED
         if claimed.task_kind in {"browse", "deep_research"}:
             error_detail = _RETRIEVAL_EXECUTION_FAILED
+        elif claimed.task_kind == "canvas":
+            error_detail = _CANVAS_EXECUTION_FAILED
         elif claimed.knowledge_document_ids:
             error_detail = _PLAN_KNOWLEDGE_FAILED
         repository.mark_task_failed(

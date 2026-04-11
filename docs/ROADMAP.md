@@ -19,9 +19,9 @@ Completed phases, landed slices, and historical closeout notes live in:
 
 ### Active priorities
 
-1. **Canvas and artifact workspace**
-   - `task_kind = canvas` is already in the public contract and should not stay a known value that deterministically fails
-   - first-class workspace outputs are also the missing bridge between plan/research tasks and durable user-visible artifacts
+1. **Workbench output restoration and export shape**
+   - `canvas` now has a minimal durable baseline through `canvas_document` workspace outputs
+   - the remaining gap is how workspace outputs reopen, restore into sessions/projects, and later export into richer artifact flows
 
 2. **Real web retrieval for workbench**
    - `/api/workbench/sources` already exposes `web`
@@ -46,14 +46,12 @@ P0 and P1 are complete and archived. The remaining work is the operating-model f
 
 #### P2: finish the move from mature codebase to industrial operating model
 
-- Add signed-release and provenance/SBOM workflows for distributable artifacts.
-- Establish vulnerability response, dependency-refresh cadence, and credential-rotation policy.
+- Extend the new provenance/SBOM baseline into signed-release automation for distributable artifacts.
+- Operationalize the documented vulnerability response, dependency-refresh cadence, and credential-rotation policy with recurring review evidence.
 - Add targeted fault-injection or chaos-style validation for upstream timeouts, SSE interruption, file-system failure, and sidecar boot failure.
 - Continue decomposing large multi-responsibility modules until typical feature changes stay localized.
 - Extend architecture-drift controls to shared DTOs, desktop bridges, and future connector/runtime boundaries.
-- Track quality trends over time:
-  - coverage trend
-  - CI stability
+- Extend the weekly quality snapshot baseline into longer-lived trend reporting for:
   - defect escape rate
   - performance trend
   - dependency vulnerability backlog
@@ -85,7 +83,6 @@ Score target by end of this uplift track:
 - Remaining work:
   - durable checkpoints beyond status-only task rows
   - clearer task cancellation and retry semantics
-  - typed workspace outputs distinct from task rows
   - source registry extensions for real web and future connector-backed retrieval
 - Sequencing rule:
   - finish shared runtime foundations before widening frontend promises
@@ -110,10 +107,9 @@ Score target by end of this uplift track:
 
 - Goal: make work products first-class and close the highest-priority remaining task-contract gap.
 - Remaining work:
-  - implement `task_kind = canvas`
-  - add typed workspace-output metadata beyond chat-only downloadable files
-  - link tasks to durable outputs
   - define history/session restoration rules for workbench outputs
+  - define export or artifact-linkage rules from workspace outputs to downloadable files
+  - decide how future non-canvas workspace outputs share the same typed output model
 
 #### Phase 17E: project memory and connectors
 

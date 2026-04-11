@@ -258,7 +258,7 @@ describe('ChatWindow composer', () => {
     expect(onPlanModeChange).toHaveBeenCalledWith(false)
   })
 
-  it('shows a compact blue thinking indicator and lets it disable thinking mode', () => {
+  it('shows a compact blue thinking indicator, uses hover highlight, and lets it disable thinking mode', () => {
     const onThinkingEnabledChange = vi.fn()
     renderChatWindow({ thinkingEnabled: true, onThinkingEnabledChange })
 
@@ -266,7 +266,9 @@ describe('ChatWindow composer', () => {
     expect(screen.getByText('Thinking')).toBeInTheDocument()
 
     fireEvent.mouseEnter(thinkingButton)
-    expect(screen.getByRole('tooltip')).toHaveTextContent('Thinking mode is enabled.')
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    expect(thinkingButton.style.background).not.toBe('transparent')
+    expect(thinkingButton.style.boxShadow).not.toBe('none')
 
     fireEvent.click(thinkingButton)
     expect(onThinkingEnabledChange).toHaveBeenCalledWith(false)
@@ -310,6 +312,25 @@ describe('ChatWindow composer', () => {
 
     expect(screen.getByRole('dialog', { name: /code sandbox/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Run' })).toBeInTheDocument()
+  })
+
+  it('keeps code sandbox inputs usable after opening the panel', () => {
+    renderChatWindow()
+
+    fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
+    fireEvent.click(screen.getByRole('button', { name: /open code sandbox/i }))
+
+    const commandInput = screen.getByPlaceholderText(/optional: sh/i)
+    const codeArea = screen.getByPlaceholderText("echo 'hello from the sandbox'")
+    const stdinArea = screen.getByPlaceholderText(/optional stdin content/i)
+
+    fireEvent.change(commandInput, { target: { value: 'python demo.py' } })
+    fireEvent.change(codeArea, { target: { value: 'print(42)' } })
+    fireEvent.change(stdinArea, { target: { value: 'stdin data' } })
+
+    expect(commandInput).toHaveValue('python demo.py')
+    expect(codeArea).toHaveValue('print(42)')
+    expect(stdinArea).toHaveValue('stdin data')
   })
 
   it('disables the code sandbox action when the feature is unavailable', () => {

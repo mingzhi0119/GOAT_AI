@@ -60,21 +60,11 @@ function formatArtifactSize(byteSize: number): string {
   return `${(byteSize / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function formatConversationStamp(createdAt?: string): string | null {
-  if (!createdAt) return null
-  const date = new Date(createdAt)
-  if (Number.isNaN(date.getTime())) return null
-  const month = `${date.getMonth() + 1}`.padStart(2, '0')
-  const day = `${date.getDate()}`.padStart(2, '0')
-  return `${month}:${day}`
-}
-
 const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode = 'wide' }) => {
   const isUser = message.role === 'user'
   const isError = message.isError === true
   const isNarrow = layoutMode === 'narrow'
   const [copied, setCopied] = useState(false)
-  const createdStamp = formatConversationStamp(message.createdAt)
   const artifactByFilename = new Map(
     (message.artifacts ?? []).map(artifact => [artifact.filename, artifact]),
   )
@@ -243,19 +233,10 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode 
             </div>
 
             {!message.isStreaming && displayContent && (
-              <div className="assistant-copy-footer mt-2 flex h-0 items-center gap-2 overflow-hidden opacity-0 transition-all duration-150 group-hover:h-6 group-hover:opacity-100 group-focus-within:h-6 group-focus-within:opacity-100">
+              <div className="assistant-copy-footer mt-2 flex min-h-6 items-center gap-2">
                 {copyControl('assistant-copy-hit flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs', {
                   background: 'transparent',
                 })}
-                {createdStamp && (
-                  <time
-                    dateTime={message.createdAt}
-                    className="text-[10px] font-medium tracking-[0.08em]"
-                    style={{ color: 'var(--text-muted)' }}
-                  >
-                    {createdStamp}
-                  </time>
-                )}
               </div>
             )}
           </div>

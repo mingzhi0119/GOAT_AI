@@ -34,6 +34,7 @@ interface ComposerControlsProps {
   onToggleModelMenu: () => void
   onToggleReasoningMenu: () => void
   onThinkingEnabledChange: (enabled: boolean) => void
+  thinkingTooltipEnabled?: boolean
   onStop: () => void
   onSubmit: () => void
 }
@@ -68,6 +69,7 @@ export default function ComposerControls({
   onToggleModelMenu,
   onToggleReasoningMenu,
   onThinkingEnabledChange,
+  thinkingTooltipEnabled = false,
   onStop,
   onSubmit,
 }: ComposerControlsProps) {
@@ -168,10 +170,20 @@ export default function ComposerControls({
           {supportsThinking && thinkingEnabled && (
             <button
               type="button"
-              className="relative inline-flex shrink-0 items-center gap-1 text-[13px] font-medium"
-              style={{ color: 'var(--theme-accent-strong)' }}
+              className="relative inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[13px] font-medium transition-all"
+              style={{
+                color: 'var(--theme-accent-strong)',
+                background:
+                  hoveredCapability === 'thinking'
+                    ? 'var(--composer-selected-surface)'
+                    : 'transparent',
+                boxShadow:
+                  hoveredCapability === 'thinking'
+                    ? '0 10px 20px rgba(15,23,42,0.12)'
+                    : 'none',
+              }}
               aria-label="Thinking mode enabled"
-              title="Thinking mode is enabled."
+              title={thinkingTooltipEnabled ? 'Thinking mode is enabled.' : undefined}
               onClick={() => onThinkingEnabledChange(false)}
               onMouseEnter={() => setHoveredCapability('thinking')}
               onMouseLeave={() => setHoveredCapability(null)}
@@ -182,7 +194,7 @@ export default function ComposerControls({
                 <ThinkingModeIcon />
               </span>
               <span>Thinking</span>
-              {hoveredCapability === 'thinking' && (
+              {thinkingTooltipEnabled && hoveredCapability === 'thinking' && (
                 <span
                   role="tooltip"
                   className="pointer-events-none absolute bottom-[calc(100%+0.45rem)] left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-medium shadow-[0_10px_20px_rgba(15,23,42,0.14)]"

@@ -4383,6 +4383,7 @@
               "retrieval.sources_resolved",
               "retrieval.step.completed",
               "retrieval.step.skipped",
+              "workspace_output.created",
               "task.completed",
               "task.failed"
             ],
@@ -4630,6 +4631,14 @@
               }
             ],
             "description": "Optional completed task result. Current runtime guarantees markdown for plan tasks and may include citations for browse or deep_research tasks when retrieval succeeds."
+          },
+          "workspace_outputs": {
+            "items": {
+              "$ref": "#/components/schemas/WorkbenchWorkspaceOutputPayload"
+            },
+            "type": "array",
+            "title": "Workspace Outputs",
+            "description": "Optional durable workspace outputs linked to this task. Canvas documents are the first output kind in this runtime slice."
           }
         },
         "type": "object",
@@ -4642,6 +4651,65 @@
         ],
         "title": "WorkbenchTaskStatusResponse",
         "description": "Status payload returned when polling a durable workbench task."
+      },
+      "WorkbenchWorkspaceOutputPayload": {
+        "properties": {
+          "output_id": {
+            "type": "string",
+            "title": "Output Id",
+            "description": "Stable durable output identifier."
+          },
+          "output_kind": {
+            "type": "string",
+            "const": "canvas_document",
+            "title": "Output Kind",
+            "description": "Typed workspace-output family."
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Human-readable title for the output."
+          },
+          "content_format": {
+            "type": "string",
+            "const": "markdown",
+            "title": "Content Format",
+            "description": "Serialization format used by the stored content payload."
+          },
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "description": "Durable output body content."
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "UTC ISO-8601 creation timestamp."
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "UTC ISO-8601 last-update timestamp."
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata",
+            "description": "Optional structured metadata for richer future workbench UIs."
+          }
+        },
+        "type": "object",
+        "required": [
+          "output_id",
+          "output_kind",
+          "title",
+          "content_format",
+          "content",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "WorkbenchWorkspaceOutputPayload",
+        "description": "Typed durable output linked to one workbench task."
       }
     }
   },

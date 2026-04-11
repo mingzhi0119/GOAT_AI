@@ -37,7 +37,8 @@ Last updated: 2026-04-11
 ### Workbench and sandbox
 
 - durable workbench tasks with polling and event timelines
-- minimal runtime execution for `plan`, `browse`, and `deep_research`
+- minimal runtime execution for `plan`, `browse`, `deep_research`, and `canvas`
+- typed durable workspace outputs, with `canvas_document` as the first shipped output kind
 - declarative workbench source registry with `knowledge` ready and `web` still runtime-incomplete
 - durable code sandbox execution with persisted events and replayable logs
 - Docker-first isolation with `localhost` as an explicit trusted-dev fallback
@@ -52,14 +53,17 @@ Last updated: 2026-04-11
 ### Governance and operations
 
 - staged release governance workflow and approval gate
+- desktop provenance baseline workflow for the Linux sidecar artifact (digest + SBOM, with attestations when supported)
 - versioned observability assets in-repo
 - nightly performance smoke with explicit budgets
+- weekly quality snapshot workflow for recurring coverage-trend capture
 - backup, restore, rollback, and recovery-drill coverage
+- documented vulnerability response, dependency-refresh cadence, and credential-rotation policy
 - CI gates for lint, tests, build, contract sync, dependency audit, secret scan, and desktop supply chain
 
 ## Current known boundaries
 
-- `canvas` remains in the public task enum but is not implemented yet
+- workbench canvas now produces a durable `canvas_document`, but history/session restoration rules for workspace outputs are still open
 - workbench `web` retrieval is still declared before it is truly runtime-ready
 - project memory and connectors are not implemented yet
 - storage remains SQLite-first and single-writer by design
@@ -69,10 +73,10 @@ Last updated: 2026-04-11
 ## Status by active roadmap area
 
 - **16B storage evolution:** complete; repository ownership boundaries are explicit across sessions, artifacts, knowledge, media, workbench, and sandbox, and future datastore-shape changes require a separate decision package
-- **17 runtime platform:** partial workbench runtime is landed; canvas, real web retrieval, project memory, and connectors remain open
+- **17 runtime platform:** partial workbench runtime is landed; canvas and typed workspace outputs now have a minimal baseline, while web retrieval, output restoration rules, project memory, and connectors remain open
 - **18 sandbox follow-ons:** MVP is landed; richer async control, egress policy, and Rust supervisor work remain open
 - **19 desktop maturity:** Windows packaging is landed; cross-platform packaged validation, signing, updater readiness, and deeper native runtime operations remain open
-- **engineering quality uplift:** P0 and P1 are complete; P2 operating-model work remains
+- **engineering quality uplift:** P0 and P1 are complete; P2 is in progress with provenance/SBOM baseline, security-response policy, and weekly quality snapshots landed
 
 ## Recommended live references
 

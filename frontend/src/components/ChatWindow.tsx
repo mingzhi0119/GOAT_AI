@@ -693,6 +693,7 @@ const ChatWindow: FC<Props> = ({
                   setActivePanel(prev => (prev === 'reasoning' ? null : 'reasoning'))
                 }}
                 onThinkingEnabledChange={onThinkingEnabledChange}
+                thinkingTooltipEnabled={false}
                 onStop={onStop}
                 onSubmit={handleSubmit}
               />

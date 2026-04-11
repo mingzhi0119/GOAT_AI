@@ -9,12 +9,15 @@ from backend.models.knowledge import KnowledgeCitation
 
 WorkbenchTaskKind = Literal["plan", "browse", "deep_research", "canvas"]
 WorkbenchTaskStatus = Literal["queued", "running", "completed", "failed"]
+WorkbenchWorkspaceOutputKind = Literal["canvas_document"]
+WorkbenchWorkspaceOutputFormat = Literal["markdown"]
 WorkbenchTaskEventType = Literal[
     "task.queued",
     "task.started",
     "retrieval.sources_resolved",
     "retrieval.step.completed",
     "retrieval.step.skipped",
+    "workspace_output.created",
     "task.completed",
     "task.failed",
 ]
@@ -86,6 +89,13 @@ class WorkbenchTaskStatusResponse(WorkbenchTaskAcceptedResponse):
             "tasks when retrieval succeeds."
         ),
     )
+    workspace_outputs: list["WorkbenchWorkspaceOutputPayload"] = Field(
+        default_factory=list,
+        description=(
+            "Optional durable workspace outputs linked to this task. Canvas "
+            "documents are the first output kind in this runtime slice."
+        ),
+    )
 
 
 class WorkbenchTaskResultPayload(BaseModel):
@@ -99,6 +109,27 @@ class WorkbenchTaskResultPayload(BaseModel):
     citations: list[KnowledgeCitation] = Field(
         default_factory=list,
         description="Optional citations gathered during browse/research retrieval.",
+    )
+
+
+class WorkbenchWorkspaceOutputPayload(BaseModel):
+    """Typed durable output linked to one workbench task."""
+
+    output_id: str = Field(..., description="Stable durable output identifier.")
+    output_kind: WorkbenchWorkspaceOutputKind = Field(
+        ..., description="Typed workspace-output family."
+    )
+    title: str = Field(..., description="Human-readable title for the output.")
+    content_format: WorkbenchWorkspaceOutputFormat = Field(
+        ...,
+        description="Serialization format used by the stored content payload.",
+    )
+    content: str = Field(..., description="Durable output body content.")
+    created_at: str = Field(..., description="UTC ISO-8601 creation timestamp.")
+    updated_at: str = Field(..., description="UTC ISO-8601 last-update timestamp.")
+    metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Optional structured metadata for richer future workbench UIs.",
     )
 
 

@@ -39,6 +39,7 @@ This document records the current threat model and the guardrails that matter fo
 - Formatting checks should stay lightweight enough to avoid forcing a repository-wide rewrite for legacy files.
 - Dependency audit exceptions must be explicit, time-bounded, and tracked in-repo. Silent local bypasses or ad hoc CI edits are not acceptable release practice.
 - Current desktop Rust audit waivers live in [DESKTOP_CARGO_AUDIT_EXCEPTIONS.md](DESKTOP_CARGO_AUDIT_EXCEPTIONS.md) and must be reviewed together with any workflow ignore changes.
+- The operator response targets, dependency refresh cadence, and credential rotation policy now live in [SECURITY_RESPONSE.md](SECURITY_RESPONSE.md). Treat that document as the source of truth for review cadence and escalation windows.
 
 ## Frontend and desktop supply chain
 
@@ -52,3 +53,4 @@ This document records the current threat model and the guardrails that matter fo
 - [OPERATIONS.md](OPERATIONS.md)
 - [ROADMAP.md](ROADMAP.md)
 - [PROJECT_STATUS.md](PROJECT_STATUS.md)
+- [SECURITY_RESPONSE.md](SECURITY_RESPONSE.md)

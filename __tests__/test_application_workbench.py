@@ -18,6 +18,7 @@ from backend.models.workbench import WorkbenchTaskRequest
 from backend.services.workbench_runtime import (
     WorkbenchTaskCreatePayload,
     WorkbenchTaskRecord,
+    WorkbenchWorkspaceOutputRecord,
 )
 from backend.services.workbench_source_registry import WorkbenchSourceDescriptor
 from goat_ai.config import Settings
@@ -56,6 +57,7 @@ class _FakeRepository:
     def __init__(self) -> None:
         self.created_payload: WorkbenchTaskCreatePayload | None = None
         self.task: WorkbenchTaskRecord | None = None
+        self.workspace_outputs: list[WorkbenchWorkspaceOutputRecord] = []
 
     def create_task(self, payload: WorkbenchTaskCreatePayload) -> WorkbenchTaskRecord:
         self.created_payload = payload
@@ -88,6 +90,12 @@ class _FakeRepository:
     def list_task_events(self, task_id: str) -> list[object]:
         _ = task_id
         return []
+
+    def list_workspace_outputs(
+        self, task_id: str
+    ) -> list[WorkbenchWorkspaceOutputRecord]:
+        _ = task_id
+        return list(self.workspace_outputs)
 
 
 class _FakeDispatcher:
@@ -217,3 +225,61 @@ class ApplicationWorkbenchTests(unittest.TestCase):
                     settings=_settings(),
                     auth_context=_auth_context(owner_id="other-owner"),
                 )
+
+    def test_get_workbench_task_includes_workspace_outputs(self) -> None:
+        repository = _FakeRepository()
+        repository.task = WorkbenchTaskRecord(
+            id="wb-2",
+            task_kind="canvas",
+            status="completed",
+            prompt="Draft",
+            session_id="session-1",
+            project_id=None,
+            knowledge_document_ids=[],
+            connector_ids=[],
+            source_ids=[],
+            created_at="2026-04-11T00:00:00+00:00",
+            updated_at="2026-04-11T00:00:02+00:00",
+            result_text="# Draft\n\nBody",
+            auth_scopes=["knowledge:read"],
+            credential_id="cred-1",
+            auth_mode="api_key",
+            owner_id="owner-1",
+            tenant_id="tenant-1",
+            principal_id="principal-1",
+        )
+        repository.workspace_outputs = [
+            WorkbenchWorkspaceOutputRecord(
+                id="wbo-1",
+                task_id="wb-2",
+                output_kind="canvas_document",
+                title="Draft",
+                content_format="markdown",
+                content_text="# Draft\n\nBody",
+                created_at="2026-04-11T00:00:01+00:00",
+                updated_at="2026-04-11T00:00:02+00:00",
+                metadata={"editable": True},
+            )
+        ]
+
+        from unittest.mock import patch
+
+        with patch(
+            "backend.application.workbench.authorize_workbench_task_read",
+            return_value=AuthorizationDecision(
+                allowed=True,
+                reason_code="allowed",
+                conceal_existence=False,
+            ),
+        ):
+            response = get_workbench_task(
+                task_id="wb-2",
+                repository=repository,
+                settings=_settings(),
+                auth_context=_auth_context(),
+            )
+
+        self.assertEqual("completed", response.status)
+        self.assertEqual(1, len(response.workspace_outputs))
+        self.assertEqual("wbo-1", response.workspace_outputs[0].output_id)
+        self.assertEqual("canvas_document", response.workspace_outputs[0].output_kind)

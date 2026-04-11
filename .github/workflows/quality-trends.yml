@@ -1,0 +1,64 @@
+name: Quality Trends
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 12 * * 1"
+
+jobs:
+  quality-snapshot:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: astral-sh/setup-uv@v8.0.0
+        with:
+          enable-cache: true
+      - name: Install backend dependencies
+        run: uv pip install --system -r requirements-ci.txt
+      - name: Backend tests with JSON coverage
+        run: |
+          python -m pytest __tests__/ -q \
+            --cov=backend \
+            --cov=goat_ai \
+            --cov-report=json:backend-coverage.json \
+            --cov-report=term \
+            --cov-fail-under=70
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.14.1"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Frontend tests with coverage
+        working-directory: frontend
+        run: npm run test:coverage
+      - name: Frontend build
+        working-directory: frontend
+        run: npm run build
+      - name: Build quality snapshot
+        run: |
+          python -m tools.quality_snapshot \
+            --backend-coverage-json backend-coverage.json \
+            --frontend-lcov frontend/coverage/lcov.info \
+            --output quality-snapshot.json \
+            --workflow-name quality-trends \
+            --sha "${GITHUB_SHA}" \
+            --ref-name "${GITHUB_REF_NAME}" \
+            --event-name "${GITHUB_EVENT_NAME}" \
+            --run-id "${GITHUB_RUN_ID}" \
+            --run-attempt "${GITHUB_RUN_ATTEMPT}"
+      - name: Upload quality snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-snapshot
+          path: |
+            quality-snapshot.json
+            backend-coverage.json
+            frontend/coverage/lcov.info

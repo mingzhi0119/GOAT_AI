@@ -371,7 +371,7 @@ Notes:
   - `plan`: completed markdown result
   - `browse`: minimal retrieval execution over runtime-ready sources; completed results may include citations
   - `deep_research`: same minimal retrieval chain with a higher-quality retrieval profile; completed results may include citations
-  - `canvas`: accepted by the envelope but still settles to `failed` with `error_detail = "Task kind is not implemented yet."`
+  - `canvas`: completes with a durable `canvas_document` workspace output plus inline markdown result content
 - unknown or caller-invisible source ids return `422`
 
 ## `GET /api/workbench/sources`
@@ -404,7 +404,7 @@ Returns the current durable state for one workbench task.
 
 Current behavior:
 
-- returns `200` with `task_id`, `task_kind`, `status`, `created_at`, `updated_at`, optional `error_detail`, and optional `result`
+- returns `200` with `task_id`, `task_kind`, `status`, `created_at`, `updated_at`, optional `error_detail`, optional `result`, and `workspace_outputs`
 - completed `plan` tasks return:
 
 ```json
@@ -448,6 +448,37 @@ Current behavior:
 }
 ```
 
+- completed `canvas` tasks also include durable typed outputs:
+
+```json
+{
+  "task_id": "wb-789",
+  "task_kind": "canvas",
+  "status": "completed",
+  "created_at": "2026-04-10T18:00:00+00:00",
+  "updated_at": "2026-04-10T18:00:02+00:00",
+  "error_detail": null,
+  "result": {
+    "format": "markdown",
+    "content": "# Draft canvas\n\n## Objective\n- ..."
+  },
+  "workspace_outputs": [
+    {
+      "output_id": "wbo-123",
+      "output_kind": "canvas_document",
+      "title": "Draft canvas",
+      "content_format": "markdown",
+      "content": "# Draft canvas\n\n## Objective\n- ...",
+      "created_at": "2026-04-10T18:00:02+00:00",
+      "updated_at": "2026-04-10T18:00:02+00:00",
+      "metadata": {
+        "editable": true
+      }
+    }
+  ]
+}
+```
+
 - queued and running tasks return `result = null`
 - failed tasks return `result = null` plus a stable `error_detail`
 - missing or caller-invisible task ids return `404`
@@ -473,6 +504,7 @@ Current behavior:
   - `retrieval.sources_resolved`
   - `retrieval.step.completed`
   - `retrieval.step.skipped`
+  - `workspace_output.created`
   - `task.completed`
   - `task.failed`
 - missing or caller-invisible task ids return `404`

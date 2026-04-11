@@ -111,7 +111,7 @@ export default function PlusMenu({
             </span>
           </span>
         </span>
-        <ChevronRightIcon />
+        <ChevronRightIcon className="h-[18px] w-[18px] shrink-0" />
       </button>
 
       <button
@@ -131,7 +131,7 @@ export default function PlusMenu({
             </span>
           </span>
         </span>
-        <ChevronRightIcon />
+        <ChevronRightIcon className="h-[18px] w-[18px] shrink-0" />
       </button>
 
       <div

@@ -76,4 +76,33 @@ describe('PlusMenu', () => {
 
     expect(screen.getByRole('button', { name: /code sandbox unavailable/i })).toBeDisabled()
   })
+
+  it('renders larger chevrons for submenu-style actions', () => {
+    const { container } = render(
+      <PlusMenu
+        isOpen={true}
+        isNarrow={false}
+        codeSandboxFeature={{
+          policy_allowed: true,
+          allowed_by_config: true,
+          available_on_host: true,
+          effective_enabled: true,
+          provider_name: 'docker',
+          isolation_level: 'container',
+          network_policy_enforced: true,
+          deny_reason: null,
+        }}
+        planModeEnabled={false}
+        supportsThinking={false}
+        thinkingEnabled={false}
+        onOpenCodeSandbox={vi.fn()}
+        onUploadFiles={vi.fn()}
+        onOpenManageUploads={vi.fn()}
+        onTogglePlanMode={vi.fn()}
+        onToggleThinkingMode={vi.fn()}
+      />,
+    )
+
+    expect(container.querySelectorAll('svg.h-\\[18px\\].w-\\[18px\\]').length).toBe(2)
+  })
 })

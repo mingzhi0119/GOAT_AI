@@ -567,7 +567,7 @@ schemas:
       - created_at
     properties:
       sequence: integer
-      event_type: task.queued|task.started|retrieval.sources_resolved|retrieval.step.completed|retrieval.step.skipped|task.completed|task.failed
+      event_type: task.queued|task.started|retrieval.sources_resolved|retrieval.step.completed|retrieval.step.skipped|workspace_output.created|task.completed|task.failed
       created_at: string
       status: queued|running|completed|failed|null
       message: string|null
@@ -616,6 +616,26 @@ schemas:
       updated_at: string
       error_detail: string|null
       result: WorkbenchTaskResultPayload|null
+      workspace_outputs: WorkbenchWorkspaceOutputPayload[]
+  WorkbenchWorkspaceOutputPayload:
+    type: object
+    required:
+      - output_id
+      - output_kind
+      - title
+      - content_format
+      - content
+      - created_at
+      - updated_at
+    properties:
+      output_id: string
+      output_kind: string
+      title: string
+      content_format: string
+      content: string
+      created_at: string
+      updated_at: string
+      metadata: object
 endpoints:
   - op: list_models_route
     method: GET

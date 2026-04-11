@@ -51,6 +51,18 @@ def _decode_object_list(raw: object) -> list[dict[str, object]] | None:
     return out
 
 
+def _decode_object(raw: object) -> dict[str, object] | None:
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    return parsed
+
+
 @dataclass(frozen=True, kw_only=True)
 class WorkbenchTaskRecord:
     """Durable workbench task record persisted for status polling."""
@@ -99,6 +111,32 @@ class WorkbenchTaskEventRecord:
 
 
 @dataclass(frozen=True, kw_only=True)
+class WorkbenchWorkspaceOutputRecord:
+    """Typed durable workspace output linked to one task."""
+
+    id: str
+    task_id: str
+    output_kind: str
+    title: str
+    content_format: str
+    content_text: str
+    created_at: str
+    updated_at: str
+    metadata: dict[str, object] | None = None
+    owner_id: str = ""
+    tenant_id: str = "tenant:default"
+    principal_id: str = ""
+
+    @property
+    def ownership(self) -> PersistedResourceOwnership:
+        return ownership_from_fields(
+            owner_id=self.owner_id,
+            tenant_id=self.tenant_id,
+            principal_id=self.principal_id,
+        )
+
+
+@dataclass(frozen=True, kw_only=True)
 class WorkbenchTaskCreatePayload:
     """Payload required to create one durable queued workbench task."""
 
@@ -130,6 +168,32 @@ class WorkbenchTaskCreatePayload:
         )
 
 
+@dataclass(frozen=True, kw_only=True)
+class WorkbenchWorkspaceOutputCreatePayload:
+    """Payload required to create one durable workspace output."""
+
+    output_id: str
+    task_id: str
+    output_kind: str
+    title: str
+    content_format: str
+    content_text: str
+    created_at: str
+    updated_at: str
+    metadata: dict[str, object] | None = None
+    owner_id: str = ""
+    tenant_id: str = "tenant:default"
+    principal_id: str = ""
+
+    @property
+    def ownership(self) -> PersistedResourceOwnership:
+        return ownership_from_fields(
+            owner_id=self.owner_id,
+            tenant_id=self.tenant_id,
+            principal_id=self.principal_id,
+        )
+
+
 class WorkbenchTaskRepository(Protocol):
     """Persistence boundary for durable workbench task records."""
 
@@ -141,6 +205,10 @@ class WorkbenchTaskRepository(Protocol):
         self, task_id: str, *, updated_at: str
     ) -> WorkbenchTaskRecord | None: ...
 
+    def create_workspace_output(
+        self, payload: WorkbenchWorkspaceOutputCreatePayload
+    ) -> WorkbenchWorkspaceOutputRecord: ...
+
     def mark_task_completed(
         self,
         task_id: str,
@@ -148,6 +216,7 @@ class WorkbenchTaskRepository(Protocol):
         updated_at: str,
         result_text: str,
         result_citations: list[dict[str, object]] | None = None,
+        workspace_output_count: int | None = None,
     ) -> None: ...
 
     def mark_task_failed(
@@ -159,6 +228,10 @@ class WorkbenchTaskRepository(Protocol):
     def list_task_ids_by_status(self, statuses: Iterable[str]) -> list[str]: ...
 
     def list_task_events(self, task_id: str) -> list[WorkbenchTaskEventRecord]: ...
+
+    def list_workspace_outputs(
+        self, task_id: str
+    ) -> list[WorkbenchWorkspaceOutputRecord]: ...
 
     def append_task_event(
         self,
@@ -306,6 +379,81 @@ class SQLiteWorkbenchTaskRepository:
             _raise_write_error("workbench_task_claim", exc)
         return self.get_task(task_id)
 
+    def create_workspace_output(
+        self, payload: WorkbenchWorkspaceOutputCreatePayload
+    ) -> WorkbenchWorkspaceOutputRecord:
+        metadata_json = None
+        if payload.metadata:
+            metadata_json = json.dumps(
+                payload.metadata, ensure_ascii=False, sort_keys=True
+            )
+        try:
+            with sqlite3.connect(self._db_path) as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                conn.execute(
+                    """
+                    INSERT INTO workbench_workspace_outputs (
+                        id,
+                        task_id,
+                        output_kind,
+                        title,
+                        content_format,
+                        content_text,
+                        metadata_json,
+                        created_at,
+                        updated_at,
+                        owner_id,
+                        tenant_id,
+                        principal_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        payload.output_id,
+                        payload.task_id,
+                        payload.output_kind,
+                        payload.title,
+                        payload.content_format,
+                        payload.content_text,
+                        metadata_json,
+                        payload.created_at,
+                        payload.updated_at,
+                        payload.owner_id,
+                        payload.tenant_id,
+                        payload.principal_id,
+                    ),
+                )
+                self._append_event(
+                    conn,
+                    task_id=payload.task_id,
+                    event_type="workspace_output.created",
+                    created_at=payload.created_at,
+                    status="running",
+                    message=f"Workspace output {payload.output_id} created.",
+                    metadata={
+                        "output_id": payload.output_id,
+                        "output_kind": payload.output_kind,
+                        "content_format": payload.content_format,
+                    },
+                )
+                conn.commit()
+        except Exception as exc:
+            _raise_write_error("workbench_workspace_output_create", exc)
+
+        return WorkbenchWorkspaceOutputRecord(
+            id=payload.output_id,
+            task_id=payload.task_id,
+            output_kind=payload.output_kind,
+            title=payload.title,
+            content_format=payload.content_format,
+            content_text=payload.content_text,
+            created_at=payload.created_at,
+            updated_at=payload.updated_at,
+            metadata=dict(payload.metadata or {}),
+            owner_id=payload.owner_id,
+            tenant_id=payload.tenant_id,
+            principal_id=payload.principal_id,
+        )
+
     def mark_task_completed(
         self,
         task_id: str,
@@ -313,6 +461,7 @@ class SQLiteWorkbenchTaskRepository:
         updated_at: str,
         result_text: str,
         result_citations: list[dict[str, object]] | None = None,
+        workspace_output_count: int | None = None,
     ) -> None:
         try:
             with sqlite3.connect(self._db_path) as conn:
@@ -347,6 +496,7 @@ class SQLiteWorkbenchTaskRepository:
                     metadata={
                         "result_format": "markdown",
                         "citation_count": len(result_citations or []),
+                        "workspace_output_count": int(workspace_output_count or 0),
                     },
                 )
                 conn.commit()
@@ -472,6 +622,53 @@ class SQLiteWorkbenchTaskRepository:
         except Exception as exc:
             _raise_read_error("workbench_task_events_list", exc)
         return [self._row_to_event(row) for row in rows]
+
+    def list_workspace_outputs(
+        self, task_id: str
+    ) -> list[WorkbenchWorkspaceOutputRecord]:
+        try:
+            with sqlite3.connect(self._db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    """
+                    SELECT
+                        id,
+                        task_id,
+                        output_kind,
+                        title,
+                        content_format,
+                        content_text,
+                        metadata_json,
+                        created_at,
+                        updated_at,
+                        owner_id,
+                        tenant_id,
+                        principal_id
+                    FROM workbench_workspace_outputs
+                    WHERE task_id = ?
+                    ORDER BY created_at ASC, id ASC
+                    """,
+                    (task_id,),
+                ).fetchall()
+        except Exception as exc:
+            _raise_read_error("workbench_workspace_outputs_list", exc)
+        return [
+            WorkbenchWorkspaceOutputRecord(
+                id=str(row["id"]),
+                task_id=str(row["task_id"]),
+                output_kind=str(row["output_kind"]),
+                title=str(row["title"]),
+                content_format=str(row["content_format"]),
+                content_text=str(row["content_text"]),
+                metadata=_decode_object(row["metadata_json"]),
+                created_at=str(row["created_at"]),
+                updated_at=str(row["updated_at"]),
+                owner_id=str(row["owner_id"] or ""),
+                tenant_id=str(row["tenant_id"] or "tenant:default"),
+                principal_id=str(row["principal_id"] or ""),
+            )
+            for row in rows
+        ]
 
     def append_task_event(
         self,

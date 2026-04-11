@@ -43,3 +43,22 @@ Each release workflow run should retain:
 - staging / production job outcome
 
 This is enough to answer "what exactly was deployed?" during rollback or incident review.
+
+## Supply-chain provenance follow-on
+
+P2 adds a separate provenance baseline workflow at
+[`.github/workflows/desktop-provenance.yml`](../.github/workflows/desktop-provenance.yml).
+
+That workflow currently covers the Linux desktop sidecar path by generating:
+
+- the built desktop sidecar artifact
+- a SHA-256 digest manifest
+- an SPDX SBOM
+- GitHub artifact attestations when the repository plan or repo variables permit it
+
+If artifact attestations are not available for the repository plan, keep the digest
+manifest and SBOM outputs as the minimum provenance record and enable attestations
+later via the `ENABLE_GITHUB_ATTESTATIONS` repository variable when support is ready.
+
+Signed public installers remain a later roadmap item; this provenance workflow is the
+baseline that should exist before release-signing automation is considered complete.

@@ -1580,9 +1580,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
             body["detail"],
         )
 
-    def test_workbench_canvas_task_still_fails_with_not_implemented_detail(
-        self,
-    ) -> None:
+    def test_workbench_canvas_task_completes_with_workspace_output(self) -> None:
         self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
         self.client.app.dependency_overrides[get_settings] = lambda: self.settings
 
@@ -1596,9 +1594,28 @@ class ApiBlackboxContractTests(unittest.TestCase):
         status_response = self.client.get(f"/api/workbench/tasks/{task_id}")
         self.assertEqual(200, status_response.status_code)
         status_body = status_response.json()
-        self.assertEqual("failed", status_body["status"])
+        self.assertEqual("completed", status_body["status"])
+        self.assertIsNone(status_body["error_detail"])
+        self.assertEqual("markdown", status_body["result"]["format"])
+        self.assertEqual(1, len(status_body["workspace_outputs"]))
         self.assertEqual(
-            "Task kind is not implemented yet.", status_body["error_detail"]
+            "canvas_document", status_body["workspace_outputs"][0]["output_kind"]
+        )
+        self.assertEqual(
+            status_body["result"]["content"],
+            status_body["workspace_outputs"][0]["content"],
+        )
+
+        events_response = self.client.get(f"/api/workbench/tasks/{task_id}/events")
+        self.assertEqual(200, events_response.status_code)
+        self.assertEqual(
+            [
+                "task.queued",
+                "task.started",
+                "workspace_output.created",
+                "task.completed",
+            ],
+            [event["event_type"] for event in events_response.json()["events"]],
         )
 
 

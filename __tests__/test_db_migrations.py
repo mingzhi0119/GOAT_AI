@@ -47,6 +47,7 @@ class DbMigrationsTests(unittest.TestCase):
                         "017_workbench_task_source_and_auth_state",
                         "018_code_sandbox_executions",
                         "019_code_sandbox_async_and_logs",
+                        "020_workbench_workspace_outputs",
                     ],
                 )
                 cols = [
@@ -137,6 +138,19 @@ class DbMigrationsTests(unittest.TestCase):
                 self.assertIn("seq", workbench_event_cols)
                 self.assertIn("event_type", workbench_event_cols)
                 self.assertIn("metadata_json", workbench_event_cols)
+                workbench_output_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(workbench_workspace_outputs)"
+                    ).fetchall()
+                ]
+                self.assertIn("task_id", workbench_output_cols)
+                self.assertIn("output_kind", workbench_output_cols)
+                self.assertIn("content_format", workbench_output_cols)
+                self.assertIn("content_text", workbench_output_cols)
+                self.assertIn("metadata_json", workbench_output_cols)
+                self.assertIn("tenant_id", workbench_output_cols)
+                self.assertIn("principal_id", workbench_output_cols)
                 sandbox_cols = [
                     r[1]
                     for r in conn.execute(
@@ -214,7 +228,7 @@ class DbMigrationsTests(unittest.TestCase):
             conn = sqlite3.connect(db_path)
             try:
                 n = conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]
-                self.assertEqual(n, 19)
+                self.assertEqual(n, 20)
                 cols = [
                     r[1]
                     for r in conn.execute("PRAGMA table_info(conversations)").fetchall()
@@ -282,6 +296,17 @@ class DbMigrationsTests(unittest.TestCase):
                 self.assertIn("seq", workbench_event_cols)
                 self.assertIn("event_type", workbench_event_cols)
                 self.assertIn("metadata_json", workbench_event_cols)
+                workbench_output_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(workbench_workspace_outputs)"
+                    ).fetchall()
+                ]
+                self.assertIn("task_id", workbench_output_cols)
+                self.assertIn("output_kind", workbench_output_cols)
+                self.assertIn("content_format", workbench_output_cols)
+                self.assertIn("content_text", workbench_output_cols)
+                self.assertIn("metadata_json", workbench_output_cols)
                 sandbox_cols = [
                     r[1]
                     for r in conn.execute(

@@ -8,6 +8,7 @@ from backend.services import log_service
 from backend.services.workbench_runtime import (
     SQLiteWorkbenchTaskRepository,
     WorkbenchTaskCreatePayload,
+    WorkbenchWorkspaceOutputCreatePayload,
 )
 
 
@@ -73,6 +74,7 @@ class WorkbenchRuntimeTests(unittest.TestCase):
         self.assertEqual("completed", stored.status)
         self.assertEqual("## Goal\n- Draft a plan", stored.result_text)
         self.assertEqual("doc-1", stored.result_citations[0]["document_id"])
+        self.assertEqual([], self.repository.list_workspace_outputs("wb-1"))
         self.assertEqual([], stored.source_ids)
         self.assertEqual(["history:write"], stored.auth_scopes)
         self.assertEqual("cred-1", stored.credential_id)
@@ -86,6 +88,58 @@ class WorkbenchRuntimeTests(unittest.TestCase):
         self.assertEqual("completed", events[-1].status)
         self.assertEqual("markdown", events[-1].metadata["result_format"])
         self.assertEqual(1, events[-1].metadata["citation_count"])
+        self.assertEqual(0, events[-1].metadata["workspace_output_count"])
+
+    def test_create_workspace_output_persists_typed_document(self) -> None:
+        self.repository.create_task(
+            WorkbenchTaskCreatePayload(
+                task_id="wb-canvas",
+                task_kind="canvas",
+                prompt="Draft a canvas",
+                session_id="session-1",
+                project_id="project-1",
+                knowledge_document_ids=[],
+                connector_ids=[],
+                source_ids=[],
+                created_at="2026-04-10T18:00:00+00:00",
+                updated_at="2026-04-10T18:00:00+00:00",
+            )
+        )
+        self.repository.claim_task_for_execution(
+            "wb-canvas", updated_at="2026-04-10T18:00:01+00:00"
+        )
+
+        created = self.repository.create_workspace_output(
+            WorkbenchWorkspaceOutputCreatePayload(
+                output_id="wbo-1",
+                task_id="wb-canvas",
+                output_kind="canvas_document",
+                title="Canvas title",
+                content_format="markdown",
+                content_text="# Canvas title\n\nDraft body",
+                created_at="2026-04-10T18:00:02+00:00",
+                updated_at="2026-04-10T18:00:02+00:00",
+                metadata={"editable": True},
+                owner_id="owner-1",
+                tenant_id="tenant-1",
+                principal_id="principal-1",
+            )
+        )
+
+        self.assertEqual("wbo-1", created.id)
+        stored = self.repository.list_workspace_outputs("wb-canvas")
+        self.assertEqual(1, len(stored))
+        self.assertEqual("canvas_document", stored[0].output_kind)
+        self.assertEqual("Canvas title", stored[0].title)
+        self.assertEqual("# Canvas title\n\nDraft body", stored[0].content_text)
+        self.assertTrue(stored[0].metadata["editable"])
+
+        events = self.repository.list_task_events("wb-canvas")
+        self.assertEqual(
+            ["task.queued", "task.started", "workspace_output.created"],
+            [event.event_type for event in events],
+        )
+        self.assertEqual("wbo-1", events[-1].metadata["output_id"])
 
     def test_mark_failed_persists_error_detail(self) -> None:
         self.repository.create_task(

@@ -245,9 +245,12 @@ Merges to `main` should be gated by GitHub branch protection, required checks, a
 P1 governance assets now live in-repo too:
 
 - release workflow and approval policy: [docs/RELEASE_GOVERNANCE.md](docs/RELEASE_GOVERNANCE.md)
+- security response / dependency refresh / credential rotation policy: [docs/SECURITY_RESPONSE.md](docs/SECURITY_RESPONSE.md)
 - observability assets: [ops/observability/README.md](ops/observability/README.md)
 - incident response starter runbook: [docs/INCIDENT_TRIAGE.md](docs/INCIDENT_TRIAGE.md)
 - scheduled performance smoke: [`.github/workflows/performance-nightly.yml`](.github/workflows/performance-nightly.yml)
+- scheduled quality snapshot baseline: [`.github/workflows/quality-trends.yml`](.github/workflows/quality-trends.yml)
+- desktop provenance + SBOM baseline: [`.github/workflows/desktop-provenance.yml`](.github/workflows/desktop-provenance.yml)
 
 ## Docs
 
@@ -261,6 +264,8 @@ P1 governance assets now live in-repo too:
 - [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md): SQLite backup/restore drill
 - [docs/ROLLBACK.md](docs/ROLLBACK.md): rollback procedure for shared-host deploys
 - [docs/SECURITY.md](docs/SECURITY.md): upload/API threat notes and CI security posture
+- [docs/SECURITY_RESPONSE.md](docs/SECURITY_RESPONSE.md): vulnerability response windows, dependency refresh cadence, and credential rotation policy
+- [docs/QUALITY_TRENDS.md](docs/QUALITY_TRENDS.md): recurring quality snapshot workflow and current trend baseline
 - [docs/RELEASE_GOVERNANCE.md](docs/RELEASE_GOVERNANCE.md): staged release and production approval policy
 - [docs/INCIDENT_TRIAGE.md](docs/INCIDENT_TRIAGE.md): first-response runbook for readiness, latency, retrieval, and feature-gate failures
 - [docs/ROADMAP.md](docs/ROADMAP.md): unfinished backlog and priority queue
