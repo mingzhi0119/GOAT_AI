@@ -18,6 +18,7 @@ Short index for coding agents. Canonical rules live in the docs below.
 4. Type every function boundary.
 5. Test the boundary, mock external systems.
 6. Do not let touched layers regress industrial score guardrails: green gates, boundary tests, and recoverable runtime behavior.
+7. On Windows hosts, every Linux-targeted compile, package, shell-script validation, or Ubuntu CI-parity check must run through WSL, not plain PowerShell.
 
 ## Before delivering code
 
@@ -27,6 +28,8 @@ Short index for coding agents. Canonical rules live in the docs below.
 - When formatting-sensitive Python files changed, also run `python -m ruff format --check` on the touched files.
 - For frontend changes, run `cd frontend && npm ci && npm test -- --run`.
 - CI also runs `cd frontend && npm run build`; run the local build for frontend changes that touch types, build inputs, packaging, test utilities, or any build-only failure path.
+- For Linux-targeted validation from Windows, prefer the repo-local skills under [`.agents/skills`](.agents/skills): `$wsl-linux-build`, `$wsl-linux-rust-desktop`, and `$wsl-linux-ops-checks`.
+- Skills are the reusable workflow layer; `AGENTS.md` and [`docs/ENGINEERING_STANDARDS.md`](docs/ENGINEERING_STANDARDS.md) remain the enforcement point for permanent repository policy.
 - Add or update tests for happy path, failure path, and at least one boundary case when you touch core behavior.
 - Do not treat a red local CI-equivalent gate as follow-up work.
 - Do not run manual visual verification unless the user asks.

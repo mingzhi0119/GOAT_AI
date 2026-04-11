@@ -1,0 +1,7 @@
+interface:
+  display_name: "WSL Rust Desktop"
+  short_description: "Validate Linux Tauri and Rust desktop flows through WSL."
+  default_prompt: "Use $wsl-linux-rust-desktop to run the Linux desktop validation flow for this repository in WSL."
+
+policy:
+  allow_implicit_invocation: true

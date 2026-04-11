@@ -9,9 +9,27 @@
 
 Runtime target resolution now follows a single-port policy: always `GOAT_SERVER_PORT` (default `62606`), with no `8002` fallback.
 
+## WSL-first development baseline
+
+For Windows-hosted contributors, the default working mode is:
+
+- run the active repository from **WSL**
+- store the working copy inside the **WSL filesystem**
+- treat native Windows development as the exception path, not the default path
+
+Recommended baseline:
+
+- distro: `Ubuntu`
+- repo path: `~/dev/GOAT_AI`
+- Codex/Windows UI access path: `\\wsl$\Ubuntu\home\<user>\dev\GOAT_AI`
+
+Do not use `/mnt/<drive>/...` as the recommended active working copy for this repository.
+
+Use [WSL_DEVELOPMENT.md](WSL_DEVELOPMENT.md) for the full migration guide, toolchain checklist, and Windows-native exception list.
+
 ## Development
 
-Backend:
+Backend from Linux or WSL:
 
 ```bash
 python3.14 -m venv .venv   # use Python 3.14 when available (matches CI; see `.github/workflows/ci.yml`)
@@ -24,7 +42,7 @@ python3 -m uvicorn server:app --host 0.0.0.0 --port 62606 --reload
 
 `lint-imports` enforces backend package layering (`pyproject.toml`); run it after dependency or router/service refactors.
 
-**Repository tools:** run CLI modules from the **repository root** with `python -m tools.<module>` (for example `python -m tools.run_rag_eval`, `python -m tools.check_api_contract_sync`). This avoids setting `PYTHONPATH` manually; `.env` is for app runtime, not your shell. For **`python -m tools.check_api_contract_sync`**, use the **same Python minor as CI (3.14)** so `docs/openapi.json` matches `app.openapi()`. On Windows, **pandas** may not yet ship wheels for 3.14; use WSL to refresh artifacts: `bash scripts/wsl_api_contract_refresh.sh` (requires `uv` in WSL; installs a transient 3.14 env via `uv run`).
+**Repository tools:** run CLI modules from the **repository root** with `python -m tools.<module>` (for example `python -m tools.run_rag_eval`, `python -m tools.check_api_contract_sync`). This avoids setting `PYTHONPATH` manually; `.env` is for app runtime, not your shell. For **`python -m tools.check_api_contract_sync`**, use the **same Python minor as CI (3.14)** so `docs/openapi.json` matches `app.openapi()`. On Windows hosts, treat WSL as the default execution environment for these commands. `bash scripts/wsl_api_contract_refresh.sh` remains the preferred artifact-refresh path when Windows packaging availability differs from CI.
 
 ### SQLite schema migrations (Phase 13 Section 13.0)
 
@@ -42,7 +60,7 @@ npm run dev
 
 ### Windows desktop prerequisites
 
-For the Tauri-based desktop shell and future packaged Windows app flow, use the bootstrap script instead of manually clicking through installers:
+This is a **Windows-native exception flow**, not the default inner loop. For the Tauri-based desktop shell and future packaged Windows app flow, use the bootstrap script instead of manually clicking through installers:
 
 ```powershell
 .\scripts\install_desktop_prereqs.ps1 -Profile Runtime
@@ -87,6 +105,7 @@ Important notes:
 - the output is copied to `frontend/src-tauri/binaries/goat-backend-$TARGET_TRIPLE[.exe]`
 - `npm run desktop:build` triggers the same sidecar build automatically through Tauri's `beforeBuildCommand`
 - PyInstaller is **not** a cross-compiler; build each platform's sidecar on that platform (or an equivalent CI runner / VM)
+- on Windows developer machines, Linux-targeted desktop validation should still run from WSL; Windows-native packaging remains a separate exception flow
 - packaged desktop builds move app-owned writable state out of the repository and into the platform app-local-data directory
 
 Desktop sidecar writable paths:
@@ -139,6 +158,8 @@ Important behavior:
 - Rollback uses an explicit ref: see [ROLLBACK.md](ROLLBACK.md)
 - Windows deploy reuses Ollama on `127.0.0.1:11434` when available unless `OLLAMA_BASE_URL` is explicitly set
 - Deploy now includes a post-deploy contract check (`scripts/post_deploy_check.py`) before success is reported: it exercises `GET /api/health`, `GET /api/ready`, `GET /api/system/runtime-target`, and a short `POST /api/chat` stream. The chat step passes when the SSE body includes **at least one** `token` or **`thinking`** frame (so thinking-first models still validate), and fails on HTTP errors, empty SSE, or a first-frame `error`
+
+Windows PowerShell deploy remains a deliberate native Windows exception path. Routine development and Linux-targeted validation should still happen from WSL.
 
 ## Deployment profiles
 

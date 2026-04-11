@@ -1,0 +1,7 @@
+interface:
+  display_name: "WSL Linux Build"
+  short_description: "Run Linux-targeted repo commands through WSL from Windows."
+  default_prompt: "Use $wsl-linux-build to run Linux-targeted validation for this repository through WSL."
+
+policy:
+  allow_implicit_invocation: true

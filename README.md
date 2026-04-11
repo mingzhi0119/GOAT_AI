@@ -13,6 +13,17 @@ Strategic Intelligence assistant for Simon Business School, University of Roches
 - **Portable by design:** the same repo is meant to run on **Windows, macOS, and Linux** for development, and on **various Linux (or container) server layouts** for production, not tied to a single school-owned Ubuntu image. Paths, ports, GPU selection, and secrets are **environment-driven** (see `.env.example` and [docs/OPERATIONS.md](docs/OPERATIONS.md)); avoid hardcoding host-specific assumptions in code.
 - **Reference vs local:** a documented production URL in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) is a **reference deployment**, not a constraint on where you may install or develop.
 
+### Windows development baseline
+
+For Windows-hosted contributors, the default local development environment is now **WSL + a repository stored inside the WSL filesystem**, not an active checkout under `/mnt/<drive>` and not PowerShell-first development.
+
+- Recommended distro: `Ubuntu`
+- Recommended repo path: `~/dev/GOAT_AI`
+- Open the WSL-hosted repo in Codex or other Windows UI tools via `\\wsl$\<distro>\home\<user>\dev\GOAT_AI`
+- Keep native Windows development for the short list of Windows-only or materially Windows-friendlier flows such as installer generation, `deploy.ps1`, `install_desktop_prereqs.ps1`, WebView2 checks, and MSVC/Visual Studio build-tool integration
+
+See [docs/WSL_DEVELOPMENT.md](docs/WSL_DEVELOPMENT.md) for the migration guide and exception list.
+
 ### Capability-based / high-risk features
 
 Some capabilities (for example the shipped **provider-backed code execution runtime**) require explicit runtime declarations and operator review. Separate concerns:
@@ -105,7 +116,7 @@ Core API surface:
 
 ## Quick Start
 
-Development:
+Development from Linux or WSL:
 
 ```bash
 python3.14 -m venv .venv   # or any `python3` that matches CI (see `.github/workflows/ci.yml`)
@@ -116,6 +127,8 @@ python3 -m uvicorn server:app --host 0.0.0.0 --port 62606 --reload
 ```
 
 Use **Python 3.14** for the venv when you can so `python -m tools.check_api_contract_sync` matches the CI backend job.
+
+If you develop on Windows, run the commands above from a WSL-hosted checkout. See [docs/WSL_DEVELOPMENT.md](docs/WSL_DEVELOPMENT.md).
 
 Frontend dev server:
 
@@ -240,6 +253,7 @@ P1 governance assets now live in-repo too:
 ## Docs
 
 - [AGENTS.md](AGENTS.md): short index for agents; **canonical rules:** [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md)
+- [docs/WSL_DEVELOPMENT.md](docs/WSL_DEVELOPMENT.md): WSL-first Windows development baseline, migration steps, and Windows-native exception list
 - [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md): current shipped state
 - [docs/APPEARANCE.md](docs/APPEARANCE.md): appearance/theme architecture, controls, and extension rules
 - [docs/API_REFERENCE.md](docs/API_REFERENCE.md): endpoint contract

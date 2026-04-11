@@ -1,0 +1,7 @@
+interface:
+  display_name: "WSL Ops Checks"
+  short_description: "Run Ubuntu-facing script and ops validation through WSL."
+  default_prompt: "Use $wsl-linux-ops-checks to validate Linux-facing scripts or operational checks through WSL."
+
+policy:
+  allow_implicit_invocation: true
