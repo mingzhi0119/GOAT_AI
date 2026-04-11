@@ -19,7 +19,12 @@ def _find_rustc() -> Path | None:
     rustc = shutil.which("rustc")
     if rustc:
         return Path(rustc)
-    cargo_home = Path.home() / ".cargo" / "bin" / ("rustc.exe" if sys.platform == "win32" else "rustc")
+    cargo_home = (
+        Path.home()
+        / ".cargo"
+        / "bin"
+        / ("rustc.exe" if sys.platform == "win32" else "rustc")
+    )
     return cargo_home if cargo_home.is_file() else None
 
 
@@ -105,7 +110,9 @@ def main() -> None:
 
     built_binary = dist_dir / f"{tmp_name}{extension}"
     if not built_binary.is_file():
-        raise SystemExit(f"Expected PyInstaller output at {built_binary}, but it was not created.")
+        raise SystemExit(
+            f"Expected PyInstaller output at {built_binary}, but it was not created."
+        )
 
     final_binary = BINARIES_DIR / output_name
     replacement_binary = BINARIES_DIR / f"{output_name}.tmp"

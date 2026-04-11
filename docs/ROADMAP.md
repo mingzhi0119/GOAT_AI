@@ -30,9 +30,12 @@ Ship these before taking on net-new product promises that widen the runtime surf
   - stop relying on plain string equality for secrets
   - move toward hashed or otherwise non-reversible credential storage
   - require constant-time comparison where raw comparisons still exist
-- Add supply-chain gates for desktop/frontend dependencies (`npm audit`, `cargo audit`, signed-artifact plan).
-- Reduce the highest-risk large-file hotspots by extracting focused submodules instead of adding more logic inline.
-- Add direct automated tests for delivery-critical scripts and desktop wrappers.
+- [x] Add supply-chain gates for desktop/frontend dependencies:
+  - CI-blocking `npm audit --audit-level=high`
+  - CI-blocking `cargo audit` for `frontend/src-tauri/Cargo.lock`
+  - a documented desktop artifact trust model that keeps unsigned packages internal/test-only until signing is in place
+- [x] Reduce the highest-risk large-file hotspots by extracting focused submodules instead of adding more logic inline.
+- [x] Add direct automated tests for delivery-critical scripts and desktop wrappers.
 - Keep Rust migration work scoped to stable, systems-oriented boundaries during P0; do not begin broad business-logic rewrites before the quality gates above are green.
 
 P0 exit criteria:

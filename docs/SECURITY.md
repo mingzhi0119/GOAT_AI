@@ -33,8 +33,19 @@ This document records the current threat model and the guardrails that matter fo
 ## Dependency and CI hygiene
 
 - `pip-audit` runs in CI against `requirements-ci.txt` (runtime `requirements.txt` plus lint/test tooling) to surface known dependency vulnerabilities.
+- `npm audit --audit-level=high` runs in CI against `frontend/package-lock.json`, including desktop build-tool dependencies in `devDependencies`.
+- `cargo audit --deny warnings --file frontend/src-tauri/Cargo.lock` runs in CI for the desktop Rust shell and bundled runtime dependencies.
 - `ruff check` runs in CI to catch style and correctness regressions early.
 - Formatting checks should stay lightweight enough to avoid forcing a repository-wide rewrite for legacy files.
+- Dependency audit exceptions must be explicit, time-bounded, and tracked in-repo. Silent local bypasses or ad hoc CI edits are not acceptable release practice.
+- Current desktop Rust audit waivers live in [DESKTOP_CARGO_AUDIT_EXCEPTIONS.md](DESKTOP_CARGO_AUDIT_EXCEPTIONS.md) and must be reviewed together with any workflow ignore changes.
+
+## Frontend and desktop supply chain
+
+- Frontend and desktop dependency audits are release gates, not advisory checks. PRs and pushes to `main` must keep the `frontend` and `desktop-supply-chain` jobs green.
+- Desktop artifacts produced from local developer machines or unsigned ad hoc builds are internal/test-only artifacts. They must not be presented as public production releases.
+- Publicly distributed desktop installers must come from target-platform CI or an equivalent auditable release pipeline, then move through the later signing flow tracked in `ROADMAP.md`.
+- Until signed-release automation lands, any externally shared desktop package must be labeled internal/test-only and accompanied by the exact build provenance used to create it.
 
 ## Related docs
 

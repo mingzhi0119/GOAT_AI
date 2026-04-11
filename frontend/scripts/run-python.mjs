@@ -1,23 +1,31 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import os from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join, posix as pathPosix, win32 as pathWin32 } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const frontendRoot = join(scriptDir, "..");
 
-function pythonCandidates() {
+function joinForPlatform(platform, ...parts) {
+  return platform === "win32" ? pathWin32.join(...parts) : pathPosix.join(...parts);
+}
+
+export function pythonCandidates({
+  env = process.env,
+  homeDir = os.homedir(),
+  platform = process.platform,
+} = {}) {
   const candidates = [];
-  const explicit = process.env.GOAT_DESKTOP_PYTHON?.trim();
+  const explicit = env.GOAT_DESKTOP_PYTHON?.trim();
   if (explicit) {
     candidates.push(explicit);
   }
-  if (process.platform === "win32") {
-    const localAppData = process.env.LOCALAPPDATA || join(os.homedir(), "AppData", "Local");
+  if (platform === "win32") {
+    const localAppData = env.LOCALAPPDATA || joinForPlatform(platform, homeDir, "AppData", "Local");
     candidates.push(
-      join(localAppData, "Python", "pythoncore-3.14-64", "python.exe"),
-      join(localAppData, "Programs", "Python", "Python314", "python.exe"),
+      joinForPlatform(platform, localAppData, "Python", "pythoncore-3.14-64", "python.exe"),
+      joinForPlatform(platform, localAppData, "Programs", "Python", "Python314", "python.exe"),
       "python",
       "py",
     );
@@ -27,15 +35,36 @@ function pythonCandidates() {
   return candidates;
 }
 
-function findPython() {
-  for (const candidate of pythonCandidates()) {
+export function buildPythonVersionArgs({
+  candidate,
+  platform = process.platform,
+}) {
+  return platform === "win32" && candidate === "py" ? ["-3.14", "--version"] : ["--version"];
+}
+
+export function buildPythonArgs({
+  python,
+  rawArgs,
+  platform = process.platform,
+}) {
+  return platform === "win32" && python === "py" ? ["-3.14", ...rawArgs] : rawArgs;
+}
+
+export function findPython({
+  cwd = frontendRoot,
+  env = process.env,
+  exists = existsSync,
+  homeDir = os.homedir(),
+  platform = process.platform,
+  spawn = spawnSync,
+} = {}) {
+  for (const candidate of pythonCandidates({ env, homeDir, platform })) {
     const isPathLike = candidate.includes("/") || candidate.includes("\\");
-    if (isPathLike && !existsSync(candidate)) {
+    if (isPathLike && !exists(candidate)) {
       continue;
     }
-    const versionArgs = process.platform === "win32" && candidate === "py" ? ["-3.14", "--version"] : ["--version"];
-    const result = spawnSync(candidate, versionArgs, {
-      cwd: frontendRoot,
+    const result = spawn(candidate, buildPythonVersionArgs({ candidate, platform }), {
+      cwd,
       stdio: "ignore",
       shell: false,
     });
@@ -46,27 +75,57 @@ function findPython() {
   return null;
 }
 
-const python = findPython();
-if (!python) {
-  console.error("Failed to locate a usable Python interpreter for desktop build tooling.");
-  process.exit(1);
+export function runPythonCli({
+  cwd = frontendRoot,
+  env = process.env,
+  exists = existsSync,
+  homeDir = os.homedir(),
+  platform = process.platform,
+  rawArgs = process.argv.slice(2),
+  spawn = spawnSync,
+} = {}) {
+  const python = findPython({
+    cwd,
+    env,
+    exists,
+    homeDir,
+    platform,
+    spawn,
+  });
+  if (!python) {
+    return {
+      exitCode: 1,
+      errorMessage: "Failed to locate a usable Python interpreter for desktop build tooling.",
+    };
+  }
+
+  const result = spawn(python, buildPythonArgs({ python, rawArgs, platform }), {
+    cwd,
+    stdio: "inherit",
+    shell: false,
+  });
+
+  if (result.error) {
+    return {
+      exitCode: 1,
+      errorMessage: `Failed to launch Python: ${result.error.message}`,
+    };
+  }
+
+  return {
+    exitCode: result.status ?? 1,
+  };
 }
 
-const rawArgs = process.argv.slice(2);
-const pythonArgs =
-  process.platform === "win32" && python === "py"
-    ? ["-3.14", ...rawArgs]
-    : rawArgs;
-
-const result = spawnSync(python, pythonArgs, {
-  cwd: frontendRoot,
-  stdio: "inherit",
-  shell: false,
-});
-
-if (result.error) {
-  console.error(`Failed to launch Python: ${result.error.message}`);
-  process.exit(1);
+function isMainModule() {
+  const entry = process.argv[1];
+  return Boolean(entry) && import.meta.url === pathToFileURL(entry).href;
 }
 
-process.exit(result.status ?? 1);
+if (isMainModule()) {
+  const result = runPythonCli();
+  if (result.errorMessage) {
+    console.error(result.errorMessage);
+  }
+  process.exit(result.exitCode);
+}
