@@ -1638,8 +1638,8 @@
         "tags": [
           "workbench"
         ],
-        "summary": "Start a workbench task (scaffold)",
-        "description": "Validate the contract shape and enforce the runtime gate for future tasks.",
+        "summary": "Create and enqueue a durable workbench task",
+        "description": "Create a durable queued workbench task record and enqueue execution.",
         "operationId": "post_workbench_task_api_workbench_tasks_post",
         "requestBody": {
           "content": {
@@ -1652,16 +1652,74 @@
           "required": true
         },
         "responses": {
-          "501": {
-            "description": "Workbench task execution is not implemented.",
+          "202": {
+            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object",
-                  "title": "Response Post Workbench Task Api Workbench Tasks Post"
+                  "$ref": "#/components/schemas/WorkbenchTaskAcceptedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Workbench runtime is not available on this deployment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workbench/sources": {
+      "get": {
+        "tags": [
+          "workbench"
+        ],
+        "summary": "List declarative workbench retrieval sources",
+        "description": "List the current caller-visible retrieval sources for workbench tasks.",
+        "operationId": "get_workbench_sources_route_api_workbench_sources_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbenchSourcesResponse"
                 }
               }
             }
@@ -1685,6 +1743,162 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Workbench runtime is not available on this deployment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workbench/tasks/{task_id}": {
+      "get": {
+        "tags": [
+          "workbench"
+        ],
+        "summary": "Read one durable workbench task status",
+        "description": "Read the current durable state for one workbench task.",
+        "operationId": "get_workbench_task_status_api_workbench_tasks__task_id__get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbenchTaskStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "description": "Workbench runtime is not available on this deployment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workbench/tasks/{task_id}/events": {
+      "get": {
+        "tags": [
+          "workbench"
+        ],
+        "summary": "Read one durable workbench task event timeline",
+        "description": "Read the current durable event timeline for one workbench task.",
+        "operationId": "get_workbench_task_event_timeline_api_workbench_tasks__task_id__events_get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbenchTaskEventsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
           },
           "503": {
             "description": "Workbench runtime is not available on this deployment.",
@@ -3290,6 +3504,256 @@
         "title": "WorkbenchFeaturePayload",
         "description": "Capability inventory for future agent/workbench surfaces."
       },
+      "WorkbenchSourcePayload": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "title": "Source Id",
+            "description": "Stable source identifier used by tasks."
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name",
+            "description": "Human-readable source label."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "builtin",
+              "knowledge",
+              "connector"
+            ],
+            "title": "Kind",
+            "description": "High-level source family."
+          },
+          "scope_kind": {
+            "type": "string",
+            "enum": [
+              "global",
+              "knowledge_documents",
+              "connector_binding"
+            ],
+            "title": "Scope Kind",
+            "description": "Whether the source is global, document-scoped, or connector-bound."
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Capabilities",
+            "description": "Declared retrieval capabilities such as search, fetch, and citations."
+          },
+          "task_kinds": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "plan",
+                "browse",
+                "deep_research",
+                "canvas"
+              ]
+            },
+            "type": "array",
+            "title": "Task Kinds",
+            "description": "Workbench task kinds that may eventually use this source."
+          },
+          "read_only": {
+            "type": "boolean",
+            "title": "Read Only",
+            "description": "Whether the source is read-only from the model/runtime perspective.",
+            "default": true
+          },
+          "runtime_ready": {
+            "type": "boolean",
+            "title": "Runtime Ready",
+            "description": "Whether the source can be used by the current backend runtime today."
+          },
+          "deny_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deny Reason",
+            "description": "Stable deny reason when the source exists but is not runtime-ready."
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "Concise operational description."
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "display_name",
+          "kind",
+          "scope_kind",
+          "runtime_ready",
+          "description"
+        ],
+        "title": "WorkbenchSourcePayload",
+        "description": "Declarative retrieval source entry for future workbench tasks."
+      },
+      "WorkbenchSourcesResponse": {
+        "properties": {
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/WorkbenchSourcePayload"
+            },
+            "type": "array",
+            "title": "Sources",
+            "description": "Sources the current caller can see for workbench retrieval tasks."
+          }
+        },
+        "type": "object",
+        "title": "WorkbenchSourcesResponse",
+        "description": "Visible retrieval source inventory for the current caller."
+      },
+      "WorkbenchTaskAcceptedResponse": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id",
+            "description": "Stable durable task identifier."
+          },
+          "task_kind": {
+            "type": "string",
+            "enum": [
+              "plan",
+              "browse",
+              "deep_research",
+              "canvas"
+            ],
+            "title": "Task Kind",
+            "description": "Task surface requested by the client."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "description": "Current durable task lifecycle state."
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "UTC ISO-8601 creation timestamp."
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "task_kind",
+          "status",
+          "created_at"
+        ],
+        "title": "WorkbenchTaskAcceptedResponse",
+        "description": "Minimal accepted-task payload returned when a workbench task is created."
+      },
+      "WorkbenchTaskEventPayload": {
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "title": "Sequence",
+            "description": "Task-local event ordering number."
+          },
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "task.queued",
+              "task.started",
+              "retrieval.sources_resolved",
+              "retrieval.step.completed",
+              "retrieval.step.skipped",
+              "task.completed",
+              "task.failed"
+            ],
+            "title": "Event Type",
+            "description": "Stable event name for this task lifecycle update."
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "UTC ISO-8601 event timestamp."
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "running",
+                  "completed",
+                  "failed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "Optional task lifecycle status associated with this event."
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "description": "Optional stable human-readable event summary."
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata",
+            "description": "Optional structured metadata for clients that need richer polling."
+          }
+        },
+        "type": "object",
+        "required": [
+          "sequence",
+          "event_type",
+          "created_at"
+        ],
+        "title": "WorkbenchTaskEventPayload",
+        "description": "One durable event emitted during task execution."
+      },
+      "WorkbenchTaskEventsResponse": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id",
+            "description": "Stable durable task identifier."
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/WorkbenchTaskEventPayload"
+            },
+            "type": "array",
+            "title": "Events",
+            "description": "Ordered durable events for this task."
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id"
+        ],
+        "title": "WorkbenchTaskEventsResponse",
+        "description": "Durable event timeline returned when polling workbench task progress."
+      },
       "WorkbenchTaskRequest": {
         "properties": {
           "task_kind": {
@@ -3341,13 +3805,21 @@
             "title": "Knowledge Document Ids",
             "description": "Optional attached knowledge documents for retrieval-aware tasks."
           },
+          "source_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Ids",
+            "description": "Optional retrieval source ids for browse, research, or plan context."
+          },
           "connector_ids": {
             "items": {
               "type": "string"
             },
             "type": "array",
             "title": "Connector Ids",
-            "description": "Optional connector scopes for future browse/research tasks."
+            "description": "Deprecated alias for source_ids. Prefer source_ids for new clients."
           }
         },
         "type": "object",
@@ -3356,7 +3828,111 @@
           "prompt"
         ],
         "title": "WorkbenchTaskRequest",
-        "description": "Scaffold request body for future long-running workbench tasks."
+        "description": "Request body for durable long-running workbench tasks."
+      },
+      "WorkbenchTaskResultPayload": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "const": "markdown",
+            "title": "Format",
+            "description": "Serialization format for the returned result content.",
+            "default": "markdown"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "description": "Rendered task result content."
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeCitation"
+            },
+            "type": "array",
+            "title": "Citations",
+            "description": "Optional citations gathered during browse/research retrieval."
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "WorkbenchTaskResultPayload",
+        "description": "Minimal inline result shape for a completed workbench task."
+      },
+      "WorkbenchTaskStatusResponse": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id",
+            "description": "Stable durable task identifier."
+          },
+          "task_kind": {
+            "type": "string",
+            "enum": [
+              "plan",
+              "browse",
+              "deep_research",
+              "canvas"
+            ],
+            "title": "Task Kind",
+            "description": "Task surface requested by the client."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "description": "Current durable task lifecycle state."
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "UTC ISO-8601 creation timestamp."
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "UTC ISO-8601 last-update timestamp."
+          },
+          "error_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Detail",
+            "description": "Optional stable human-readable failure detail."
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkbenchTaskResultPayload"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional completed task result. Current runtime guarantees markdown for plan tasks and may include citations for browse or deep_research tasks when retrieval succeeds."
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "task_kind",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "WorkbenchTaskStatusResponse",
+        "description": "Status payload returned when polling a durable workbench task."
       }
     }
   },
@@ -3399,7 +3975,7 @@
     },
     {
       "name": "workbench",
-      "description": "Future agent/workbench task orchestration (scaffold)."
+      "description": "Durable workbench task orchestration."
     }
   ]
 }

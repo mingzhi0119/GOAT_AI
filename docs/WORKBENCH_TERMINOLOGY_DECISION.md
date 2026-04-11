@@ -143,7 +143,11 @@ Recommended direction:
   - `created_at`
   - `updated_at`
   - `error_detail`
-- `workbench_task_output` can wait until execution exists
+- `workbench_task_event`
+  - durable lifecycle and step timeline
+  - stable event names and per-task ordering
+  - metadata for progress, retrieval stages, and future output refs
+- `workbench_task_output` can wait until richer execution exists
 
 Before execution lands, the task record only needs enough shape to support:
 
@@ -151,21 +155,38 @@ Before execution lands, the task record only needs enough shape to support:
 - polling
 - future linkage to outputs
 
+After minimal execution lands, the next shared runtime seam should be event-oriented before output-oriented.
+
+Current companion seam:
+
+- `workbench source registry`
+  - declarative inventory for `web`, `knowledge`, and future connector-backed retrieval
+  - task requests should resolve source ids through this registry instead of treating connector strings as opaque input
+
 ## Immediate implication for the next step
 
-The next most valuable backend slice is still the minimal task-status skeleton for `POST /api/workbench/tasks`.
+The minimal task-status skeleton is now landed. The next workbench slice should preserve the same terminology while extending execution cautiously.
 
-Recommended MVP shape:
+Current Phase 17B reality:
 
 1. `POST /api/workbench/tasks`
    returns `task_id`, `task_kind`, `status`, `created_at`
 2. `GET /api/workbench/tasks/{task_id}`
-   returns the same record plus optional `error_detail`
-3. minimal status enum:
+   returns lifecycle metadata plus optional `error_detail` and, for completed `plan` tasks, a minimal inline markdown `result`
+3. `GET /api/workbench/tasks/{task_id}/events`
+   returns a durable ordered event timeline for lifecycle polling
+4. status enum remains:
    `queued`, `running`, `completed`, `failed`
-4. no executor yet:
-   task creation writes a durable placeholder record only
-5. persistence can be in-memory first for local scaffolding, but SQLite is the better near-term choice if the API contract should survive restart and support polling realism
+5. `task_kind = plan` was the first execution slice, but it is no longer the only runnable task kind
+6. inline `plan` result is a narrow MVP compromise, not a license to treat every future workspace output as an inline task blob
+
+Current Phase 17C reality:
+
+1. `browse` and `deep_research` now run a minimal retrieval pipeline over the shared source registry
+2. retrieval progress is recorded as task events before terminal completion/failure
+3. completed browse/research results may include citations, but they still return as inline task results for now
+4. `web` remains registered but not runtime-ready; `knowledge` is the current runnable retrieval source
+5. this is still a bridge phase, not the final `workspace output` model
 
 ## Naming recommendation
 

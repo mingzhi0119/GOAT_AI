@@ -439,6 +439,62 @@ schemas:
       artifact_workspace: RuntimeFeaturePayload
       project_memory: RuntimeFeaturePayload
       connectors: RuntimeFeaturePayload
+  WorkbenchSourcePayload:
+    type: object
+    required:
+      - source_id
+      - display_name
+      - kind
+      - scope_kind
+      - runtime_ready
+      - description
+    properties:
+      source_id: string
+      display_name: string
+      kind: builtin|knowledge|connector
+      scope_kind: global|knowledge_documents|connector_binding
+      capabilities: string[]
+      task_kinds: plan|browse|deep_research|canvas[]
+      read_only: boolean
+      runtime_ready: boolean
+      deny_reason: string|null
+      description: string
+  WorkbenchSourcesResponse:
+    type: object
+    properties:
+      sources: WorkbenchSourcePayload[]
+  WorkbenchTaskAcceptedResponse:
+    type: object
+    required:
+      - task_id
+      - task_kind
+      - status
+      - created_at
+    properties:
+      task_id: string
+      task_kind: plan|browse|deep_research|canvas
+      status: queued|running|completed|failed
+      created_at: string
+  WorkbenchTaskEventPayload:
+    type: object
+    required:
+      - sequence
+      - event_type
+      - created_at
+    properties:
+      sequence: integer
+      event_type: task.queued|task.started|retrieval.sources_resolved|retrieval.step.completed|retrieval.step.skipped|task.completed|task.failed
+      created_at: string
+      status: queued|running|completed|failed|null
+      message: string|null
+      metadata: object
+  WorkbenchTaskEventsResponse:
+    type: object
+    required:
+      - task_id
+    properties:
+      task_id: string
+      events: WorkbenchTaskEventPayload[]
   WorkbenchTaskRequest:
     type: object
     required:
@@ -450,7 +506,32 @@ schemas:
       session_id: string|null
       project_id: string|null
       knowledge_document_ids: string[]
+      source_ids: string[]
       connector_ids: string[]
+  WorkbenchTaskResultPayload:
+    type: object
+    required:
+      - content
+    properties:
+      format: string
+      content: string
+      citations: KnowledgeCitation[]
+  WorkbenchTaskStatusResponse:
+    type: object
+    required:
+      - task_id
+      - task_kind
+      - status
+      - created_at
+      - updated_at
+    properties:
+      task_id: string
+      task_kind: plan|browse|deep_research|canvas
+      status: queued|running|completed|failed
+      created_at: string
+      updated_at: string
+      error_detail: string|null
+      result: WorkbenchTaskResultPayload|null
 endpoints:
   - op: list_models_route
     method: GET
@@ -779,11 +860,46 @@ endpoints:
     body: WorkbenchTaskRequest
     content_type: application/json
     response:
+      202: WorkbenchTaskAcceptedResponse
       errors:
         - 401
         - 422
         - 429
-        - 501
+        - 503
+  - op: get_workbench_sources_route
+    method: GET
+    path: /workbench/sources
+    response:
+      200: WorkbenchSourcesResponse
+      errors:
+        - 401
+        - 429
+        - 503
+  - op: get_workbench_task_status
+    method: GET
+    path: /workbench/tasks/{task_id}
+    path_params:
+      task_id: string
+    response:
+      200: WorkbenchTaskStatusResponse
+      errors:
+        - 401
+        - 404
+        - 422
+        - 429
+        - 503
+  - op: get_workbench_task_event_timeline
+    method: GET
+    path: /workbench/tasks/{task_id}/events
+    path_params:
+      task_id: string
+    response:
+      200: WorkbenchTaskEventsResponse
+      errors:
+        - 401
+        - 404
+        - 422
+        - 429
         - 503
   - op: health
     method: GET

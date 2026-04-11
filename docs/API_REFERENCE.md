@@ -49,7 +49,10 @@ Base path: `/api`
 | `GET` | `/api/system/runtime-target` | Runtime target resolution |
 | `GET` | `/api/system/features` | Capability-gated feature flags (config + host probe) |
 | `POST` | `/api/code-sandbox/exec` | Code sandbox scaffold (503 when runtime gate closed; 403 when policy denies; 501 when enabled but not implemented) |
-| `POST` | `/api/workbench/tasks` | Future agent/workbench task scaffold (503 when runtime gate closed; 501 when enabled but not implemented) |
+| `POST` | `/api/workbench/tasks` | Create and enqueue a durable workbench task |
+| `GET` | `/api/workbench/sources` | List declarative workbench retrieval sources |
+| `GET` | `/api/workbench/tasks/{task_id}` | Read one durable workbench task status |
+| `GET` | `/api/workbench/tasks/{task_id}/events` | Read one durable workbench task event timeline |
 
 ## `GET /api/health`
 
@@ -135,7 +138,7 @@ Example:
 Notes:
 
 - `code_sandbox.policy_allowed` remains caller-specific and separate from runtime readiness
-- `workbench.*` advertises planned surfaces without claiming runtime support before execution is implemented
+- `workbench.*` is reported per capability; workbench can be enabled overall while specific surfaces still remain unavailable
 - frontend UI should use this endpoint to hide or disable unavailable surfaces instead of assuming that a visible button implies runtime support
 
 ## `GET /api/models`
@@ -312,8 +315,8 @@ Returns:
 
 Purpose:
 
-- provide one stable future task-entry contract for Plan Mode, Browse, Deep Research, and Canvas
-- validate request shape now while the runtime remains gated off
+- provide one stable task-entry contract for Plan Mode, Browse, Deep Research, and Canvas
+- create a durable queued record and enqueue best-effort execution
 
 Request body:
 
@@ -324,23 +327,142 @@ Request body:
   "session_id": "session-123",
   "project_id": "project-123",
   "knowledge_document_ids": ["doc-123"],
-  "connector_ids": ["web"]
+  "source_ids": ["knowledge"]
+}
+```
+
+Returns `202 Accepted`:
+
+```json
+{
+  "task_id": "wb-123",
+  "task_kind": "plan",
+  "status": "queued",
+  "created_at": "2026-04-10T18:00:00+00:00"
 }
 ```
 
 Notes:
 
-- current deployments should expect `503` with `FEATURE_UNAVAILABLE` until the runtime exists
-- if operators enable the feature family before task execution lands, the route returns `501`
-- this endpoint is intentionally scaffold-only; it exists to stabilize the task envelope before frontend exposure
+- current deployments return `503` with `FEATURE_UNAVAILABLE` when the shared workbench runtime is operator-disabled
+- task creation persists a durable queued task, then workbench launches best-effort in-process execution
+- the task record is stored in SQLite so polling survives process restarts
+- lifecycle updates are also written to a durable event timeline for future long-running browse/research execution
+- `source_ids` are resolved through the shared source registry instead of being treated as opaque strings
+- legacy `connector_ids` is still accepted as a deprecated alias for `source_ids`
+- when `knowledge_document_ids` are attached, the task implicitly includes the `knowledge` source even if the caller omitted it from `source_ids`
+- `browse` and `deep_research` now fail fast with `422` when no runtime-ready retrieval source is available to the caller
+- request shape is intentionally forward-compatible for future task execution and output linkage
+- current task-kind behavior:
+  - `plan`: completed markdown result
+  - `browse`: minimal retrieval execution over runtime-ready sources; completed results may include citations
+  - `deep_research`: same minimal retrieval chain with a higher-quality retrieval profile; completed results may include citations
+  - `canvas`: accepted by the envelope but still settles to `failed` with `error_detail = "Task kind is not implemented yet."`
+- unknown or caller-invisible source ids return `422`
 
-`chart` is retained only for backward compatibility.
+## `GET /api/workbench/sources`
 
-Idempotency:
+Returns the caller-visible retrieval sources that workbench tasks may reference.
 
-- Optional `Idempotency-Key` deduplicates retries
-- Duplicate key plus the same file bytes returns the same JSON body
-- Reusing a key with different file bytes returns `409` with `code = IDEMPOTENCY_CONFLICT`
+Current behavior:
+
+- returns `200` with `sources`
+- current built-in source ids are:
+  - `web`
+  - `knowledge`
+- each source includes:
+  - `source_id`
+  - `display_name`
+  - `kind`
+  - `scope_kind`
+  - `capabilities`
+  - `task_kinds`
+  - `read_only`
+  - `runtime_ready`
+  - optional `deny_reason`
+  - `description`
+- `knowledge` is hidden unless the caller can read knowledge resources
+- `web` is registered for future browse/deep-research execution but currently reports `runtime_ready = false` and `deny_reason = "not_implemented"`
+
+## `GET /api/workbench/tasks/{task_id}`
+
+Returns the current durable state for one workbench task.
+
+Current behavior:
+
+- returns `200` with `task_id`, `task_kind`, `status`, `created_at`, `updated_at`, optional `error_detail`, and optional `result`
+- completed `plan` tasks return:
+
+```json
+{
+  "task_id": "wb-123",
+  "task_kind": "plan",
+  "status": "completed",
+  "created_at": "2026-04-10T18:00:00+00:00",
+  "updated_at": "2026-04-10T18:00:02+00:00",
+  "error_detail": null,
+  "result": {
+    "format": "markdown",
+    "content": "## Goal\n- ..."
+  }
+}
+```
+
+- completed `browse` / `deep_research` tasks may also include citations in `result`:
+
+```json
+{
+  "task_id": "wb-456",
+  "task_kind": "browse",
+  "status": "completed",
+  "created_at": "2026-04-10T18:00:00+00:00",
+  "updated_at": "2026-04-10T18:00:02+00:00",
+  "error_detail": null,
+  "result": {
+    "format": "markdown",
+    "content": "## Browse Summary\n- Query: ...",
+    "citations": [
+      {
+        "document_id": "doc-123",
+        "chunk_id": "chunk-123",
+        "filename": "strategy.txt",
+        "snippet": "Porter Five Forces explains competitive pressure.",
+        "score": 0.98
+      }
+    ]
+  }
+}
+```
+
+- queued and running tasks return `result = null`
+- failed tasks return `result = null` plus a stable `error_detail`
+- missing or caller-invisible task ids return `404`
+- the same runtime gate still applies: if workbench is disabled for the deployment, the route returns `503` with `FEATURE_UNAVAILABLE`
+
+## `GET /api/workbench/tasks/{task_id}/events`
+
+Returns the current durable event timeline for one workbench task.
+
+Current behavior:
+
+- returns `200` with `task_id` and ordered `events`
+- each event includes:
+  - `sequence`
+  - `event_type`
+  - `created_at`
+  - optional `status`
+  - optional `message`
+  - optional `metadata`
+- current lifecycle event names are:
+  - `task.queued`
+  - `task.started`
+  - `retrieval.sources_resolved`
+  - `retrieval.step.completed`
+  - `retrieval.step.skipped`
+  - `task.completed`
+  - `task.failed`
+- missing or caller-invisible task ids return `404`
+- the same runtime gate still applies: if workbench is disabled for the deployment, the route returns `503` with `FEATURE_UNAVAILABLE`
 
 ## `POST /api/knowledge/uploads`
 

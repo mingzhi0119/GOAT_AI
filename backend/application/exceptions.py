@@ -50,6 +50,14 @@ class ChatIdempotencyInProgressError(RuntimeError):
     """Raised when a chat idempotency key is already pending."""
 
 
+class WorkbenchTaskNotFoundError(LookupError):
+    """Raised when a durable workbench task cannot be found or is not visible."""
+
+
+class WorkbenchSourceValidationError(ValueError):
+    """Raised when a workbench task references unknown or unavailable sources."""
+
+
 __all__ = [
     "ChatCapacityError",
     "ChatIdempotencyConflictError",
@@ -68,4 +76,6 @@ __all__ = [
     "UploadIdempotencyConflictError",
     "UploadIdempotencyInProgressError",
     "VisionNotSupported",
+    "WorkbenchSourceValidationError",
+    "WorkbenchTaskNotFoundError",
 ]

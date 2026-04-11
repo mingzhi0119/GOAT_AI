@@ -20,6 +20,9 @@ Last updated: 2026-04-10
 - **Frontend shell status:** composer control-surface polish, responsive `wide/narrow` chat-shell baseline, and the integrated manual UI verification workflow are landed on `main`.
 - **Frontend appearance status:** a Codex-like appearance system is landed on `main`: dedicated Appearance panel, `light/dark/system` mode, `classic/urochester/thu` styles, accent color, UI/code font selection, contrast tuning, translucent sidebar control, root-token theming, local preference persistence, style-specific footer logos, denser sidebar history layout, and theme-card alignment polish. Architecture hand-off: [APPEARANCE.md](APPEARANCE.md).
 - **Phase 16A status:** complete. `code_sandbox` now enforces separate policy and runtime gates on top of request-scoped `AuthorizationContext`: `GET /api/system/features` returns caller-specific `policy_allowed`, `POST /api/code-sandbox/exec` returns **503** + `FEATURE_UNAVAILABLE` for runtime denial and **403** + `FEATURE_DISABLED` for policy denial (`sandbox:execute`), and Prometheus exposes `feature_gate_denials_total{feature,gate_kind,reason}`.
+- **Phase 17A status:** durable workbench task skeleton is landed. `POST /api/workbench/tasks` creates a SQLite-backed queued task record, `GET /api/workbench/tasks/{task_id}` polls status, and the shared runtime gate still returns **503** + `FEATURE_UNAVAILABLE` when the feature family is disabled.
+- **Phase 17B status:** partial MVP is landed for `task_kind = plan`. Accepted workbench tasks now transition through durable `queued/running/completed/failed` states, completed plan tasks expose an inline markdown result on `GET /api/workbench/tasks/{task_id}`, and `GET /api/workbench/tasks/{task_id}/events` now exposes a durable lifecycle timeline.
+- **Phase 17C status:** first retrieval runtime slice is landed. `GET /api/workbench/sources` exposes a declarative source registry, task creation validates requested source ids through that registry, `knowledge` is runtime-ready for reuse, and `web` is registered but still marked not implemented. `browse` / `deep_research` now execute a minimal source-resolution -> retrieval-step-events -> citations path over runtime-ready sources; `canvas` is still not implemented.
 - **RAG-ready wording:** use the term **RAG-ready** in release notes or marketing only after `python -m tools.run_rag_eval` passes in CI or pre-release checks and this file still documents the same threshold.
 
 ## What is shipped
@@ -41,6 +44,7 @@ Last updated: 2026-04-10
   - `POST /api/knowledge/answers`
 - Session history via `GET /api/history`, `GET /api/history/{session_id}`, `PATCH /api/history/{session_id}`, `DELETE /api/history`, and `DELETE /api/history/{session_id}`
 - Generated chat artifact download via `GET /api/artifacts/{artifact_id}`
+- Durable workbench task creation and polling via `POST /api/workbench/tasks`, `GET /api/workbench/tasks/{task_id}`, `GET /api/workbench/tasks/{task_id}/events`, and `GET /api/workbench/sources`, with minimal `plan`, `browse`, and `deep_research` execution
 - GPU telemetry and rolling inference latency APIs, including first-token latency telemetry
 - Latency telemetry includes p50/p95 and model-scoped buckets for completion and first-token metrics
 - Model capability detection via `GET /api/models/capabilities`
@@ -96,6 +100,10 @@ Last updated: 2026-04-10
 | GET | `/api/system/runtime-target` |
 | GET | `/api/system/features` |
 | POST | `/api/code-sandbox/exec` |
+| POST | `/api/workbench/tasks` |
+| GET | `/api/workbench/sources` |
+| GET | `/api/workbench/tasks/{task_id}` |
+| GET | `/api/workbench/tasks/{task_id}/events` |
 
 ## Important behavior notes
 
@@ -105,6 +113,8 @@ Last updated: 2026-04-10
 - `/api/chat` accepts `knowledge_document_ids` and uses retrieval-backed generation when indexed documents are attached
 - Chat can emit persisted downloadable artifacts over SSE and serve them from `GET /api/artifacts/{artifact_id}`
 - `/api/knowledge/*` routes now support persisted upload, synchronous ingestion, retrieval, retrieval-backed answers, and attached-document fallback when lexical retrieval misses
+- `/api/workbench/tasks` now persists a queued durable task to SQLite and workbench execution covers `plan`, `browse`, and `deep_research`; polling returns `queued/running/completed/failed`, completed browse/research tasks include citations in `result`, and `GET /api/workbench/tasks/{task_id}/events` exposes both lifecycle and retrieval-step events
+- `/api/workbench/sources` now exposes the caller-visible retrieval-source registry; current built-ins are `knowledge` (runtime-ready) and `web` (registered for future browse/research work, not implemented yet)
 - `/api/health` is liveness only; `/api/ready` is the deploy/readiness probe and returns `503` when SQLite or the optional Ollama probe is not ready
 - History reads are normalized at the backend boundary: `/api/history/{session_id}` returns standard chat roles plus structured `chart_spec`, legacy `file_context`, and `knowledge_documents`, while legacy stored payloads remain readable through a dedicated compatibility codec
 - When `GOAT_API_KEY` is configured, every API except `/api/health` and `/api/ready` requires `X-GOAT-API-Key`

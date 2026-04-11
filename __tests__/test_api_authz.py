@@ -182,6 +182,73 @@ class ApiAuthzTests(unittest.TestCase):
         )
         self.assertEqual(404, response.status_code)
 
+    def test_workbench_owner_mismatch_returns_404(self) -> None:
+        self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        create = self.client.post(
+            "/api/workbench/tasks",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+            json={"task_kind": "plan", "prompt": "Draft a plan"},
+        )
+        self.assertEqual(202, create.status_code)
+        task_id = create.json()["task_id"]
+
+        response = self.client.get(
+            f"/api/workbench/tasks/{task_id}",
+            headers={"X-GOAT-API-Key": "read-key", "X-GOAT-Owner-Id": "bob"},
+        )
+        self.assertEqual(404, response.status_code)
+
+        events_response = self.client.get(
+            f"/api/workbench/tasks/{task_id}/events",
+            headers={"X-GOAT-API-Key": "read-key", "X-GOAT-Owner-Id": "bob"},
+        )
+        self.assertEqual(404, events_response.status_code)
+
+    def test_workbench_sources_hide_knowledge_without_knowledge_read_scope(
+        self,
+    ) -> None:
+        self.settings = replace(
+            self.settings,
+            feature_agent_workbench_enabled=True,
+            api_key="bootstrap-auth-enabled",
+            api_key_write="",
+            api_credentials_json="""
+            [
+              {
+                "credential_id": "cred-workbench-limited",
+                "secret": "limited-workbench",
+                "principal_id": "principal:limited-workbench",
+                "tenant_id": "tenant:default",
+                "status": "active",
+                "scopes": ["history:read", "history:write"]
+              }
+            ]
+            """,
+        )
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        response = self.client.get(
+            "/api/workbench/sources",
+            headers={"X-GOAT-API-Key": "limited-workbench"},
+        )
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(
+            ["web"], [item["source_id"] for item in response.json()["sources"]]
+        )
+
+        features = self.client.get(
+            "/api/system/features",
+            headers={"X-GOAT-API-Key": "limited-workbench"},
+        )
+        self.assertEqual(200, features.status_code)
+        workbench = features.json()["workbench"]
+        self.assertTrue(workbench["agent_tasks"]["effective_enabled"])
+        self.assertFalse(workbench["browse"]["effective_enabled"])
+        self.assertFalse(workbench["deep_research"]["effective_enabled"])
+        self.assertFalse(workbench["connectors"]["effective_enabled"])
+
     @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=True)
     def test_system_features_resolve_policy_gate_per_credential(
         self, _mock: object

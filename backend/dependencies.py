@@ -5,7 +5,7 @@ Import these in routers; never instantiate services directly in route handlers.
 
 from __future__ import annotations
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, HTTPException, Request
 
 from backend.domain.authz_types import AuthorizationContext
 from backend.domain.credential_registry import build_local_authorization_context
@@ -19,6 +19,11 @@ from backend.services.chat_runtime import (
     SQLiteSessionRepository,
     TitleGenerator,
 )
+from backend.services.workbench_runtime import (
+    WorkbenchTaskRepository,
+    SQLiteWorkbenchTaskRepository,
+)
+from backend.services.workbench_execution_service import execute_workbench_task
 from backend.services.tabular_context import (
     EmbeddedCsvTabularExtractor,
     TabularContextExtractor,
@@ -27,6 +32,7 @@ from backend.services.safeguard_service import (
     ModeScopedSafeguardService,
     SafeguardService,
 )
+from backend.application.ports import WorkbenchTaskDispatcher
 from backend.types import LLMClient, Settings
 from goat_ai.ollama_client import OllamaService
 
@@ -52,6 +58,53 @@ def get_session_repository(
 ) -> SessionRepository:
     """Return the session repository bound to current settings."""
     return SQLiteSessionRepository(settings.log_db_path)
+
+
+def get_workbench_task_repository(
+    settings: Settings = Depends(get_settings),
+) -> WorkbenchTaskRepository:
+    """Return the workbench task repository bound to current settings."""
+    return SQLiteWorkbenchTaskRepository(settings.log_db_path)
+
+
+class _BackgroundWorkbenchTaskDispatcher:
+    def __init__(
+        self,
+        *,
+        background_tasks: BackgroundTasks,
+        repository: WorkbenchTaskRepository,
+        llm: LLMClient,
+        settings: Settings,
+    ) -> None:
+        self._background_tasks = background_tasks
+        self._repository = repository
+        self._llm = llm
+        self._settings = settings
+
+    def dispatch_task(self, *, task_id: str, request_id: str = "") -> None:
+        self._background_tasks.add_task(
+            execute_workbench_task,
+            task_id=task_id,
+            repository=self._repository,
+            llm=self._llm,
+            settings=self._settings,
+            request_id=request_id,
+        )
+
+
+def get_workbench_task_dispatcher(
+    background_tasks: BackgroundTasks,
+    repository: WorkbenchTaskRepository = Depends(get_workbench_task_repository),
+    llm: LLMClient = Depends(get_llm_client),
+    settings: Settings = Depends(get_settings),
+) -> WorkbenchTaskDispatcher:
+    """Return the scheduler that hands accepted workbench tasks to the runtime."""
+    return _BackgroundWorkbenchTaskDispatcher(
+        background_tasks=background_tasks,
+        repository=repository,
+        llm=llm,
+        settings=settings,
+    )
 
 
 def get_authorization_context(

@@ -1,6 +1,6 @@
 # GOAT AI Roadmap
 
-> Last updated: 2026-04-09
+> Last updated: 2026-04-10
 > Current release tag: **v1.2.0**
 > Shipped status: [PROJECT_STATUS.md](PROJECT_STATUS.md)
 
@@ -33,38 +33,57 @@ Prioritize the backend/runtime seams for the next frontend surfaces before expos
   - one stable task-entry contract exists for future long-running agent work
   - docs and error semantics make clear that unavailable runtime returns `503` / `FEATURE_UNAVAILABLE`
 
-### Phase 17A: workbench contract and capability discovery
-
-- Backend-first scaffold:
-  - shared `workbench` capability family in `GET /api/system/features`
-  - stable task envelope for `plan`, `browse`, `deep_research`, and `canvas`
-  - disabled-by-default operator flag plus runtime-gated stub route
-- Non-goals:
-  - no fake task execution
-  - no frontend exposure beyond capability-aware hiding/disabled states
-
 ### Phase 17B: Plan Mode runtime integration
 
-- Goal: server-side plan/task orchestration with durable task ids, status polling/streaming, and artifact references
+- Goal: server-side plan/task orchestration beyond the now-landed durable task skeleton (`POST /api/workbench/tasks` + `GET /api/workbench/tasks/{task_id}`)
+- Current landed slice:
+  - `task_kind = plan` now executes through a minimal in-process runner
+  - polling returns durable `queued/running/completed/failed`
+  - completed plan tasks expose a minimal inline markdown result on `GET`
+  - `GET /api/workbench/tasks/{task_id}/events` now exposes a durable lifecycle timeline (`task.queued`, `task.started`, `task.completed`, `task.failed`)
 - Backend prerequisites:
-  - task state model
-  - task event stream or polling contract
   - safe cancellation / retry semantics
+  - execution beyond `plan`
+
+### Phase 17 shared runtime foundations
+
+Use the same runtime primitives across 17C/17D/17E instead of building isolated feature-specific endpoints.
+
+- Why this shape:
+  - OpenAI deep research uses background execution plus tool-driven retrieval (`web search`, `file search`, remote MCP) rather than a single request/response search route: [Deep research guide](https://developers.openai.com/api/docs/guides/deep-research)
+  - MCP standardizes external data sources, tools, and workflows behind one connector surface instead of one-off app integrations: [MCP introduction](https://modelcontextprotocol.io/docs/getting-started/intro)
+  - LangGraph durable execution guidance emphasizes persisted progress, replay safety, and side-effect boundaries for long-running workflows: [Durable execution](https://docs.langchain.com/oss/javascript/langgraph/durable-execution)
+- Required shared primitives:
+  - durable task timeline / checkpoints, not status-only rows
+  - source registry abstraction for web, knowledge, and future connector-backed retrieval
+  - typed workspace outputs that stay distinct from the task row itself
+- Sequencing rule:
+  - land shared runtime foundations first
+  - then expose Browse / Deep Research / Canvas / project memory behaviors on top of them
 
 ### Phase 17C: Browse and Deep Research runtime
 
 - Goal: add retrieval/browse execution primitives before exposing real Search/Browse and Deep Research in the UI
+- Current landed slice:
+  - `GET /api/workbench/sources` exposes a declarative source registry
+  - current visible sources are `web` and `knowledge`
+  - `web` is registered for future browse/deep-research work but remains runtime-unready
+  - `knowledge` is runtime-ready and already reuses existing retrieval/authz boundaries
+  - task creation now validates requested source ids through the shared registry instead of treating `connector_ids` as opaque strings
+  - `task_kind = browse` and `task_kind = deep_research` now execute a minimal retrieval pipeline
+  - execution writes `retrieval.sources_resolved`, `retrieval.step.completed`, and `retrieval.step.skipped` events into the durable task timeline
+  - completed browse/research tasks return markdown plus citations gathered from runtime-ready sources
 - Backend prerequisites:
-  - source registry abstraction for web and connector-backed retrieval
-  - citation model shared by chat and research outputs
-  - bounded multi-step task execution rather than direct request/response only
+  - bounded multi-step task execution backed by durable task events instead of direct request/response only
+  - staged safety boundaries for public-web research vs private-source retrieval
+  - actual web execution and remote-connector adapters behind the new registry
 
 ### Phase 17D: canvas and artifact workspace
 
 - Goal: make artifacts/work products first-class so research and planning outputs can be revisited and iterated
 - Backend prerequisites:
-  - artifact/workspace metadata beyond chat-only downloadable files
-  - task-to-artifact linkage
+  - typed workspace-output metadata beyond chat-only downloadable files
+  - task-to-output linkage (artifact and future canvas document refs)
   - history/session restoration rules for workbench outputs
 
 ### Phase 17E: project memory and connectors
@@ -74,12 +93,12 @@ Prioritize the backend/runtime seams for the next frontend surfaces before expos
   - explicit project scope and tenancy rules
   - connector registry / capability metadata
   - memory write/read boundaries that do not bypass existing authz/resource rules
+  - read-only retrieval contracts for browse/research connectors before any write-capable integration is enabled
 
 ### UI surfaces waiting on backend/runtime
 
 These items should remain roadmap-only in the frontend until the corresponding backend/runtime slice exists.
 
-- Plan Mode runtime integration
 - Cloud model API integration for non-local inference backends
 - Real Search / Browse mode
 - Deep Research

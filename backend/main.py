@@ -74,7 +74,7 @@ def create_app() -> FastAPI:
             },
             {
                 "name": "workbench",
-                "description": "Future agent/workbench task orchestration (scaffold).",
+                "description": "Durable workbench task orchestration.",
             },
         ],
     )

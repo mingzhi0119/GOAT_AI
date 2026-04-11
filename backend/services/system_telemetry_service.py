@@ -14,7 +14,9 @@ from backend.models.system import (
     WorkbenchFeaturePayload,
 )
 from backend.services.feature_gate_service import code_sandbox_policy_allowed
+from backend.services.workbench_source_registry import list_workbench_sources
 from backend.types import Settings
+from goat_ai.feature_gate_reasons import RUNTIME_NOT_IMPLEMENTED
 from goat_ai.feature_gates import (
     RuntimeFeatureSnapshot,
     compute_agent_workbench_snapshot,
@@ -47,6 +49,10 @@ def build_system_features_response(
     """Expose machine-readable capability flags for optional / high-risk features."""
     snap = compute_code_sandbox_snapshot(settings)
     workbench = compute_agent_workbench_snapshot(settings)
+    visible_sources = list_workbench_sources(
+        settings=settings,
+        auth_context=auth_context,
+    )
 
     def _runtime_payload(snapshot: RuntimeFeatureSnapshot) -> RuntimeFeaturePayload:
         return RuntimeFeaturePayload(
@@ -54,6 +60,28 @@ def build_system_features_response(
             available_on_host=snapshot.available_on_host,
             effective_enabled=snapshot.effective_enabled,
             deny_reason=snapshot.deny_reason,
+        )
+
+    def _workbench_capability(
+        *,
+        runtime_ready: bool,
+        deny_reason: str | None = None,
+    ) -> RuntimeFeaturePayload:
+        if not workbench.allowed_by_config:
+            return _runtime_payload(workbench)
+        return RuntimeFeaturePayload(
+            allowed_by_config=True,
+            available_on_host=runtime_ready,
+            effective_enabled=workbench.effective_enabled and runtime_ready,
+            deny_reason=None
+            if runtime_ready
+            else (deny_reason or RUNTIME_NOT_IMPLEMENTED),
+        )
+
+    def _has_runnable_source(task_kind: str) -> bool:
+        return any(
+            source.runtime_ready and task_kind in source.task_kinds
+            for source in visible_sources
         )
 
     return SystemFeaturesResponse(
@@ -67,11 +95,18 @@ def build_system_features_response(
         workbench=WorkbenchFeaturePayload(
             agent_tasks=_runtime_payload(workbench),
             plan_mode=_runtime_payload(workbench),
-            browse=_runtime_payload(workbench),
-            deep_research=_runtime_payload(workbench),
-            artifact_workspace=_runtime_payload(workbench),
-            project_memory=_runtime_payload(workbench),
-            connectors=_runtime_payload(workbench),
+            browse=_workbench_capability(runtime_ready=_has_runnable_source("browse")),
+            deep_research=_workbench_capability(
+                runtime_ready=_has_runnable_source("deep_research")
+            ),
+            artifact_workspace=_workbench_capability(runtime_ready=False),
+            project_memory=_workbench_capability(runtime_ready=False),
+            connectors=_workbench_capability(
+                runtime_ready=any(
+                    source.runtime_ready and source.kind == "connector"
+                    for source in visible_sources
+                )
+            ),
         ),
     )
 

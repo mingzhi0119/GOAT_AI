@@ -40,6 +40,11 @@ class DbMigrationsTests(unittest.TestCase):
                         "010_chat_artifacts",
                         "011_authorization_tenancy",
                         "012_knowledge_media_authorization",
+                        "013_workbench_tasks",
+                        "014_workbench_task_result_text",
+                        "015_workbench_task_events",
+                        "016_workbench_task_result_citations",
+                        "017_workbench_task_source_and_auth_state",
                     ],
                 )
                 cols = [
@@ -101,6 +106,35 @@ class DbMigrationsTests(unittest.TestCase):
                 ]
                 self.assertIn("tenant_id", media_cols)
                 self.assertIn("principal_id", media_cols)
+                workbench_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(workbench_tasks)"
+                    ).fetchall()
+                ]
+                self.assertIn("status", workbench_cols)
+                self.assertIn("prompt", workbench_cols)
+                self.assertIn("knowledge_document_ids", workbench_cols)
+                self.assertIn("connector_ids", workbench_cols)
+                self.assertIn("source_ids", workbench_cols)
+                self.assertIn("owner_id", workbench_cols)
+                self.assertIn("tenant_id", workbench_cols)
+                self.assertIn("principal_id", workbench_cols)
+                self.assertIn("result_text", workbench_cols)
+                self.assertIn("result_citations_json", workbench_cols)
+                self.assertIn("auth_scopes_json", workbench_cols)
+                self.assertIn("credential_id", workbench_cols)
+                self.assertIn("auth_mode", workbench_cols)
+                workbench_event_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(workbench_task_events)"
+                    ).fetchall()
+                ]
+                self.assertIn("task_id", workbench_event_cols)
+                self.assertIn("seq", workbench_event_cols)
+                self.assertIn("event_type", workbench_event_cols)
+                self.assertIn("metadata_json", workbench_event_cols)
             finally:
                 conn.close()
 
@@ -140,7 +174,7 @@ class DbMigrationsTests(unittest.TestCase):
             conn = sqlite3.connect(db_path)
             try:
                 n = conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]
-                self.assertEqual(n, 12)
+                self.assertEqual(n, 17)
                 cols = [
                     r[1]
                     for r in conn.execute("PRAGMA table_info(conversations)").fetchall()
@@ -179,6 +213,35 @@ class DbMigrationsTests(unittest.TestCase):
                 ]
                 self.assertIn("tenant_id", media_cols)
                 self.assertIn("principal_id", media_cols)
+                workbench_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(workbench_tasks)"
+                    ).fetchall()
+                ]
+                self.assertIn("status", workbench_cols)
+                self.assertIn("prompt", workbench_cols)
+                self.assertIn("knowledge_document_ids", workbench_cols)
+                self.assertIn("connector_ids", workbench_cols)
+                self.assertIn("source_ids", workbench_cols)
+                self.assertIn("owner_id", workbench_cols)
+                self.assertIn("tenant_id", workbench_cols)
+                self.assertIn("principal_id", workbench_cols)
+                self.assertIn("result_text", workbench_cols)
+                self.assertIn("result_citations_json", workbench_cols)
+                self.assertIn("auth_scopes_json", workbench_cols)
+                self.assertIn("credential_id", workbench_cols)
+                self.assertIn("auth_mode", workbench_cols)
+                workbench_event_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(workbench_task_events)"
+                    ).fetchall()
+                ]
+                self.assertIn("task_id", workbench_event_cols)
+                self.assertIn("seq", workbench_event_cols)
+                self.assertIn("event_type", workbench_event_cols)
+                self.assertIn("metadata_json", workbench_event_cols)
             finally:
                 conn.close()
 

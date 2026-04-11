@@ -215,7 +215,19 @@ class ContractFakeLLM:
         *,
         ollama_options: dict[str, float | int] | None = None,
     ) -> str:
-        return ""
+        return (
+            "## Goal\n"
+            "- Produce a concise plan\n\n"
+            "## Key Questions\n"
+            "- What is the desired outcome?\n\n"
+            "## Proposed Steps\n"
+            "- Review the request\n"
+            "- Draft the plan\n\n"
+            "## Risks\n"
+            "- Missing context\n\n"
+            "## Deliverables\n"
+            "- A short markdown plan"
+        )
 
 
 class UnavailableLLM(ContractFakeLLM):
@@ -1152,23 +1164,276 @@ class ApiBlackboxContractTests(unittest.TestCase):
         )
         self.assertEqual(400, bad.status_code)
 
-    def test_workbench_enabled_reaches_not_implemented_scaffold(self) -> None:
+    def test_workbench_enabled_creates_and_reads_durable_task(self) -> None:
         self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
 
         features = self.client.get("/api/system/features")
         self.assertEqual(200, features.status_code)
         feature_body = features.json()
         self.assertTrue(feature_body["workbench"]["agent_tasks"]["effective_enabled"])
         self.assertTrue(feature_body["workbench"]["plan_mode"]["effective_enabled"])
+        self.assertTrue(feature_body["workbench"]["browse"]["effective_enabled"])
+        self.assertTrue(feature_body["workbench"]["deep_research"]["effective_enabled"])
+        self.assertFalse(
+            feature_body["workbench"]["artifact_workspace"]["effective_enabled"]
+        )
+        self.assertFalse(
+            feature_body["workbench"]["project_memory"]["effective_enabled"]
+        )
+        self.assertFalse(feature_body["workbench"]["connectors"]["effective_enabled"])
+
+        sources_response = self.client.get("/api/workbench/sources")
+        self.assertEqual(200, sources_response.status_code)
+        sources_body = sources_response.json()
+        self.assertEqual(
+            ["web", "knowledge"],
+            [source["source_id"] for source in sources_body["sources"]],
+        )
+        self.assertFalse(sources_body["sources"][0]["runtime_ready"])
+        self.assertEqual("not_implemented", sources_body["sources"][0]["deny_reason"])
+        self.assertTrue(sources_body["sources"][1]["runtime_ready"])
+        self.assertEqual(
+            ["plan", "browse", "deep_research"],
+            sources_body["sources"][1]["task_kinds"],
+        )
+
+        create_response = self.client.post(
+            "/api/workbench/tasks",
+            json={
+                "task_kind": "plan",
+                "prompt": "Draft a plan",
+                "session_id": "chat-1",
+                "project_id": "project-1",
+                "source_ids": ["web"],
+            },
+        )
+
+        self.assertEqual(202, create_response.status_code)
+        created = create_response.json()
+        self.assertTrue(created["task_id"].startswith("wb-"))
+        self.assertEqual("plan", created["task_kind"])
+        self.assertEqual("queued", created["status"])
+        self.assertIn("created_at", created)
+        self.assertNotIn("result", created)
+
+        status_response = self.client.get(f"/api/workbench/tasks/{created['task_id']}")
+        self.assertEqual(200, status_response.status_code)
+        status_body = status_response.json()
+        self.assertEqual(created["task_id"], status_body["task_id"])
+        self.assertEqual("plan", status_body["task_kind"])
+        self.assertEqual("completed", status_body["status"])
+        self.assertEqual(created["created_at"], status_body["created_at"])
+        self.assertGreaterEqual(status_body["updated_at"], status_body["created_at"])
+        self.assertIsNone(status_body["error_detail"])
+        self.assertEqual("markdown", status_body["result"]["format"])
+        self.assertIn("Goal", status_body["result"]["content"])
+
+        events_response = self.client.get(
+            f"/api/workbench/tasks/{created['task_id']}/events"
+        )
+        self.assertEqual(200, events_response.status_code)
+        events_body = events_response.json()
+        self.assertEqual(created["task_id"], events_body["task_id"])
+        self.assertEqual(
+            ["task.queued", "task.started", "task.completed"],
+            [event["event_type"] for event in events_body["events"]],
+        )
+        self.assertEqual(
+            [1, 2, 3], [event["sequence"] for event in events_body["events"]]
+        )
+        self.assertEqual("queued", events_body["events"][0]["status"])
+        self.assertEqual("completed", events_body["events"][-1]["status"])
+        self.assertEqual(["web"], events_body["events"][0]["metadata"]["source_ids"])
+        self.assertEqual(
+            "markdown", events_body["events"][-1]["metadata"]["result_format"]
+        )
+
+        missing = self.client.get("/api/workbench/tasks/wb-missing")
+        self.assertEqual(404, missing.status_code)
+        self.assertEqual("Workbench task not found", missing.json()["detail"])
+
+    def test_workbench_task_rejects_unknown_source_ids(self) -> None:
+        self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
 
         response = self.client.post(
             "/api/workbench/tasks",
-            json={"task_kind": "plan", "prompt": "Draft a plan"},
+            json={
+                "task_kind": "plan",
+                "prompt": "Draft a plan",
+                "source_ids": ["unknown-source"],
+            },
         )
-        self.assertEqual(501, response.status_code)
+        self.assertEqual(422, response.status_code)
+        body = response.json()
+        self.assertEqual("REQUEST_VALIDATION_ERROR", body["code"])
+        self.assertIn("Unknown or unavailable workbench sources", body["detail"])
+
+    def test_workbench_task_infers_knowledge_source_from_attached_docs(self) -> None:
+        self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        create_response = self.client.post(
+            "/api/workbench/tasks",
+            json={
+                "task_kind": "plan",
+                "prompt": "Draft a plan",
+                "knowledge_document_ids": ["doc-123"],
+            },
+        )
+        self.assertEqual(202, create_response.status_code)
+        task_id = create_response.json()["task_id"]
+
+        events_response = self.client.get(f"/api/workbench/tasks/{task_id}/events")
+        self.assertEqual(200, events_response.status_code)
         self.assertEqual(
-            "Workbench task execution is not implemented yet.",
-            response.json()["detail"],
+            ["knowledge"], events_response.json()["events"][0]["metadata"]["source_ids"]
+        )
+
+    def test_workbench_plan_task_surfaces_failed_status_when_execution_fails(
+        self,
+    ) -> None:
+        self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+        self.client.app.dependency_overrides[get_llm_client] = lambda: UnavailableLLM()
+        try:
+            create_response = self.client.post(
+                "/api/workbench/tasks",
+                json={"task_kind": "plan", "prompt": "Draft a plan"},
+            )
+            self.assertEqual(202, create_response.status_code)
+            task_id = create_response.json()["task_id"]
+
+            status_response = self.client.get(f"/api/workbench/tasks/{task_id}")
+        finally:
+            self.client.app.dependency_overrides[get_llm_client] = lambda: (
+                ContractFakeLLM()
+            )
+
+        self.assertEqual(200, status_response.status_code)
+        status_body = status_response.json()
+        self.assertEqual("failed", status_body["status"])
+        self.assertEqual("AI backend unavailable.", status_body["error_detail"])
+        self.assertIsNone(status_body["result"])
+
+        events_response = self.client.get(f"/api/workbench/tasks/{task_id}/events")
+        self.assertEqual(200, events_response.status_code)
+        self.assertEqual(
+            ["task.queued", "task.started", "task.failed"],
+            [event["event_type"] for event in events_response.json()["events"]],
+        )
+
+    def test_workbench_browse_task_uses_knowledge_source_and_returns_citations(
+        self,
+    ) -> None:
+        self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        upload = self.client.post(
+            "/api/knowledge/uploads",
+            files={
+                "file": (
+                    "strategy.txt",
+                    b"Porter Five Forces explains competitive pressure.",
+                    "text/plain",
+                )
+            },
+        )
+        self.assertEqual(200, upload.status_code)
+        document_id = upload.json()["document_id"]
+        ingest = self.client.post(
+            "/api/knowledge/ingestions",
+            json={
+                "document_id": document_id,
+                "parser_profile": "default",
+                "chunking_profile": "default",
+                "embedding_profile": "default",
+            },
+        )
+        self.assertEqual(200, ingest.status_code)
+
+        create_response = self.client.post(
+            "/api/workbench/tasks",
+            json={
+                "task_kind": "browse",
+                "prompt": "competitive pressure",
+                "knowledge_document_ids": [document_id],
+            },
+        )
+        self.assertEqual(202, create_response.status_code)
+        task_id = create_response.json()["task_id"]
+
+        status_response = self.client.get(f"/api/workbench/tasks/{task_id}")
+        self.assertEqual(200, status_response.status_code)
+        status_body = status_response.json()
+        self.assertEqual("completed", status_body["status"])
+        self.assertIsNone(status_body["error_detail"])
+        self.assertIn("Browse Summary", status_body["result"]["content"])
+        self.assertGreaterEqual(len(status_body["result"]["citations"]), 1)
+        self.assertEqual(
+            "Porter Five Forces explains competitive pressure.",
+            status_body["result"]["citations"][0]["snippet"],
+        )
+
+        events_response = self.client.get(f"/api/workbench/tasks/{task_id}/events")
+        self.assertEqual(200, events_response.status_code)
+        self.assertEqual(
+            [
+                "task.queued",
+                "task.started",
+                "retrieval.sources_resolved",
+                "retrieval.step.completed",
+                "task.completed",
+            ],
+            [event["event_type"] for event in events_response.json()["events"]],
+        )
+        self.assertEqual(
+            "knowledge",
+            events_response.json()["events"][3]["metadata"]["source_id"],
+        )
+
+    def test_workbench_deep_research_with_web_only_is_rejected_up_front(
+        self,
+    ) -> None:
+        self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        response = self.client.post(
+            "/api/workbench/tasks",
+            json={
+                "task_kind": "deep_research",
+                "prompt": "Look something up",
+                "source_ids": ["web"],
+            },
+        )
+        self.assertEqual(422, response.status_code)
+        body = response.json()
+        self.assertEqual("REQUEST_VALIDATION_ERROR", body["code"])
+        self.assertIn(
+            "At least one runtime-ready retrieval source is required",
+            body["detail"],
+        )
+
+    def test_workbench_canvas_task_still_fails_with_not_implemented_detail(
+        self,
+    ) -> None:
+        self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        create_response = self.client.post(
+            "/api/workbench/tasks",
+            json={"task_kind": "canvas", "prompt": "Draft something"},
+        )
+        self.assertEqual(202, create_response.status_code)
+        task_id = create_response.json()["task_id"]
+
+        status_response = self.client.get(f"/api/workbench/tasks/{task_id}")
+        self.assertEqual(200, status_response.status_code)
+        status_body = status_response.json()
+        self.assertEqual("failed", status_body["status"])
+        self.assertEqual(
+            "Task kind is not implemented yet.", status_body["error_detail"]
         )
 
 
@@ -1280,6 +1545,9 @@ class ApiProtectedBlackboxContractTests(unittest.TestCase):
                 "/api/workbench/tasks",
                 {"json": {"task_kind": "plan", "prompt": "Draft a plan"}},
             ),
+            ("GET", "/api/workbench/sources", {}),
+            ("GET", "/api/workbench/tasks/wb-1", {}),
+            ("GET", "/api/workbench/tasks/wb-1/events", {}),
             ("GET", "/api/system/metrics", {}),
         ]
 
