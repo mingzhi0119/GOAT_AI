@@ -25,13 +25,13 @@ from backend.application.workbench import (
     get_workbench_workspace_output,
     list_workbench_workspace_outputs,
 )
-from backend.dependencies import (
+from backend.platform.dependencies import (
     get_authorization_context,
     get_session_repository,
     get_workbench_task_dispatcher,
     get_workbench_task_repository,
 )
-from backend.config import get_settings
+from backend.platform.config import get_settings
 from backend.domain.authz_types import AuthorizationContext
 from backend.models.common import ErrorResponse
 from backend.models.workbench import (

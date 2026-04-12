@@ -2687,7 +2687,7 @@
           "content"
         ],
         "title": "ChatMessage",
-        "description": "A single turn in the conversation (mirrors goat_ai.types.ChatTurn)."
+        "description": "A single turn in the conversation (mirrors goat_ai.shared.types.ChatTurn)."
       },
       "ChatRequest": {
         "properties": {

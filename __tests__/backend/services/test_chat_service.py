@@ -22,7 +22,7 @@ from backend.services.session_service import (
     session_title_for_upsert,
     truncate_session_title,
 )
-from goat_ai.clocks import FakeClock
+from goat_ai.shared.clocks import FakeClock
 
 
 @dataclass

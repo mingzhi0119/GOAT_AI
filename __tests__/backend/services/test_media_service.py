@@ -15,7 +15,7 @@ from backend.services.media_service import (
     load_images_base64_for_chat,
     load_normalized_base64_for_ollama,
 )
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 PNG_1X1_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ioAAAAASUVORK5CYII="
 

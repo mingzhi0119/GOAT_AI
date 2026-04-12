@@ -11,8 +11,11 @@ from backend.services.system_telemetry_service import (
     build_runtime_target_response,
     build_system_features_response,
 )
-from goat_ai.config import Settings
-from goat_ai.feature_gates import CodeSandboxFeatureSnapshot, RuntimeFeatureSnapshot
+from goat_ai.config.settings import Settings
+from goat_ai.config.feature_gates import (
+    CodeSandboxFeatureSnapshot,
+    RuntimeFeatureSnapshot,
+)
 
 
 def _settings() -> Settings:

@@ -7,11 +7,11 @@ from __tests__.helpers.repo_root import repo_root
 REPO_ROOT = repo_root(Path(__file__))
 
 SUPPORTED_PORT_POLICY_FILES = [
-    REPO_ROOT / "backend" / "config.py",
+    REPO_ROOT / "backend" / "platform" / "config.py",
     REPO_ROOT / "server.py",
     REPO_ROOT / "frontend" / "vite.config.ts",
     REPO_ROOT / ".env.example",
-    REPO_ROOT / "goat_ai" / "runtime_target.py",
+    REPO_ROOT / "goat_ai" / "runtime" / "runtime_target.py",
     REPO_ROOT / "tools" / "ops" / "post_deploy_check.py",
     REPO_ROOT / "docs" / "operations" / "OPERATIONS.md",
 ]

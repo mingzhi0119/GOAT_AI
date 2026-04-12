@@ -32,7 +32,7 @@ except ImportError:  # pragma: no cover - exercised in environments without dock
 
 from backend.services.exceptions import FeatureNotAvailable
 from backend.types import Settings
-from goat_ai.feature_gate_reasons import (
+from goat_ai.config.feature_gate_reasons import (
     RUNTIME_DOCKER_UNAVAILABLE,
     RUNTIME_LOCALHOST_UNAVAILABLE,
 )

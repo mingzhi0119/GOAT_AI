@@ -17,7 +17,7 @@ from backend.services.session_message_codec import (
     build_session_payload,
     is_file_context_message,
 )
-from goat_ai.clocks import Clock, SystemClock
+from goat_ai.shared.clocks import Clock, SystemClock
 
 logger = logging.getLogger(__name__)
 _CJK_CHAR_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")

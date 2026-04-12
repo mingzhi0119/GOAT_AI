@@ -15,7 +15,7 @@ from backend.services.code_sandbox_runtime import (
     SQLiteCodeSandboxExecutionRepository,
 )
 from backend.services.db_migrations import apply_migrations
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 
 class _FakeSandboxProvider:

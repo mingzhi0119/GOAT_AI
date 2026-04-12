@@ -11,10 +11,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from backend.config import CORS_ORIGINS, get_settings
+from backend.platform.config import CORS_ORIGINS, get_settings
 from backend.domain.rate_limit_policy import RateLimitPolicy
-from backend.exception_handlers import register_exception_handlers
-from backend.http_security import register_http_security
+from backend.platform.exception_handlers import register_exception_handlers
+from backend.platform.http_security import register_http_security
 from backend.routers import (
     artifacts,
     chat,
@@ -41,11 +41,11 @@ from backend.services.rate_limiter import StoredSlidingWindowRateLimiter
 from backend.services.rate_limit_store import InMemorySlidingWindowRateLimitStore
 from backend.services.workbench_execution_service import recover_workbench_tasks
 from backend.services.workbench_runtime import SQLiteWorkbenchTaskRepository
-from goat_ai.config import Settings
-from goat_ai.latency_metrics import init_latency_metrics
-from goat_ai.logging_config import configure_logging
-from goat_ai.ollama_client import OllamaService
-from goat_ai.otel_tracing import init_otel_if_enabled, is_otel_enabled
+from goat_ai.config.settings import Settings
+from goat_ai.telemetry.latency_metrics import init_latency_metrics
+from goat_ai.telemetry.logging_config import configure_logging
+from goat_ai.llm.ollama_client import OllamaService
+from goat_ai.telemetry.otel_tracing import init_otel_if_enabled, is_otel_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +189,7 @@ def _build_app(
     register_exception_handlers(app)
 
     if enable_runtime_startup and is_otel_enabled():
-        from backend.otel_middleware import OtelTraceContextMiddleware
+        from backend.platform.otel_middleware import OtelTraceContextMiddleware
 
         app.add_middleware(OtelTraceContextMiddleware)
 

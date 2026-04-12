@@ -18,7 +18,7 @@ from backend.services.code_sandbox_runtime import (
     CodeSandboxExecutionCreatePayload,
     CodeSandboxExecutionRecord,
 )
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 
 def _settings() -> Settings:

@@ -7,7 +7,7 @@ import re
 import subprocess
 
 from backend.models.system import GPUStatusResponse
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 logger = logging.getLogger(__name__)
 

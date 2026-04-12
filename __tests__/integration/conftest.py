@@ -8,9 +8,9 @@ import pytest
 
 
 def _clear_imported_settings_caches() -> None:
-    import backend.config as backend_config
-    import backend.dependencies as backend_dependencies
-    import backend.http_security as backend_http_security
+    import backend.platform.config as backend_config
+    import backend.platform.dependencies as backend_dependencies
+    import backend.platform.http_security as backend_http_security
     import backend.main as backend_main
     from backend.routers import (
         artifacts,
@@ -30,7 +30,7 @@ def _clear_imported_settings_caches() -> None:
     backend_http_security.get_settings.cache_clear()
     backend_main.get_settings.cache_clear()
 
-    # Some tests reload backend.config, so route modules can hold stale get_settings aliases.
+    # Some tests reload backend.platform.config, so route modules can hold stale get_settings aliases.
     for module in (
         artifacts,
         chat,

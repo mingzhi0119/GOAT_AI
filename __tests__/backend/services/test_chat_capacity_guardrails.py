@@ -10,14 +10,14 @@ except ImportError:  # pragma: no cover
     TestClient = None  # type: ignore[assignment]
 
 from backend.api_errors import REQUEST_VALIDATION_ERROR
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 if TestClient is not None:
-    from backend.config import get_settings
-    from backend.dependencies import get_llm_client, get_title_generator
+    from backend.platform.config import get_settings
+    from backend.platform.dependencies import get_llm_client, get_title_generator
     from backend.main import create_app
     from backend.services import log_service
-    from goat_ai.types import ChatTurn
+    from goat_ai.shared.types import ChatTurn
 
 
 class _FakeLLM:

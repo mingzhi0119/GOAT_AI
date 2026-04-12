@@ -10,11 +10,11 @@ except ImportError:  # pragma: no cover - environment without backend deps
     FastAPI = None  # type: ignore[assignment]
     TestClient = None  # type: ignore[assignment]
 
-from goat_ai.ollama_client import ToolCallPlan
-from goat_ai.types import ChatTurn
+from goat_ai.llm.ollama_client import ToolCallPlan
+from goat_ai.shared.types import ChatTurn
 
 if FastAPI is not None:
-    from backend.dependencies import get_llm_client
+    from backend.platform.dependencies import get_llm_client
     from backend.routers import models
 
 

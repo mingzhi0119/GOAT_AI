@@ -6,8 +6,8 @@ from typing import Optional
 
 import pandas as pd
 
-from goat_ai.config import Settings
-from goat_ai.types import TabularUploadLike
+from goat_ai.config.settings import Settings
+from goat_ai.shared.types import TabularUploadLike
 
 logger = logging.getLogger(__name__)
 

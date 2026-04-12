@@ -5,9 +5,9 @@ from unittest.mock import Mock, patch
 
 import requests
 
-from goat_ai.config import Settings
-from goat_ai.exceptions import OllamaUnavailable
-from goat_ai.ollama_client import OllamaService, _iter_stream_parts_from_chunk
+from goat_ai.config.settings import Settings
+from goat_ai.shared.exceptions import OllamaUnavailable
+from goat_ai.llm.ollama_client import OllamaService, _iter_stream_parts_from_chunk
 
 
 def _settings(*, ttl: int) -> Settings:
@@ -66,7 +66,7 @@ def test_stream_tokens_uses_chat_first_event_timeout() -> None:
     fake_response.iter_lines.return_value = []
 
     with patch(
-        "goat_ai.ollama_client.requests.post", return_value=fake_response
+        "goat_ai.llm.ollama_client.requests.post", return_value=fake_response
     ) as post_mock:
         list(service.stream_tokens("gemma4:26b", [], "system"))
 
@@ -89,7 +89,7 @@ def test_generate_completion_uses_generate_timeout() -> None:
     fake_response.json.return_value = {"response": "ok"}
 
     with patch(
-        "goat_ai.ollama_client.requests.post", return_value=fake_response
+        "goat_ai.llm.ollama_client.requests.post", return_value=fake_response
     ) as post_mock:
         text = service.generate_completion("gemma4:26b", "hello")
 
@@ -109,8 +109,10 @@ def test_stream_tokens_midstream_disconnect_raises_ollama_unavailable() -> None:
             yield b'{"message":{"role":"assistant","content":"Hello"},"done":false}'
             raise requests.exceptions.ChunkedEncodingError("stream interrupted")
 
-    with patch("goat_ai.ollama_client.requests.post", return_value=_BrokenResponse()):
-        with patch("goat_ai.ollama_client.inc_ollama_error") as error_counter:
+    with patch(
+        "goat_ai.llm.ollama_client.requests.post", return_value=_BrokenResponse()
+    ):
+        with patch("goat_ai.llm.ollama_client.inc_ollama_error") as error_counter:
             try:
                 list(service.stream_tokens("gemma4:26b", [], "system"))
                 assert False, "Expected OllamaUnavailable"
@@ -128,7 +130,7 @@ def test_get_model_capabilities_uses_ttl_cache() -> None:
     fake_response.raise_for_status.return_value = None
 
     with patch(
-        "goat_ai.ollama_client.requests.post", return_value=fake_response
+        "goat_ai.llm.ollama_client.requests.post", return_value=fake_response
     ) as post_mock:
         first = service.get_model_capabilities("qwen3")
         second = service.get_model_capabilities("qwen3")
@@ -146,7 +148,7 @@ def test_get_model_capabilities_without_cache_calls_each_time() -> None:
     fake_response.raise_for_status.return_value = None
 
     with patch(
-        "goat_ai.ollama_client.requests.post", return_value=fake_response
+        "goat_ai.llm.ollama_client.requests.post", return_value=fake_response
     ) as post_mock:
         service.get_model_capabilities("gemma4:26b")
         service.get_model_capabilities("gemma4:26b")
@@ -164,7 +166,7 @@ def test_describe_model_for_api_parses_context_length() -> None:
     }
     fake_response.raise_for_status.return_value = None
 
-    with patch("goat_ai.ollama_client.requests.post", return_value=fake_response):
+    with patch("goat_ai.llm.ollama_client.requests.post", return_value=fake_response):
         caps, ctx = service.describe_model_for_api("ctx-parse-model")
 
     assert caps == ["completion"]
@@ -182,7 +184,7 @@ def test_get_model_context_length_reuses_show_cache() -> None:
     fake_response.raise_for_status.return_value = None
 
     with patch(
-        "goat_ai.ollama_client.requests.post", return_value=fake_response
+        "goat_ai.llm.ollama_client.requests.post", return_value=fake_response
     ) as post_mock:
         assert service.get_model_capabilities("m") == ["completion"]
         assert service.get_model_context_length("m") == 8192
@@ -199,10 +201,10 @@ def test_list_model_names_retries_then_succeeds() -> None:
 
     with (
         patch(
-            "goat_ai.ollama_client.requests.get", side_effect=[failing, success]
+            "goat_ai.llm.ollama_client.requests.get", side_effect=[failing, success]
         ) as get_mock,
-        patch("goat_ai.ollama_client.time.sleep") as sleep_mock,
-        patch("goat_ai.ollama_client.random.uniform", return_value=0.0),
+        patch("goat_ai.llm.ollama_client.time.sleep") as sleep_mock,
+        patch("goat_ai.llm.ollama_client.random.uniform", return_value=0.0),
     ):
         names = service.list_model_names()
 
@@ -224,7 +226,7 @@ def test_read_circuit_breaker_opens_and_half_open_recovers() -> None:
     service = OllamaService(tuned)
 
     with patch(
-        "goat_ai.ollama_client.requests.get",
+        "goat_ai.llm.ollama_client.requests.get",
         side_effect=requests.ConnectionError("down"),
     ) as get_mock:
         try:
@@ -234,7 +236,7 @@ def test_read_circuit_breaker_opens_and_half_open_recovers() -> None:
             pass
     assert get_mock.call_count == 1
 
-    with patch("goat_ai.ollama_client.requests.get") as blocked_mock:
+    with patch("goat_ai.llm.ollama_client.requests.get") as blocked_mock:
         try:
             service.list_model_names()
             assert False, "Expected open breaker rejection"
@@ -246,9 +248,9 @@ def test_read_circuit_breaker_opens_and_half_open_recovers() -> None:
     success.raise_for_status.return_value = None
     success.json.return_value = {"models": [{"name": "gemma4:26b"}]}
     with (
-        patch("goat_ai.ollama_client.time.monotonic", return_value=999.0),
+        patch("goat_ai.llm.ollama_client.time.monotonic", return_value=999.0),
         patch(
-            "goat_ai.ollama_client.requests.get", return_value=success
+            "goat_ai.llm.ollama_client.requests.get", return_value=success
         ) as recovered_get,
     ):
         service._breaker_open_until_monotonic = 100.0

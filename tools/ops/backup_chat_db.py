@@ -8,7 +8,7 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-from goat_ai.config import load_settings
+from goat_ai.config.settings import load_settings
 
 
 def _default_project_root() -> Path:

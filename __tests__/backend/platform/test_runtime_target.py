@@ -3,8 +3,11 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from goat_ai.config import Settings
-from goat_ai.runtime_target import current_runtime_target, ordered_runtime_targets
+from goat_ai.config.settings import Settings
+from goat_ai.runtime.runtime_target import (
+    current_runtime_target,
+    ordered_runtime_targets,
+)
 
 
 def make_settings(**overrides: object) -> Settings:

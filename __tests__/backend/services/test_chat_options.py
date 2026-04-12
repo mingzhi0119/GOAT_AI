@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from backend.application.chat import _resolve_base_system_prompt
 from backend.models.chat import ChatMessage, ChatRequest
 from backend.services.chat_orchestration import PromptComposer
-from goat_ai.config import default_system_prompt_for_theme
+from goat_ai.config.settings import default_system_prompt_for_theme
 from backend.routers.chat_options import (
     build_ollama_options,
     ollama_options_from_chat_request,

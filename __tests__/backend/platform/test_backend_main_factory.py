@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from backend import main
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 
 class BackendMainFactoryTests(unittest.TestCase):

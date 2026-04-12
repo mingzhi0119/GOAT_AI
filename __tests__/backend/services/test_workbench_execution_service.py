@@ -17,7 +17,7 @@ from backend.services.workbench_runtime import (
     WorkbenchTaskCreatePayload,
 )
 from backend.services.workbench_source_registry import WorkbenchSourceDescriptor
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 
 class _FakeLLM:

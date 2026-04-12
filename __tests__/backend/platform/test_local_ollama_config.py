@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from goat_ai import config
+import goat_ai.config.settings as config
 
 
 class LocalOllamaConfigTests(unittest.TestCase):

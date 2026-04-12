@@ -11,7 +11,7 @@ from backend.services.workbench_source_registry import (
     normalize_requested_source_ids,
     resolve_requested_sources,
 )
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 
 def _settings(root: Path) -> Settings:

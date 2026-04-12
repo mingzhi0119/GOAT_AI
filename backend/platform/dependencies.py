@@ -10,7 +10,7 @@ from fastapi import BackgroundTasks, Depends, HTTPException, Request
 from backend.domain.authz_types import AuthorizationContext
 from backend.domain.credential_registry import build_local_authorization_context
 from backend.api_errors import AUTH_INVALID_API_KEY, build_error_body
-from backend.config import get_settings
+from backend.platform.config import get_settings
 from backend.services.chat_runtime import (
     ConversationLogger,
     OllamaTitleGenerator,
@@ -54,7 +54,7 @@ from backend.application.ports import (
     WorkbenchTaskDispatcher,
 )
 from backend.types import LLMClient, Settings
-from goat_ai.ollama_client import OllamaService
+from goat_ai.llm.ollama_client import OllamaService
 
 
 def get_llm_client(settings: Settings = Depends(get_settings)) -> LLMClient:

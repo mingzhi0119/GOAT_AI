@@ -11,7 +11,11 @@ def test_build_sidecar_command_includes_module_and_data_root(tmp_path: Path) -> 
         data_root=tmp_path / "desktop-data",
     )
 
-    assert command[:3] == [subject.sys.executable, "-m", "goat_ai.desktop_sidecar"]
+    assert command[:3] == [
+        subject.sys.executable,
+        "-m",
+        "goat_ai.runtime.desktop_sidecar",
+    ]
     assert "--data-root" in command
     assert str(tmp_path / "desktop-data") in command
 

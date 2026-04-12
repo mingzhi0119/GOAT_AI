@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from backend.config import BACKEND_HOST, BACKEND_PORT
+from backend.platform.config import BACKEND_HOST, BACKEND_PORT
 from backend.domain.authz_types import AuthorizationContext
 from backend.models.system import (
     CodeSandboxFeaturePayload,
@@ -17,14 +17,17 @@ from backend.models.system import (
 from backend.services.feature_gate_service import code_sandbox_policy_allowed
 from backend.services.workbench_source_registry import list_workbench_sources
 from backend.types import Settings
-from goat_ai.feature_gate_reasons import RUNTIME_NOT_IMPLEMENTED
-from goat_ai.feature_gates import (
+from goat_ai.config.feature_gate_reasons import RUNTIME_NOT_IMPLEMENTED
+from goat_ai.config.feature_gates import (
     RuntimeFeatureSnapshot,
     compute_agent_workbench_snapshot,
     compute_code_sandbox_snapshot,
 )
-from goat_ai.latency_metrics import get_inference_snapshot
-from goat_ai.runtime_target import current_runtime_target, ordered_runtime_targets
+from goat_ai.telemetry.latency_metrics import get_inference_snapshot
+from goat_ai.runtime.runtime_target import (
+    current_runtime_target,
+    ordered_runtime_targets,
+)
 
 
 def build_inference_latency_response() -> InferenceLatencyResponse:

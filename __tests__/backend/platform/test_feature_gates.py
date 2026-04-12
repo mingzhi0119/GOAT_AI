@@ -6,8 +6,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from backend.domain.credential_registry import build_local_authorization_context
-from goat_ai.config import Settings
-from goat_ai.feature_gates import (
+from goat_ai.config.settings import Settings
+from goat_ai.config.feature_gates import (
     compute_agent_workbench_snapshot,
     compute_code_sandbox_snapshot,
     probe_docker_available,
@@ -62,8 +62,8 @@ class TestFeatureGates(unittest.TestCase):
             self.assertIsNone(snap.deny_reason)
             require_agent_workbench_enabled(settings)
 
-    @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=True)
-    @patch("goat_ai.feature_gates.docker.DockerClient")
+    @patch("goat_ai.config.feature_gates._path_usable_for_docker", return_value=True)
+    @patch("goat_ai.config.feature_gates.docker.DockerClient")
     def test_code_sandbox_enabled_when_config_and_probe_ok(
         self, mock_client: object, _mock: object
     ) -> None:
@@ -77,7 +77,7 @@ class TestFeatureGates(unittest.TestCase):
             self.assertEqual("container", snap.isolation_level)
             self.assertTrue(snap.network_policy_enforced)
 
-    @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=False)
+    @patch("goat_ai.config.feature_gates._path_usable_for_docker", return_value=False)
     def test_code_sandbox_docker_unavailable(self, _mock: object) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             s = _settings(Path(tmp), feature_code_sandbox_enabled=True)
@@ -86,7 +86,7 @@ class TestFeatureGates(unittest.TestCase):
             self.assertEqual("docker_unavailable", snap.deny_reason)
 
     @patch(
-        "goat_ai.feature_gates.resolve_localhost_sandbox_shell",
+        "goat_ai.config.feature_gates.resolve_localhost_sandbox_shell",
         return_value="powershell.exe",
     )
     def test_code_sandbox_localhost_enabled_when_shell_available(
@@ -106,7 +106,10 @@ class TestFeatureGates(unittest.TestCase):
             self.assertEqual("host", snap.isolation_level)
             self.assertFalse(snap.network_policy_enforced)
 
-    @patch("goat_ai.feature_gates.resolve_localhost_sandbox_shell", return_value=None)
+    @patch(
+        "goat_ai.config.feature_gates.resolve_localhost_sandbox_shell",
+        return_value=None,
+    )
     def test_code_sandbox_localhost_unavailable(self, _mock: object) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             settings = _settings(
@@ -133,8 +136,8 @@ class TestFeatureGates(unittest.TestCase):
             code_sandbox_policy_allowed(build_local_authorization_context())
         )
 
-    @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=True)
-    @patch("goat_ai.feature_gates.docker.DockerClient")
+    @patch("goat_ai.config.feature_gates._path_usable_for_docker", return_value=True)
+    @patch("goat_ai.config.feature_gates.docker.DockerClient")
     def test_require_code_sandbox_enabled_allows_when_policy_and_runtime_allow(
         self, mock_client: object, _mock: object
     ) -> None:
@@ -143,7 +146,7 @@ class TestFeatureGates(unittest.TestCase):
             settings = _settings(Path(tmp), feature_code_sandbox_enabled=True)
             require_code_sandbox_enabled(settings, build_local_authorization_context())
 
-    @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=False)
+    @patch("goat_ai.config.feature_gates._path_usable_for_docker", return_value=False)
     def test_require_code_sandbox_enabled_raises_runtime_denial_first(
         self, _mock: object
     ) -> None:
@@ -156,7 +159,10 @@ class TestFeatureGates(unittest.TestCase):
         self.assertEqual("runtime", exc_info.exception.gate_kind)
         self.assertEqual("docker_unavailable", exc_info.exception.deny_reason)
 
-    @patch("goat_ai.feature_gates.resolve_localhost_sandbox_shell", return_value=None)
+    @patch(
+        "goat_ai.config.feature_gates.resolve_localhost_sandbox_shell",
+        return_value=None,
+    )
     def test_require_code_sandbox_enabled_raises_localhost_runtime_denial(
         self, _mock: object
     ) -> None:
@@ -173,8 +179,8 @@ class TestFeatureGates(unittest.TestCase):
         self.assertEqual("runtime", exc_info.exception.gate_kind)
         self.assertEqual("localhost_unavailable", exc_info.exception.deny_reason)
 
-    @patch("goat_ai.feature_gates._path_usable_for_docker", return_value=True)
-    @patch("goat_ai.feature_gates.docker.DockerClient")
+    @patch("goat_ai.config.feature_gates._path_usable_for_docker", return_value=True)
+    @patch("goat_ai.config.feature_gates.docker.DockerClient")
     def test_require_code_sandbox_enabled_raises_policy_denial(
         self, mock_client: object, _mock: object
     ) -> None:

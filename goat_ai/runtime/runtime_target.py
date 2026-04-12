@@ -6,7 +6,7 @@ import socket
 from dataclasses import asdict, dataclass
 from typing import Callable
 
-from goat_ai.config import Settings, load_settings
+from goat_ai.config.settings import Settings, load_settings
 
 RuntimeTargetProbe = Callable[[str, int], tuple[bool, str]]
 

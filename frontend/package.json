@@ -14,7 +14,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "desktop:sidecar:build": "node ./scripts/run-python.mjs ../tools/build_desktop_sidecar.py",
+    "desktop:sidecar:build": "node ./scripts/run-python.mjs ../tools/desktop/build_desktop_sidecar.py",
     "desktop:dev": "node ./scripts/run-tauri.mjs dev --config src-tauri/tauri.conf.json",
     "desktop:build": "node ./scripts/run-tauri.mjs build --config src-tauri/tauri.conf.json"
   },

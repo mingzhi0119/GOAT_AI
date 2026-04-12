@@ -19,8 +19,8 @@ from backend.application.history import (
     rename_history_session,
 )
 from backend.application.ports import SessionRepository, Settings
-from backend.config import get_settings
-from backend.dependencies import (
+from backend.platform.config import get_settings
+from backend.platform.dependencies import (
     get_authorization_context,
     get_session_repository,
     get_workbench_task_repository,

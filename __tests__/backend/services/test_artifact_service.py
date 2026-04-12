@@ -10,7 +10,7 @@ from backend.services.artifact_service import (
     prepare_export_artifact,
 )
 from backend.services.exceptions import PersistenceWriteError
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 
 class ArtifactServiceTests(unittest.TestCase):

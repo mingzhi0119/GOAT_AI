@@ -14,12 +14,12 @@ except ImportError:  # pragma: no cover - environment without backend deps
 
 from backend.models.upload import UploadAnalysisResponse
 from backend.services import log_service
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 if FastAPI is not None:
-    from backend.config import get_settings
-    from backend.exception_handlers import register_exception_handlers
-    from backend.dependencies import get_llm_client
+    from backend.platform.config import get_settings
+    from backend.platform.exception_handlers import register_exception_handlers
+    from backend.platform.dependencies import get_llm_client
     from backend.routers import upload
 
 

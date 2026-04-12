@@ -10,7 +10,7 @@ from typing import Protocol
 import pandas as pd
 
 from backend.models.chat import ChatMessage
-from goat_ai.tools import CHART_DATA_CSV_MARKER
+from goat_ai.chat.tools import CHART_DATA_CSV_MARKER
 
 logger = logging.getLogger(__name__)
 

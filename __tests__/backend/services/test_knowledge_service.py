@@ -19,7 +19,7 @@ from backend.services.knowledge_repository import (
     KnowledgeIngestionRecord,
     SQLiteKnowledgeRepository,
 )
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 
 def _settings(root: Path) -> Settings:

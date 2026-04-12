@@ -8,7 +8,7 @@ from typing import Any
 
 import requests
 
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 logger = logging.getLogger(__name__)
 

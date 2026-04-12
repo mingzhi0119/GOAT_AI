@@ -13,7 +13,7 @@ import pandas as pd
 from backend.domain.authz_types import AuthorizationContext
 from backend.models.chat import ChatMessage
 from backend.models.artifact import ChatArtifact
-from backend.prometheus_metrics import inc_chat_stream_completed
+from backend.platform.prometheus_metrics import inc_chat_stream_completed
 from backend.services.chat_orchestration import (
     ChartToolOrchestrator,
     PromptComposer,
@@ -43,11 +43,11 @@ from backend.services.tabular_context import (
     TabularContextExtractor,
 )
 from backend.types import Settings
-from goat_ai.clocks import Clock
-from goat_ai.echarts_tool import GENERATE_CHART_V2_SCHEMA
-from goat_ai.exceptions import OllamaUnavailable
-from goat_ai.ollama_client import LLMClient, StreamTextPart, ToolCallPlan
-from goat_ai.types import ChatTurn
+from goat_ai.shared.clocks import Clock
+from goat_ai.charts.echarts_tool import GENERATE_CHART_V2_SCHEMA
+from goat_ai.shared.exceptions import OllamaUnavailable
+from goat_ai.llm.ollama_client import LLMClient, StreamTextPart, ToolCallPlan
+from goat_ai.shared.types import ChatTurn
 
 logger = logging.getLogger(__name__)
 _STREAM_OUTPUT_HOLDBACK_TOKENS = 1

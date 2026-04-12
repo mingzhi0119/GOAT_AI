@@ -6,7 +6,7 @@ import math
 import threading
 from collections import defaultdict
 
-from goat_ai.telemetry_counters import (
+from goat_ai.telemetry.telemetry_counters import (
     snapshot_feature_gate_denials,
     snapshot_knowledge_query_rewrite_applied,
     snapshot_knowledge_retrieval,

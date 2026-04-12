@@ -1,8 +1,8 @@
-"""Unit tests for goat_ai.latency_metrics."""
+"""Unit tests for goat_ai.telemetry.latency_metrics."""
 
 from __future__ import annotations
 
-from goat_ai.latency_metrics import (
+from goat_ai.telemetry.latency_metrics import (
     get_inference_snapshot,
     init_latency_metrics,
     record_chat_first_token_ms,

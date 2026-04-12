@@ -4,7 +4,7 @@ from backend.models.knowledge import KnowledgeSearchRequest
 from backend.services.knowledge_pipeline import normalize_document
 from backend.services.knowledge_service import search_knowledge
 from backend.types import LLMClient
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 DEFAULT_PROMPT_RECOMMENDER_MODEL = "gemma4:26b"
 _MAX_EVIDENCE_CHARS = 2400

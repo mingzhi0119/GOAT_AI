@@ -24,7 +24,7 @@ from backend.services.workbench_runtime import (
     WorkbenchWorkspaceOutputRecord,
 )
 from backend.services.workbench_source_registry import WorkbenchSourceDescriptor
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 from backend.services.artifact_service import PersistedArtifactRecord
 
 

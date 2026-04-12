@@ -11,7 +11,7 @@ FRONTEND_ROOT = REPO_ROOT / "frontend"
 TAURI_ROOT = FRONTEND_ROOT / "src-tauri"
 BINARIES_DIR = TAURI_ROOT / "binaries"
 BUILD_ROOT = TAURI_ROOT / ".desktop-sidecar-build"
-ENTRYPOINT = REPO_ROOT / "goat_ai" / "desktop_sidecar.py"
+ENTRYPOINT = REPO_ROOT / "goat_ai" / "runtime" / "desktop_sidecar.py"
 BASE_NAME = "goat-backend"
 
 

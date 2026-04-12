@@ -13,13 +13,13 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from backend.config import get_settings
-from backend.dependencies import get_llm_client, get_title_generator
+from backend.platform.config import get_settings
+from backend.platform.dependencies import get_llm_client, get_title_generator
 from backend.main import create_contract_app
 from backend.services import log_service
-from goat_ai.config import Settings
-from goat_ai.latency_metrics import init_latency_metrics
-from goat_ai.types import ChatTurn
+from goat_ai.config.settings import Settings
+from goat_ai.telemetry.latency_metrics import init_latency_metrics
+from goat_ai.shared.types import ChatTurn
 
 
 @dataclass(frozen=True)

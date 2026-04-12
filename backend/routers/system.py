@@ -15,8 +15,8 @@ from backend.application.system import (
 )
 from backend.domain.authz_types import AuthorizationContext
 from backend.application.ports import Settings
-from backend.config import get_settings
-from backend.dependencies import get_authorization_context
+from backend.platform.config import get_settings
+from backend.platform.dependencies import get_authorization_context
 from backend.models.common import ErrorResponse
 from backend.models.system import (
     GPUStatusResponse,

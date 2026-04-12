@@ -11,7 +11,7 @@ from backend.services.upload_prompt_service import (
     build_template_fallback_prompt,
     recommend_template_prompt,
 )
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 
 class _FakeLLM:

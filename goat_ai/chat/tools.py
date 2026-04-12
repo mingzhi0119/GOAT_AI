@@ -4,7 +4,7 @@ from typing import Any, Sequence
 
 import pandas as pd
 
-from goat_ai.types import ChatTurn
+from goat_ai.shared.types import ChatTurn
 
 # Marker used by the backend to embed the raw CSV data inside the file-context
 # prompt so that tabular extractors can reconstruct a DataFrame from history.

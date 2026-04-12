@@ -13,7 +13,7 @@ from backend.services.code_sandbox_provider import (
     SandboxProviderRequest,
 )
 from backend.services.exceptions import FeatureNotAvailable
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 
 def _settings(root: Path) -> Settings:

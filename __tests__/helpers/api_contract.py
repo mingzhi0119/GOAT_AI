@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from goat_ai.ollama_client import ToolCallPlan
-from goat_ai.types import ChatTurn
+from goat_ai.llm.ollama_client import ToolCallPlan
+from goat_ai.shared.types import ChatTurn
 
 
 def parse_sse_payloads(body: str) -> list[dict[str, Any]]:

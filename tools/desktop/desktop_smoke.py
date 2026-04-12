@@ -28,7 +28,7 @@ def build_sidecar_command(*, host: str, port: int, data_root: Path) -> list[str]
     return [
         sys.executable,
         "-m",
-        "goat_ai.desktop_sidecar",
+        "goat_ai.runtime.desktop_sidecar",
         "--host",
         host,
         "--port",

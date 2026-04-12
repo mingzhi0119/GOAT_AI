@@ -18,17 +18,17 @@ from backend.domain.credential_registry import (
     build_local_authorization_context,
     resolve_authorization_context,
 )
-from backend.config import get_settings
-from backend.prometheus_metrics import record_http_request
+from backend.platform.config import get_settings
+from backend.platform.prometheus_metrics import record_http_request
 from backend.services.rate_limiter import (
     RateLimiter,
     RateLimitPolicyLike,
     StoredSlidingWindowRateLimiter,
 )
 from backend.services.rate_limit_store import RateLimitStore
-from goat_ai.clocks import Clock, SystemClock
-from goat_ai.config import Settings
-from goat_ai.request_context import reset_request_id, set_request_id
+from goat_ai.shared.clocks import Clock, SystemClock
+from goat_ai.config.settings import Settings
+from goat_ai.telemetry.request_context import reset_request_id, set_request_id
 
 _HEALTH_PATH = "/api/health"
 _READY_PATH = "/api/ready"

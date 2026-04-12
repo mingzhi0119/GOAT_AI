@@ -22,7 +22,7 @@ from backend.services.workbench_runtime import (
     WorkbenchTaskRepository,
 )
 from backend.types import LLMClient, Settings
-from goat_ai.exceptions import OllamaUnavailable
+from goat_ai.shared.exceptions import OllamaUnavailable
 
 logger = logging.getLogger(__name__)
 

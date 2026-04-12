@@ -27,14 +27,14 @@ from backend.api_errors import (
     REQUEST_VALIDATION_ERROR,
     VISION_NOT_SUPPORTED,
 )
-from goat_ai.config import Settings
-from goat_ai.exceptions import OllamaUnavailable
-from goat_ai.ollama_client import ToolCallPlan
-from goat_ai.types import ChatTurn
+from goat_ai.config.settings import Settings
+from goat_ai.shared.exceptions import OllamaUnavailable
+from goat_ai.llm.ollama_client import ToolCallPlan
+from goat_ai.shared.types import ChatTurn
 
 if TestClient is not None:
-    from backend.config import get_settings
-    from backend.dependencies import (
+    from backend.platform.config import get_settings
+    from backend.platform.dependencies import (
         get_code_sandbox_provider,
         get_llm_client,
         get_title_generator,
@@ -193,7 +193,7 @@ class ContractFakeLLM:
                 last_user = str(message.get("content", ""))
                 break
         if any(
-            token in last_user.lower() for token in ("chart", "pie", "饼图", "图表")
+            token in last_user.lower() for token in ("chart", "pie", "楗煎浘", "鍥捐〃")
         ) and self.supports_tool_calling(model):
             yield ToolCallPlan(
                 assistant_message={
@@ -1348,7 +1348,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(404, missing.status_code)
         self.assertEqual("Workbench task not found", missing.json()["detail"])
 
-    @patch("goat_ai.feature_gates.probe_docker_available", return_value=True)
+    @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
     def test_code_sandbox_enabled_executes_and_reads_durable_record(
         self, _mock: object
     ) -> None:
@@ -1401,7 +1401,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
             [event["event_type"] for event in events.json()["events"]],
         )
 
-    @patch("goat_ai.feature_gates.probe_docker_available", return_value=True)
+    @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
     def test_code_sandbox_async_exec_returns_accepted_and_streams_logs(
         self, _mock: object
     ) -> None:
@@ -1441,7 +1441,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual("completed", final_status.json()["status"])
         self.assertIn("async log line", final_status.json()["stdout"])
 
-    @patch("goat_ai.feature_gates.probe_docker_available", return_value=True)
+    @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
     def test_code_sandbox_exec_rejects_invalid_network_policy(
         self, _mock: object
     ) -> None:

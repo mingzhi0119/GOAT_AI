@@ -19,13 +19,13 @@ type = "layers"
 layers = [
     "backend.main",
     "backend.routers",
-    "backend.dependencies",
-    "backend.exception_handlers",
-    "backend.http_security | backend.otel_middleware",
+    "backend.platform.dependencies",
+    "backend.platform.exception_handlers",
+    "backend.platform.http_security | backend.platform.otel_middleware",
     "backend.application",
     "backend.services",
     "backend.domain",
     "backend.models",
-    "backend.api_errors | backend.config | backend.types",
+    "backend.api_errors | backend.platform.config | backend.types",
     "goat_ai",
 ]

@@ -10,7 +10,7 @@ from backend.services.gpu_service import (
     _parse_gpu_row,
     read_gpu_status,
 )
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 
 class GPUServiceTests(unittest.TestCase):

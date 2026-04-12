@@ -20,7 +20,7 @@ from backend.services.chat_runtime import SessionUpsertPayload
 from backend.services.session_message_codec import build_session_payload
 from backend.services.workbench_runtime import WorkbenchWorkspaceOutputRecord
 from __tests__.helpers.session_repository import InMemorySessionRepository
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 
 class _FakeWorkbenchRepository:

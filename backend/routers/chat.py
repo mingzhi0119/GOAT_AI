@@ -27,8 +27,8 @@ from backend.application.ports import (
     TabularContextExtractor,
     TitleGenerator,
 )
-from backend.config import get_settings
-from backend.dependencies import (
+from backend.platform.config import get_settings
+from backend.platform.dependencies import (
     get_authorization_context,
     get_conversation_logger,
     get_llm_client,

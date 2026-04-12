@@ -6,8 +6,8 @@ import os
 import sys
 from typing import Any
 
-from goat_ai.config import load_dotenv_if_present
-from goat_ai.request_context import get_request_id
+from goat_ai.config.settings import load_dotenv_if_present
+from goat_ai.telemetry.request_context import get_request_id
 
 
 class RequestContextFilter(logging.Filter):

@@ -20,7 +20,7 @@ from backend.domain.authz_types import AuthorizationContext
 from backend.domain.authorization import PrincipalId, TenantId
 from backend.models.chat import ChatMessage, ChatRequest
 from backend.services import log_service
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 
 class _FakeLLM:

@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from goat_ai.config import Settings
-from goat_ai.exceptions import OllamaUnavailable
-from goat_ai.ollama_client import LLMClient
+from goat_ai.config.settings import Settings
+from goat_ai.shared.exceptions import OllamaUnavailable
+from goat_ai.llm.ollama_client import LLMClient
 
 
 @runtime_checkable

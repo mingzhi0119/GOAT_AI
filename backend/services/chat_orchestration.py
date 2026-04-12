@@ -33,12 +33,15 @@ from backend.services.safeguard_service import (
 from backend.services.session_service import last_user_message, persist_chat_session
 from backend.services.sse import sse_done_event, sse_error_event, sse_token_event
 from backend.services.tabular_context import TabularContextExtractor
-from goat_ai.clocks import Clock
-from goat_ai.echarts_tool import parse_chart_intent_v2
-from goat_ai.latency_metrics import record_chat_first_token_ms, record_chat_inference_ms
-from goat_ai.ollama_client import LLMClient, ToolCallPlan
-from goat_ai.tools import messages_for_ollama
-from goat_ai.types import ChatTurn
+from goat_ai.shared.clocks import Clock
+from goat_ai.charts.echarts_tool import parse_chart_intent_v2
+from goat_ai.telemetry.latency_metrics import (
+    record_chat_first_token_ms,
+    record_chat_inference_ms,
+)
+from goat_ai.llm.ollama_client import LLMClient, ToolCallPlan
+from goat_ai.chat.tools import messages_for_ollama
+from goat_ai.shared.types import ChatTurn
 
 logger = logging.getLogger(__name__)
 

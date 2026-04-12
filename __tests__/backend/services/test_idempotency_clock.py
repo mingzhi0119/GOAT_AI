@@ -10,7 +10,7 @@ from pathlib import Path
 
 from backend.services.db_migrations import apply_migrations
 from backend.services.idempotency_service import SQLiteIdempotencyStore
-from goat_ai.clocks import FakeClock
+from goat_ai.shared.clocks import FakeClock
 
 
 class TestIdempotencyClock(unittest.TestCase):

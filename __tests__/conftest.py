@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from goat_ai.latency_metrics import init_latency_metrics
+from goat_ai.telemetry.latency_metrics import init_latency_metrics
 
 
 @pytest.fixture(autouse=True)

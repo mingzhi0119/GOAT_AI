@@ -7,7 +7,7 @@ import re
 import pandas as pd
 
 from backend.models.chart_v2 import ChartMetaV2, ChartSpecV2
-from goat_ai.chart_intent_v2 import (
+from goat_ai.charts.chart_intent_v2 import (
     AggregateOp,
     ChartIntentFilterV2,
     ChartIntentSeriesV2,

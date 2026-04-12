@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from backend.models.chart_v2 import ChartIntentV2, ChartSpecV2
-from goat_ai.echarts_tool import GENERATE_CHART_V2_SCHEMA, parse_chart_intent_v2
+from goat_ai.charts.echarts_tool import GENERATE_CHART_V2_SCHEMA, parse_chart_intent_v2
 
 
 class ChartV2ModelTests(unittest.TestCase):

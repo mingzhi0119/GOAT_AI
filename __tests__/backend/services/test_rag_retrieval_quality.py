@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from dataclasses import replace
 
-from goat_ai.config import load_settings
+from goat_ai.config.settings import load_settings
 
 from backend.services.knowledge_pipeline import KnowledgeSearchHit
 from backend.services.retrieval_quality.policy import (
@@ -11,9 +11,9 @@ from backend.services.retrieval_quality.policy import (
     resolve_rerank_mode,
 )
 from backend.services.retrieval_quality.query_rewrite import conservative_rewrite_query
-from backend import prometheus_metrics
+from backend.platform import prometheus_metrics
 from backend.services.retrieval_quality.rerank import lexical_rerank_hits
-from goat_ai.telemetry_counters import (
+from goat_ai.telemetry.telemetry_counters import (
     inc_knowledge_query_rewrite_applied,
     inc_knowledge_retrieval,
     reset_knowledge_retrieval_metrics_for_tests,

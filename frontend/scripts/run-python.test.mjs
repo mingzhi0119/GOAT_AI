@@ -72,7 +72,7 @@ describe("run-python", () => {
       exists: () => false,
       homeDir: "/home/goat",
       platform: "linux",
-      rawArgs: ["../tools/build_desktop_sidecar.py"],
+      rawArgs: ["../tools/desktop/build_desktop_sidecar.py"],
       spawn: vi.fn().mockReturnValue({ status: 1 }),
     });
 
@@ -94,7 +94,7 @@ describe("run-python", () => {
       exists: () => true,
       homeDir: "/home/goat",
       platform: "linux",
-      rawArgs: ["../tools/build_desktop_sidecar.py", "--clean"],
+      rawArgs: ["../tools/desktop/build_desktop_sidecar.py", "--clean"],
       spawn,
     });
 
@@ -102,7 +102,7 @@ describe("run-python", () => {
     expect(spawn).toHaveBeenNthCalledWith(
       2,
       "python3",
-      ["../tools/build_desktop_sidecar.py", "--clean"],
+      ["../tools/desktop/build_desktop_sidecar.py", "--clean"],
       expect.objectContaining({ cwd: "/repo/frontend", shell: false, stdio: "inherit" }),
     );
   });

@@ -4,9 +4,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from backend.dependencies import get_llm_client
-from goat_ai.config import Settings
-from goat_ai.ollama_client import OllamaService
+from backend.platform.dependencies import get_llm_client
+from goat_ai.config.settings import Settings
+from goat_ai.llm.ollama_client import OllamaService
 
 
 def _settings(root: Path, **kwargs: object) -> Settings:

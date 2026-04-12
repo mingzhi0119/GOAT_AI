@@ -12,7 +12,7 @@ JSON error responses use a **stable envelope** so logs, metrics, and clients sha
 
 - **`detail`** - String for most 4xx/5xx from handlers; **array of objects** for `422` validation (FastAPI / Pydantic shape unchanged, wrapped with `code` and `request_id`).
 - **`code`** - Machine-readable, **do not rename** once shipped (breaking change for clients and dashboards).
-- **`request_id`** - Omitted only if context is missing (should not happen on normal HTTP requests after middleware runs). Clients may send **`X-Request-ID`**; the server echoes it here and in the response header. The active id is stored in **`goat_ai.request_context`** (re-exported from `backend.api_errors` for convenience).
+- **`request_id`** - Omitted only if context is missing (should not happen on normal HTTP requests after middleware runs). Clients may send **`X-Request-ID`**; the server echoes it here and in the response header. The active id is stored in **`goat_ai.telemetry.request_context`** (re-exported from `backend.api_errors` for convenience).
 
 ## Registry
 
@@ -39,7 +39,7 @@ JSON error responses use a **stable envelope** so logs, metrics, and clients sha
 
 ## Source of truth
 
-- Constants: `backend/api_errors.py` (request correlation: `goat_ai.request_context`)
+- Constants: `backend/api_errors.py` (request correlation: `goat_ai.telemetry.request_context`)
 - Handler registration: `backend/exception_handlers.py`
 - OpenAPI schema: `ErrorResponse` in `backend/models/common.py` -> `docs/api/openapi.json`
 

@@ -7,7 +7,7 @@ from backend.application.upload import analyze_upload_json
 from backend.domain.authz_types import AuthorizationContext
 from backend.domain.authorization import PrincipalId, TenantId
 from backend.models.upload import UploadAnalysisResponse
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 
 class _FakeIdempotencyStore:

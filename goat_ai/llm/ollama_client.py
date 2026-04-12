@@ -13,16 +13,16 @@ from typing import Any, Generator, Literal, Protocol
 
 import requests
 
-from goat_ai.config import Settings
-from goat_ai.exceptions import OllamaUnavailable
-from goat_ai.otel_tracing import otel_span
-from goat_ai.telemetry_counters import OLLAMA_ERROR_API_CODE, inc_ollama_error
-from goat_ai.tools import (
+from goat_ai.config.settings import Settings
+from goat_ai.shared.exceptions import OllamaUnavailable
+from goat_ai.telemetry.otel_tracing import otel_span
+from goat_ai.telemetry.telemetry_counters import OLLAMA_ERROR_API_CODE, inc_ollama_error
+from goat_ai.chat.tools import (
     conversation_transcript,
     messages_for_ollama,
     messages_for_ollama_with_images,
 )
-from goat_ai.types import ChatTurn
+from goat_ai.shared.types import ChatTurn
 
 logger = logging.getLogger(__name__)
 

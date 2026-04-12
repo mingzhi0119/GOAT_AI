@@ -8,7 +8,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-from goat_ai.otel_tracing import attach_request_trace_context, is_otel_enabled
+from goat_ai.telemetry.otel_tracing import attach_request_trace_context, is_otel_enabled
 
 
 class OtelTraceContextMiddleware(BaseHTTPMiddleware):

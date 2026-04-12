@@ -31,8 +31,8 @@ from backend.application.ports import (
     VisionNotSupported,
 )
 from backend.services.exceptions import KnowledgeFeatureNotImplemented
-from goat_ai.feature_gates import feature_gate_public_detail
-from goat_ai.request_context import get_request_id
+from goat_ai.config.feature_gates import feature_gate_public_detail
+from goat_ai.telemetry.request_context import get_request_id
 
 logger = logging.getLogger(__name__)
 

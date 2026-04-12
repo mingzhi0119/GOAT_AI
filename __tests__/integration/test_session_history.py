@@ -49,7 +49,7 @@ def _seed_session(db: Path, session_id: str, title: str, owner_id: str = "") -> 
 
 def test_list_history_returns_seeded_sessions(app_client: object) -> None:
     from fastapi.testclient import TestClient
-    from backend.config import get_settings
+    from backend.platform.config import get_settings
 
     assert isinstance(app_client, TestClient)
     settings = get_settings()
@@ -74,7 +74,7 @@ def test_list_history_returns_seeded_sessions(app_client: object) -> None:
 
 def test_get_history_session_detail_returns_messages(app_client: object) -> None:
     from fastapi.testclient import TestClient
-    from backend.config import get_settings
+    from backend.platform.config import get_settings
 
     assert isinstance(app_client, TestClient)
     settings = get_settings()
@@ -107,7 +107,7 @@ def test_get_history_session_detail_not_found(app_client: object) -> None:
 
 def test_delete_history_session_removes_it(app_client: object) -> None:
     from fastapi.testclient import TestClient
-    from backend.config import get_settings
+    from backend.platform.config import get_settings
 
     assert isinstance(app_client, TestClient)
     settings = get_settings()
@@ -133,7 +133,7 @@ def test_delete_history_session_not_found(app_client: object) -> None:
 
 def test_rename_history_session_updates_title(app_client: object) -> None:
     from fastapi.testclient import TestClient
-    from backend.config import get_settings
+    from backend.platform.config import get_settings
 
     assert isinstance(app_client, TestClient)
     settings = get_settings()
@@ -159,7 +159,7 @@ def test_rename_history_session_rejects_whitespace_only_title(
     app_client: object,
 ) -> None:
     from fastapi.testclient import TestClient
-    from backend.config import get_settings
+    from backend.platform.config import get_settings
 
     assert isinstance(app_client, TestClient)
     settings = get_settings()
@@ -185,7 +185,7 @@ def test_rename_history_session_returns_500_on_persistence_failure(
     integration_env: None,
 ) -> None:
     from fastapi.testclient import TestClient
-    from backend.config import get_settings
+    from backend.platform.config import get_settings
     from backend.main import create_app
 
     settings = get_settings()
@@ -215,7 +215,7 @@ def test_rename_history_session_returns_500_on_persistence_failure(
 
 def test_delete_all_history_removes_all(app_client: object) -> None:
     from fastapi.testclient import TestClient
-    from backend.config import get_settings
+    from backend.platform.config import get_settings
 
     assert isinstance(app_client, TestClient)
     settings = get_settings()

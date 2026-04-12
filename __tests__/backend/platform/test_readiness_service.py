@@ -5,8 +5,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from backend.readiness_service import evaluate_readiness
-from goat_ai.config import Settings
+from backend.platform.readiness_service import evaluate_readiness
+from goat_ai.config.settings import Settings
 
 
 def _settings(*, ready_skip_ollama_probe: bool = False) -> Settings:
@@ -38,7 +38,7 @@ class ReadinessServiceTests(unittest.TestCase):
 
     def test_readiness_reports_sqlite_failure(self) -> None:
         with patch(
-            "backend.readiness_service.sqlite3.connect",
+            "backend.platform.readiness_service.sqlite3.connect",
             side_effect=OSError("db locked"),
         ):
             body, status = evaluate_readiness(_settings(ready_skip_ollama_probe=True))
@@ -50,7 +50,7 @@ class ReadinessServiceTests(unittest.TestCase):
 
     def test_readiness_reports_ollama_failure(self) -> None:
         with patch(
-            "backend.readiness_service.requests.get",
+            "backend.platform.readiness_service.requests.get",
             side_effect=RuntimeError("connection refused"),
         ):
             body, status = evaluate_readiness(_settings())
@@ -64,7 +64,9 @@ class ReadinessServiceTests(unittest.TestCase):
         response = Mock()
         response.status_code = 200
         response.raise_for_status.return_value = None
-        with patch("backend.readiness_service.requests.get", return_value=response):
+        with patch(
+            "backend.platform.readiness_service.requests.get", return_value=response
+        ):
             body, status = evaluate_readiness(_settings())
 
         self.assertEqual(200, status)

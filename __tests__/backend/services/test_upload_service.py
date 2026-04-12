@@ -7,7 +7,7 @@ from pathlib import Path
 
 from backend.services import log_service
 from backend.services.upload_service import stream_upload_analysis_sse
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 
 class UploadServiceTests(unittest.TestCase):

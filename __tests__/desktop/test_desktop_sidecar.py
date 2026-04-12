@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from types import SimpleNamespace
 
-import goat_ai.desktop_sidecar as subject
+import goat_ai.runtime.desktop_sidecar as subject
 
 
 def test_configure_desktop_environment_seeds_runtime_paths(

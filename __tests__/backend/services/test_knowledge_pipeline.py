@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from backend.services.knowledge_pipeline import normalize_document
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 
 class KnowledgePipelineNormalizationTests(unittest.TestCase):

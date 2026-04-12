@@ -10,7 +10,7 @@ from unittest.mock import patch
 from backend.services.safeguard_service import (
     ModeScopedSafeguardService,
 )
-from goat_ai.config import Settings, load_settings
+from goat_ai.config.settings import Settings, load_settings
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -99,7 +99,7 @@ class TestGetSafeguardServiceFactory(unittest.TestCase):
 
     def _factory(self, **kwargs: object) -> object:
         """Call get_safeguard_service() with an injected Settings, bypassing FastAPI."""
-        from backend.dependencies import get_safeguard_service
+        from backend.platform.dependencies import get_safeguard_service
 
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             s = _settings(Path(tmp), **kwargs)

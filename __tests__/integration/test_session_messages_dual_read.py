@@ -20,7 +20,7 @@ pytestmark = pytest.mark.integration
 def test_upsert_writes_session_messages_and_get_reads_them(
     integration_env: None,
 ) -> None:
-    from backend.config import get_settings
+    from backend.platform.config import get_settings
 
     settings = get_settings()
     log_service.init_db(settings.log_db_path)

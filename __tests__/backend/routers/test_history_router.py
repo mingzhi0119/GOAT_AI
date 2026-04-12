@@ -12,10 +12,10 @@ except ImportError:  # pragma: no cover - environment without backend deps
     TestClient = None  # type: ignore[assignment]
 
 from backend.services import log_service
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 if FastAPI is not None:
-    from backend.config import get_settings
+    from backend.platform.config import get_settings
     from backend.routers import history
 
 

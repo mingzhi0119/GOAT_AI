@@ -4,7 +4,7 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 from backend.types import AsyncUploadReader
 

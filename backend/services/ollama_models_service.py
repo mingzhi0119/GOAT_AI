@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from goat_ai.exceptions import OllamaUnavailable
+from goat_ai.shared.exceptions import OllamaUnavailable
 
 from backend.models.chat import ModelCapabilitiesResponse, ModelsResponse
 from backend.services.exceptions import InferenceBackendUnavailable

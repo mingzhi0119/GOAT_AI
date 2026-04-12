@@ -6,8 +6,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from goat_ai.config import Settings, resolve_localhost_sandbox_shell
-from goat_ai.feature_gate_reasons import (
+from goat_ai.config.settings import Settings, resolve_localhost_sandbox_shell
+from goat_ai.config.feature_gate_reasons import (
     GateKind,
     RUNTIME_DISABLED_BY_OPERATOR,
     RUNTIME_DOCKER_UNAVAILABLE,
@@ -117,7 +117,10 @@ def probe_docker_available(settings: Settings) -> bool:
     """Return True if a configured or default Docker socket/pipe appears usable."""
     if docker is None:
         return False
-    if not any(_path_usable_for_docker(candidate) for candidate in _docker_paths_to_probe(settings)):
+    if not any(
+        _path_usable_for_docker(candidate)
+        for candidate in _docker_paths_to_probe(settings)
+    ):
         return False
     client = None
     try:

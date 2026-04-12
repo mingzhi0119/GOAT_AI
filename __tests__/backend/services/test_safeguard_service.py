@@ -5,7 +5,7 @@ import unittest
 from collections.abc import Generator
 from pathlib import Path
 
-from backend import prometheus_metrics
+from backend.platform import prometheus_metrics
 from backend.models.chat import ChatMessage
 from backend.services import log_service
 from backend.services.chat_runtime import (
@@ -17,7 +17,7 @@ from backend.services.safeguard_service import (
     SAFEGUARD_REFUSAL_MESSAGE,
     RuleBasedSafeguardService,
 )
-from goat_ai.types import ChatTurn
+from goat_ai.shared.types import ChatTurn
 
 
 class CountingLLM:

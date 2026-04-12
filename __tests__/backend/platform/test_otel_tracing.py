@@ -6,7 +6,11 @@ import os
 import unittest
 from unittest.mock import patch
 
-from goat_ai.otel_tracing import init_otel_if_enabled, is_otel_enabled, otel_span
+from goat_ai.telemetry.otel_tracing import (
+    init_otel_if_enabled,
+    is_otel_enabled,
+    otel_span,
+)
 
 
 class OtelTracingTests(unittest.TestCase):

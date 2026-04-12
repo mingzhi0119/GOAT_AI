@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from backend.domain.credential_registry import resolve_authorization_context
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 
 def _settings(**overrides: object) -> Settings:

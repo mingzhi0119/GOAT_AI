@@ -10,7 +10,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Protocol
 
-from goat_ai.clocks import Clock, SystemClock
+from goat_ai.shared.clocks import Clock, SystemClock
 
 logger = logging.getLogger(__name__)
 

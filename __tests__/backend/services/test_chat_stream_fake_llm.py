@@ -16,9 +16,9 @@ from backend.services.chat_runtime import (
 from backend.services.chat_service import stream_chat_sse
 from backend.services.safeguard_service import RuleBasedSafeguardService
 from backend.services.sse import sse_event
-from goat_ai.latency_metrics import get_inference_snapshot
-from goat_ai.ollama_client import ToolCallPlan
-from goat_ai.types import ChatTurn
+from goat_ai.telemetry.latency_metrics import get_inference_snapshot
+from goat_ai.llm.ollama_client import ToolCallPlan
+from goat_ai.shared.types import ChatTurn
 
 
 class FakeLLMClient:

@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 from backend.domain.rate_limit_policy import RateLimitPolicy
-from goat_ai.clocks import FakeClock
+from goat_ai.shared.clocks import FakeClock
 
 
 class FakeRateLimitStore:
@@ -41,10 +41,10 @@ class TestRegisterHttpSecurityClockInjection(unittest.TestCase):
         window_sec: int = 60,
         max_requests: int = 2,
     ):
-        import backend.http_security as http_security
+        import backend.platform.http_security as http_security
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
-        from goat_ai.config import Settings
+        from goat_ai.config.settings import Settings
 
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             root = Path(tmp)

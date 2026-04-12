@@ -79,7 +79,7 @@ def test_main_builds_and_installs_sidecar(
     repo_root = tmp_path / "repo"
     binaries_dir = repo_root / "frontend" / "src-tauri" / "binaries"
     build_root = repo_root / "frontend" / "src-tauri" / ".desktop-sidecar-build"
-    entrypoint = repo_root / "goat_ai" / "desktop_sidecar.py"
+    entrypoint = repo_root / "goat_ai" / "runtime" / "desktop_sidecar.py"
     migrations_dir = repo_root / "backend" / "migrations"
     entrypoint.parent.mkdir(parents=True)
     migrations_dir.mkdir(parents=True)
@@ -132,7 +132,7 @@ def test_main_reports_pyinstaller_failure(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     repo_root = tmp_path / "repo"
-    entrypoint = repo_root / "goat_ai" / "desktop_sidecar.py"
+    entrypoint = repo_root / "goat_ai" / "runtime" / "desktop_sidecar.py"
     entrypoint.parent.mkdir(parents=True)
     entrypoint.write_text("print('desktop')\n", encoding="utf-8")
 

@@ -10,7 +10,7 @@ from backend.services.session_message_codec import (
     build_session_payload,
     is_file_context_message,
 )
-from goat_ai.tools import CHART_DATA_CSV_MARKER, LEGACY_CSV_FENCE_SUBSTRING
+from goat_ai.chat.tools import CHART_DATA_CSV_MARKER, LEGACY_CSV_FENCE_SUBSTRING
 
 
 class SessionMessageCodecTests(unittest.TestCase):

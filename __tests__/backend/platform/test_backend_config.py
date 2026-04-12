@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib
 import os
 
-import backend.config as backend_config
+import backend.platform.config as backend_config
 
 
 def _restore_env(name: str, value: str | None) -> None:
