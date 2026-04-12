@@ -127,7 +127,67 @@ def test_main_writes_summary_json(
     subject.main()
 
     summary = json.loads((artifact_dir / "summary.json").read_text(encoding="utf-8"))
+    assert summary["status"] == "passed"
+    assert summary["phase"] == "completed"
+    assert summary["desktop_exe"] == str(desktop_exe.resolve())
+    assert summary["sidecar_path"] == str(sidecar.resolve())
+    assert summary["config"]["scenarios"] == ["missing_sidecar"]
+    assert summary["config"]["startup_timeout_sec"] == 15.0
     assert summary["results"][0]["scenario"] == "missing_sidecar"
+    assert summary["results"][0]["status"] == "passed"
+
+
+def test_main_writes_failed_summary_json(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    artifact_dir = tmp_path / "artifacts"
+    desktop_exe = tmp_path / "goat-ai-desktop.exe"
+    sidecar = tmp_path / "goat-backend.exe"
+    desktop_exe.write_text("", encoding="utf-8")
+    sidecar.write_text("", encoding="utf-8")
+    failed_result = subject.PackagedShellFaultResult(
+        scenario="hang_before_ready",
+        stdout_path="stdout.log",
+        stderr_path="stderr.log",
+        status="failed",
+        error="timed out",
+    )
+    monkeypatch.setattr(
+        subject,
+        "_build_parser",
+        lambda: _parser_with_namespace(
+            desktop_exe=desktop_exe,
+            sidecar=sidecar,
+            artifact_dir=artifact_dir,
+            scenarios=["hang_before_ready"],
+            startup_timeout_sec=15.0,
+            health_timeout_sec=2,
+            restart_limit=1,
+            backoff_ms=100,
+            hang_sec=5.0,
+            app_identifier=subject.DEFAULT_WINDOWS_APP_IDENTIFIER,
+        ),
+    )
+    monkeypatch.setattr(
+        subject,
+        "run_fault_scenario",
+        lambda **kwargs: (_ for _ in ()).throw(
+            subject.PackagedShellFaultScenarioError(
+                "timed out",
+                result=failed_result,
+            )
+        ),
+    )
+
+    with pytest.raises(SystemExit, match="timed out"):
+        subject.main()
+
+    summary = json.loads((artifact_dir / "summary.json").read_text(encoding="utf-8"))
+    assert summary["status"] == "failed"
+    assert summary["phase"] == "scenario:hang_before_ready"
+    assert summary["error"] == "timed out"
+    assert summary["results"][0]["status"] == "failed"
+    assert summary["results"][0]["scenario"] == "hang_before_ready"
 
 
 def _parser_with_namespace(**kwargs: object):

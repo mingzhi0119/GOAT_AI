@@ -107,6 +107,12 @@ The workflow boundaries stay distinct:
 - `.github/workflows/desktop-provenance.yml`: signed installer provenance plus installed Windows startup evidence for release artifacts
 - `.github/workflows/fault-injection.yml`: recurring installed Windows drill to catch regression drift between releases
 
+For PR packaged diagnostics, `desktop-package-windows` should retain a
+`desktop-windows-fault-smoke` artifact containing at least the packaged-build
+log, packaged-shell smoke log, top-level `summary.json`, and per-scenario result
+files. That artifact proves packaged CI-binary startup evidence only; it is not
+release-installed MSI/NSIS evidence.
+
 Required desktop signing secrets:
 
 - `GOAT_DESKTOP_SIGNING_CERT_BASE64`

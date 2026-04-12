@@ -143,6 +143,10 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
         "python -m tools.desktop.packaged_shell_fault_smoke"
         not in desktop_supply_chain_job
     )
+    assert "Tee-Object -FilePath $buildLog" in desktop_windows_job
+    assert "packaged-shell-fault-smoke.log" in desktop_windows_job
+    assert "summary.json" in desktop_windows_job
+    assert "GITHUB_STEP_SUMMARY" in desktop_windows_job
     assert "--scenario missing_sidecar" in desktop_windows_job
     assert "--scenario exit_before_ready" in desktop_windows_job
     assert "--scenario hang_before_ready" in desktop_windows_job
@@ -151,6 +155,13 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     assert "--restart-limit 1" in desktop_windows_job
     assert "--backoff-ms 100" in desktop_windows_job
     assert "--hang-sec 5" in desktop_windows_job
+    assert (
+        "hashFiles('frontend/src-tauri/target/release/bundle/msi/*.msi')" in ci_workflow
+    )
+    assert (
+        "hashFiles('frontend/src-tauri/target/release/bundle/nsis/*-setup.exe')"
+        in ci_workflow
+    )
     assert "Build Linux desktop sidecar" in desktop_supply_chain_job
     assert "Rust dependency audit" in desktop_supply_chain_job
     assert "python -m tools.desktop.write_desktop_release_provenance" in ci_workflow
@@ -196,8 +207,14 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     assert "merge-blocking packaged-shell fault smoke" in roadmap
     assert "packaged-build truth set" in operations_doc
     assert "non-desktop-only backend or documentation changes" in operations_doc
+    assert "desktop-windows-fault-smoke" in operations_doc
+    assert "artifact should contain at least" in operations_doc
+    assert "build.log" in operations_doc
+    assert "summary.json" in operations_doc
     assert "frontend build inputs" in incident_triage
     assert "non-desktop-only backend or documentation changes" in incident_triage
+    assert "desktop-fault-smoke/summary.json" in incident_triage
+    assert "desktop-fault-smoke/build.log" in incident_triage
 
 
 def test_main_writes_json_output(

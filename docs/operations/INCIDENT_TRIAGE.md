@@ -17,6 +17,7 @@ Use this runbook when staging or production health regresses and you need a fast
 5. Expect `desktop-package-windows` for desktop build inputs, not just `frontend/src-tauri/**`: frontend build inputs such as `frontend/src/**`, `frontend/public/**`, `frontend/index.html`, Vite/Tailwind/PostCSS/TS config, desktop scripts, desktop tools, and desktop governance tests/workflows are in scope for that PR gate.
 6. Do not expect `desktop-package-windows` for non-desktop-only backend or documentation changes when the packaged Windows build surface is untouched.
 7. Treat `.github/workflows/desktop-provenance.yml` as the source of truth for installed Windows release evidence and `.github/workflows/fault-injection.yml` as the recurring installed-desktop drill; do not mix those failures into the PR packaged gate.
+8. When `desktop-package-windows` fails, check `desktop-fault-smoke/summary.json` first, then `desktop-fault-smoke/build.log` and `desktop-fault-smoke/packaged-shell-fault-smoke.log`; those retained artifacts are the expected packaged PR evidence bundle.
 
 ## What to look at first
 
@@ -50,6 +51,7 @@ Use this runbook when staging or production health regresses and you need a fast
 - Repeated readiness failures after deploy: use `ROLLBACK.md` rather than iterating hotfixes blindly on the host.
 - Observability asset drift or OTel enabled-path failures: fix `backend-heavy` first so alerts, dashboards, runbooks, and `traceparent` propagation are back in sync before debugging higher-level symptoms.
 - Repeated desktop startup failures: capture sidecar logs, Tauri shell logs, the packaged app version, the logged restart attempt counts, the recorded failure stage, the installer kind (`msi` vs `nsis`), the install root, the uninstall result, and whether the failure came from `desktop-package-windows`, release installed evidence, or the scheduled installed drill before retrying. Call out the exact fault-smoke scenario when known: `missing_sidecar`, `exit_before_ready`, or `hang_before_ready`.
+- For packaged PR-gate failures, include `desktop-fault-smoke/summary.json`, `desktop-fault-smoke/build.log`, and `desktop-fault-smoke/packaged-shell-fault-smoke.log` in the first-pass diagnosis before retrying the workflow.
 
 ## Required follow-up
 

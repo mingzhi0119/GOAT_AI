@@ -126,6 +126,8 @@ Important notes:
 - `desktop-package-windows` is still the PR packaged-binary gate only; it does not install MSI/NSIS artifacts
 - `desktop-package-windows` should trigger for desktop build inputs, not just Rust shell files: `frontend/src/**`, `frontend/public/**`, `frontend/index.html`, Vite/Tailwind/PostCSS/TS config, desktop scripts, desktop tooling, and desktop governance tests/workflows are part of the packaged-build truth set
 - non-desktop-only backend or documentation changes should not burn the Windows packaged PR gate when they do not affect the packaged desktop build surface
+- the `desktop-windows-fault-smoke` artifact should contain at least `build.log`, `packaged-shell-fault-smoke.log`, top-level `summary.json`, and per-scenario logs/result JSON so packaged PR failures stay diagnosable without rerunning the workflow
+- when the Windows package build succeeds, CI should still retain packaged installers plus `desktop-windows-ci-provenance.json` even if the packaged fault smoke fails later in the same job
 - `desktop-supply-chain` remains the Linux sidecar/provenance/cargo-audit gate; it does not own the Windows pre-ready retry semantics
 - `.github/workflows/desktop-provenance.yml` now runs `python -m tools.desktop.installed_windows_desktop_fault_smoke` against both the built `.msi` and NSIS installers before release assets are uploaded
 - `.github/workflows/fault-injection.yml` reruns the same installed Windows drill on a schedule so installer regressions do not hide behind release-only evidence

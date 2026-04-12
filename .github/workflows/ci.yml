@@ -262,12 +262,21 @@ jobs:
         working-directory: frontend
         run: npm ci
       - name: Build Windows desktop package
+        shell: pwsh
         working-directory: frontend
-        run: npm run desktop:build
+        run: |
+          $diagnosticsDir = "..\desktop-fault-smoke"
+          New-Item -ItemType Directory -Force -Path $diagnosticsDir | Out-Null
+          $buildLog = Join-Path $diagnosticsDir "build.log"
+          & npm run desktop:build *>&1 | Tee-Object -FilePath $buildLog
+          if ($LASTEXITCODE -ne 0) {
+            throw "npm run desktop:build failed with exit code $LASTEXITCODE."
+          }
       - name: Packaged-shell fault smoke
         shell: pwsh
         run: |
-          python -m tools.desktop.packaged_shell_fault_smoke `
+          $smokeLog = "desktop-fault-smoke/packaged-shell-fault-smoke.log"
+          & python -m tools.desktop.packaged_shell_fault_smoke `
             --desktop-exe frontend/src-tauri/target/release/goat-ai-desktop.exe `
             --sidecar frontend/src-tauri/target/release/goat-backend.exe `
             --artifact-dir desktop-fault-smoke `
@@ -278,7 +287,38 @@ jobs:
             --health-timeout-sec 2 `
             --restart-limit 1 `
             --backoff-ms 100 `
-            --hang-sec 5
+            --hang-sec 5 *>&1 | Tee-Object -FilePath $smokeLog
+          if ($LASTEXITCODE -ne 0) {
+            throw "packaged_shell_fault_smoke failed with exit code $LASTEXITCODE."
+          }
+      - name: Summarize packaged desktop diagnostics
+        if: ${{ always() }}
+        shell: pwsh
+        run: |
+          Add-Content $env:GITHUB_STEP_SUMMARY "## desktop-package-windows"
+          if (Test-Path "desktop-fault-smoke/summary.json") {
+            $summary = Get-Content "desktop-fault-smoke/summary.json" -Raw | ConvertFrom-Json
+            Add-Content $env:GITHUB_STEP_SUMMARY ""
+            Add-Content $env:GITHUB_STEP_SUMMARY "- status: $($summary.status)"
+            Add-Content $env:GITHUB_STEP_SUMMARY "- phase: $($summary.phase)"
+            if ($summary.error) {
+              Add-Content $env:GITHUB_STEP_SUMMARY "- error: $($summary.error)"
+            }
+            if ($summary.results.Count -gt 0) {
+              foreach ($result in $summary.results) {
+                Add-Content $env:GITHUB_STEP_SUMMARY "- scenario $($result.scenario): $($result.status) stage=$($result.failure_stage)"
+              }
+            }
+          } else {
+            Add-Content $env:GITHUB_STEP_SUMMARY ""
+            Add-Content $env:GITHUB_STEP_SUMMARY "- packaged-shell fault smoke did not produce summary.json."
+          }
+          if (Test-Path "desktop-fault-smoke/build.log") {
+            Add-Content $env:GITHUB_STEP_SUMMARY "- retained build log: desktop-fault-smoke/build.log"
+          }
+          if (Test-Path "desktop-fault-smoke/packaged-shell-fault-smoke.log") {
+            Add-Content $env:GITHUB_STEP_SUMMARY "- retained smoke log: desktop-fault-smoke/packaged-shell-fault-smoke.log"
+          }
       - name: Upload packaged-shell fault smoke artifacts
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -286,6 +326,7 @@ jobs:
           name: desktop-windows-fault-smoke
           path: desktop-fault-smoke
       - name: Write packaged desktop provenance
+        if: ${{ always() && hashFiles('frontend/src-tauri/target/release/bundle/msi/*.msi') != '' && hashFiles('frontend/src-tauri/target/release/bundle/nsis/*-setup.exe') != '' }}
         shell: pwsh
         run: |
           python -m tools.desktop.write_desktop_release_provenance `
@@ -298,6 +339,7 @@ jobs:
             --platform windows-x64 `
             --distribution-channel internal_test
       - name: Upload packaged desktop artifacts
+        if: ${{ always() && hashFiles('frontend/src-tauri/target/release/bundle/msi/*.msi') != '' && hashFiles('frontend/src-tauri/target/release/bundle/nsis/*-setup.exe') != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: desktop-windows-ci-artifacts
