@@ -216,6 +216,7 @@ schemas:
       chart_spec: object|null
       file_context: HistorySessionFileContext|null
       knowledge_documents: HistorySessionKnowledgeDocument[]
+      workspace_outputs: WorkbenchWorkspaceOutputPayload[]
       chart_data_source: string|null
   HistorySessionFileContext:
     type: object
@@ -567,7 +568,7 @@ schemas:
       - created_at
     properties:
       sequence: integer
-      event_type: task.queued|task.started|retrieval.sources_resolved|retrieval.step.completed|retrieval.step.skipped|workspace_output.created|task.completed|task.failed
+      event_type: task.queued|task.started|retrieval.sources_resolved|retrieval.step.completed|retrieval.step.skipped|workspace_output.created|workspace_output.exported|task.completed|task.failed
       created_at: string
       status: queued|running|completed|failed|null
       message: string|null
@@ -617,6 +618,13 @@ schemas:
       error_detail: string|null
       result: WorkbenchTaskResultPayload|null
       workspace_outputs: WorkbenchWorkspaceOutputPayload[]
+  WorkbenchWorkspaceOutputExportRequest:
+    type: object
+    required:
+      - format
+    properties:
+      format: markdown|text|csv|xlsx|docx
+      filename: string|null
   WorkbenchWorkspaceOutputPayload:
     type: object
     required:
@@ -636,6 +644,11 @@ schemas:
       created_at: string
       updated_at: string
       metadata: object
+      artifacts: ChatArtifact[]
+  WorkbenchWorkspaceOutputsResponse:
+    type: object
+    properties:
+      outputs: WorkbenchWorkspaceOutputPayload[]
 endpoints:
   - op: list_models_route
     method: GET
@@ -1058,6 +1071,44 @@ endpoints:
       task_id: string
     response:
       200: WorkbenchTaskStatusResponse
+      errors:
+        - 401
+        - 404
+        - 422
+        - 429
+        - 503
+  - op: list_workbench_workspace_outputs_route
+    method: GET
+    path: /workbench/workspace-outputs
+    response:
+      200: WorkbenchWorkspaceOutputsResponse
+      errors:
+        - 401
+        - 422
+        - 429
+        - 503
+  - op: get_workbench_workspace_output_route
+    method: GET
+    path: /workbench/workspace-outputs/{output_id}
+    path_params:
+      output_id: string
+    response:
+      200: WorkbenchWorkspaceOutputPayload
+      errors:
+        - 401
+        - 404
+        - 422
+        - 429
+        - 503
+  - op: export_workbench_workspace_output_route
+    method: POST
+    path: /workbench/workspace-outputs/{output_id}/exports
+    path_params:
+      output_id: string
+    body: WorkbenchWorkspaceOutputExportRequest
+    content_type: application/json
+    response:
+      201: ChatArtifact
       errors:
         - 401
         - 404

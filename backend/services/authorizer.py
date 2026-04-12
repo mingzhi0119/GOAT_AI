@@ -7,7 +7,10 @@ from backend.services.artifact_service import PersistedArtifactRecord
 from backend.services.chat_runtime import SessionDetailRecord, SessionSummaryRecord
 from backend.services.code_sandbox_runtime import CodeSandboxExecutionRecord
 from backend.services.knowledge_repository import KnowledgeDocumentRecord
-from backend.services.workbench_runtime import WorkbenchTaskRecord
+from backend.services.workbench_runtime import (
+    WorkbenchTaskRecord,
+    WorkbenchWorkspaceOutputRecord,
+)
 
 
 def _has_scope(ctx: AuthorizationContext, required_scope: str) -> bool:
@@ -168,6 +171,29 @@ def authorize_workbench_task_read(
     boundaries without introducing new credential scope strings.
     """
     ownership = ownership_from_resource(task)
+    if ownership.tenant_id and ownership.tenant_id != ctx.tenant_id.value:
+        return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
+    if ownership.principal_id and ownership.principal_id != ctx.principal_id.value:
+        return AuthorizationDecision(
+            False, "principal_mismatch", conceal_existence=True
+        )
+    if not _owner_visible(
+        resource_owner_id=ownership.owner_id,
+        legacy_owner_id=ctx.legacy_owner_id,
+        require_owner_header=require_owner_header,
+    ):
+        return AuthorizationDecision(False, "owner_mismatch", conceal_existence=True)
+    return AuthorizationDecision(True, "ok")
+
+
+def authorize_workbench_output_read(
+    *,
+    ctx: AuthorizationContext,
+    output: WorkbenchWorkspaceOutputRecord,
+    require_owner_header: bool,
+) -> AuthorizationDecision:
+    """Authorize visibility for one persisted workbench workspace output."""
+    ownership = ownership_from_resource(output)
     if ownership.tenant_id and ownership.tenant_id != ctx.tenant_id.value:
         return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
     if ownership.principal_id and ownership.principal_id != ctx.principal_id.value:

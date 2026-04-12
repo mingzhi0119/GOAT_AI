@@ -421,10 +421,18 @@ class OllamaService:
             stream=True,
             stream_timeout_sec=self._s.chat_first_event_timeout_sec,
         )
-        for line in res.iter_lines():
-            if line:
-                chunk = json.loads(line.decode("utf-8"))
-                yield from _iter_stream_parts_from_chunk(chunk)
+        try:
+            for line in res.iter_lines():
+                if line:
+                    chunk = json.loads(line.decode("utf-8"))
+                    yield from _iter_stream_parts_from_chunk(chunk)
+        except requests.RequestException as exc:
+            inc_ollama_error(
+                code=OLLAMA_ERROR_API_CODE,
+                endpoint="chat",
+                http_status="stream_interrupted",
+            )
+            raise OllamaUnavailable("Ollama chat stream interrupted") from exc
 
     def yield_generate_tokens(
         self,
@@ -451,10 +459,18 @@ class OllamaService:
                 code=OLLAMA_ERROR_API_CODE, endpoint="generate", http_status="none"
             )
             raise OllamaUnavailable("Cannot reach Ollama /api/generate") from exc
-        for line in res.iter_lines():
-            if line:
-                chunk = json.loads(line.decode("utf-8"))
-                yield from _iter_stream_parts_from_chunk(chunk)
+        try:
+            for line in res.iter_lines():
+                if line:
+                    chunk = json.loads(line.decode("utf-8"))
+                    yield from _iter_stream_parts_from_chunk(chunk)
+        except requests.RequestException as exc:
+            inc_ollama_error(
+                code=OLLAMA_ERROR_API_CODE,
+                endpoint="generate",
+                http_status="stream_interrupted",
+            )
+            raise OllamaUnavailable("Ollama generate stream interrupted") from exc
 
     def generate_completion(
         self,
@@ -543,33 +559,47 @@ class OllamaService:
         except ValueError:
             return
 
-        for line in res.iter_lines():
-            if not line:
-                continue
+        try:
+            for line in res.iter_lines():
+                if not line:
+                    continue
 
-            chunk = json.loads(line.decode("utf-8"))
-            message = chunk.get("message")
-            if isinstance(message, dict):
-                tool_calls = message.get("tool_calls")
-                if isinstance(tool_calls, list) and tool_calls:
-                    first_call = tool_calls[0]
-                    if isinstance(first_call, dict):
-                        function = first_call.get("function")
-                        if isinstance(function, dict):
-                            name = function.get("name")
-                            arguments = function.get("arguments")
-                            if isinstance(name, str) and isinstance(arguments, dict):
-                                yield ToolCallPlan(
-                                    assistant_message={
-                                        "role": str(message.get("role") or "assistant"),
-                                        "content": str(message.get("content") or ""),
-                                        "tool_calls": tool_calls,
-                                    },
-                                    tool_name=name,
-                                    arguments=arguments,
-                                )
+                chunk = json.loads(line.decode("utf-8"))
+                message = chunk.get("message")
+                if isinstance(message, dict):
+                    tool_calls = message.get("tool_calls")
+                    if isinstance(tool_calls, list) and tool_calls:
+                        first_call = tool_calls[0]
+                        if isinstance(first_call, dict):
+                            function = first_call.get("function")
+                            if isinstance(function, dict):
+                                name = function.get("name")
+                                arguments = function.get("arguments")
+                                if isinstance(name, str) and isinstance(
+                                    arguments, dict
+                                ):
+                                    yield ToolCallPlan(
+                                        assistant_message={
+                                            "role": str(
+                                                message.get("role") or "assistant"
+                                            ),
+                                            "content": str(
+                                                message.get("content") or ""
+                                            ),
+                                            "tool_calls": tool_calls,
+                                        },
+                                        tool_name=name,
+                                        arguments=arguments,
+                                    )
 
-            yield from _iter_stream_parts_from_chunk(chunk)
+                yield from _iter_stream_parts_from_chunk(chunk)
+        except requests.RequestException as exc:
+            inc_ollama_error(
+                code=OLLAMA_ERROR_API_CODE,
+                endpoint="chat",
+                http_status="stream_interrupted",
+            )
+            raise OllamaUnavailable("Ollama tool stream interrupted") from exc
 
     def plan_tool_call(
         self,
@@ -649,7 +679,15 @@ class OllamaService:
         except ValueError:
             return
 
-        for line in res.iter_lines():
-            if line:
-                chunk = json.loads(line.decode("utf-8"))
-                yield from _iter_stream_parts_from_chunk(chunk)
+        try:
+            for line in res.iter_lines():
+                if line:
+                    chunk = json.loads(line.decode("utf-8"))
+                    yield from _iter_stream_parts_from_chunk(chunk)
+        except requests.RequestException as exc:
+            inc_ollama_error(
+                code=OLLAMA_ERROR_API_CODE,
+                endpoint="chat",
+                http_status="stream_interrupted",
+            )
+            raise OllamaUnavailable("Ollama follow-up stream interrupted") from exc

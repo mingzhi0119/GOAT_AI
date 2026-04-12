@@ -19,61 +19,18 @@ Completed phases, landed slices, and historical closeout notes live in:
 
 ### Active priorities
 
-1. **Workbench output restoration and export shape**
-   - `canvas` now has a minimal durable baseline through `canvas_document` workspace outputs
-   - the remaining gap is how workspace outputs reopen, restore into sessions/projects, and later export into richer artifact flows
-
-2. **Real web retrieval for workbench**
+1. **Real web retrieval for workbench**
    - `/api/workbench/sources` already exposes `web`
    - the source remains declarative but runtime-unready
    - browse/deep-research should not remain permanently partial behind a fake-ready public source
 
-3. **Project memory and connectors**
+2. **Project memory and connectors**
    - both are already advertised as future capability slots
    - they should not grow UI promises until the runtime, tenancy, and connector boundaries are real
 
-4. **Desktop distribution maturity**
+3. **Desktop distribution maturity**
    - Windows packaging is landed
    - signed release, cross-platform packaged validation, updater readiness, and stronger native runtime operations are still open
-
-5. **Industrial operating model completion**
-   - P0 and P1 governance work is landed
-   - the remaining uplift is the P2 operating-model work: signed artifacts, security cadence, fault injection, architectural drift control, and quality trend tracking
-
-### Engineering quality uplift (`7/10 -> 9/10`)
-
-P0 and P1 are complete and archived. The remaining work is the operating-model finish line.
-
-#### P2: finish the move from mature codebase to industrial operating model
-
-- Extend the new provenance/SBOM baseline into signed-release automation for distributable artifacts.
-- Operationalize the documented vulnerability response, dependency-refresh cadence, and credential-rotation policy with recurring review evidence.
-- Add targeted fault-injection or chaos-style validation for upstream timeouts, SSE interruption, file-system failure, and sidecar boot failure.
-- Continue decomposing large multi-responsibility modules until typical feature changes stay localized.
-- Extend architecture-drift controls to shared DTOs, desktop bridges, and future connector/runtime boundaries.
-- Extend the weekly quality snapshot baseline into longer-lived trend reporting for:
-  - defect escape rate
-  - performance trend
-  - dependency vulnerability backlog
-
-P2 exit criteria:
-
-- artifacts are traceable, signed where applicable, and auditable
-- reliability and security are proven by drills, not only by code inspection
-- core engineering scores stay stable release over release instead of depending on individual contributors
-
-Score target by end of this uplift track:
-
-- Correctness: `>= 9/10`
-- Testability: `>= 9/10`
-- Maintainability: `>= 8.5/10`
-- Readability: `>= 8/10`
-- Architecture & Decoupling: `>= 9/10`
-- Reliability: `>= 9/10`
-- Performance: `>= 8.5/10`
-- Security: `>= 9/10`
-- Observability: `>= 9/10`
-- Delivery Maturity: `>= 9/10`
 
 ### Runtime platform
 
@@ -81,7 +38,6 @@ Score target by end of this uplift track:
 
 - Goal: finish the shared task/runtime primitives that Browse, Deep Research, Canvas, project memory, and connectors should all build on.
 - Remaining work:
-  - durable checkpoints beyond status-only task rows
   - clearer task cancellation and retry semantics
   - source registry extensions for real web and future connector-backed retrieval
 - Sequencing rule:
@@ -102,14 +58,6 @@ Score target by end of this uplift track:
   - actual public-web execution behind the `web` source
   - staged safety boundaries for public web vs private retrieval
   - remote connector adapters behind the shared source registry
-
-#### Phase 17D: canvas and artifact workspace
-
-- Goal: make work products first-class and close the highest-priority remaining task-contract gap.
-- Remaining work:
-  - define history/session restoration rules for workbench outputs
-  - define export or artifact-linkage rules from workspace outputs to downloadable files
-  - decide how future non-canvas workspace outputs share the same typed output model
 
 #### Phase 17E: project memory and connectors
 
@@ -195,7 +143,6 @@ These items should remain roadmap-only in the frontend until the corresponding b
 - Cloud model API integration for non-local inference backends
 - Real Search / Browse mode
 - Deep Research
-- Canvas / artifact workspace
 - Project-scoped knowledge / memory
 - Connected apps / external sources
 

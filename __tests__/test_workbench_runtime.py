@@ -133,6 +133,46 @@ class WorkbenchRuntimeTests(unittest.TestCase):
         self.assertEqual("Canvas title", stored[0].title)
         self.assertEqual("# Canvas title\n\nDraft body", stored[0].content_text)
         self.assertTrue(stored[0].metadata["editable"])
+        self.assertEqual(
+            "session-1", self.repository.get_workspace_output("wbo-1").session_id
+        )
+        self.assertEqual(
+            ["wbo-1"],
+            [
+                output.id
+                for output in self.repository.list_workspace_outputs_for_session(
+                    "session-1"
+                )
+            ],
+        )
+        self.assertEqual(
+            ["wbo-1"],
+            [
+                output.id
+                for output in self.repository.list_workspace_outputs_for_project(
+                    "project-1"
+                )
+            ],
+        )
+        self.repository.replace_workspace_output_metadata(
+            "wbo-1",
+            metadata={
+                "editable": True,
+                "artifacts": [
+                    {
+                        "artifact_id": "art-1",
+                        "filename": "canvas.md",
+                        "mime_type": "text/markdown",
+                        "byte_size": 12,
+                        "download_url": "/api/artifacts/art-1",
+                    }
+                ],
+            },
+            updated_at="2026-04-10T18:00:03+00:00",
+        )
+        refreshed = self.repository.get_workspace_output("wbo-1")
+        assert refreshed is not None
+        self.assertEqual("art-1", refreshed.metadata["artifacts"][0]["artifact_id"])
 
         events = self.repository.list_task_events("wb-canvas")
         self.assertEqual(

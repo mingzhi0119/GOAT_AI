@@ -5,6 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from backend.models.artifact import ChatArtifact
+from backend.models.workbench import WorkbenchWorkspaceOutputPayload
 
 
 class HistorySessionMessage(BaseModel):
@@ -62,6 +63,10 @@ class HistorySessionDetailResponse(HistorySessionSummary):
     file_context: HistorySessionFileContext | None = None
     knowledge_documents: list[HistorySessionKnowledgeDocument] = Field(
         default_factory=list
+    )
+    workspace_outputs: list[WorkbenchWorkspaceOutputPayload] = Field(
+        default_factory=list,
+        description="Durable workbench outputs linked to this session.",
     )
     chart_data_source: str | None = Field(
         default=None, pattern="^(uploaded|demo|none)$"

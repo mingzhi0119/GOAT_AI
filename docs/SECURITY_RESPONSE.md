@@ -59,13 +59,24 @@ summarized in [SECURITY.md](SECURITY.md).
 ## 5. Evidence and review
 
 - Weekly review should include:
-  - CI audit outputs
+  - `security-review-snapshot.json` from [`.github/workflows/quality-trends.yml`](../.github/workflows/quality-trends.yml)
   - current ignore lists and expiration dates
   - pending dependency refresh PRs or backlog items
 - Monthly review should include:
   - last successful credential rotation date per credential class
   - release artifact provenance/SBOM workflow health
   - trend snapshots from [QUALITY_TRENDS.md](QUALITY_TRENDS.md)
+
+## 6. Repository variables for recurring evidence
+
+Configure these repository variables so the recurring security-review snapshot can
+record credential-rotation evidence without exposing raw secrets:
+
+- `GOAT_LAST_SHARED_API_KEY_ROTATION_DATE`
+- `GOAT_LAST_DEPLOY_CREDENTIAL_ROTATION_DATE`
+- `GOAT_LAST_DESKTOP_SIGNING_KEY_ROTATION_DATE`
+
+Values must use `YYYY-MM-DD`.
 
 ## Related docs
 

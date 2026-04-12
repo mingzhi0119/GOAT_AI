@@ -5,12 +5,14 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
+from backend.models.artifact import ChatArtifact
 from backend.models.knowledge import KnowledgeCitation
 
 WorkbenchTaskKind = Literal["plan", "browse", "deep_research", "canvas"]
 WorkbenchTaskStatus = Literal["queued", "running", "completed", "failed"]
 WorkbenchWorkspaceOutputKind = Literal["canvas_document"]
 WorkbenchWorkspaceOutputFormat = Literal["markdown"]
+WorkbenchWorkspaceExportFormat = Literal["markdown", "text", "csv", "xlsx", "docx"]
 WorkbenchTaskEventType = Literal[
     "task.queued",
     "task.started",
@@ -18,6 +20,7 @@ WorkbenchTaskEventType = Literal[
     "retrieval.step.completed",
     "retrieval.step.skipped",
     "workspace_output.created",
+    "workspace_output.exported",
     "task.completed",
     "task.failed",
 ]
@@ -131,6 +134,10 @@ class WorkbenchWorkspaceOutputPayload(BaseModel):
         default_factory=dict,
         description="Optional structured metadata for richer future workbench UIs.",
     )
+    artifacts: list[ChatArtifact] = Field(
+        default_factory=list,
+        description="Downloadable artifacts exported from this workspace output.",
+    )
 
 
 class WorkbenchTaskEventPayload(BaseModel):
@@ -204,4 +211,25 @@ class WorkbenchSourcesResponse(BaseModel):
     sources: list[WorkbenchSourcePayload] = Field(
         default_factory=list,
         description="Sources the current caller can see for workbench retrieval tasks.",
+    )
+
+
+class WorkbenchWorkspaceOutputsResponse(BaseModel):
+    """Durable workspace outputs returned by session/project or output-id reads."""
+
+    outputs: list[WorkbenchWorkspaceOutputPayload] = Field(
+        default_factory=list,
+        description="Typed durable workspace outputs visible to the current caller.",
+    )
+
+
+class WorkbenchWorkspaceOutputExportRequest(BaseModel):
+    """Request body for exporting one workspace output into a downloadable artifact."""
+
+    format: WorkbenchWorkspaceExportFormat = Field(
+        description="Target export format for the generated artifact."
+    )
+    filename: str | None = Field(
+        default=None,
+        description="Optional explicit filename; extension must match the export format.",
     )

@@ -13,6 +13,7 @@ describe('session history utils', () => {
       owner_id: '',
       file_context: { prompt: '[User uploaded tabular data for analysis]\n\nCHART_DATA_CSV:\n```csv```' },
       knowledge_documents: [],
+      workspace_outputs: [],
       chart_spec: null,
       chart_data_source: 'uploaded',
       messages: [

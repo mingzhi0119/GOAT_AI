@@ -20,13 +20,18 @@ from backend.application.history import (
 )
 from backend.application.ports import SessionRepository, Settings
 from backend.config import get_settings
-from backend.dependencies import get_authorization_context, get_session_repository
+from backend.dependencies import (
+    get_authorization_context,
+    get_session_repository,
+    get_workbench_task_repository,
+)
 from backend.models.common import ErrorResponse
 from backend.models.history import (
     HistorySessionDetailResponse,
     HistorySessionListResponse,
     HistorySessionRenameRequest,
 )
+from backend.services.workbench_runtime import WorkbenchTaskRepository
 
 router = APIRouter()
 
@@ -173,6 +178,9 @@ def get_history_session(
     session_id: str,
     request: Request,
     session_repository: SessionRepository = Depends(get_session_repository),
+    workbench_repository: WorkbenchTaskRepository = Depends(
+        get_workbench_task_repository
+    ),
     settings: Settings = Depends(get_settings),
     auth_context: AuthorizationContext = Depends(get_authorization_context),
 ) -> HistorySessionDetailResponse:
@@ -180,6 +188,7 @@ def get_history_session(
     try:
         return get_history_session_detail(
             repository=session_repository,
+            workbench_repository=workbench_repository,
             session_id=session_id,
             settings=settings,
             auth_context=auth_context,
@@ -207,6 +216,9 @@ def delete_history_session(
     session_id: str,
     request: Request,
     session_repository: SessionRepository = Depends(get_session_repository),
+    workbench_repository: WorkbenchTaskRepository = Depends(
+        get_workbench_task_repository
+    ),
     settings: Settings = Depends(get_settings),
     auth_context: AuthorizationContext = Depends(get_authorization_context),
 ) -> Response:
@@ -214,6 +226,7 @@ def delete_history_session(
     try:
         delete_history_session_use_case(
             repository=session_repository,
+            workbench_repository=workbench_repository,
             session_id=session_id,
             settings=settings,
             auth_context=auth_context,

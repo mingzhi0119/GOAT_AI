@@ -42,6 +42,7 @@ describe('useHistory', () => {
       chart_spec: null,
       file_context: null,
       knowledge_documents: [],
+      workspace_outputs: [],
       chart_data_source: null,
     })
     vi.mocked(deleteSession).mockResolvedValue(undefined)

@@ -28,6 +28,13 @@ _ARTIFACT_LINK_RE = re.compile(
     re.IGNORECASE,
 )
 _SUPPORTED_EXTENSIONS = {"md", "txt", "csv", "xlsx", "docx"}
+_FORMAT_TO_EXTENSION = {
+    "markdown": "md",
+    "text": "txt",
+    "csv": "csv",
+    "xlsx": "xlsx",
+    "docx": "docx",
+}
 
 
 @dataclass(frozen=True)
@@ -144,6 +151,38 @@ def persist_artifact(
             pass
         raise
     return record
+
+
+def prepare_export_artifact(
+    *,
+    title: str,
+    content_text: str,
+    export_format: str,
+    filename: str | None = None,
+) -> PreparedArtifact:
+    """Build one prepared artifact from durable workspace-output content."""
+    extension = _FORMAT_TO_EXTENSION.get(export_format)
+    if extension is None:
+        raise ValueError("Unsupported export format.")
+    resolved_filename = filename.strip() if isinstance(filename, str) else ""
+    if resolved_filename:
+        expected_suffix = f".{extension}"
+        if not resolved_filename.lower().endswith(expected_suffix):
+            raise ValueError(
+                "Filename extension must match the requested export format."
+            )
+    else:
+        resolved_filename = (
+            f"{_slugify_filename_stem(title) or 'workspace-output'}.{extension}"
+        )
+
+    prepared = _build_prepared_artifact(
+        filename=resolved_filename,
+        assistant_text=content_text,
+    )
+    if prepared is None:
+        raise ValueError("Unsupported export format.")
+    return prepared
 
 
 def load_artifact_for_download(
@@ -289,3 +328,8 @@ def _markdown_to_plain_text(text: str) -> str:
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _slugify_filename_stem(raw: str) -> str:
+    stem = re.sub(r"[^a-zA-Z0-9]+", "-", raw.strip().lower()).strip("-")
+    return stem[:80]

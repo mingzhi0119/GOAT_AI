@@ -230,6 +230,47 @@ class ApiAuthzTests(unittest.TestCase):
         )
         self.assertEqual(404, events_response.status_code)
 
+    def test_workbench_workspace_output_owner_mismatch_returns_404(self) -> None:
+        self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        create = self.client.post(
+            "/api/workbench/tasks",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+            json={
+                "task_kind": "canvas",
+                "prompt": "Draft a canvas",
+                "session_id": "sess-output-authz",
+            },
+        )
+        self.assertEqual(202, create.status_code)
+        task_id = create.json()["task_id"]
+        task_status = self.client.get(
+            f"/api/workbench/tasks/{task_id}",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+        )
+        self.assertEqual(200, task_status.status_code)
+        output_id = task_status.json()["workspace_outputs"][0]["output_id"]
+
+        response = self.client.get(
+            f"/api/workbench/workspace-outputs/{output_id}",
+            headers={"X-GOAT-API-Key": "read-key", "X-GOAT-Owner-Id": "bob"},
+        )
+        self.assertEqual(404, response.status_code)
+
+        export_response = self.client.post(
+            f"/api/workbench/workspace-outputs/{output_id}/exports",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "bob"},
+            json={"format": "markdown"},
+        )
+        self.assertEqual(404, export_response.status_code)
+
+        history_response = self.client.get(
+            "/api/history/sess-output-authz",
+            headers={"X-GOAT-API-Key": "read-key", "X-GOAT-Owner-Id": "bob"},
+        )
+        self.assertEqual(404, history_response.status_code)
+
     def test_workbench_sources_hide_knowledge_without_knowledge_read_scope(
         self,
     ) -> None:

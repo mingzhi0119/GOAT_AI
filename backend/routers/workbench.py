@@ -8,20 +8,26 @@ from backend.api_errors import build_error_body
 from backend.application.exceptions import (
     WorkbenchSourceValidationError,
     WorkbenchTaskNotFoundError,
+    WorkbenchWorkspaceOutputNotFoundError,
 )
 from backend.application.ports import (
+    SessionRepository,
     Settings,
     WorkbenchTaskDispatcher,
     WorkbenchTaskRepository,
 )
 from backend.application.workbench import (
     create_and_dispatch_workbench_task,
+    export_workbench_workspace_output,
     get_workbench_sources,
     get_workbench_task,
     get_workbench_task_events,
+    get_workbench_workspace_output,
+    list_workbench_workspace_outputs,
 )
 from backend.dependencies import (
     get_authorization_context,
+    get_session_repository,
     get_workbench_task_dispatcher,
     get_workbench_task_repository,
 )
@@ -33,8 +39,12 @@ from backend.models.workbench import (
     WorkbenchTaskEventsResponse,
     WorkbenchTaskRequest,
     WorkbenchTaskStatusResponse,
+    WorkbenchWorkspaceOutputExportRequest,
+    WorkbenchWorkspaceOutputPayload,
+    WorkbenchWorkspaceOutputsResponse,
     WorkbenchSourcesResponse,
 )
+from backend.models.artifact import ChatArtifact
 
 router = APIRouter()
 
@@ -142,6 +152,136 @@ def get_workbench_task_status(
             detail=build_error_body(
                 detail=str(exc),
                 status_code=404,
+            ),
+        ) from exc
+
+
+@router.get(
+    "/workbench/workspace-outputs",
+    response_model=WorkbenchWorkspaceOutputsResponse,
+    summary="List durable workspace outputs by session or project scope",
+    responses={
+        401: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+        503: {
+            "model": ErrorResponse,
+            "description": "Workbench runtime is not available on this deployment.",
+        },
+    },
+)
+def list_workbench_workspace_outputs_route(
+    session_id: str | None = None,
+    project_id: str | None = None,
+    repository: WorkbenchTaskRepository = Depends(get_workbench_task_repository),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
+    settings: Settings = Depends(get_settings),
+) -> WorkbenchWorkspaceOutputsResponse:
+    """List visible workspace outputs for one session or project restoration scope."""
+    try:
+        return list_workbench_workspace_outputs(
+            repository=repository,
+            settings=settings,
+            auth_context=auth_context,
+            session_id=session_id,
+            project_id=project_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=build_error_body(
+                detail=str(exc),
+                status_code=422,
+            ),
+        ) from exc
+
+
+@router.get(
+    "/workbench/workspace-outputs/{output_id}",
+    response_model=WorkbenchWorkspaceOutputPayload,
+    summary="Read one durable workspace output",
+    responses={
+        401: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+        503: {
+            "model": ErrorResponse,
+            "description": "Workbench runtime is not available on this deployment.",
+        },
+    },
+)
+def get_workbench_workspace_output_route(
+    output_id: str,
+    repository: WorkbenchTaskRepository = Depends(get_workbench_task_repository),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
+    settings: Settings = Depends(get_settings),
+) -> WorkbenchWorkspaceOutputPayload:
+    """Read the latest durable state for one workspace output."""
+    try:
+        return get_workbench_workspace_output(
+            output_id=output_id,
+            repository=repository,
+            settings=settings,
+            auth_context=auth_context,
+        )
+    except WorkbenchWorkspaceOutputNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=build_error_body(
+                detail=str(exc),
+                status_code=404,
+            ),
+        ) from exc
+
+
+@router.post(
+    "/workbench/workspace-outputs/{output_id}/exports",
+    status_code=201,
+    response_model=ChatArtifact,
+    summary="Export one durable workspace output into a downloadable artifact",
+    responses={
+        401: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+        503: {
+            "model": ErrorResponse,
+            "description": "Workbench runtime is not available on this deployment.",
+        },
+    },
+)
+def export_workbench_workspace_output_route(
+    output_id: str,
+    payload: WorkbenchWorkspaceOutputExportRequest,
+    session_repository: SessionRepository = Depends(get_session_repository),
+    task_repository: WorkbenchTaskRepository = Depends(get_workbench_task_repository),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
+    settings: Settings = Depends(get_settings),
+) -> ChatArtifact:
+    """Create one downloadable artifact from a durable workspace output."""
+    try:
+        return export_workbench_workspace_output(
+            output_id=output_id,
+            request=payload,
+            task_repository=task_repository,
+            session_repository=session_repository,
+            settings=settings,
+            auth_context=auth_context,
+        )
+    except WorkbenchWorkspaceOutputNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=build_error_body(
+                detail=str(exc),
+                status_code=404,
+            ),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=build_error_body(
+                detail=str(exc),
+                status_code=422,
             ),
         ) from exc
 

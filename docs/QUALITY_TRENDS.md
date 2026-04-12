@@ -2,20 +2,26 @@
 
 Last updated: 2026-04-11
 
-This document defines the first P2 baseline for recurring engineering-quality trend
-capture.
+This document defines the shipped recurring engineering-quality evidence baseline.
 
 ## Current baseline
 
 - Workflow: [`.github/workflows/quality-trends.yml`](../.github/workflows/quality-trends.yml)
 - Snapshot generator: [`tools/quality_snapshot.py`](../tools/quality_snapshot.py)
 - Artifact output: `quality-snapshot`
+- Related security snapshot generator: [`tools/security_review_snapshot.py`](../tools/security_review_snapshot.py)
+- Related performance summary generator: [`tools/load_chat_smoke.py`](../tools/load_chat_smoke.py)
 
 The scheduled workflow currently captures:
 
 - backend coverage from `coverage.py` JSON output
 - frontend coverage from `frontend/coverage/lcov.info`
+- recurring security-review evidence:
+  - Python / Node / Rust dependency-audit state
+  - desktop Cargo-audit exception review metadata
+  - configured credential-rotation evidence inputs
 - a clean frontend production build in the same recurring run
+- optional deployed-environment performance smoke summary when `PERFORMANCE_BASE_URL` is configured
 - git SHA, ref, workflow run id, and run attempt metadata
 
 ## How to use it
@@ -23,16 +29,15 @@ The scheduled workflow currently captures:
 1. Run the workflow manually or let the weekly schedule produce a fresh snapshot.
 2. Download the `quality-snapshot` artifact from the workflow run.
 3. Compare the new `quality-snapshot.json` with previous snapshots.
-4. Escalate any sustained regression in coverage or repeated workflow instability.
+4. Review `security-review-snapshot.json` for backlog growth or missing rotation evidence.
+5. When present, compare `performance-summary.json` with previous runs for latency drift.
+6. Escalate any sustained regression in coverage, security backlog, or recurring workflow instability.
 
-## What this baseline does not cover yet
+## Remaining limits
 
-- defect escape rate
-- long-term dependency vulnerability backlog history
-- automatic performance-trend aggregation from the nightly smoke workflow
-- release-over-release scorecard rollups
-
-Those remain active P2 follow-ons in [ROADMAP.md](ROADMAP.md).
+- defect escape rate still relies on release/incident review rather than a first-class issue-tracker integration
+- performance trend evidence depends on a configured deployed target (`PERFORMANCE_BASE_URL`) for weekly capture
+- release-over-release scorecard rollups remain a human review activity over the stored artifacts rather than a rendered dashboard in-repo
 
 ## Related docs
 

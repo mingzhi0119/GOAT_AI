@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -59,6 +61,7 @@ def test_main_fails_when_latency_budget_is_exceeded(
             show_system_inference=False,
             max_total_p95_ms=500.0,
             max_first_token_p95_ms=150.0,
+            json_output=None,
         ),
     )
     samples = iter(
@@ -90,6 +93,7 @@ def test_main_succeeds_when_latency_budget_is_met(
             show_system_inference=True,
             max_total_p95_ms=1000.0,
             max_first_token_p95_ms=300.0,
+            json_output=None,
         ),
     )
     samples = iter(
@@ -116,3 +120,30 @@ def test_main_succeeds_when_latency_budget_is_met(
     ]
     output = capsys.readouterr().out
     assert "LOAD_CHAT_SMOKE_FAILED" not in output
+
+
+def test_write_summary_json_records_budget_status(tmp_path: Path) -> None:
+    output_path = tmp_path / "performance-summary.json"
+
+    subject.write_summary_json(
+        output=output_path,
+        base_url="http://127.0.0.1:62606",
+        model="demo",
+        summary=subject.SmokeSummary(
+            runs=3,
+            total_avg_ms=200.0,
+            total_p50_ms=180.0,
+            total_p95_ms=320.0,
+            first_token_avg_ms=90.0,
+            first_token_p50_ms=80.0,
+            first_token_p95_ms=110.0,
+        ),
+        max_total_p95_ms=500.0,
+        max_first_token_p95_ms=150.0,
+        failures=[],
+    )
+
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["status"] == "pass"
+    assert payload["summary"]["total_p95_ms"] == 320.0
+    assert payload["budgets"]["max_first_token_p95_ms"] == 150.0

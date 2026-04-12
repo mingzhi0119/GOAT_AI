@@ -13,6 +13,8 @@ import statistics
 import time
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
 
 import requests
 
@@ -118,6 +120,60 @@ def _print_summary(summary: SmokeSummary) -> None:
         print(f"- first_token p95_ms: {summary.first_token_p95_ms:.1f}")
 
 
+def _summary_to_dict(summary: SmokeSummary) -> dict[str, float | int | None]:
+    return {
+        "runs": summary.runs,
+        "total_avg_ms": round(summary.total_avg_ms, 2),
+        "total_p50_ms": round(summary.total_p50_ms, 2),
+        "total_p95_ms": round(summary.total_p95_ms, 2),
+        "first_token_avg_ms": (
+            round(summary.first_token_avg_ms, 2)
+            if summary.first_token_avg_ms is not None
+            else None
+        ),
+        "first_token_p50_ms": (
+            round(summary.first_token_p50_ms, 2)
+            if summary.first_token_p50_ms is not None
+            else None
+        ),
+        "first_token_p95_ms": (
+            round(summary.first_token_p95_ms, 2)
+            if summary.first_token_p95_ms is not None
+            else None
+        ),
+    }
+
+
+def write_summary_json(
+    *,
+    output: Path,
+    base_url: str,
+    model: str,
+    summary: SmokeSummary,
+    max_total_p95_ms: float | None,
+    max_first_token_p95_ms: float | None,
+    failures: list[str],
+) -> None:
+    payload = {
+        "schema_version": 1,
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "base_url": base_url,
+        "model": model,
+        "summary": _summary_to_dict(summary),
+        "budgets": {
+            "max_total_p95_ms": max_total_p95_ms,
+            "max_first_token_p95_ms": max_first_token_p95_ms,
+        },
+        "status": "pass" if not failures else "fail",
+        "failures": list(failures),
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
 def _check_threshold(
     *,
     label: str,
@@ -158,6 +214,7 @@ def main() -> int:
     parser.add_argument("--show-system-inference", action="store_true")
     parser.add_argument("--max-total-p95-ms", type=float, default=0.0)
     parser.add_argument("--max-first-token-p95-ms", type=float, default=0.0)
+    parser.add_argument("--json-output", type=Path, default=None)
     args = parser.parse_args()
 
     if args.runs < 1:
@@ -190,6 +247,16 @@ def main() -> int:
         ),
     ]
     failures = [item for item in failures if item]
+    if args.json_output is not None:
+        write_summary_json(
+            output=args.json_output,
+            base_url=args.base_url,
+            model=args.model,
+            summary=summary,
+            max_total_p95_ms=args.max_total_p95_ms or None,
+            max_first_token_p95_ms=args.max_first_token_p95_ms or None,
+            failures=failures,
+        )
     if failures:
         for failure in failures:
             print(f"LOAD_CHAT_SMOKE_FAILED: {failure}")

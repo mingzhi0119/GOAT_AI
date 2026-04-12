@@ -67,6 +67,7 @@ export interface HistorySessionDetail extends HistorySessionItem {
   chart_spec: ChartSpec | null
   file_context: HistorySessionFileContext | null
   knowledge_documents: HistorySessionKnowledgeDocument[]
+  workspace_outputs: WorkbenchWorkspaceOutput[]
   chart_data_source: HistoryChartDataSource | null
 }
 
@@ -148,6 +149,32 @@ export interface WorkbenchFeatures {
   artifact_workspace: RuntimeFeature
   project_memory: RuntimeFeature
   connectors: RuntimeFeature
+}
+
+export type WorkbenchWorkspaceOutputKind = 'canvas_document'
+export type WorkbenchWorkspaceOutputFormat = 'markdown'
+
+export interface WorkbenchWorkspaceOutput {
+  output_id: string
+  output_kind: WorkbenchWorkspaceOutputKind
+  title: string
+  content_format: WorkbenchWorkspaceOutputFormat
+  content: string
+  created_at: string
+  updated_at: string
+  metadata: Record<string, unknown>
+  artifacts: ChatArtifact[]
+}
+
+export interface WorkbenchWorkspaceOutputsResponse {
+  outputs: WorkbenchWorkspaceOutput[]
+}
+
+export type WorkbenchWorkspaceExportFormat = 'markdown' | 'text' | 'csv' | 'xlsx' | 'docx'
+
+export interface WorkbenchWorkspaceExportRequest {
+  format: WorkbenchWorkspaceExportFormat
+  filename?: string
 }
 
 export interface SystemFeatures {

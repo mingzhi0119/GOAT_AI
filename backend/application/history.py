@@ -5,14 +5,18 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any
 
+from backend.application.ports import (
+    SessionNotFoundError,
+    SessionRepository,
+    Settings,
+    WorkbenchTaskRepository,
+)
 from backend.domain.authz_types import AuthorizationContext
-from backend.services.authorizer import authorize_session_read, authorize_session_write
 from backend.application.exceptions import (
     HistoryOwnerRequiredError,
     HistorySessionNotFoundError,
     HistoryValidationError,
 )
-from backend.application.ports import SessionNotFoundError, SessionRepository, Settings
 from backend.domain.authorization import ResourceRef
 from backend.models.history import (
     HistorySessionDetailResponse,
@@ -20,7 +24,13 @@ from backend.models.history import (
     HistorySessionKnowledgeDocument,
     HistorySessionListResponse,
 )
+from backend.models.workbench import WorkbenchWorkspaceOutputPayload
 from backend.services.authz_audit import emit_authorization_audit
+from backend.services.authorizer import (
+    authorize_session_read,
+    authorize_session_write,
+    authorize_workbench_output_read,
+)
 
 
 def _session_summary_as_dict(session: Any) -> dict[str, object]:
@@ -90,6 +100,7 @@ def delete_all_history_sessions(
 def delete_history_session(
     *,
     repository: SessionRepository,
+    workbench_repository: WorkbenchTaskRepository | None,
     session_id: str,
     settings: Settings,
     auth_context: AuthorizationContext,
@@ -98,6 +109,7 @@ def delete_history_session(
     """Delete one session, enforcing owner visibility rules."""
     get_history_session_detail(
         repository=repository,
+        workbench_repository=workbench_repository,
         session_id=session_id,
         settings=settings,
         auth_context=auth_context,
@@ -148,6 +160,7 @@ def rename_history_session(
 def get_history_session_detail(
     *,
     repository: SessionRepository,
+    workbench_repository: WorkbenchTaskRepository | None,
     session_id: str,
     settings: Settings,
     auth_context: AuthorizationContext,
@@ -186,4 +199,43 @@ def get_history_session_detail(
         for item in raw_knowledge_documents
         if isinstance(item, dict)
     ]
+    response_body["workspace_outputs"] = _list_visible_session_workspace_outputs(
+        workbench_repository=workbench_repository,
+        session_id=session_id,
+        settings=settings,
+        auth_context=auth_context,
+    )
     return HistorySessionDetailResponse.model_validate(response_body)
+
+
+def _list_visible_session_workspace_outputs(
+    *,
+    workbench_repository: WorkbenchTaskRepository | None,
+    session_id: str,
+    settings: Settings,
+    auth_context: AuthorizationContext,
+) -> list[WorkbenchWorkspaceOutputPayload]:
+    if workbench_repository is None:
+        return []
+    visible: list[WorkbenchWorkspaceOutputPayload] = []
+    for output in workbench_repository.list_workspace_outputs_for_session(session_id):
+        decision = authorize_workbench_output_read(
+            ctx=auth_context,
+            output=output,
+            require_owner_header=settings.require_session_owner,
+        )
+        if not decision.allowed:
+            continue
+        visible.append(
+            WorkbenchWorkspaceOutputPayload(
+                output_id=output.id,
+                output_kind=output.output_kind,
+                title=output.title,
+                content_format=output.content_format,
+                content=output.content_text,
+                created_at=output.created_at,
+                updated_at=output.updated_at,
+                metadata=dict(output.metadata or {}),
+            )
+        )
+    return visible

@@ -319,6 +319,20 @@ class UnavailableLLM(ContractFakeLLM):
         raise OllamaUnavailable("offline")
 
 
+class InterruptedStreamLLM(ContractFakeLLM):
+    def stream_tokens(
+        self,
+        model: str,
+        messages: list[ChatTurn],
+        system_prompt: str,
+        *,
+        ollama_options: dict[str, float | int] | None = None,
+        last_user_images_base64: list[str] | None = None,
+    ):
+        yield "Partial reply"
+        raise OllamaUnavailable("stream interrupted")
+
+
 class EmptyModelsLLM(ContractFakeLLM):
     def list_model_names(self) -> list[str]:
         return []
@@ -596,6 +610,32 @@ class ApiBlackboxContractTests(unittest.TestCase):
             [event["type"] for event in events],
         )
         self.assertEqual("Failed to persist chat result.", events[-2]["message"])
+
+    def test_chat_endpoint_emits_error_after_partial_stream_interrupt(self) -> None:
+        self.client.app.dependency_overrides[get_llm_client] = lambda: (
+            InterruptedStreamLLM()
+        )
+        try:
+            response = self.client.post(
+                "/api/chat",
+                json={
+                    "model": "blackbox-model",
+                    "session_id": "chat-stream-interrupted",
+                    "messages": [{"role": "user", "content": "Hello there"}],
+                },
+            )
+        finally:
+            self.client.app.dependency_overrides[get_llm_client] = lambda: (
+                ContractFakeLLM()
+            )
+
+        self.assertEqual(200, response.status_code)
+        events = parse_sse_payloads(response.text)
+        self.assertEqual(["error", "done"], [event["type"] for event in events])
+        self.assertEqual(
+            "AI service temporarily unavailable.",
+            events[0]["message"],
+        )
 
     def test_chat_blocked_input_still_emits_refusal_when_persistence_fails(
         self,
@@ -1230,7 +1270,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertTrue(feature_body["workbench"]["plan_mode"]["effective_enabled"])
         self.assertTrue(feature_body["workbench"]["browse"]["effective_enabled"])
         self.assertTrue(feature_body["workbench"]["deep_research"]["effective_enabled"])
-        self.assertFalse(
+        self.assertTrue(
             feature_body["workbench"]["artifact_workspace"]["effective_enabled"]
         )
         self.assertFalse(
@@ -1584,9 +1624,24 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
         self.client.app.dependency_overrides[get_settings] = lambda: self.settings
 
+        session_seed = self.client.post(
+            "/api/chat",
+            json={
+                "model": "blackbox-model",
+                "session_id": "canvas-session-1",
+                "messages": [{"role": "user", "content": "Seed session"}],
+            },
+        )
+        self.assertEqual(200, session_seed.status_code)
+
         create_response = self.client.post(
             "/api/workbench/tasks",
-            json={"task_kind": "canvas", "prompt": "Draft something"},
+            json={
+                "task_kind": "canvas",
+                "prompt": "Draft something",
+                "session_id": "canvas-session-1",
+                "project_id": "project-canvas-1",
+            },
         )
         self.assertEqual(202, create_response.status_code)
         task_id = create_response.json()["task_id"]
@@ -1605,6 +1660,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
             status_body["result"]["content"],
             status_body["workspace_outputs"][0]["content"],
         )
+        output_id = status_body["workspace_outputs"][0]["output_id"]
 
         events_response = self.client.get(f"/api/workbench/tasks/{task_id}/events")
         self.assertEqual(200, events_response.status_code)
@@ -1616,6 +1672,69 @@ class ApiBlackboxContractTests(unittest.TestCase):
                 "task.completed",
             ],
             [event["event_type"] for event in events_response.json()["events"]],
+        )
+
+        output_response = self.client.get(
+            f"/api/workbench/workspace-outputs/{output_id}"
+        )
+        self.assertEqual(200, output_response.status_code)
+        self.assertEqual(output_id, output_response.json()["output_id"])
+        self.assertEqual([], output_response.json()["artifacts"])
+
+        export_response = self.client.post(
+            f"/api/workbench/workspace-outputs/{output_id}/exports",
+            json={"format": "markdown"},
+        )
+        self.assertEqual(201, export_response.status_code)
+        artifact = export_response.json()
+        self.assertTrue(artifact["artifact_id"].startswith("art-"))
+        self.assertTrue(artifact["filename"].endswith(".md"))
+
+        exported_output_response = self.client.get(
+            f"/api/workbench/workspace-outputs/{output_id}"
+        )
+        self.assertEqual(200, exported_output_response.status_code)
+        self.assertEqual(
+            artifact["artifact_id"],
+            exported_output_response.json()["artifacts"][0]["artifact_id"],
+        )
+
+        download_response = self.client.get(artifact["download_url"])
+        self.assertEqual(200, download_response.status_code)
+        self.assertIn("## Goal", download_response.text)
+
+        session_outputs = self.client.get(
+            "/api/workbench/workspace-outputs",
+            params={"session_id": "canvas-session-1"},
+        )
+        self.assertEqual(200, session_outputs.status_code)
+        self.assertEqual(
+            [output_id],
+            [item["output_id"] for item in session_outputs.json()["outputs"]],
+        )
+        self.assertEqual(
+            artifact["artifact_id"],
+            session_outputs.json()["outputs"][0]["artifacts"][0]["artifact_id"],
+        )
+
+        project_outputs = self.client.get(
+            "/api/workbench/workspace-outputs",
+            params={"project_id": "project-canvas-1"},
+        )
+        self.assertEqual(200, project_outputs.status_code)
+        self.assertEqual(
+            [output_id],
+            [item["output_id"] for item in project_outputs.json()["outputs"]],
+        )
+
+        history_response = self.client.get("/api/history/canvas-session-1")
+        self.assertEqual(200, history_response.status_code)
+        self.assertEqual(
+            [output_id],
+            [
+                item["output_id"]
+                for item in history_response.json()["workspace_outputs"]
+            ],
         )
 
 
@@ -1728,6 +1847,8 @@ class ApiProtectedBlackboxContractTests(unittest.TestCase):
                 {"json": {"task_kind": "plan", "prompt": "Draft a plan"}},
             ),
             ("GET", "/api/workbench/sources", {}),
+            ("GET", "/api/workbench/workspace-outputs?session_id=sess-1", {}),
+            ("GET", "/api/workbench/workspace-outputs/wbo-1", {}),
             ("GET", "/api/workbench/tasks/wb-1", {}),
             ("GET", "/api/workbench/tasks/wb-1/events", {}),
             ("GET", "/api/system/metrics", {}),

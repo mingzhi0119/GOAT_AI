@@ -135,6 +135,7 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 - Keep `.github/CODEOWNERS` as the source of truth for default directory ownership.
 - Keep `.github/workflows/release-governance.yml` and the GitHub Environment approval rules aligned with the documented release process in `docs/RELEASE_GOVERNANCE.md`.
 - Keep `.github/workflows/quality-trends.yml`, `tools/quality_snapshot.py`, and `docs/QUALITY_TRENDS.md` aligned when quality-trend inputs change.
+- Keep `.github/workflows/fault-injection.yml` aligned with the targeted resilience drills it is expected to prove.
 - Use four long-lived Codex owner lanes: Lead/Platform, Frontend, Backend, Docs/Assets.
 - Shared contracts and cross-layer boundaries must be jointly reviewed by the owning lanes.
 - Lead/Platform owns CI, governance boundaries, shared-boundary arbitration, and the final merge recommendation.
@@ -176,6 +177,7 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 - When changing operator-facing metrics, update the versioned observability assets under `ops/observability/` and any affected incident runbooks in the same change.
 - When changing performance budgets or smoke-test semantics, update `tools/load_chat_smoke.py`, the scheduled workflow, and `docs/OPERATIONS.md` together.
 - When changing coverage output paths or recurring quality-capture semantics, update `tools/quality_snapshot.py`, `.github/workflows/quality-trends.yml`, and `docs/QUALITY_TRENDS.md` together.
+- When changing dependency-audit evidence or credential-rotation review inputs, update `tools/security_review_snapshot.py`, `.github/workflows/quality-trends.yml`, and `docs/SECURITY_RESPONSE.md` together.
 - When changing backup, restore, rollback, or SQLite persistence semantics, update the recovery drill (`scripts/exercise_recovery_drill.py`), its tests, and the linked runbooks in the same change.
 
 ## 13. API Artifacts

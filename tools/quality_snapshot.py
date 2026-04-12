@@ -13,6 +13,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--backend-coverage-json", type=Path, required=True)
     parser.add_argument("--frontend-lcov", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--security-review-json", type=Path, default=None)
+    parser.add_argument("--performance-summary-json", type=Path, default=None)
     parser.add_argument("--sha", default="")
     parser.add_argument("--ref-name", default="")
     parser.add_argument("--event-name", default="")
@@ -94,10 +96,41 @@ def parse_frontend_lcov(path: Path) -> dict[str, float | int | None]:
     }
 
 
+def parse_security_review(path: Path) -> dict[str, object]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    review = payload.get("review", {})
+    if not isinstance(review, dict):
+        raise ValueError("Security review snapshot is missing a review object.")
+    return {
+        "status": str(review.get("status", "")),
+        "release_blocker_count": int(review.get("release_blocker_count", 0) or 0),
+        "attention_count": int(review.get("attention_count", 0) or 0),
+        "dependency_backlog_total": int(review.get("dependency_backlog_total", 0) or 0),
+    }
+
+
+def parse_performance_summary(path: Path) -> dict[str, object]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    summary = payload.get("summary", {})
+    if not isinstance(summary, dict):
+        raise ValueError("Performance summary is missing a summary object.")
+    return {
+        "status": str(payload.get("status", "")),
+        "runs": int(summary.get("runs", 0) or 0),
+        "total_p95_ms": summary.get("total_p95_ms"),
+        "first_token_p95_ms": summary.get("first_token_p95_ms"),
+        "failure_count": len(payload.get("failures", []))
+        if isinstance(payload.get("failures"), list)
+        else 0,
+    }
+
+
 def build_snapshot(
     *,
     backend_coverage_json: Path,
     frontend_lcov: Path,
+    security_review_json: Path | None,
+    performance_summary_json: Path | None,
     sha: str,
     ref_name: str,
     event_name: str,
@@ -121,6 +154,16 @@ def build_snapshot(
         "metrics": {
             "backend_coverage": parse_backend_coverage(backend_coverage_json),
             "frontend_coverage": parse_frontend_lcov(frontend_lcov),
+            "security_review": (
+                parse_security_review(security_review_json)
+                if security_review_json is not None
+                else None
+            ),
+            "performance_smoke": (
+                parse_performance_summary(performance_summary_json)
+                if performance_summary_json is not None
+                else None
+            ),
         },
     }
 
@@ -130,6 +173,8 @@ def main() -> None:
     snapshot = build_snapshot(
         backend_coverage_json=args.backend_coverage_json,
         frontend_lcov=args.frontend_lcov,
+        security_review_json=args.security_review_json,
+        performance_summary_json=args.performance_summary_json,
         sha=args.sha,
         ref_name=args.ref_name,
         event_name=args.event_name,

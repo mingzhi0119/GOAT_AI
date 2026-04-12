@@ -54,6 +54,10 @@ class WorkbenchTaskNotFoundError(LookupError):
     """Raised when a durable workbench task cannot be found or is not visible."""
 
 
+class WorkbenchWorkspaceOutputNotFoundError(LookupError):
+    """Raised when a durable workspace output cannot be found or is not visible."""
+
+
 class WorkbenchSourceValidationError(ValueError):
     """Raised when a workbench task references unknown or unavailable sources."""
 
@@ -88,4 +92,5 @@ __all__ = [
     "VisionNotSupported",
     "WorkbenchSourceValidationError",
     "WorkbenchTaskNotFoundError",
+    "WorkbenchWorkspaceOutputNotFoundError",
 ]

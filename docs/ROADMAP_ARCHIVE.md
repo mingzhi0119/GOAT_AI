@@ -62,6 +62,47 @@ single-writer deployment model. Any future schema or datastore change now requir
 new migration/compatibility/rollback decision package instead of extending Phase 16B
 in place.
 
+### Engineering quality uplift P2 closeout
+
+The industrial operating-model track is now fully archived. P0 and P1 had already
+landed; P2 closed the remaining governance and evidence gaps without changing the
+product feature roadmap.
+
+Completed in this closeout:
+
+- recurring quality evidence now captures backend/frontend coverage, security-review backlog, and optional performance-smoke summaries
+- recurring security review evidence now records Python/Node/Rust audit state, Cargo audit exception review dates, and credential-rotation evidence inputs
+- recurring fault-injection coverage now exercises upstream-unavailable, persistence-failure, recovery-drill, and desktop-boot-failure paths through a dedicated workflow
+- artifact provenance remains in place through digest + SBOM + attestation-capable desktop provenance workflows
+- architecture-drift and shared-boundary guardrails remain enforced through import-layer tests, contract-sync gates, desktop smoke coverage, and explicit engineering standards
+
+What stays open after this closeout:
+
+- target-platform desktop installer signing and updater readiness stay under Phase 19C
+- ongoing module decomposition now belongs to the relevant feature/runtime phases instead of a standalone governance track
+
+### Phase 17D closeout: canvas and artifact workspace baseline
+
+Phase 17D is now fully out of the active roadmap. The shipped baseline turns
+workbench outputs into first-class durable deliverables for the first `canvas`
+slice without widening the public contract beyond the current workbench scope.
+
+Completed in this closeout:
+
+- `task_kind = canvas` no longer deterministically fails
+- durable `workspace_output` persistence exists with `canvas_document` as the first shipped kind
+- task status now returns typed `workspace_outputs`
+- session restoration now returns visible workspace outputs through `GET /api/history/{session_id}`
+- durable outputs can be reopened directly by id
+- durable outputs can be listed by `session_id` or `project_id` restoration scope
+- workspace outputs can now be exported to downloadable chat artifacts through `POST /api/workbench/workspace-outputs/{output_id}/exports`
+- exported artifacts are linked back onto the durable output payload and task event timeline via `workspace_output.exported`
+
+What stays open after this closeout:
+
+- additional non-canvas workspace output kinds using the same typed output model
+- broader workbench runtime work in real `web`, project memory, and connectors
+
 The historical 16C checklist covered:
 
 - credential compatibility for `GOAT_API_KEY`, `GOAT_API_KEY_WRITE`, and `X-GOAT-Owner-Id`

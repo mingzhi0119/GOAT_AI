@@ -96,10 +96,8 @@ class SystemTelemetryServiceTests(unittest.TestCase):
         self.assertTrue(response.code_sandbox.policy_allowed)
         self.assertTrue(response.workbench.browse.effective_enabled)
         self.assertTrue(response.workbench.deep_research.effective_enabled)
-        self.assertFalse(response.workbench.artifact_workspace.effective_enabled)
-        self.assertEqual(
-            "not_implemented", response.workbench.artifact_workspace.deny_reason
-        )
+        self.assertTrue(response.workbench.artifact_workspace.effective_enabled)
+        self.assertIsNone(response.workbench.artifact_workspace.deny_reason)
         self.assertTrue(response.workbench.connectors.effective_enabled)
 
     def test_preserves_operator_disabled_workbench_snapshot(self) -> None:

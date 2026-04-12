@@ -1,0 +1,29 @@
+name: Fault Injection
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 13 * * 3"
+
+jobs:
+  resilience-drills:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: astral-sh/setup-uv@v8.0.0
+        with:
+          enable-cache: true
+      - name: Install backend dependencies
+        run: uv pip install --system -r requirements-ci.txt
+      - name: Run resilience drill suite
+        run: |
+          python -m pytest \
+            __tests__/test_ollama_client_cache.py \
+            __tests__/test_desktop_smoke.py \
+            __tests__/test_recovery_drill.py \
+            __tests__/test_api_blackbox_contract.py \
+            -k "interrupted or unavailable or persist or recovery_drill or desktop_smoke" \
+            -q

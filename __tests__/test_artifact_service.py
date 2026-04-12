@@ -4,7 +4,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from backend.services.artifact_service import PreparedArtifact, persist_artifact
+from backend.services.artifact_service import (
+    PreparedArtifact,
+    persist_artifact,
+    prepare_export_artifact,
+)
 from backend.services.exceptions import PersistenceWriteError
 from goat_ai.config import Settings
 
@@ -55,6 +59,26 @@ class ArtifactServiceTests(unittest.TestCase):
         artifacts_root = self.settings.data_dir / "uploads" / "artifacts"
         if artifacts_root.exists():
             self.assertEqual([], list(artifacts_root.rglob("*")))
+
+    def test_prepare_export_artifact_derives_filename_from_title(self) -> None:
+        prepared = prepare_export_artifact(
+            title="Quarterly Draft",
+            content_text="# Quarterly Draft\n\nBody",
+            export_format="markdown",
+        )
+
+        self.assertEqual("quarterly-draft.md", prepared.filename)
+        self.assertEqual("text/markdown", prepared.mime_type)
+        self.assertEqual(b"# Quarterly Draft\n\nBody", prepared.content)
+
+    def test_prepare_export_artifact_rejects_mismatched_extension(self) -> None:
+        with self.assertRaisesRegex(ValueError, "extension must match"):
+            prepare_export_artifact(
+                title="Quarterly Draft",
+                content_text="# Quarterly Draft\n\nBody",
+                export_format="markdown",
+                filename="quarterly.txt",
+            )
 
 
 if __name__ == "__main__":

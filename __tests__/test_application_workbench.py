@@ -6,11 +6,14 @@ from pathlib import Path
 from backend.application.exceptions import (
     WorkbenchSourceValidationError,
     WorkbenchTaskNotFoundError,
+    WorkbenchWorkspaceOutputNotFoundError,
 )
 from backend.application.workbench import (
     create_and_dispatch_workbench_task,
     create_workbench_task,
     get_workbench_task,
+    get_workbench_workspace_output,
+    list_workbench_workspace_outputs,
 )
 from backend.domain.authz_types import AuthorizationContext
 from backend.domain.authorization import AuthorizationDecision, PrincipalId, TenantId
@@ -22,6 +25,7 @@ from backend.services.workbench_runtime import (
 )
 from backend.services.workbench_source_registry import WorkbenchSourceDescriptor
 from goat_ai.config import Settings
+from backend.services.artifact_service import PersistedArtifactRecord
 
 
 def _settings() -> Settings:
@@ -97,6 +101,32 @@ class _FakeRepository:
         _ = task_id
         return list(self.workspace_outputs)
 
+    def get_workspace_output(
+        self, output_id: str
+    ) -> WorkbenchWorkspaceOutputRecord | None:
+        for output in self.workspace_outputs:
+            if output.id == output_id:
+                return output
+        return None
+
+    def list_workspace_outputs_for_session(
+        self, session_id: str
+    ) -> list[WorkbenchWorkspaceOutputRecord]:
+        return [
+            output
+            for output in self.workspace_outputs
+            if output.session_id == session_id
+        ]
+
+    def list_workspace_outputs_for_project(
+        self, project_id: str
+    ) -> list[WorkbenchWorkspaceOutputRecord]:
+        return [
+            output
+            for output in self.workspace_outputs
+            if output.project_id == project_id
+        ]
+
 
 class _FakeDispatcher:
     def __init__(self) -> None:
@@ -104,6 +134,14 @@ class _FakeDispatcher:
 
     def dispatch_task(self, *, task_id: str, request_id: str = "") -> None:
         self.calls.append((task_id, request_id))
+
+
+class _FakeSessionRepository:
+    def __init__(self) -> None:
+        self.artifacts: list[PersistedArtifactRecord] = []
+
+    def create_chat_artifact(self, record: PersistedArtifactRecord) -> None:
+        self.artifacts.append(record)
 
 
 class ApplicationWorkbenchTests(unittest.TestCase):
@@ -283,3 +321,158 @@ class ApplicationWorkbenchTests(unittest.TestCase):
         self.assertEqual(1, len(response.workspace_outputs))
         self.assertEqual("wbo-1", response.workspace_outputs[0].output_id)
         self.assertEqual("canvas_document", response.workspace_outputs[0].output_kind)
+
+    def test_get_workbench_workspace_output_conceals_unauthorized_records(self) -> None:
+        repository = _FakeRepository()
+        repository.workspace_outputs = [
+            WorkbenchWorkspaceOutputRecord(
+                id="wbo-1",
+                task_id="wb-2",
+                output_kind="canvas_document",
+                title="Draft",
+                content_format="markdown",
+                content_text="# Draft",
+                created_at="2026-04-11T00:00:01+00:00",
+                updated_at="2026-04-11T00:00:02+00:00",
+                owner_id="owner-1",
+                tenant_id="tenant-1",
+                principal_id="principal-1",
+            )
+        ]
+
+        with self.assertRaises(WorkbenchWorkspaceOutputNotFoundError):
+            get_workbench_workspace_output(
+                output_id="wbo-1",
+                repository=repository,
+                settings=_settings(),
+                auth_context=_auth_context(owner_id="other-owner"),
+            )
+
+    def test_list_workbench_workspace_outputs_by_session_filters_visible_outputs(
+        self,
+    ) -> None:
+        repository = _FakeRepository()
+        repository.workspace_outputs = [
+            WorkbenchWorkspaceOutputRecord(
+                id="wbo-1",
+                task_id="wb-2",
+                output_kind="canvas_document",
+                title="Draft",
+                content_format="markdown",
+                content_text="# Draft",
+                created_at="2026-04-11T00:00:01+00:00",
+                updated_at="2026-04-11T00:00:02+00:00",
+                session_id="session-1",
+                owner_id="owner-1",
+                tenant_id="tenant-1",
+                principal_id="principal-1",
+            ),
+            WorkbenchWorkspaceOutputRecord(
+                id="wbo-2",
+                task_id="wb-3",
+                output_kind="canvas_document",
+                title="Hidden",
+                content_format="markdown",
+                content_text="# Hidden",
+                created_at="2026-04-11T00:00:03+00:00",
+                updated_at="2026-04-11T00:00:04+00:00",
+                session_id="session-1",
+                owner_id="other-owner",
+                tenant_id="tenant-1",
+                principal_id="principal-1",
+            ),
+        ]
+
+        response = list_workbench_workspace_outputs(
+            repository=repository,
+            settings=_settings(),
+            auth_context=_auth_context(),
+            session_id="session-1",
+        )
+
+        self.assertEqual(1, len(response.outputs))
+        self.assertEqual("wbo-1", response.outputs[0].output_id)
+
+    def test_export_workbench_workspace_output_registers_linked_artifact(self) -> None:
+        repository = _FakeRepository()
+        session_repository = _FakeSessionRepository()
+        repository.workspace_outputs = [
+            WorkbenchWorkspaceOutputRecord(
+                id="wbo-1",
+                task_id="wb-2",
+                output_kind="canvas_document",
+                title="Draft Canvas",
+                content_format="markdown",
+                content_text="# Draft Canvas\n\nBody",
+                created_at="2026-04-11T00:00:01+00:00",
+                updated_at="2026-04-11T00:00:02+00:00",
+                session_id="session-1",
+                owner_id="owner-1",
+                tenant_id="tenant-1",
+                principal_id="principal-1",
+                metadata={"editable": True},
+            )
+        ]
+        repository.appended_events: list[dict[str, object]] = []
+
+        def _replace_workspace_output_metadata(
+            output_id: str, *, metadata: dict[str, object], updated_at: str
+        ) -> None:
+            for index, output in enumerate(repository.workspace_outputs):
+                if output.id != output_id:
+                    continue
+                repository.workspace_outputs[index] = WorkbenchWorkspaceOutputRecord(
+                    **{
+                        **output.__dict__,
+                        "metadata": metadata,
+                        "updated_at": updated_at,
+                    }
+                )
+
+        def _append_task_event(
+            task_id: str,
+            *,
+            event_type: str,
+            created_at: str,
+            status: str | None,
+            message: str | None,
+            metadata: dict[str, object] | None,
+        ) -> None:
+            repository.appended_events.append(
+                {
+                    "task_id": task_id,
+                    "event_type": event_type,
+                    "created_at": created_at,
+                    "status": status,
+                    "message": message,
+                    "metadata": metadata,
+                }
+            )
+
+        repository.replace_workspace_output_metadata = (
+            _replace_workspace_output_metadata  # type: ignore[attr-defined]
+        )
+        repository.append_task_event = _append_task_event  # type: ignore[attr-defined]
+
+        from backend.application.workbench import export_workbench_workspace_output
+        from backend.models.workbench import WorkbenchWorkspaceOutputExportRequest
+
+        artifact = export_workbench_workspace_output(
+            output_id="wbo-1",
+            request=WorkbenchWorkspaceOutputExportRequest(format="markdown"),
+            task_repository=repository,
+            session_repository=session_repository,
+            settings=_settings(),
+            auth_context=_auth_context(),
+        )
+
+        self.assertTrue(artifact.filename.endswith(".md"))
+        self.assertEqual(1, len(session_repository.artifacts))
+        refreshed = repository.workspace_outputs[0]
+        self.assertEqual(
+            artifact.artifact_id, refreshed.metadata["artifacts"][0]["artifact_id"]
+        )
+        self.assertEqual(
+            "workspace_output.exported",
+            repository.appended_events[0]["event_type"],
+        )

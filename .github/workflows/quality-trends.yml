@@ -20,6 +20,9 @@ jobs:
           enable-cache: true
       - name: Install backend dependencies
         run: uv pip install --system -r requirements-ci.txt
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
       - name: Backend tests with JSON coverage
         run: |
           python -m pytest __tests__/ -q \
@@ -36,14 +39,105 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+      - name: Collect security audit JSON
+        id: security_audits
+        shell: bash
+        run: |
+          set +e
+          pip-audit -r requirements-ci.txt --format=json > pip-audit.json
+          pip_status=$?
+          (
+            cd frontend
+            npm audit --audit-level=none --json > ../npm-audit.json
+          )
+          npm_status=$?
+          cargo audit --json --file frontend/src-tauri/Cargo.lock \
+            --ignore RUSTSEC-2024-0370 \
+            --ignore RUSTSEC-2024-0411 \
+            --ignore RUSTSEC-2024-0412 \
+            --ignore RUSTSEC-2024-0413 \
+            --ignore RUSTSEC-2024-0414 \
+            --ignore RUSTSEC-2024-0415 \
+            --ignore RUSTSEC-2024-0416 \
+            --ignore RUSTSEC-2024-0417 \
+            --ignore RUSTSEC-2024-0418 \
+            --ignore RUSTSEC-2024-0419 \
+            --ignore RUSTSEC-2024-0420 \
+            --ignore RUSTSEC-2024-0429 \
+            --ignore RUSTSEC-2025-0057 \
+            --ignore RUSTSEC-2025-0075 \
+            --ignore RUSTSEC-2025-0080 \
+            --ignore RUSTSEC-2025-0081 \
+            --ignore RUSTSEC-2025-0098 \
+            --ignore RUSTSEC-2025-0100 \
+            --ignore RUSTSEC-2026-0097 > cargo-audit.json
+          cargo_status=$?
+          {
+            echo "pip_status=${pip_status}"
+            echo "npm_status=${npm_status}"
+            echo "cargo_status=${cargo_status}"
+          } >> "${GITHUB_OUTPUT}"
+          exit 0
+      - name: Build security review snapshot
+        run: |
+          python -m tools.security_review_snapshot \
+            --pip-audit-json pip-audit.json \
+            --npm-audit-json npm-audit.json \
+            --cargo-audit-json cargo-audit.json \
+            --desktop-cargo-exceptions-doc docs/DESKTOP_CARGO_AUDIT_EXCEPTIONS.md \
+            --output security-review-snapshot.json \
+            --workflow-name quality-trends \
+            --sha "${GITHUB_SHA}" \
+            --ref-name "${GITHUB_REF_NAME}" \
+            --event-name "${GITHUB_EVENT_NAME}" \
+            --run-id "${GITHUB_RUN_ID}" \
+            --run-attempt "${GITHUB_RUN_ATTEMPT}" \
+            --pip-exit-code "${{ steps.security_audits.outputs.pip_status }}" \
+            --npm-exit-code "${{ steps.security_audits.outputs.npm_status }}" \
+            --cargo-exit-code "${{ steps.security_audits.outputs.cargo_status }}" \
+            --shared-api-key-rotated-at "${{ vars.GOAT_LAST_SHARED_API_KEY_ROTATION_DATE }}" \
+            --deploy-credential-rotated-at "${{ vars.GOAT_LAST_DEPLOY_CREDENTIAL_ROTATION_DATE }}" \
+            --desktop-signing-key-rotated-at "${{ vars.GOAT_LAST_DESKTOP_SIGNING_KEY_ROTATION_DATE }}"
       - name: Frontend tests with coverage
         working-directory: frontend
         run: npm run test:coverage
       - name: Frontend build
         working-directory: frontend
         run: npm run build
-      - name: Build quality snapshot
+      - name: Resolve performance target
+        id: performance_target
+        shell: bash
         run: |
+          base_url="${{ secrets.PERFORMANCE_BASE_URL }}"
+          if [[ -n "${base_url}" ]]; then
+            echo "available=true" >> "${GITHUB_OUTPUT}"
+            echo "base_url=${base_url}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "available=false" >> "${GITHUB_OUTPUT}"
+          fi
+      - name: Performance smoke summary
+        if: steps.performance_target.outputs.available == 'true'
+        env:
+          PERFORMANCE_API_KEY: ${{ secrets.PERFORMANCE_API_KEY }}
+        run: |
+          python -m tools.load_chat_smoke \
+            --base-url "${{ steps.performance_target.outputs.base_url }}" \
+            --model "gemma4:26b" \
+            --runs 10 \
+            --api-key "${PERFORMANCE_API_KEY}" \
+            --show-system-inference \
+            --max-total-p95-ms 12000 \
+            --max-first-token-p95-ms 2000 \
+            --json-output performance-summary.json | tee performance-smoke.log
+      - name: Build quality snapshot
+        shell: bash
+        run: |
+          extra_args=(
+            --security-review-json security-review-snapshot.json
+          )
+          if [[ -f performance-summary.json ]]; then
+            extra_args+=(--performance-summary-json performance-summary.json)
+          fi
           python -m tools.quality_snapshot \
             --backend-coverage-json backend-coverage.json \
             --frontend-lcov frontend/coverage/lcov.info \
@@ -53,12 +147,20 @@ jobs:
             --ref-name "${GITHUB_REF_NAME}" \
             --event-name "${GITHUB_EVENT_NAME}" \
             --run-id "${GITHUB_RUN_ID}" \
-            --run-attempt "${GITHUB_RUN_ATTEMPT}"
+            --run-attempt "${GITHUB_RUN_ATTEMPT}" \
+            "${extra_args[@]}"
       - name: Upload quality snapshot
         uses: actions/upload-artifact@v4
         with:
           name: quality-snapshot
+          if-no-files-found: error
           path: |
             quality-snapshot.json
             backend-coverage.json
             frontend/coverage/lcov.info
+            security-review-snapshot.json
+            pip-audit.json
+            npm-audit.json
+            cargo-audit.json
+            performance-summary.json
+            performance-smoke.log

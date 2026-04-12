@@ -102,10 +102,41 @@ def test_build_snapshot_includes_metadata_and_metrics(tmp_path: Path) -> None:
     frontend_path.write_text(
         "LF:10\nLH:7\nFNF:2\nFNH:2\nBRF:4\nBRH:3\n", encoding="utf-8"
     )
+    security_review_path = tmp_path / "security-review.json"
+    security_review_path.write_text(
+        json.dumps(
+            {
+                "review": {
+                    "status": "pass",
+                    "release_blocker_count": 0,
+                    "attention_count": 1,
+                    "dependency_backlog_total": 2,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    performance_summary_path = tmp_path / "performance-summary.json"
+    performance_summary_path.write_text(
+        json.dumps(
+            {
+                "status": "pass",
+                "summary": {
+                    "runs": 10,
+                    "total_p95_ms": 900.0,
+                    "first_token_p95_ms": 200.0,
+                },
+                "failures": [],
+            }
+        ),
+        encoding="utf-8",
+    )
 
     snapshot = subject.build_snapshot(
         backend_coverage_json=backend_path,
         frontend_lcov=frontend_path,
+        security_review_json=security_review_path,
+        performance_summary_json=performance_summary_path,
         sha="abc123",
         ref_name="main",
         event_name="schedule",
@@ -126,3 +157,5 @@ def test_build_snapshot_includes_metadata_and_metrics(tmp_path: Path) -> None:
     assert isinstance(metrics, dict)
     assert metrics["backend_coverage"]["statements_pct"] == 90.0
     assert metrics["frontend_coverage"]["lines_pct"] == 70.0
+    assert metrics["security_review"]["dependency_backlog_total"] == 2
+    assert metrics["performance_smoke"]["total_p95_ms"] == 900.0

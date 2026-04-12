@@ -102,7 +102,7 @@ def build_system_features_response(
             deep_research=_workbench_capability(
                 runtime_ready=_has_runnable_source("deep_research")
             ),
-            artifact_workspace=_workbench_capability(runtime_ready=False),
+            artifact_workspace=_workbench_capability(runtime_ready=True),
             project_memory=_workbench_capability(runtime_ready=False),
             connectors=_workbench_capability(
                 runtime_ready=any(

@@ -98,6 +98,28 @@ def test_generate_completion_uses_generate_timeout() -> None:
     assert post_mock.call_args.kwargs["timeout"] == 123.0
 
 
+def test_stream_tokens_midstream_disconnect_raises_ollama_unavailable() -> None:
+    service = OllamaService(_settings(ttl=60))
+
+    class _BrokenResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def iter_lines(self):
+            yield b'{"message":{"role":"assistant","content":"Hello"},"done":false}'
+            raise requests.exceptions.ChunkedEncodingError("stream interrupted")
+
+    with patch("goat_ai.ollama_client.requests.post", return_value=_BrokenResponse()):
+        with patch("goat_ai.ollama_client.inc_ollama_error") as error_counter:
+            try:
+                list(service.stream_tokens("gemma4:26b", [], "system"))
+                assert False, "Expected OllamaUnavailable"
+            except OllamaUnavailable as exc:
+                assert "interrupted" in str(exc)
+
+    assert error_counter.call_count == 1
+
+
 def test_get_model_capabilities_uses_ttl_cache() -> None:
     service = OllamaService(_settings(ttl=60))
 

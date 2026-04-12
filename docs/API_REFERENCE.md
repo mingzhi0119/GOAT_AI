@@ -54,6 +54,9 @@ Base path: `/api`
 | `GET` | `/api/code-sandbox/executions/{execution_id}/logs` | Stream replayable sandbox logs over SSE |
 | `POST` | `/api/workbench/tasks` | Create and enqueue a durable workbench task |
 | `GET` | `/api/workbench/sources` | List declarative workbench retrieval sources |
+| `GET` | `/api/workbench/workspace-outputs` | List durable workspace outputs by session or project scope |
+| `GET` | `/api/workbench/workspace-outputs/{output_id}` | Read one durable workspace output |
+| `POST` | `/api/workbench/workspace-outputs/{output_id}/exports` | Export one durable workspace output into a downloadable artifact |
 | `GET` | `/api/workbench/tasks/{task_id}` | Read one durable workbench task status |
 | `GET` | `/api/workbench/tasks/{task_id}/events` | Read one durable workbench task event timeline |
 
@@ -146,6 +149,7 @@ Notes:
 - `code_sandbox.policy_allowed` remains caller-specific and separate from runtime readiness
 - `code_sandbox.provider_name`, `isolation_level`, and `network_policy_enforced` describe the currently selected backend contract; `localhost` is a weaker trusted-dev fallback than Docker
 - `workbench.*` is reported per capability; workbench can be enabled overall while specific surfaces still remain unavailable
+- `workbench.artifact_workspace` now reflects the shipped baseline for durable workspace outputs plus export-to-artifact linkage
 - frontend UI should use this endpoint to hide or disable unavailable surfaces instead of assuming that a visible button implies runtime support
 
 ## `GET /api/models`
@@ -371,7 +375,7 @@ Notes:
   - `plan`: completed markdown result
   - `browse`: minimal retrieval execution over runtime-ready sources; completed results may include citations
   - `deep_research`: same minimal retrieval chain with a higher-quality retrieval profile; completed results may include citations
-  - `canvas`: completes with a durable `canvas_document` workspace output plus inline markdown result content
+  - `canvas`: completes with a durable `canvas_document` workspace output plus inline markdown result content; that output can later be exported to a downloadable artifact
 - unknown or caller-invisible source ids return `422`
 
 ## `GET /api/workbench/sources`
@@ -397,6 +401,77 @@ Current behavior:
   - `description`
 - `knowledge` is hidden unless the caller can read knowledge resources
 - `web` is registered for future browse/deep-research execution but currently reports `runtime_ready = false` and `deny_reason = "not_implemented"`
+
+## `GET /api/workbench/workspace-outputs`
+
+Lists visible durable workspace outputs for one restoration scope.
+
+Query parameters:
+
+- `session_id`: restore outputs linked to one session
+- `project_id`: restore outputs linked to one project
+
+Current behavior:
+
+- provide exactly one of `session_id` or `project_id`
+- returns `200` with `outputs`
+- unauthorized or non-existent scope members are simply omitted from the list
+- current output kinds are:
+  - `canvas_document`
+- each output also surfaces any linked downloadable `artifacts` that were created from it
+
+Example:
+
+```json
+{
+  "outputs": [
+    {
+      "output_id": "wbo-123",
+      "output_kind": "canvas_document",
+      "title": "Draft canvas",
+      "content_format": "markdown",
+      "content": "# Draft canvas\n\n## Objective\n- ...",
+      "created_at": "2026-04-10T18:00:02+00:00",
+      "updated_at": "2026-04-10T18:00:02+00:00",
+      "metadata": {
+        "editable": true
+      },
+      "artifacts": []
+    }
+  ]
+}
+```
+
+## `GET /api/workbench/workspace-outputs/{output_id}`
+
+Reads one durable workspace output by stable id.
+
+Current behavior:
+
+- returns `200` with one typed output payload
+- missing or caller-invisible output ids return `404`
+- this is the canonical reopen/read endpoint for a durable workbench output
+
+## `POST /api/workbench/workspace-outputs/{output_id}/exports`
+
+Exports one durable workspace output into a downloadable artifact and links that
+artifact back onto the output payload.
+
+Request body:
+
+```json
+{
+  "format": "markdown",
+  "filename": "draft-canvas.md"
+}
+```
+
+Current behavior:
+
+- returns `201` with a normal `ChatArtifact` payload
+- missing or caller-invisible output ids return `404`
+- invalid export requests return `422`, for example when `filename` has an extension that does not match `format`
+- exported artifacts are appended to the output's `artifacts` list and are also visible through the existing `GET /api/artifacts/{artifact_id}` download route
 
 ## `GET /api/workbench/tasks/{task_id}`
 
@@ -473,7 +548,17 @@ Current behavior:
       "updated_at": "2026-04-10T18:00:02+00:00",
       "metadata": {
         "editable": true
-      }
+      },
+      "artifacts": [
+        {
+          "artifact_id": "art-123",
+          "filename": "draft-canvas.md",
+          "mime_type": "text/markdown",
+          "byte_size": 128,
+          "download_url": "/api/artifacts/art-123",
+          "source_message_id": "canvas-session-1:assistant:0"
+        }
+      ]
     }
   ]
 }
@@ -505,6 +590,7 @@ Current behavior:
   - `retrieval.step.completed`
   - `retrieval.step.skipped`
   - `workspace_output.created`
+  - `workspace_output.exported`
   - `task.completed`
   - `task.failed`
 - missing or caller-invisible task ids return `404`
@@ -658,6 +744,9 @@ Notes:
 
 - `messages` contains only normalized chat roles: `user`, `assistant`, `system`
 - `chart_spec`, `file_context`, and `knowledge_documents` are returned as dedicated fields instead of compatibility pseudo-roles
+- `workspace_outputs` contains visible durable workbench outputs linked through tasks that were created with the same `session_id`
+- each workspace output may include linked downloadable `artifacts` exported from that durable output
+- session-linked restoration assumes that session id already exists in persisted history; workbench does not create chat-session stubs on its own in this slice
 - `chart_data_source` indicates where chart data came from: `uploaded`, `demo`, or `none`
 - Legacy stored sessions are still readable; compatibility decode lives in the backend storage codec, not the API contract
 

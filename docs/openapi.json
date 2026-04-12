@@ -2155,6 +2155,278 @@
         }
       }
     },
+    "/api/workbench/workspace-outputs": {
+      "get": {
+        "tags": [
+          "workbench"
+        ],
+        "summary": "List durable workspace outputs by session or project scope",
+        "description": "List visible workspace outputs for one session or project restoration scope.",
+        "operationId": "list_workbench_workspace_outputs_route_api_workbench_workspace_outputs_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbenchWorkspaceOutputsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "description": "Workbench runtime is not available on this deployment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workbench/workspace-outputs/{output_id}": {
+      "get": {
+        "tags": [
+          "workbench"
+        ],
+        "summary": "Read one durable workspace output",
+        "description": "Read the latest durable state for one workspace output.",
+        "operationId": "get_workbench_workspace_output_route_api_workbench_workspace_outputs__output_id__get",
+        "parameters": [
+          {
+            "name": "output_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Output Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbenchWorkspaceOutputPayload"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "description": "Workbench runtime is not available on this deployment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workbench/workspace-outputs/{output_id}/exports": {
+      "post": {
+        "tags": [
+          "workbench"
+        ],
+        "summary": "Export one durable workspace output into a downloadable artifact",
+        "description": "Create one downloadable artifact from a durable workspace output.",
+        "operationId": "export_workbench_workspace_output_route_api_workbench_workspace_outputs__output_id__exports_post",
+        "parameters": [
+          {
+            "name": "output_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Output Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkbenchWorkspaceOutputExportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatArtifact"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "description": "Workbench runtime is not available on this deployment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workbench/tasks/{task_id}/events": {
       "get": {
         "tags": [
@@ -3202,6 +3474,14 @@
             },
             "type": "array",
             "title": "Knowledge Documents"
+          },
+          "workspace_outputs": {
+            "items": {
+              "$ref": "#/components/schemas/WorkbenchWorkspaceOutputPayload"
+            },
+            "type": "array",
+            "title": "Workspace Outputs",
+            "description": "Durable workbench outputs linked to this session."
           },
           "chart_data_source": {
             "anyOf": [
@@ -4384,6 +4664,7 @@
               "retrieval.step.completed",
               "retrieval.step.skipped",
               "workspace_output.created",
+              "workspace_output.exported",
               "task.completed",
               "task.failed"
             ],
@@ -4652,6 +4933,40 @@
         "title": "WorkbenchTaskStatusResponse",
         "description": "Status payload returned when polling a durable workbench task."
       },
+      "WorkbenchWorkspaceOutputExportRequest": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "text",
+              "csv",
+              "xlsx",
+              "docx"
+            ],
+            "title": "Format",
+            "description": "Target export format for the generated artifact."
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename",
+            "description": "Optional explicit filename; extension must match the export format."
+          }
+        },
+        "type": "object",
+        "required": [
+          "format"
+        ],
+        "title": "WorkbenchWorkspaceOutputExportRequest",
+        "description": "Request body for exporting one workspace output into a downloadable artifact."
+      },
       "WorkbenchWorkspaceOutputPayload": {
         "properties": {
           "output_id": {
@@ -4696,6 +5011,14 @@
             "type": "object",
             "title": "Metadata",
             "description": "Optional structured metadata for richer future workbench UIs."
+          },
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/ChatArtifact"
+            },
+            "type": "array",
+            "title": "Artifacts",
+            "description": "Downloadable artifacts exported from this workspace output."
           }
         },
         "type": "object",
@@ -4710,6 +5033,21 @@
         ],
         "title": "WorkbenchWorkspaceOutputPayload",
         "description": "Typed durable output linked to one workbench task."
+      },
+      "WorkbenchWorkspaceOutputsResponse": {
+        "properties": {
+          "outputs": {
+            "items": {
+              "$ref": "#/components/schemas/WorkbenchWorkspaceOutputPayload"
+            },
+            "type": "array",
+            "title": "Outputs",
+            "description": "Typed durable workspace outputs visible to the current caller."
+          }
+        },
+        "type": "object",
+        "title": "WorkbenchWorkspaceOutputsResponse",
+        "description": "Durable workspace outputs returned by session/project or output-id reads."
       }
     }
   },

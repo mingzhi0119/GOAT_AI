@@ -249,7 +249,8 @@ P1 governance assets now live in-repo too:
 - observability assets: [ops/observability/README.md](ops/observability/README.md)
 - incident response starter runbook: [docs/INCIDENT_TRIAGE.md](docs/INCIDENT_TRIAGE.md)
 - scheduled performance smoke: [`.github/workflows/performance-nightly.yml`](.github/workflows/performance-nightly.yml)
-- scheduled quality snapshot baseline: [`.github/workflows/quality-trends.yml`](.github/workflows/quality-trends.yml)
+- scheduled quality + security evidence capture: [`.github/workflows/quality-trends.yml`](.github/workflows/quality-trends.yml)
+- scheduled fault-injection drills: [`.github/workflows/fault-injection.yml`](.github/workflows/fault-injection.yml)
 - desktop provenance + SBOM baseline: [`.github/workflows/desktop-provenance.yml`](.github/workflows/desktop-provenance.yml)
 
 ## Docs

@@ -55,10 +55,13 @@ jobs:
             --api-key "${PERFORMANCE_API_KEY}" \
             --show-system-inference \
             --max-total-p95-ms 12000 \
-            --max-first-token-p95-ms 2000 | tee performance-smoke.log
+            --max-first-token-p95-ms 2000 \
+            --json-output performance-summary.json | tee performance-smoke.log
       - name: Upload performance log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: performance-smoke-log
-          path: performance-smoke.log
+          path: |
+            performance-smoke.log
+            performance-summary.json
