@@ -6,6 +6,7 @@ import { useApiKey } from './hooks/useApiKey'
 import { useChatLayoutMode } from './hooks/useChatLayoutMode'
 import { useChatSession } from './hooks/useChatSession'
 import { useChatShellActions } from './hooks/useChatShellActions'
+import { useDesktopDiagnostics } from './hooks/useDesktopDiagnostics'
 import { useGpuStatus } from './hooks/useGpuStatus'
 import { useModels } from './hooks/useModels'
 import { useOwnerId } from './hooks/useOwnerId'
@@ -54,6 +55,7 @@ export default function App() {
   })
   const gpu = useGpuStatus(session.isStreaming)
   const systemFeatures = useSystemFeatures()
+  const desktopDiagnostics = useDesktopDiagnostics()
   const {
     handleDeleteAllHistory,
     handleDeleteConversation,
@@ -112,6 +114,8 @@ export default function App() {
           onOpenAppearance={() => setAppearanceOpen(true)}
           onRenameConversation={handleRenameConversation}
           thinkingEnabled={effectiveThinkingEnabled}
+          desktopDiagnostics={desktopDiagnostics.diagnostics}
+          desktopDiagnosticsError={desktopDiagnostics.error}
           apiKey={apiKey}
           ownerId={ownerId}
           onApiKeyChange={setApiKey}

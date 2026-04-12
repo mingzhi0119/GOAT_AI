@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from backend.api_errors import build_error_body
+from backend.api_errors import RESOURCE_CONFLICT, build_error_body
 from backend.application.exceptions import (
     WorkbenchSourceValidationError,
+    WorkbenchTaskConflictError,
     WorkbenchTaskNotFoundError,
     WorkbenchWorkspaceOutputNotFoundError,
 )
@@ -17,6 +18,7 @@ from backend.application.ports import (
     WorkbenchTaskRepository,
 )
 from backend.application.workbench import (
+    cancel_workbench_task,
     create_and_dispatch_workbench_task,
     export_workbench_workspace_output,
     get_workbench_sources,
@@ -24,6 +26,7 @@ from backend.application.workbench import (
     get_workbench_task_events,
     get_workbench_workspace_output,
     list_workbench_workspace_outputs,
+    retry_workbench_task,
 )
 from backend.platform.dependencies import (
     get_authorization_context,
@@ -152,6 +155,107 @@ def get_workbench_task_status(
             detail=build_error_body(
                 detail=str(exc),
                 status_code=404,
+            ),
+        ) from exc
+
+
+@router.post(
+    "/workbench/tasks/{task_id}/cancel",
+    response_model=WorkbenchTaskStatusResponse,
+    summary="Cancel one queued durable workbench task",
+    responses={
+        401: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+        503: {
+            "model": ErrorResponse,
+            "description": "Workbench runtime is not available on this deployment.",
+        },
+    },
+)
+def cancel_workbench_task_route(
+    task_id: str,
+    repository: WorkbenchTaskRepository = Depends(get_workbench_task_repository),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
+    settings: Settings = Depends(get_settings),
+) -> WorkbenchTaskStatusResponse:
+    """Cancel one visible queued workbench task."""
+    try:
+        return cancel_workbench_task(
+            task_id=task_id,
+            repository=repository,
+            settings=settings,
+            auth_context=auth_context,
+        )
+    except WorkbenchTaskNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=build_error_body(
+                detail=str(exc),
+                status_code=404,
+            ),
+        ) from exc
+    except WorkbenchTaskConflictError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=build_error_body(
+                detail=str(exc),
+                code=RESOURCE_CONFLICT,
+                status_code=409,
+            ),
+        ) from exc
+
+
+@router.post(
+    "/workbench/tasks/{task_id}/retry",
+    status_code=202,
+    response_model=WorkbenchTaskAcceptedResponse,
+    summary="Retry one terminal durable workbench task",
+    responses={
+        401: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+        503: {
+            "model": ErrorResponse,
+            "description": "Workbench runtime is not available on this deployment.",
+        },
+    },
+)
+def retry_workbench_task_route(
+    http_request: Request,
+    task_id: str,
+    repository: WorkbenchTaskRepository = Depends(get_workbench_task_repository),
+    dispatcher: WorkbenchTaskDispatcher = Depends(get_workbench_task_dispatcher),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
+    settings: Settings = Depends(get_settings),
+) -> WorkbenchTaskAcceptedResponse:
+    """Retry one visible terminal workbench task as a new queued task."""
+    try:
+        return retry_workbench_task(
+            task_id=task_id,
+            repository=repository,
+            dispatcher=dispatcher,
+            settings=settings,
+            auth_context=auth_context,
+            request_id=str(getattr(http_request.state, "request_id", "")),
+        )
+    except WorkbenchTaskNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=build_error_body(
+                detail=str(exc),
+                status_code=404,
+            ),
+        ) from exc
+    except WorkbenchTaskConflictError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=build_error_body(
+                detail=str(exc),
+                code=RESOURCE_CONFLICT,
+                status_code=409,
             ),
         ) from exc
 

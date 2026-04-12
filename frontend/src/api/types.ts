@@ -186,8 +186,30 @@ export interface SystemFeatures {
   workbench: WorkbenchFeatures
 }
 
+export interface DesktopDiagnostics {
+  desktop_mode: boolean
+  backend_base_url: string | null
+  readiness_ok: boolean | null
+  failing_checks: string[]
+  skipped_checks: string[]
+  code_sandbox_effective_enabled: boolean | null
+  workbench_effective_enabled: boolean | null
+  app_data_dir: string | null
+  runtime_root: string | null
+  data_dir: string | null
+  log_dir: string | null
+  log_db_path: string | null
+  packaged_shell_log_path: string | null
+}
+
 export type CodeSandboxRuntimePreset = 'shell'
-export type CodeSandboxExecutionStatus = 'queued' | 'running' | 'completed' | 'failed' | 'denied'
+export type CodeSandboxExecutionStatus =
+  | 'queued'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'denied'
+  | 'cancelled'
 export type CodeSandboxExecutionMode = 'sync' | 'async'
 export type CodeSandboxNetworkPolicy = 'disabled' | 'allowlist' | 'enabled'
 

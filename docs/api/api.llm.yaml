@@ -93,7 +93,7 @@ schemas:
       sequence: integer
       event_type: string
       created_at: string
-      status: queued|running|completed|failed|denied|null
+      status: queued|running|completed|failed|denied|cancelled|null
       message: string|null
       metadata: object
   CodeSandboxExecutionEventsResponse:
@@ -116,7 +116,7 @@ schemas:
       - updated_at
     properties:
       execution_id: string
-      status: queued|running|completed|failed|denied
+      status: queued|running|completed|failed|denied|cancelled
       execution_mode: sync|async
       runtime_preset: string
       network_policy: disabled|allowlist|enabled
@@ -168,6 +168,24 @@ schemas:
     properties:
       path: string
       byte_size: integer
+  DesktopDiagnosticsResponse:
+    type: object
+    required:
+      - desktop_mode
+    properties:
+      desktop_mode: boolean
+      backend_base_url: string|null
+      readiness_ok: boolean|null
+      failing_checks: string[]
+      skipped_checks: string[]
+      code_sandbox_effective_enabled: boolean|null
+      workbench_effective_enabled: boolean|null
+      app_data_dir: string|null
+      runtime_root: string|null
+      data_dir: string|null
+      log_dir: string|null
+      log_db_path: string|null
+      packaged_shell_log_path: string|null
   ErrorResponse:
     type: object
     required:
@@ -572,7 +590,7 @@ schemas:
     properties:
       task_id: string
       task_kind: plan|browse|deep_research|canvas
-      status: queued|running|completed|failed
+      status: queued|running|completed|failed|cancelled
       created_at: string
   WorkbenchTaskEventPayload:
     type: object
@@ -582,9 +600,9 @@ schemas:
       - created_at
     properties:
       sequence: integer
-      event_type: task.queued|task.started|retrieval.sources_resolved|retrieval.step.completed|retrieval.step.skipped|workspace_output.created|workspace_output.exported|task.completed|task.failed
+      event_type: task.queued|task.started|task.cancelled|task.retry_requested|task.retry_created|retrieval.sources_resolved|retrieval.step.completed|retrieval.step.skipped|workspace_output.created|workspace_output.exported|task.completed|task.failed
       created_at: string
-      status: queued|running|completed|failed|null
+      status: queued|running|completed|failed|cancelled|null
       message: string|null
       metadata: object
   WorkbenchTaskEventsResponse:
@@ -626,7 +644,7 @@ schemas:
     properties:
       task_id: string
       task_kind: plan|browse|deep_research|canvas
-      status: queued|running|completed|failed
+      status: queued|running|completed|failed|cancelled
       created_at: string
       updated_at: string
       error_detail: string|null
@@ -953,6 +971,14 @@ endpoints:
       errors:
         - 401
         - 429
+  - op: get_desktop_diagnostics_route
+    method: GET
+    path: /system/desktop
+    response:
+      200: DesktopDiagnosticsResponse
+      errors:
+        - 401
+        - 429
   - op: get_runtime_target_route
     method: GET
     path: /system/runtime-target
@@ -1000,6 +1026,36 @@ endpoints:
         - 401
         - 403
         - 404
+        - 422
+        - 429
+        - 503
+  - op: post_code_sandbox_execution_cancel_route
+    method: POST
+    path: /code-sandbox/executions/{execution_id}/cancel
+    path_params:
+      execution_id: string
+    response:
+      200: CodeSandboxExecutionResponse
+      errors:
+        - 401
+        - 403
+        - 404
+        - 409
+        - 422
+        - 429
+        - 503
+  - op: post_code_sandbox_execution_retry_route
+    method: POST
+    path: /code-sandbox/executions/{execution_id}/retry
+    path_params:
+      execution_id: string
+    response:
+      200: CodeSandboxExecutionResponse
+      errors:
+        - 401
+        - 403
+        - 404
+        - 409
         - 422
         - 429
         - 503
@@ -1088,6 +1144,34 @@ endpoints:
       errors:
         - 401
         - 404
+        - 422
+        - 429
+        - 503
+  - op: cancel_workbench_task_route
+    method: POST
+    path: /workbench/tasks/{task_id}/cancel
+    path_params:
+      task_id: string
+    response:
+      200: WorkbenchTaskStatusResponse
+      errors:
+        - 401
+        - 404
+        - 409
+        - 422
+        - 429
+        - 503
+  - op: retry_workbench_task_route
+    method: POST
+    path: /workbench/tasks/{task_id}/retry
+    path_params:
+      task_id: string
+    response:
+      202: WorkbenchTaskAcceptedResponse
+      errors:
+        - 401
+        - 404
+        - 409
         - 422
         - 429
         - 503

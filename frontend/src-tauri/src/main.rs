@@ -28,6 +28,8 @@ use tauri_plugin_shell::{process::CommandChild, process::CommandEvent, ShellExt}
 const DEFAULT_BACKEND_HOST: &str = "127.0.0.1";
 const DEFAULT_BACKEND_PORT: &str = "62606";
 const HEALTH_TIMEOUT_SEC: u64 = 25;
+const PRE_READY_RESTART_LIMIT: usize = 2;
+const PRE_READY_RESTART_BACKOFF_MS: u64 = 750;
 
 #[derive(Clone, Default)]
 struct BackendProcessState(Arc<Mutex<Option<BackendProcessHandle>>>);
@@ -38,11 +40,21 @@ struct BackendReadyState(Arc<AtomicBool>);
 #[derive(Clone, Default)]
 struct BackendShutdownState(Arc<AtomicBool>);
 
+#[derive(Clone, Default)]
+struct BackendStartupFailureState(Arc<AtomicBool>);
+
 enum BackendProcessHandle {
     #[cfg(debug_assertions)]
     Dev(Child),
     #[cfg(not(debug_assertions))]
     Release(CommandChild),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum BackendStartupWaitOutcome {
+    Ready,
+    FailedEarly,
+    TimedOut,
 }
 
 fn normalize_configured_value(value: Option<String>, default: &str) -> String {
@@ -119,6 +131,41 @@ fn backend_termination_diagnostic(
     message
 }
 
+fn pre_ready_restart_backoff(attempt_index: usize) -> Duration {
+    Duration::from_millis((attempt_index as u64) * PRE_READY_RESTART_BACKOFF_MS)
+}
+
+fn store_backend_process(state: &BackendProcessState, child: BackendProcessHandle) {
+    if let Ok(mut slot) = state.0.lock() {
+        *slot = Some(child);
+    }
+}
+
+fn stop_active_backend_process(state: &BackendProcessState) {
+    if let Ok(mut slot) = state.0.lock() {
+        if let Some(child) = slot.take() {
+            child.kill();
+        }
+    }
+}
+
+fn next_retry_detail(
+    current_attempt_index: usize,
+    total_attempts: usize,
+) -> Option<String> {
+    if current_attempt_index + 1 >= total_attempts {
+        return None;
+    }
+    let next_attempt = current_attempt_index + 2;
+    let backoff = pre_ready_restart_backoff(current_attempt_index + 1);
+    Some(format!(
+        "Retrying before window reveal after {} ms backoff (next attempt {}/{}).",
+        backoff.as_millis(),
+        next_attempt,
+        total_attempts
+    ))
+}
+
 #[cfg(not(debug_assertions))]
 fn desktop_log_path(logs_dir: &Path) -> PathBuf {
     logs_dir.join("desktop-shell.log")
@@ -156,6 +203,7 @@ fn main() {
         .manage(BackendProcessState::default())
         .manage(BackendReadyState::default())
         .manage(BackendShutdownState::default())
+        .manage(BackendStartupFailureState::default())
         .setup(|app| {
             let backend_host = backend_host();
             let backend_port = backend_port();
@@ -166,50 +214,116 @@ fn main() {
             let packaged_desktop_log_path = Some(resolve_desktop_log_path(app.handle())?);
             #[cfg(debug_assertions)]
             let packaged_desktop_log_path: Option<PathBuf> = None;
-
-            match spawn_backend(app.handle()) {
-                Ok(child) => {
-                    let state = app.state::<BackendProcessState>().inner().clone();
-                    if let Ok(mut slot) = state.0.lock() {
-                        *slot = Some(child);
+            let process_state = app.state::<BackendProcessState>().inner().clone();
+            let ready_state = app.state::<BackendReadyState>().inner().clone();
+            let shutdown_state = app.state::<BackendShutdownState>().inner().clone();
+            let startup_failure_state = app.state::<BackendStartupFailureState>().inner().clone();
+            let app_handle = app.handle().clone();
+            let desktop_log_path = packaged_desktop_log_path.clone();
+            thread::spawn(move || {
+                let total_attempts = PRE_READY_RESTART_LIMIT + 1;
+                for attempt_index in 0..total_attempts {
+                    if shutdown_state.0.load(Ordering::SeqCst) {
+                        stop_active_backend_process(&process_state);
+                        return;
                     }
-                    let ready_state = app.state::<BackendReadyState>().inner().clone();
-                    let app_handle = app.handle().clone();
-                    let desktop_log_path = packaged_desktop_log_path.clone();
-                    thread::spawn(move || {
-                        let ready =
-                            wait_for_backend(&health_url, Duration::from_secs(HEALTH_TIMEOUT_SEC));
-                        if !ready {
+                    startup_failure_state.0.store(false, Ordering::SeqCst);
+
+                    match spawn_backend(&app_handle) {
+                        Ok(child) => store_backend_process(&process_state, child),
+                        Err(err) => {
+                            let detail = match next_retry_detail(attempt_index, total_attempts) {
+                                Some(retry) => format!("{err} {retry}"),
+                                None => err,
+                            };
                             let diagnostic = startup_failure_diagnostic(
-                                "health_wait_timeout",
+                                "backend_spawn_failed",
                                 &health_url,
-                                Some(
-                                    "Timed out while waiting for the bundled backend to answer /api/health.",
-                                ),
+                                Some(&detail),
                             );
                             if let Some(log_path) = desktop_log_path.as_ref() {
                                 append_desktop_log(log_path, &diagnostic);
                             }
-                            eprintln!("{}", diagnostic);
-                            app_handle.exit(1);
+                            eprintln!("{diagnostic}");
+                            if attempt_index + 1 >= total_attempts {
+                                app_handle.exit(1);
+                                return;
+                            }
+                            thread::sleep(pre_ready_restart_backoff(attempt_index + 1));
+                            continue;
+                        }
+                    }
+
+                    match wait_for_backend_startup(
+                        &health_url,
+                        Duration::from_secs(HEALTH_TIMEOUT_SEC),
+                        &startup_failure_state,
+                    ) {
+                        BackendStartupWaitOutcome::Ready => {
+                            ready_state.0.store(true, Ordering::SeqCst);
+                            if let Some(window) = app_handle.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
                             return;
                         }
-                        ready_state.0.store(true, Ordering::SeqCst);
-                        if let Some(window) = app_handle.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
+                        BackendStartupWaitOutcome::FailedEarly => {
+                            stop_active_backend_process(&process_state);
+                            let detail =
+                                match next_retry_detail(attempt_index, total_attempts) {
+                                    Some(retry) => format!(
+                                        "Bundled backend exited before readiness completed. {retry}"
+                                    ),
+                                    None => {
+                                        "Bundled backend exited before readiness completed."
+                                            .to_string()
+                                    }
+                                };
+                            let diagnostic = startup_failure_diagnostic(
+                                "backend_terminated_before_ready",
+                                &health_url,
+                                Some(&detail),
+                            );
+                            if let Some(log_path) = desktop_log_path.as_ref() {
+                                append_desktop_log(log_path, &diagnostic);
+                            }
+                            eprintln!("{diagnostic}");
+                            if attempt_index + 1 >= total_attempts {
+                                app_handle.exit(1);
+                                return;
+                            }
+                            thread::sleep(pre_ready_restart_backoff(attempt_index + 1));
                         }
-                    });
-                }
-                Err(err) => {
-                    let diagnostic =
-                        startup_failure_diagnostic("backend_spawn_failed", &health_url, Some(&err));
-                    if let Some(log_path) = packaged_desktop_log_path.as_ref() {
-                        append_desktop_log(log_path, &diagnostic);
+                        BackendStartupWaitOutcome::TimedOut => {
+                            stop_active_backend_process(&process_state);
+                            let detail =
+                                match next_retry_detail(attempt_index, total_attempts) {
+                                    Some(retry) => format!(
+                                        "Timed out while waiting for the bundled backend to answer /api/health. {retry}"
+                                    ),
+                                    None => {
+                                        "Timed out while waiting for the bundled backend to answer /api/health."
+                                            .to_string()
+                                    }
+                                };
+                            let diagnostic = startup_failure_diagnostic(
+                                "health_wait_timeout",
+                                &health_url,
+                                Some(&detail),
+                            );
+                            if let Some(log_path) = desktop_log_path.as_ref() {
+                                append_desktop_log(log_path, &diagnostic);
+                            }
+                            eprintln!("{diagnostic}");
+                            if attempt_index + 1 >= total_attempts {
+                                app_handle.exit(1);
+                                return;
+                            }
+                            thread::sleep(pre_ready_restart_backoff(attempt_index + 1));
+                        }
                     }
-                    return Err(diagnostic.into());
                 }
-            }
+            });
 
             Ok(())
         })
@@ -222,12 +336,7 @@ fn main() {
                     .clone();
                 shutdown_state.0.store(true, Ordering::SeqCst);
                 let state = window.app_handle().state::<BackendProcessState>().inner().clone();
-                let lock_result = state.0.lock();
-                if let Ok(mut slot) = lock_result {
-                    if let Some(child) = slot.take() {
-                        child.kill();
-                    }
-                }
+                stop_active_backend_process(&state);
             }
         })
         .run(tauri::generate_context!())
@@ -333,6 +442,7 @@ fn repo_root() -> Option<PathBuf> {
     Some(repo_root.to_path_buf())
 }
 
+#[allow(dead_code)]
 fn wait_for_backend_with_probe<F>(timeout: Duration, interval: Duration, mut probe: F) -> bool
 where
     F: FnMut() -> bool,
@@ -347,10 +457,40 @@ where
     false
 }
 
-fn wait_for_backend(health_url: &str, timeout: Duration) -> bool {
-    wait_for_backend_with_probe(timeout, Duration::from_millis(350), || {
-        backend_ready(health_url)
-    })
+fn wait_for_backend_startup_with_probes<F, G>(
+    timeout: Duration,
+    interval: Duration,
+    mut ready_probe: F,
+    mut startup_failed: G,
+) -> BackendStartupWaitOutcome
+where
+    F: FnMut() -> bool,
+    G: FnMut() -> bool,
+{
+    let deadline = Instant::now() + timeout;
+    while Instant::now() < deadline {
+        if ready_probe() {
+            return BackendStartupWaitOutcome::Ready;
+        }
+        if startup_failed() {
+            return BackendStartupWaitOutcome::FailedEarly;
+        }
+        thread::sleep(interval);
+    }
+    BackendStartupWaitOutcome::TimedOut
+}
+
+fn wait_for_backend_startup(
+    health_url: &str,
+    timeout: Duration,
+    startup_failure_state: &BackendStartupFailureState,
+) -> BackendStartupWaitOutcome {
+    wait_for_backend_startup_with_probes(
+        timeout,
+        Duration::from_millis(350),
+        || backend_ready(health_url),
+        || startup_failure_state.0.load(Ordering::SeqCst),
+    )
 }
 
 fn backend_ready(health_url: &str) -> bool {
@@ -369,7 +509,9 @@ fn _path_exists(path: &Path) -> bool {
 mod tests {
     use super::{
         backend_health_url, backend_termination_diagnostic, normalize_configured_value,
-        startup_failure_diagnostic, wait_for_backend_with_probe,
+        pre_ready_restart_backoff, startup_failure_diagnostic,
+        wait_for_backend_startup_with_probes, wait_for_backend_with_probe,
+        BackendStartupWaitOutcome,
     };
     use std::time::Duration;
 
@@ -443,6 +585,53 @@ mod tests {
         assert!(startup.contains("spawn failed"));
         assert!(shutdown.contains("during desktop shutdown"));
     }
+
+    #[test]
+    fn pre_ready_restart_backoff_scales_with_attempt_number() {
+        assert_eq!(pre_ready_restart_backoff(1), Duration::from_millis(750));
+        assert_eq!(pre_ready_restart_backoff(2), Duration::from_millis(1500));
+    }
+
+    #[test]
+    fn wait_for_backend_startup_returns_failed_early_before_timeout() {
+        let mut attempts = 0;
+        let outcome = wait_for_backend_startup_with_probes(
+            Duration::from_millis(50),
+            Duration::from_millis(0),
+            || false,
+            || {
+                attempts += 1;
+                attempts >= 3
+            },
+        );
+
+        assert_eq!(outcome, BackendStartupWaitOutcome::FailedEarly);
+        assert_eq!(attempts, 3);
+    }
+
+    #[test]
+    fn wait_for_backend_startup_returns_ready_when_probe_succeeds_first() {
+        let outcome = wait_for_backend_startup_with_probes(
+            Duration::from_millis(50),
+            Duration::from_millis(0),
+            || true,
+            || false,
+        );
+
+        assert_eq!(outcome, BackendStartupWaitOutcome::Ready);
+    }
+
+    #[test]
+    fn wait_for_backend_startup_times_out_when_neither_probe_trips() {
+        let outcome = wait_for_backend_startup_with_probes(
+            Duration::from_millis(1),
+            Duration::from_millis(0),
+            || false,
+            || false,
+        );
+
+        assert_eq!(outcome, BackendStartupWaitOutcome::TimedOut);
+    }
 }
 
 #[cfg(not(debug_assertions))]
@@ -468,6 +657,7 @@ fn spawn_release_backend<R: tauri::Runtime>(
     fs::create_dir_all(&logs_dir)
         .map_err(|err| format!("could not create app log dir {}: {err}", logs_dir.display()))?;
     let desktop_log = desktop_log_path(&logs_dir);
+    let data_root_arg = data_root.to_string_lossy().to_string();
     append_desktop_log(&desktop_log, "Starting bundled backend sidecar.");
 
     let mut sidecar = app_handle
@@ -476,10 +666,20 @@ fn spawn_release_backend<R: tauri::Runtime>(
         .map_err(|err| format!("could not resolve bundled backend sidecar: {err}"))?;
 
     sidecar = sidecar
-        .args(["--host", &backend_host, "--port", &backend_port])
+        .args([
+            "--host",
+            &backend_host,
+            "--port",
+            &backend_port,
+            "--data-root",
+            &data_root_arg,
+        ])
         .env("GOAT_DESKTOP_APP_DATA_DIR", data_root.as_os_str())
+        .env("GOAT_RUNTIME_ROOT", data_root.as_os_str())
+        .env("GOAT_LOG_DIR", logs_dir.as_os_str())
         .env("GOAT_LOG_PATH", data_root.join("chat_logs.db").as_os_str())
         .env("GOAT_DATA_DIR", data_root.join("data").as_os_str())
+        .env("GOAT_DESKTOP_SHELL_LOG_PATH", desktop_log.as_os_str())
         .env("GOAT_SERVER_PORT", &backend_port)
         .env("GOAT_LOCAL_PORT", &backend_port)
         .env("GOAT_DEPLOY_TARGET", "local");
@@ -492,6 +692,10 @@ fn spawn_release_backend<R: tauri::Runtime>(
     let event_log_path = desktop_log.clone();
     let ready_state = app_handle.state::<BackendReadyState>().inner().clone();
     let shutdown_state = app_handle.state::<BackendShutdownState>().inner().clone();
+    let startup_failure_state = app_handle
+        .state::<BackendStartupFailureState>()
+        .inner()
+        .clone();
     let app_handle_for_events = app_handle.clone();
     tauri::async_runtime::spawn(async move {
         while let Some(event) = rx.recv().await {
@@ -520,7 +724,10 @@ fn spawn_release_backend<R: tauri::Runtime>(
                     );
                     append_desktop_log(&event_log_path, &diagnostic);
                     eprintln!("{diagnostic}");
-                    if !shutdown_requested {
+                    if !shutdown_requested && !ready {
+                        startup_failure_state.0.store(true, Ordering::SeqCst);
+                    }
+                    if !shutdown_requested && ready {
                         app_handle_for_events.exit(1);
                     }
                 }
@@ -536,7 +743,10 @@ fn spawn_release_backend<R: tauri::Runtime>(
                     );
                     append_desktop_log(&event_log_path, &diagnostic);
                     eprintln!("{diagnostic}");
-                    if !shutdown_requested {
+                    if !shutdown_requested && !ready {
+                        startup_failure_state.0.store(true, Ordering::SeqCst);
+                    }
+                    if !shutdown_requested && ready {
                         app_handle_for_events.exit(1);
                     }
                 }

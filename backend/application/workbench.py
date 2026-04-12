@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from backend.application.exceptions import (
     WorkbenchSourceValidationError,
+    WorkbenchTaskConflictError,
     WorkbenchTaskNotFoundError,
     WorkbenchWorkspaceOutputNotFoundError,
 )
@@ -163,6 +164,65 @@ def _to_source_payload(source: WorkbenchSourceDescriptor) -> WorkbenchSourcePayl
     )
 
 
+def _build_task_create_payload(
+    *,
+    task_id: str,
+    task_kind: str,
+    prompt: str,
+    session_id: str | None,
+    project_id: str | None,
+    knowledge_document_ids: list[str],
+    connector_ids: list[str],
+    source_ids: list[str],
+    created_at: str,
+    owner_id: str,
+    tenant_id: str,
+    principal_id: str,
+    auth_scopes: list[str] | None,
+    credential_id: str,
+    auth_mode: str,
+) -> WorkbenchTaskCreatePayload:
+    return WorkbenchTaskCreatePayload(
+        task_id=task_id,
+        task_kind=task_kind,
+        prompt=prompt,
+        session_id=session_id,
+        project_id=project_id,
+        knowledge_document_ids=list(knowledge_document_ids),
+        connector_ids=list(connector_ids),
+        source_ids=list(source_ids),
+        created_at=created_at,
+        updated_at=created_at,
+        owner_id=owner_id,
+        tenant_id=tenant_id,
+        principal_id=principal_id,
+        auth_scopes=list(auth_scopes or []),
+        credential_id=credential_id,
+        auth_mode=auth_mode,
+    )
+
+
+def _load_visible_task(
+    *,
+    task_id: str,
+    repository: WorkbenchTaskRepository,
+    settings: Settings,
+    auth_context: AuthorizationContext,
+) -> WorkbenchTaskRecord:
+    ensure_agent_workbench_enabled(settings)
+    task = repository.get_task(task_id)
+    if task is None:
+        raise WorkbenchTaskNotFoundError("Workbench task not found")
+    decision = authorize_workbench_task_read(
+        ctx=auth_context,
+        task=task,
+        require_owner_header=settings.require_session_owner,
+    )
+    if not decision.allowed:
+        raise WorkbenchTaskNotFoundError("Workbench task not found")
+    return task
+
+
 def create_workbench_task(
     *,
     request: WorkbenchTaskRequest,
@@ -195,7 +255,7 @@ def create_workbench_task(
             "At least one runtime-ready retrieval source is required for this task kind."
         )
     task = repository.create_task(
-        WorkbenchTaskCreatePayload(
+        _build_task_create_payload(
             task_id=f"wb-{uuid4().hex}",
             task_kind=request.task_kind,
             prompt=request.prompt,
@@ -205,7 +265,6 @@ def create_workbench_task(
             connector_ids=list(request.connector_ids),
             source_ids=[source.source_id for source in resolved_sources],
             created_at=now,
-            updated_at=now,
             owner_id=auth_context.legacy_owner_id,
             tenant_id=auth_context.tenant_id.value,
             principal_id=auth_context.principal_id.value,
@@ -245,23 +304,112 @@ def get_workbench_task(
     auth_context: AuthorizationContext,
 ) -> WorkbenchTaskStatusResponse:
     """Return one durable workbench task status when visible to the caller."""
-    ensure_agent_workbench_enabled(settings)
-    task = repository.get_task(task_id)
-    if task is None:
-        raise WorkbenchTaskNotFoundError("Workbench task not found")
-    decision = authorize_workbench_task_read(
-        ctx=auth_context,
-        task=task,
-        require_owner_header=settings.require_session_owner,
+    task = _load_visible_task(
+        task_id=task_id,
+        repository=repository,
+        settings=settings,
+        auth_context=auth_context,
     )
-    if not decision.allowed:
-        raise WorkbenchTaskNotFoundError("Workbench task not found")
     response = _to_status_response(task)
     response.workspace_outputs = [
         _to_workspace_output_payload(output)
         for output in repository.list_workspace_outputs(task.id)
     ]
     return response
+
+
+def cancel_workbench_task(
+    *,
+    task_id: str,
+    repository: WorkbenchTaskRepository,
+    settings: Settings,
+    auth_context: AuthorizationContext,
+) -> WorkbenchTaskStatusResponse:
+    """Cancel one visible queued workbench task."""
+    task = _load_visible_task(
+        task_id=task_id,
+        repository=repository,
+        settings=settings,
+        auth_context=auth_context,
+    )
+    if task.status != "queued":
+        raise WorkbenchTaskConflictError(
+            "Only queued workbench tasks can be cancelled."
+        )
+    repository.mark_task_cancelled(
+        task.id,
+        updated_at=_utc_now(),
+        error_detail="Task cancelled before execution.",
+    )
+    updated = repository.get_task(task.id)
+    if updated is None:
+        raise RuntimeError("Workbench task disappeared after cancellation.")
+    response = _to_status_response(updated)
+    response.workspace_outputs = [
+        _to_workspace_output_payload(output)
+        for output in repository.list_workspace_outputs(updated.id)
+    ]
+    return response
+
+
+def retry_workbench_task(
+    *,
+    task_id: str,
+    repository: WorkbenchTaskRepository,
+    dispatcher: WorkbenchTaskDispatcher,
+    settings: Settings,
+    auth_context: AuthorizationContext,
+    request_id: str = "",
+) -> WorkbenchTaskAcceptedResponse:
+    """Retry one visible terminal workbench task as a new queued task."""
+    task = _load_visible_task(
+        task_id=task_id,
+        repository=repository,
+        settings=settings,
+        auth_context=auth_context,
+    )
+    if task.status not in {"completed", "failed", "cancelled"}:
+        raise WorkbenchTaskConflictError(
+            "Only terminal workbench tasks can be retried."
+        )
+    now = _utc_now()
+    retried = repository.create_task(
+        _build_task_create_payload(
+            task_id=f"wb-{uuid4().hex}",
+            task_kind=task.task_kind,
+            prompt=task.prompt,
+            session_id=task.session_id,
+            project_id=task.project_id,
+            knowledge_document_ids=task.knowledge_document_ids,
+            connector_ids=task.connector_ids,
+            source_ids=task.source_ids,
+            created_at=now,
+            owner_id=task.owner_id,
+            tenant_id=task.tenant_id,
+            principal_id=task.principal_id,
+            auth_scopes=task.auth_scopes,
+            credential_id=task.credential_id,
+            auth_mode=task.auth_mode,
+        )
+    )
+    repository.append_task_event(
+        task.id,
+        event_type="task.retry_requested",
+        created_at=now,
+        status=task.status,
+        message="Retry requested.",
+        metadata={"retry_task_id": retried.id},
+    )
+    repository.append_task_event(
+        retried.id,
+        event_type="task.retry_created",
+        created_at=now,
+        status="queued",
+        message="Task created from retry.",
+        metadata={"source_task_id": task.id},
+    )
+    dispatcher.dispatch_task(task_id=retried.id, request_id=request_id)
+    return _to_accepted_response(retried)
 
 
 def get_workbench_task_events(
@@ -272,17 +420,12 @@ def get_workbench_task_events(
     auth_context: AuthorizationContext,
 ) -> WorkbenchTaskEventsResponse:
     """Return the durable event timeline for one visible workbench task."""
-    ensure_agent_workbench_enabled(settings)
-    task = repository.get_task(task_id)
-    if task is None:
-        raise WorkbenchTaskNotFoundError("Workbench task not found")
-    decision = authorize_workbench_task_read(
-        ctx=auth_context,
-        task=task,
-        require_owner_header=settings.require_session_owner,
+    task = _load_visible_task(
+        task_id=task_id,
+        repository=repository,
+        settings=settings,
+        auth_context=auth_context,
     )
-    if not decision.allowed:
-        raise WorkbenchTaskNotFoundError("Workbench task not found")
     return WorkbenchTaskEventsResponse(
         task_id=task.id,
         events=[

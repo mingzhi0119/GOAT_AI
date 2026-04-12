@@ -76,6 +76,17 @@ class SystemRouterIntegrationTests(unittest.TestCase):
         self.assertTrue(cs["policy_allowed"])
         self.assertFalse(cs["allowed_by_config"])
 
+    def test_get_desktop_diagnostics_returns_empty_payload_outside_desktop_mode(
+        self,
+    ) -> None:
+        response = self.client.get("/api/system/desktop")
+
+        self.assertEqual(200, response.status_code)
+        payload = response.json()
+        self.assertFalse(payload["desktop_mode"])
+        self.assertIsNone(payload["backend_base_url"])
+        self.assertEqual([], payload["failing_checks"])
+
     def test_code_sandbox_exec_forbidden_when_feature_off(self) -> None:
         app = FastAPI()
         register_exception_handlers(app)

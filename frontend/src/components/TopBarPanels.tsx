@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import type { DesktopDiagnostics } from '../api/types'
 import {
   AppearanceIcon,
   ChevronDownIcon,
@@ -8,6 +9,8 @@ import {
 export interface SettingsPanelProps {
   appearanceSummary: string
   advancedOpen: boolean
+  desktopDiagnostics?: DesktopDiagnostics | null
+  desktopDiagnosticsError?: string | null
   apiKey: string
   ownerId: string
   systemInstruction: string
@@ -372,6 +375,124 @@ function AppearanceSection({
   )
 }
 
+function renderDesktopSummary(diagnostics: DesktopDiagnostics): string {
+  const readiness =
+    diagnostics.readiness_ok === null
+      ? 'Unknown'
+      : diagnostics.readiness_ok
+        ? 'Ready'
+        : 'Not ready'
+  const featureSummary = [
+    diagnostics.code_sandbox_effective_enabled === null
+      ? null
+      : diagnostics.code_sandbox_effective_enabled
+        ? 'Sandbox on'
+        : 'Sandbox off',
+    diagnostics.workbench_effective_enabled === null
+      ? null
+      : diagnostics.workbench_effective_enabled
+        ? 'Workbench on'
+        : 'Workbench off',
+  ]
+    .filter(Boolean)
+    .join(' / ')
+  const failingChecks =
+    diagnostics.failing_checks.length > 0
+      ? `Failing: ${diagnostics.failing_checks.join(', ')}`
+      : 'All tracked checks passed'
+  return [readiness, featureSummary, failingChecks].filter(Boolean).join(' | ')
+}
+
+function DiagnosticsField({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
+  return (
+    <div>
+      <dt className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
+        {label}
+      </dt>
+      <dd className="mt-0.5 break-all text-xs" style={{ color: 'var(--text-main)' }}>
+        {value}
+      </dd>
+    </div>
+  )
+}
+
+function DesktopDiagnosticsSection({
+  desktopDiagnostics,
+  desktopDiagnosticsError,
+}: Pick<SettingsPanelProps, 'desktopDiagnostics' | 'desktopDiagnosticsError'>) {
+  const diagnostics = desktopDiagnostics ?? null
+
+  return (
+    <section className="border-t pt-3" style={{ borderColor: 'var(--border-color)' }}>
+      <div className="mb-2">
+        <p
+          className="text-[11px] font-semibold uppercase tracking-[0.08em]"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          Desktop runtime
+        </p>
+        <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+          Read-only diagnostics for packaged desktop startup and local runtime state.
+        </p>
+      </div>
+      {desktopDiagnosticsError ? (
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {desktopDiagnosticsError}
+        </p>
+      ) : diagnostics === null ? (
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          Loading desktop diagnostics...
+        </p>
+      ) : !diagnostics.desktop_mode ? (
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          Desktop runtime not detected in this deployment.
+        </p>
+      ) : (
+        <dl className="grid grid-cols-1 gap-2">
+          <DiagnosticsField
+            label="Summary"
+            value={renderDesktopSummary(diagnostics)}
+          />
+          <DiagnosticsField
+            label="Backend base URL"
+            value={diagnostics.backend_base_url ?? 'Not available'}
+          />
+          <DiagnosticsField
+            label="App data"
+            value={diagnostics.app_data_dir ?? 'Not available'}
+          />
+          <DiagnosticsField
+            label="Runtime root"
+            value={diagnostics.runtime_root ?? 'Not available'}
+          />
+          <DiagnosticsField
+            label="Data dir"
+            value={diagnostics.data_dir ?? 'Not available'}
+          />
+          <DiagnosticsField
+            label="Log dir"
+            value={diagnostics.log_dir ?? 'Not available'}
+          />
+          <DiagnosticsField
+            label="Log database"
+            value={diagnostics.log_db_path ?? 'Not available'}
+          />
+          <DiagnosticsField
+            label="Packaged shell log"
+            value={diagnostics.packaged_shell_log_path ?? 'Not available'}
+          />
+        </dl>
+      )}
+    </section>
+  )
+}
+
 export function ConversationActionsMenu({
   hasSession,
   onRenameConversation,
@@ -455,6 +576,8 @@ export function ConversationActionsMenu({
 export function SettingsPanel({
   appearanceSummary,
   advancedOpen,
+  desktopDiagnostics,
+  desktopDiagnosticsError,
   apiKey,
   ownerId,
   systemInstruction,
@@ -511,6 +634,10 @@ export function SettingsPanel({
           appearanceSummary={appearanceSummary}
           onOpenAppearance={onOpenAppearance}
           onClose={onClose}
+        />
+        <DesktopDiagnosticsSection
+          desktopDiagnostics={desktopDiagnostics}
+          desktopDiagnosticsError={desktopDiagnosticsError}
         />
       </div>
     </div>

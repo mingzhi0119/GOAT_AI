@@ -27,9 +27,11 @@ from goat_ai.config.settings import Settings
 if TestClient is not None:
     from backend.platform.config import get_settings
     from backend.platform.dependencies import (
+        get_code_sandbox_execution_dispatcher,
         get_code_sandbox_provider,
         get_llm_client,
         get_title_generator,
+        get_workbench_task_dispatcher,
     )
     from backend.main import create_app
     from backend.models.chat import ChatMessage
@@ -58,6 +60,16 @@ class AuthzFakeCodeSandboxProvider:
             error_detail=None,
             output_files=[],
         )
+
+
+class AuthzNoopCodeSandboxDispatcher:
+    def dispatch_execution(self, *, execution_id: str, request_id: str = "") -> None:
+        _ = (execution_id, request_id)
+
+
+class AuthzNoopWorkbenchTaskDispatcher:
+    def dispatch_task(self, *, task_id: str, request_id: str = "") -> None:
+        _ = (task_id, request_id)
 
 
 @unittest.skipUnless(TestClient is not None, "fastapi not installed")
@@ -230,6 +242,51 @@ class ApiAuthzTests(unittest.TestCase):
         )
         self.assertEqual(404, events_response.status_code)
 
+    def test_workbench_cancel_owner_mismatch_returns_404(self) -> None:
+        self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+        self.client.app.dependency_overrides[get_workbench_task_dispatcher] = lambda: (
+            AuthzNoopWorkbenchTaskDispatcher()
+        )
+
+        create = self.client.post(
+            "/api/workbench/tasks",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+            json={"task_kind": "plan", "prompt": "Draft a plan"},
+        )
+        self.assertEqual(202, create.status_code)
+        task_id = create.json()["task_id"]
+
+        cancel = self.client.post(
+            f"/api/workbench/tasks/{task_id}/cancel",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "bob"},
+        )
+        self.assertEqual(404, cancel.status_code)
+
+    def test_workbench_retry_owner_mismatch_returns_404(self) -> None:
+        self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        create = self.client.post(
+            "/api/workbench/tasks",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+            json={"task_kind": "plan", "prompt": "Draft a plan"},
+        )
+        self.assertEqual(202, create.status_code)
+        task_id = create.json()["task_id"]
+
+        status = self.client.get(
+            f"/api/workbench/tasks/{task_id}",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+        )
+        self.assertEqual(200, status.status_code)
+
+        retry = self.client.post(
+            f"/api/workbench/tasks/{task_id}/retry",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "bob"},
+        )
+        self.assertEqual(404, retry.status_code)
+
     def test_workbench_workspace_output_owner_mismatch_returns_404(self) -> None:
         self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
         self.client.app.dependency_overrides[get_settings] = lambda: self.settings
@@ -313,6 +370,13 @@ class ApiAuthzTests(unittest.TestCase):
         self.assertTrue(workbench["browse"]["effective_enabled"])
         self.assertTrue(workbench["deep_research"]["effective_enabled"])
         self.assertFalse(workbench["connectors"]["effective_enabled"])
+
+        desktop = self.client.get(
+            "/api/system/desktop",
+            headers={"X-GOAT-API-Key": "limited-workbench"},
+        )
+        self.assertEqual(200, desktop.status_code)
+        self.assertFalse(desktop.json()["desktop_mode"])
 
     @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
     def test_system_features_resolve_policy_gate_per_credential(
@@ -409,6 +473,63 @@ class ApiAuthzTests(unittest.TestCase):
             headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "bob"},
         )
         self.assertEqual(404, read_response.status_code)
+
+    @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
+    def test_code_sandbox_cancel_owner_mismatch_returns_404(
+        self, _mock: object
+    ) -> None:
+        self.settings = replace(
+            self.settings,
+            feature_code_sandbox_enabled=True,
+            require_session_owner=True,
+        )
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+        self.client.app.dependency_overrides[get_code_sandbox_provider] = lambda: (
+            AuthzFakeCodeSandboxProvider()
+        )
+        self.client.app.dependency_overrides[get_code_sandbox_execution_dispatcher] = (
+            lambda: AuthzNoopCodeSandboxDispatcher()
+        )
+
+        create_response = self.client.post(
+            "/api/code-sandbox/exec",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+            json={"execution_mode": "async", "code": "echo sandbox ok"},
+        )
+        self.assertEqual(202, create_response.status_code)
+        execution_id = create_response.json()["execution_id"]
+
+        cancel_response = self.client.post(
+            f"/api/code-sandbox/executions/{execution_id}/cancel",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "bob"},
+        )
+        self.assertEqual(404, cancel_response.status_code)
+
+    @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
+    def test_code_sandbox_retry_owner_mismatch_returns_404(self, _mock: object) -> None:
+        self.settings = replace(
+            self.settings,
+            feature_code_sandbox_enabled=True,
+            require_session_owner=True,
+        )
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+        self.client.app.dependency_overrides[get_code_sandbox_provider] = lambda: (
+            AuthzFakeCodeSandboxProvider()
+        )
+
+        create_response = self.client.post(
+            "/api/code-sandbox/exec",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+            json={"code": "echo sandbox ok"},
+        )
+        self.assertEqual(200, create_response.status_code)
+        execution_id = create_response.json()["execution_id"]
+
+        retry_response = self.client.post(
+            f"/api/code-sandbox/executions/{execution_id}/retry",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "bob"},
+        )
+        self.assertEqual(404, retry_response.status_code)
 
 
 if __name__ == "__main__":

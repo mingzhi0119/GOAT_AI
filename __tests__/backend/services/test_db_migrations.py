@@ -49,6 +49,7 @@ class DbMigrationsTests(unittest.TestCase):
                         "018_code_sandbox_executions",
                         "019_code_sandbox_async_and_logs",
                         "020_workbench_workspace_outputs",
+                        "021_workbench_task_cancelled_status",
                     ],
                 )
                 cols = [
@@ -229,7 +230,7 @@ class DbMigrationsTests(unittest.TestCase):
             conn = sqlite3.connect(db_path)
             try:
                 n = conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]
-                self.assertEqual(n, 20)
+                self.assertEqual(n, 21)
                 cols = [
                     r[1]
                     for r in conn.execute("PRAGMA table_info(conversations)").fetchall()

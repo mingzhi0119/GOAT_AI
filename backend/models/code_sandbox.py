@@ -7,7 +7,14 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-CodeSandboxStatus = Literal["queued", "running", "completed", "failed", "denied"]
+CodeSandboxStatus = Literal[
+    "queued",
+    "running",
+    "completed",
+    "failed",
+    "denied",
+    "cancelled",
+]
 CodeSandboxExecutionMode = Literal["sync", "async"]
 CodeSandboxNetworkPolicy = Literal["disabled", "allowlist", "enabled"]
 CodeSandboxRuntimePreset = Literal["shell"]

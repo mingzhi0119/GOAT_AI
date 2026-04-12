@@ -49,8 +49,11 @@ Base path: `/api`
 | `GET` | `/api/system/inference` | Rolling chat latency |
 | `GET` | `/api/system/runtime-target` | Runtime target resolution |
 | `GET` | `/api/system/features` | Capability-gated feature flags (config + host probe) |
+| `GET` | `/api/system/desktop` | Desktop runtime diagnostics for packaged installs |
 | `POST` | `/api/code-sandbox/exec` | Execute one sandbox run in `sync` or `async` mode |
 | `GET` | `/api/code-sandbox/executions/{execution_id}` | Read one persisted sandbox execution |
+| `POST` | `/api/code-sandbox/executions/{execution_id}/cancel` | Cancel one queued sandbox execution |
+| `POST` | `/api/code-sandbox/executions/{execution_id}/retry` | Retry one terminal sandbox execution as a new durable run |
 | `GET` | `/api/code-sandbox/executions/{execution_id}/events` | Read one persisted sandbox execution timeline |
 | `GET` | `/api/code-sandbox/executions/{execution_id}/logs` | Stream replayable sandbox logs over SSE |
 | `POST` | `/api/workbench/tasks` | Create and enqueue a durable workbench task |
@@ -59,6 +62,8 @@ Base path: `/api`
 | `GET` | `/api/workbench/workspace-outputs/{output_id}` | Read one durable workspace output |
 | `POST` | `/api/workbench/workspace-outputs/{output_id}/exports` | Export one durable workspace output into a downloadable artifact |
 | `GET` | `/api/workbench/tasks/{task_id}` | Read one durable workbench task status |
+| `POST` | `/api/workbench/tasks/{task_id}/cancel` | Cancel one queued durable workbench task |
+| `POST` | `/api/workbench/tasks/{task_id}/retry` | Retry one terminal durable workbench task as a new queued task |
 | `GET` | `/api/workbench/tasks/{task_id}/events` | Read one durable workbench task event timeline |
 
 ## `GET /api/health`
@@ -367,6 +372,7 @@ Notes:
 - current deployments return `503` with `FEATURE_UNAVAILABLE` when the shared workbench runtime is operator-disabled
 - task creation persists a durable queued task, then workbench launches best-effort in-process execution
 - the task record is stored in SQLite so polling survives process restarts
+- terminal task statuses are `completed`, `failed`, and `cancelled`
 - lifecycle updates are also written to a durable event timeline for future long-running browse/research execution
 - `source_ids` are resolved through the shared source registry instead of being treated as opaque strings
 - legacy `connector_ids` is still accepted as a deprecated alias for `source_ids`
@@ -575,9 +581,34 @@ Current behavior:
 ```
 
 - queued and running tasks return `result = null`
-- failed tasks return `result = null` plus a stable `error_detail`
+- failed and cancelled tasks return `result = null` plus a stable `error_detail`
 - missing or caller-invisible task ids return `404`
 - the same runtime gate still applies: if workbench is disabled for the deployment, the route returns `503` with `FEATURE_UNAVAILABLE`
+
+## `POST /api/workbench/tasks/{task_id}/cancel`
+
+Cancels one visible `queued` workbench task.
+
+Current behavior:
+
+- only `queued` tasks can be cancelled
+- success returns `200` with the normal task status payload and `status = cancelled`
+- cancelled tasks return `result = null` and `error_detail = "Task cancelled before execution."`
+- running or terminal tasks return `409` with `code = RESOURCE_CONFLICT`
+- missing or caller-invisible task ids return `404`
+
+## `POST /api/workbench/tasks/{task_id}/retry`
+
+Creates a brand-new durable task from one visible terminal task.
+
+Current behavior:
+
+- only terminal tasks can be retried: `completed`, `failed`, or `cancelled`
+- retry always creates a new `task_id`; the original task is preserved and only gains a lineage event
+- the new task reuses the original `task_kind`, `prompt`, `session_id`, `project_id`, `knowledge_document_ids`, `source_ids`, `connector_ids`, and persisted auth snapshot
+- success returns `202 Accepted` with the same accepted-task payload shape as `POST /api/workbench/tasks`
+- queued or running tasks return `409` with `code = RESOURCE_CONFLICT`
+- missing or caller-invisible task ids return `404`
 
 ## `GET /api/workbench/tasks/{task_id}/events`
 
@@ -596,6 +627,9 @@ Current behavior:
 - current lifecycle event names are:
   - `task.queued`
   - `task.started`
+  - `task.cancelled`
+  - `task.retry_requested`
+  - `task.retry_created`
   - `retrieval.sources_resolved`
   - `retrieval.step.completed`
   - `retrieval.step.skipped`
@@ -861,6 +895,30 @@ Returns machine-readable flags for optional high-risk features (see `docs/standa
 
 `policy_allowed` is evaluated per caller from the current request's authorization context; for `code_sandbox`, the scope is `sandbox:execute`. `deny_reason` when the **runtime** gate is closed is one of: `disabled_by_operator`, `docker_unavailable`, or `localhost_unavailable` (controlled enum; not raw exception text).
 
+## `GET /api/system/desktop`
+
+Returns desktop-only diagnostics used by the packaged shell settings panel. Non-desktop or server deployments return `desktop_mode: false` and leave the desktop-specific fields empty instead of pretending desktop capabilities are available.
+
+Example:
+
+```json
+{
+  "desktop_mode": true,
+  "backend_base_url": "http://127.0.0.1:62606",
+  "readiness_ok": false,
+  "failing_checks": ["ollama"],
+  "skipped_checks": [],
+  "code_sandbox_effective_enabled": true,
+  "workbench_effective_enabled": false,
+  "app_data_dir": "C:/Users/alice/AppData/Local/GOAT AI",
+  "runtime_root": "C:/Users/alice/AppData/Local/GOAT AI",
+  "data_dir": "C:/Users/alice/AppData/Local/GOAT AI/data",
+  "log_dir": "C:/Users/alice/AppData/Local/GOAT AI/logs",
+  "log_db_path": "C:/Users/alice/AppData/Local/GOAT AI/chat_logs.db",
+  "packaged_shell_log_path": "C:/Users/alice/AppData/Local/GOAT AI/logs/desktop-shell.log"
+}
+```
+
 ## `POST /api/code-sandbox/exec`
 
 Executes one shell run through the configured sandbox provider. Phase 18A uses:
@@ -939,7 +997,34 @@ Error semantics:
 
 ## `GET /api/code-sandbox/executions/{execution_id}`
 
-Returns the same durable execution shape as `POST /api/code-sandbox/exec` after the run is persisted. Owner/tenant/principal visibility rules apply; non-visible records resolve as `404`. During `async` execution the record progresses through `queued` and `running` before reaching a terminal state.
+Returns the same durable execution shape as `POST /api/code-sandbox/exec` after the run is persisted. Owner/tenant/principal visibility rules apply; non-visible records resolve as `404`. During `async` execution the record progresses through `queued` and `running` before reaching a terminal state. Terminal statuses are `completed`, `failed`, `denied`, and `cancelled`.
+
+## `POST /api/code-sandbox/executions/{execution_id}/cancel`
+
+Cancels one visible `queued` sandbox execution.
+
+Current behavior:
+
+- only `queued` executions can be cancelled
+- success returns `200` with the normal durable execution payload and `status = cancelled`
+- cancelled executions set `finished_at` and `error_detail = "Execution cancelled before start."`
+- running or terminal executions return `409` with `code = RESOURCE_CONFLICT`
+- missing or caller-invisible execution ids return `404`
+- cancelled executions are terminal and cause `GET /logs` to emit a final `done` event
+
+## `POST /api/code-sandbox/executions/{execution_id}/retry`
+
+Creates a brand-new durable execution from one visible terminal execution.
+
+Current behavior:
+
+- only terminal executions can be retried: `completed`, `failed`, `denied`, or `cancelled`
+- retry always creates a new `execution_id`; the original record remains unchanged except for an added lineage event
+- the retried execution reuses the original request payload and persisted auth snapshot
+- retrying an originally `sync` execution returns `200` with the new terminal payload
+- retrying an originally `async` execution returns `202` when the new run is still `queued` or `running`
+- queued or running executions return `409` with `code = RESOURCE_CONFLICT`
+- missing or caller-invisible execution ids return `404`
 
 ## `GET /api/code-sandbox/executions/{execution_id}/events`
 
@@ -996,6 +1081,12 @@ Returns the durable execution timeline:
   ]
 }
 ```
+
+Additional lifecycle events include:
+
+- `execution.cancelled` when a queued execution is cancelled before start
+- `execution.retry_requested` on the original record, with `metadata.retry_execution_id`
+- `execution.retry_created` on the new record, with `metadata.source_execution_id`
 
 ## `GET /api/code-sandbox/executions/{execution_id}/logs`
 

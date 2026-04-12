@@ -62,6 +62,10 @@ class WorkbenchSourceValidationError(ValueError):
     """Raised when a workbench task references unknown or unavailable sources."""
 
 
+class WorkbenchTaskConflictError(RuntimeError):
+    """Raised when a workbench task transition is invalid for its current state."""
+
+
 class CodeSandboxExecutionNotFoundError(LookupError):
     """Raised when a durable code sandbox execution cannot be found or is not visible."""
 
@@ -70,8 +74,13 @@ class CodeSandboxValidationError(ValueError):
     """Raised when a code sandbox request violates application-level validation."""
 
 
+class CodeSandboxExecutionConflictError(RuntimeError):
+    """Raised when a code sandbox execution transition is invalid for its state."""
+
+
 __all__ = [
     "CodeSandboxExecutionNotFoundError",
+    "CodeSandboxExecutionConflictError",
     "CodeSandboxValidationError",
     "ChatCapacityError",
     "ChatIdempotencyConflictError",
@@ -91,6 +100,7 @@ __all__ = [
     "UploadIdempotencyInProgressError",
     "VisionNotSupported",
     "WorkbenchSourceValidationError",
+    "WorkbenchTaskConflictError",
     "WorkbenchTaskNotFoundError",
     "WorkbenchWorkspaceOutputNotFoundError",
 ]

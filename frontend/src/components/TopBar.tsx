@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FC } from 'react'
+import type { DesktopDiagnostics } from '../api/types'
 import type { ChatLayoutMode } from '../utils/chatLayout'
 import { ConversationActionsMenu, SettingsPanel } from './TopBarPanels'
 import {
@@ -17,6 +18,8 @@ interface Props {
   onOpenAppearance: () => void
   onRenameConversation: () => void
   thinkingEnabled?: boolean
+  desktopDiagnostics?: DesktopDiagnostics | null
+  desktopDiagnosticsError?: string | null
   apiKey: string
   ownerId: string
   onApiKeyChange: (value: string) => void
@@ -173,6 +176,8 @@ const TopBar: FC<Props> = ({
   onOpenAppearance,
   onRenameConversation,
   thinkingEnabled = false,
+  desktopDiagnostics = null,
+  desktopDiagnosticsError = null,
   apiKey,
   ownerId,
   onApiKeyChange,
@@ -290,6 +295,8 @@ const TopBar: FC<Props> = ({
               <SettingsPanel
                 appearanceSummary={appearanceSummary}
                 advancedOpen={advancedOpen}
+                desktopDiagnostics={desktopDiagnostics}
+                desktopDiagnosticsError={desktopDiagnosticsError}
                 apiKey={apiKey}
                 ownerId={ownerId}
                 onApiKeyChange={onApiKeyChange}

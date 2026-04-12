@@ -381,6 +381,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/system/desktop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read desktop runtime diagnostics
+         * @description Return desktop-only diagnostics used by the settings panel and packaged runtime triage.
+         */
+        get: operations["get_desktop_diagnostics_route_api_system_desktop_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/system/runtime-target": {
         parameters: {
             query?: never;
@@ -481,6 +501,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code-sandbox/executions/{execution_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel one queued code sandbox execution
+         * @description Cancel one visible queued sandbox execution.
+         */
+        post: operations["post_code_sandbox_execution_cancel_route_api_code_sandbox_executions__execution_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code-sandbox/executions/{execution_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry one terminal code sandbox execution
+         * @description Retry one visible terminal sandbox execution as a new execution.
+         */
+        post: operations["post_code_sandbox_execution_retry_route_api_code_sandbox_executions__execution_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code-sandbox/executions/{execution_id}/events": {
         parameters: {
             query?: never;
@@ -575,6 +635,46 @@ export interface paths {
         get: operations["get_workbench_task_status_api_workbench_tasks__task_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workbench/tasks/{task_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel one queued durable workbench task
+         * @description Cancel one visible queued workbench task.
+         */
+        post: operations["cancel_workbench_task_route_api_workbench_tasks__task_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workbench/tasks/{task_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry one terminal durable workbench task
+         * @description Retry one visible terminal workbench task as a new queued task.
+         */
+        post: operations["retry_workbench_task_route_api_workbench_tasks__task_id__retry_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -868,7 +968,7 @@ export interface components {
             /** Created At */
             created_at: string;
             /** Status */
-            status?: ("queued" | "running" | "completed" | "failed" | "denied") | null;
+            status?: ("queued" | "running" | "completed" | "failed" | "denied" | "cancelled") | null;
             /** Message */
             message?: string | null;
             /** Metadata */
@@ -897,7 +997,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "queued" | "running" | "completed" | "failed" | "denied";
+            status: "queued" | "running" | "completed" | "failed" | "denied" | "cancelled";
             /**
              * Execution Mode
              * @enum {string}
@@ -1039,6 +1139,38 @@ export interface components {
              * @description Output file size in bytes.
              */
             byte_size: number;
+        };
+        /**
+         * DesktopDiagnosticsResponse
+         * @description Desktop-only runtime diagnostics used by the settings panel.
+         */
+        DesktopDiagnosticsResponse: {
+            /** Desktop Mode */
+            desktop_mode: boolean;
+            /** Backend Base Url */
+            backend_base_url?: string | null;
+            /** Readiness Ok */
+            readiness_ok?: boolean | null;
+            /** Failing Checks */
+            failing_checks?: string[];
+            /** Skipped Checks */
+            skipped_checks?: string[];
+            /** Code Sandbox Effective Enabled */
+            code_sandbox_effective_enabled?: boolean | null;
+            /** Workbench Effective Enabled */
+            workbench_effective_enabled?: boolean | null;
+            /** App Data Dir */
+            app_data_dir?: string | null;
+            /** Runtime Root */
+            runtime_root?: string | null;
+            /** Data Dir */
+            data_dir?: string | null;
+            /** Log Dir */
+            log_dir?: string | null;
+            /** Log Db Path */
+            log_db_path?: string | null;
+            /** Packaged Shell Log Path */
+            packaged_shell_log_path?: string | null;
         };
         /**
          * ErrorResponse
@@ -1767,7 +1899,7 @@ export interface components {
              * @description Current durable task lifecycle state.
              * @enum {string}
              */
-            status: "queued" | "running" | "completed" | "failed";
+            status: "queued" | "running" | "completed" | "failed" | "cancelled";
             /**
              * Created At
              * @description UTC ISO-8601 creation timestamp.
@@ -1789,7 +1921,7 @@ export interface components {
              * @description Stable event name for this task lifecycle update.
              * @enum {string}
              */
-            event_type: "task.queued" | "task.started" | "retrieval.sources_resolved" | "retrieval.step.completed" | "retrieval.step.skipped" | "workspace_output.created" | "workspace_output.exported" | "task.completed" | "task.failed";
+            event_type: "task.queued" | "task.started" | "task.cancelled" | "task.retry_requested" | "task.retry_created" | "retrieval.sources_resolved" | "retrieval.step.completed" | "retrieval.step.skipped" | "workspace_output.created" | "workspace_output.exported" | "task.completed" | "task.failed";
             /**
              * Created At
              * @description UTC ISO-8601 event timestamp.
@@ -1799,7 +1931,7 @@ export interface components {
              * Status
              * @description Optional task lifecycle status associated with this event.
              */
-            status?: ("queued" | "running" | "completed" | "failed") | null;
+            status?: ("queued" | "running" | "completed" | "failed" | "cancelled") | null;
             /**
              * Message
              * @description Optional stable human-readable event summary.
@@ -1915,7 +2047,7 @@ export interface components {
              * @description Current durable task lifecycle state.
              * @enum {string}
              */
-            status: "queued" | "running" | "completed" | "failed";
+            status: "queued" | "running" | "completed" | "failed" | "cancelled";
             /**
              * Created At
              * @description UTC ISO-8601 creation timestamp.
@@ -3239,6 +3371,44 @@ export interface operations {
             };
         };
     };
+    get_desktop_diagnostics_route_api_system_desktop_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesktopDiagnosticsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_runtime_target_route_api_system_runtime_target_get: {
         parameters: {
             query?: never;
@@ -3460,6 +3630,176 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Runtime gate closed or sandbox provider unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    post_code_sandbox_execution_cancel_route_api_code_sandbox_executions__execution_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                execution_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSandboxExecutionResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Runtime gate closed or sandbox provider unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    post_code_sandbox_execution_retry_route_api_code_sandbox_executions__execution_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                execution_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSandboxExecutionResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3789,6 +4129,158 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Workbench runtime is not available on this deployment. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_workbench_task_route_api_workbench_tasks__task_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkbenchTaskStatusResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Workbench runtime is not available on this deployment. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    retry_workbench_task_route_api_workbench_tasks__task_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkbenchTaskAcceptedResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

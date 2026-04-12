@@ -127,3 +127,21 @@ class SystemFeaturesResponse(BaseModel):
 
     code_sandbox: CodeSandboxFeaturePayload
     workbench: WorkbenchFeaturePayload
+
+
+class DesktopDiagnosticsResponse(BaseModel):
+    """Desktop-only runtime diagnostics used by the settings panel."""
+
+    desktop_mode: bool
+    backend_base_url: str | None = None
+    readiness_ok: bool | None = None
+    failing_checks: list[str] = Field(default_factory=list)
+    skipped_checks: list[str] = Field(default_factory=list)
+    code_sandbox_effective_enabled: bool | None = None
+    workbench_effective_enabled: bool | None = None
+    app_data_dir: str | None = None
+    runtime_root: str | None = None
+    data_dir: str | None = None
+    log_dir: str | None = None
+    log_db_path: str | None = None
+    packaged_shell_log_path: str | None = None

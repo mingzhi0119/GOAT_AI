@@ -8,14 +8,20 @@ from unittest.mock import patch
 from backend.application.code_sandbox import (
     _normalize_request,
     _validate_relative_workspace_path,
+    cancel_code_sandbox_execution,
     execute_code_sandbox_request,
+    retry_code_sandbox_execution,
 )
-from backend.application.exceptions import CodeSandboxValidationError
+from backend.application.exceptions import (
+    CodeSandboxExecutionConflictError,
+    CodeSandboxValidationError,
+)
 from backend.domain.authz_types import AuthorizationContext
 from backend.domain.authorization import PrincipalId, TenantId
 from backend.models.code_sandbox import CodeSandboxExecRequest, CodeSandboxInlineFile
 from backend.services.code_sandbox_runtime import (
     CodeSandboxExecutionCreatePayload,
+    CodeSandboxExecutionEventRecord,
     CodeSandboxExecutionRecord,
 )
 from goat_ai.config.settings import Settings
@@ -64,12 +70,13 @@ class _FakeDispatcher:
 
 class _FakeRepository:
     def __init__(self) -> None:
-        self.record: CodeSandboxExecutionRecord | None = None
+        self.records: dict[str, CodeSandboxExecutionRecord] = {}
+        self.events: dict[str, list[CodeSandboxExecutionEventRecord]] = {}
 
     def create_execution(
         self, payload: CodeSandboxExecutionCreatePayload
     ) -> CodeSandboxExecutionRecord:
-        self.record = CodeSandboxExecutionRecord(
+        record = CodeSandboxExecutionRecord(
             id=payload.execution_id,
             status=payload.status,
             execution_mode=payload.execution_mode,
@@ -91,12 +98,131 @@ class _FakeRepository:
             credential_id=payload.credential_id,
             auth_mode=payload.auth_mode,
         )
-        return self.record
+        self.records[record.id] = record
+        self.events.setdefault(record.id, []).append(
+            CodeSandboxExecutionEventRecord(
+                execution_id=record.id,
+                sequence=1,
+                event_type="execution.queued",
+                created_at=payload.created_at,
+                status=record.status,
+                message="Execution accepted.",
+                metadata={
+                    "execution_mode": payload.execution_mode,
+                    "network_policy": payload.network_policy,
+                    "runtime_preset": payload.runtime_preset,
+                },
+            )
+        )
+        return record
+
+    def mark_execution_cancelled(
+        self,
+        execution_id: str,
+        *,
+        updated_at: str,
+        finished_at: str,
+        error_detail: str,
+    ) -> None:
+        record = self.records.get(execution_id)
+        if record is None or record.status != "queued":
+            return
+        self.records[execution_id] = CodeSandboxExecutionRecord(
+            **{
+                **record.__dict__,
+                "status": "cancelled",
+                "updated_at": updated_at,
+                "finished_at": finished_at,
+                "error_detail": error_detail,
+                "timed_out": False,
+                "output_files": record.output_files or [],
+            }
+        )
+        self.append_execution_event(
+            execution_id,
+            event_type="execution.cancelled",
+            created_at=finished_at,
+            status="cancelled",
+            message="Execution cancelled before start.",
+            metadata=None,
+        )
+
+    def append_execution_event(
+        self,
+        execution_id: str,
+        *,
+        event_type: str,
+        created_at: str,
+        status: str | None,
+        message: str | None,
+        metadata: dict[str, object] | None,
+    ) -> None:
+        sequence = len(self.events.setdefault(execution_id, [])) + 1
+        self.events[execution_id].append(
+            CodeSandboxExecutionEventRecord(
+                execution_id=execution_id,
+                sequence=sequence,
+                event_type=event_type,
+                created_at=created_at,
+                status=status,
+                message=message,
+                metadata=metadata,
+            )
+        )
 
     def get_execution(self, execution_id: str) -> CodeSandboxExecutionRecord | None:
-        if self.record is None or self.record.id != execution_id:
-            return None
-        return self.record
+        return self.records.get(execution_id)
+
+
+def _seed_record(
+    repository: _FakeRepository,
+    *,
+    execution_id: str = "cs-seeded",
+    status: str = "queued",
+    execution_mode: str = "async",
+    owner_id: str = "owner-1",
+    tenant_id: str = "tenant-1",
+    principal_id: str = "principal-1",
+    auth_scopes: list[str] | None = None,
+    credential_id: str = "cred-seeded",
+    auth_mode: str = "api_key",
+    provider_name: str = "docker",
+) -> CodeSandboxExecutionRecord:
+    record = CodeSandboxExecutionRecord(
+        id=execution_id,
+        status=status,
+        execution_mode=execution_mode,
+        runtime_preset="shell",
+        network_policy="disabled",
+        timeout_sec=8,
+        code="echo ok",
+        command="printf retry",
+        stdin=None,
+        inline_files=[{"filename": "inputs/data.txt", "content": "seed"}],
+        created_at="2026-04-10T00:00:00Z",
+        queued_at="2026-04-10T00:00:00Z",
+        updated_at="2026-04-10T00:00:00Z",
+        started_at="2026-04-10T00:00:01Z" if status != "queued" else None,
+        finished_at="2026-04-10T00:00:02Z"
+        if status in {"completed", "failed", "denied", "cancelled"}
+        else None,
+        exit_code=0 if status == "completed" else None,
+        stdout="done" if status == "completed" else "",
+        stderr="bad exit" if status == "failed" else "",
+        timed_out=False,
+        error_detail="denied" if status == "denied" else None,
+        output_files=[],
+        provider_name=provider_name,
+        owner_id=owner_id,
+        tenant_id=tenant_id,
+        principal_id=principal_id,
+        auth_scopes=list(auth_scopes or ["sandbox:execute"]),
+        credential_id=credential_id,
+        auth_mode=auth_mode,
+    )
+    repository.records[execution_id] = record
+    repository.events[execution_id] = []
+    return record
 
 
 class ApplicationCodeSandboxTests(unittest.TestCase):
@@ -161,10 +287,10 @@ class ApplicationCodeSandboxTests(unittest.TestCase):
         dispatcher = _FakeDispatcher()
 
         def _mark_completed(**kwargs: object) -> None:
-            _ = kwargs
-            assert repository.record is not None
-            repository.record = CodeSandboxExecutionRecord(
-                **{**repository.record.__dict__, "status": "completed", "exit_code": 0}
+            execution_id = str(kwargs["execution_id"])
+            record = repository.records[execution_id]
+            repository.records[execution_id] = CodeSandboxExecutionRecord(
+                **{**record.__dict__, "status": "completed", "exit_code": 0}
             )
 
         with (
@@ -190,6 +316,170 @@ class ApplicationCodeSandboxTests(unittest.TestCase):
         self.assertEqual("completed", response.status)
         self.assertEqual(0, response.exit_code)
         self.assertEqual([], dispatcher.calls)
+
+    def test_cancel_code_sandbox_execution_marks_queued_execution_cancelled(
+        self,
+    ) -> None:
+        repository = _FakeRepository()
+        _seed_record(repository, status="queued")
+
+        with patch(
+            "backend.application.code_sandbox.ensure_code_sandbox_enabled",
+            return_value=None,
+        ):
+            response = cancel_code_sandbox_execution(
+                execution_id="cs-seeded",
+                repository=repository,
+                settings=_settings(),
+                auth_context=_auth_context(),
+            )
+
+        self.assertEqual("cancelled", response.status)
+        self.assertEqual("Execution cancelled before start.", response.error_detail)
+        self.assertIsNotNone(response.finished_at)
+        self.assertEqual(
+            "execution.cancelled",
+            repository.events["cs-seeded"][-1].event_type,
+        )
+
+    def test_cancel_code_sandbox_execution_rejects_non_queued_state(self) -> None:
+        repository = _FakeRepository()
+        _seed_record(repository, status="running")
+
+        with (
+            patch(
+                "backend.application.code_sandbox.ensure_code_sandbox_enabled",
+                return_value=None,
+            ),
+            self.assertRaises(CodeSandboxExecutionConflictError),
+        ):
+            cancel_code_sandbox_execution(
+                execution_id="cs-seeded",
+                repository=repository,
+                settings=_settings(),
+                auth_context=_auth_context(),
+            )
+
+    def test_retry_code_sandbox_execution_reuses_original_auth_snapshot(self) -> None:
+        repository = _FakeRepository()
+        seeded = _seed_record(
+            repository,
+            status="completed",
+            execution_mode="async",
+            owner_id="owner-original",
+            tenant_id="tenant-original",
+            principal_id="principal-original",
+            auth_scopes=["sandbox:execute", "history:read"],
+            credential_id="cred-original",
+            auth_mode="scoped_key",
+        )
+        dispatcher = _FakeDispatcher()
+        current_auth = AuthorizationContext(
+            principal_id=PrincipalId("principal-original"),
+            tenant_id=TenantId("tenant-original"),
+            scopes=frozenset({"sandbox:execute"}),
+            credential_id="cred-current",
+            legacy_owner_id="owner-original",
+            auth_mode="api_key",
+        )
+
+        with patch(
+            "backend.application.code_sandbox.ensure_code_sandbox_enabled",
+            return_value=None,
+        ):
+            response = retry_code_sandbox_execution(
+                execution_id=seeded.id,
+                repository=repository,
+                provider=_FakeProvider(),
+                dispatcher=dispatcher,
+                settings=_settings(),
+                auth_context=current_auth,
+            )
+
+        self.assertEqual("async", response.execution_mode)
+        self.assertEqual("queued", response.status)
+        self.assertEqual(1, len(dispatcher.calls))
+        retried = repository.get_execution(response.execution_id)
+        assert retried is not None
+        self.assertNotEqual(seeded.id, retried.id)
+        self.assertEqual("owner-original", retried.owner_id)
+        self.assertEqual("tenant-original", retried.tenant_id)
+        self.assertEqual("principal-original", retried.principal_id)
+        self.assertEqual(["sandbox:execute", "history:read"], retried.auth_scopes)
+        self.assertEqual("cred-original", retried.credential_id)
+        self.assertEqual("scoped_key", retried.auth_mode)
+        self.assertEqual(
+            "execution.retry_requested",
+            repository.events[seeded.id][-1].event_type,
+        )
+        self.assertEqual(
+            seeded.id,
+            repository.events[retried.id][-1].metadata["source_execution_id"],
+        )
+
+    def test_retry_code_sandbox_execution_runs_sync_retry_inline(self) -> None:
+        repository = _FakeRepository()
+        _seed_record(repository, status="failed", execution_mode="sync")
+        dispatcher = _FakeDispatcher()
+
+        def _complete_retry(**kwargs: object) -> None:
+            execution_id = str(kwargs["execution_id"])
+            record = repository.records[execution_id]
+            repository.records[execution_id] = CodeSandboxExecutionRecord(
+                **{
+                    **record.__dict__,
+                    "status": "completed",
+                    "exit_code": 0,
+                    "stdout": "retry ok",
+                    "stderr": "",
+                    "finished_at": "2026-04-10T00:00:03Z",
+                    "updated_at": "2026-04-10T00:00:03Z",
+                }
+            )
+
+        with (
+            patch(
+                "backend.application.code_sandbox.ensure_code_sandbox_enabled",
+                return_value=None,
+            ),
+            patch(
+                "backend.application.code_sandbox.execute_code_sandbox_execution",
+                side_effect=_complete_retry,
+            ) as execute_sync,
+        ):
+            response = retry_code_sandbox_execution(
+                execution_id="cs-seeded",
+                repository=repository,
+                provider=_FakeProvider(),
+                dispatcher=dispatcher,
+                settings=_settings(),
+                auth_context=_auth_context(),
+            )
+
+        execute_sync.assert_called_once()
+        self.assertEqual("completed", response.status)
+        self.assertEqual("retry ok", response.stdout)
+        self.assertEqual([], dispatcher.calls)
+
+    def test_retry_code_sandbox_execution_rejects_non_terminal_state(self) -> None:
+        repository = _FakeRepository()
+        _seed_record(repository, status="running")
+
+        with (
+            patch(
+                "backend.application.code_sandbox.ensure_code_sandbox_enabled",
+                return_value=None,
+            ),
+            self.assertRaises(CodeSandboxExecutionConflictError),
+        ):
+            retry_code_sandbox_execution(
+                execution_id="cs-seeded",
+                repository=repository,
+                provider=_FakeProvider(),
+                dispatcher=_FakeDispatcher(),
+                settings=_settings(),
+                auth_context=_auth_context(),
+            )
 
 
 if __name__ == "__main__":

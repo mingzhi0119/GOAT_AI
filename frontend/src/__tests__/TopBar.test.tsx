@@ -20,6 +20,8 @@ function renderTopBar() {
       hasSession={true}
       modelCapabilities={['completion', 'tools', 'thinking', 'vision']}
       appearanceSummary="Classic System"
+      desktopDiagnostics={null}
+      desktopDiagnosticsError={null}
       onOpenAppearance={onOpenAppearance}
       onRenameConversation={onRenameConversation}
       thinkingEnabled={true}
@@ -115,6 +117,8 @@ describe('TopBar options callout', () => {
         hasSession={true}
         modelCapabilities={['completion', 'tools']}
         appearanceSummary="Classic System"
+        desktopDiagnostics={null}
+        desktopDiagnosticsError={null}
         onOpenAppearance={vi.fn()}
         onRenameConversation={vi.fn()}
         thinkingEnabled={false}
@@ -202,6 +206,8 @@ describe('TopBar options callout', () => {
         modelCapabilities={['completion', 'tools', 'thinking', 'vision']}
         appearanceSummary="Classic System"
         layoutMode="narrow"
+        desktopDiagnostics={null}
+        desktopDiagnosticsError={null}
         onOpenAppearance={vi.fn()}
         onRenameConversation={vi.fn()}
         thinkingEnabled={true}
@@ -233,5 +239,58 @@ describe('TopBar options callout', () => {
     expect(screen.getByRole('tooltip')).toHaveTextContent('Tools')
     expect(screen.getByRole('tooltip')).toHaveTextContent('Thinking')
     expect(screen.getByRole('tooltip')).toHaveTextContent('Vision')
+  })
+
+  it('passes desktop diagnostics through to the settings panel', () => {
+    render(
+      <TopBar
+        sessionTitle="Strategy Sync"
+        hasSession={true}
+        modelCapabilities={['completion', 'tools']}
+        appearanceSummary="Classic System"
+        desktopDiagnostics={{
+          desktop_mode: true,
+          backend_base_url: 'http://127.0.0.1:62606',
+          readiness_ok: true,
+          failing_checks: [],
+          skipped_checks: [],
+          code_sandbox_effective_enabled: true,
+          workbench_effective_enabled: true,
+          app_data_dir: 'C:/GOAT/Desktop',
+          runtime_root: 'C:/GOAT/Desktop',
+          data_dir: 'C:/GOAT/Desktop/data',
+          log_dir: 'C:/GOAT/Desktop/logs',
+          log_db_path: 'C:/GOAT/Desktop/chat_logs.db',
+          packaged_shell_log_path: 'C:/GOAT/Desktop/logs/desktop-shell.log',
+        }}
+        desktopDiagnosticsError={null}
+        onOpenAppearance={vi.fn()}
+        onRenameConversation={vi.fn()}
+        thinkingEnabled={false}
+        apiKey=""
+        ownerId=""
+        onApiKeyChange={vi.fn()}
+        onOwnerIdChange={vi.fn()}
+        systemInstruction=""
+        onSystemInstructionChange={vi.fn()}
+        onExportMarkdown={vi.fn()}
+        onDeleteConversation={vi.fn()}
+        advancedOpen={false}
+        onAdvancedOpenChange={vi.fn()}
+        temperature={0.7}
+        onTemperatureChange={vi.fn()}
+        maxTokens={4096}
+        onMaxTokensChange={vi.fn()}
+        topP={0.9}
+        onTopPChange={vi.fn()}
+        onResetAdvanced={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+
+    expect(screen.getByText('Desktop runtime')).toBeInTheDocument()
+    expect(screen.getByText('http://127.0.0.1:62606')).toBeInTheDocument()
+    expect(screen.getByText('C:/GOAT/Desktop/logs/desktop-shell.log')).toBeInTheDocument()
   })
 })

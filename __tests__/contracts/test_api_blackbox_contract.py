@@ -24,6 +24,7 @@ from backend.api_errors import (
     MEDIA_NOT_FOUND,
     NOT_FOUND,
     RATE_LIMITED,
+    RESOURCE_CONFLICT,
     REQUEST_VALIDATION_ERROR,
     VISION_NOT_SUPPORTED,
 )
@@ -36,9 +37,11 @@ from backend.services.workbench_web_search import WorkbenchWebSearchHit
 if TestClient is not None:
     from backend.platform.config import get_settings
     from backend.platform.dependencies import (
+        get_code_sandbox_execution_dispatcher,
         get_code_sandbox_provider,
         get_llm_client,
         get_title_generator,
+        get_workbench_task_dispatcher,
     )
     from backend.main import create_app
     from backend.models.system import GPUStatusResponse
@@ -125,6 +128,16 @@ class FakeCodeSandboxProvider:
             error_detail=None,
             output_files=output_files,
         )
+
+
+class NoopCodeSandboxDispatcher:
+    def dispatch_execution(self, *, execution_id: str, request_id: str = "") -> None:
+        _ = (execution_id, request_id)
+
+
+class NoopWorkbenchTaskDispatcher:
+    def dispatch_task(self, *, task_id: str, request_id: str = "") -> None:
+        _ = (task_id, request_id)
 
 
 class ContractFakeLLM:
@@ -1164,6 +1177,13 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertFalse(feat_body["workbench"]["plan_mode"]["effective_enabled"])
         self.assertFalse(feat_body["workbench"]["browse"]["effective_enabled"])
 
+        desktop = self.client.get("/api/system/desktop")
+        self.assertEqual(200, desktop.status_code)
+        desktop_body = desktop.json()
+        self.assertFalse(desktop_body["desktop_mode"])
+        self.assertEqual([], desktop_body["failing_checks"])
+        self.assertIsNone(desktop_body["backend_base_url"])
+
         exec_stub = self.client.post("/api/code-sandbox/exec", json={})
         self.assertEqual(503, exec_stub.status_code)
         ej = exec_stub.json()
@@ -1350,6 +1370,104 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(404, missing.status_code)
         self.assertEqual("Workbench task not found", missing.json()["detail"])
 
+    def test_workbench_task_cancel_cancels_queued_task(self) -> None:
+        self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+        self.client.app.dependency_overrides[get_workbench_task_dispatcher] = lambda: (
+            NoopWorkbenchTaskDispatcher()
+        )
+
+        create_response = self.client.post(
+            "/api/workbench/tasks",
+            json={"task_kind": "plan", "prompt": "Draft a plan"},
+        )
+        self.assertEqual(202, create_response.status_code)
+        task_id = create_response.json()["task_id"]
+        self.assertEqual("queued", create_response.json()["status"])
+
+        cancel_response = self.client.post(f"/api/workbench/tasks/{task_id}/cancel")
+        self.assertEqual(200, cancel_response.status_code)
+        cancel_body = cancel_response.json()
+        self.assertEqual("cancelled", cancel_body["status"])
+        self.assertEqual(
+            "Task cancelled before execution.", cancel_body["error_detail"]
+        )
+        self.assertIsNone(cancel_body["result"])
+
+        status_response = self.client.get(f"/api/workbench/tasks/{task_id}")
+        self.assertEqual(200, status_response.status_code)
+        self.assertEqual("cancelled", status_response.json()["status"])
+
+        events_response = self.client.get(f"/api/workbench/tasks/{task_id}/events")
+        self.assertEqual(200, events_response.status_code)
+        self.assertEqual(
+            ["task.queued", "task.cancelled"],
+            [event["event_type"] for event in events_response.json()["events"]],
+        )
+
+        conflict = self.client.post(f"/api/workbench/tasks/{task_id}/cancel")
+        self.assertEqual(409, conflict.status_code)
+        self.assertEqual(RESOURCE_CONFLICT, conflict.json()["code"])
+
+    def test_workbench_task_retry_creates_new_task_with_lineage(self) -> None:
+        self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        create_response = self.client.post(
+            "/api/workbench/tasks",
+            json={
+                "task_kind": "deep_research",
+                "prompt": "Investigate launches",
+                "source_ids": ["web"],
+            },
+        )
+        self.assertEqual(202, create_response.status_code)
+        original_id = create_response.json()["task_id"]
+
+        status_response = self.client.get(f"/api/workbench/tasks/{original_id}")
+        self.assertEqual(200, status_response.status_code)
+        self.assertEqual("completed", status_response.json()["status"])
+
+        self.client.app.dependency_overrides[get_workbench_task_dispatcher] = lambda: (
+            NoopWorkbenchTaskDispatcher()
+        )
+        retry_response = self.client.post(f"/api/workbench/tasks/{original_id}/retry")
+        self.assertEqual(202, retry_response.status_code)
+        retry_body = retry_response.json()
+        self.assertNotEqual(original_id, retry_body["task_id"])
+        self.assertEqual("queued", retry_body["status"])
+
+        retried_status = self.client.get(
+            f"/api/workbench/tasks/{retry_body['task_id']}"
+        )
+        self.assertEqual(200, retried_status.status_code)
+        self.assertEqual("queued", retried_status.json()["status"])
+        self.assertIsNone(retried_status.json()["result"])
+
+        original_events = self.client.get(f"/api/workbench/tasks/{original_id}/events")
+        self.assertEqual(200, original_events.status_code)
+        self.assertEqual(
+            "task.retry_requested",
+            original_events.json()["events"][-1]["event_type"],
+        )
+        self.assertEqual(
+            retry_body["task_id"],
+            original_events.json()["events"][-1]["metadata"]["retry_task_id"],
+        )
+
+        retried_events = self.client.get(
+            f"/api/workbench/tasks/{retry_body['task_id']}/events"
+        )
+        self.assertEqual(200, retried_events.status_code)
+        self.assertEqual(
+            "task.retry_created",
+            retried_events.json()["events"][1]["event_type"],
+        )
+        self.assertEqual(
+            original_id,
+            retried_events.json()["events"][1]["metadata"]["source_task_id"],
+        )
+
     @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
     def test_code_sandbox_enabled_executes_and_reads_durable_record(
         self, _mock: object
@@ -1442,6 +1560,114 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(200, final_status.status_code)
         self.assertEqual("completed", final_status.json()["status"])
         self.assertIn("async log line", final_status.json()["stdout"])
+
+    @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
+    def test_code_sandbox_cancel_cancels_queued_execution_and_finishes_logs(
+        self, _mock: object
+    ) -> None:
+        self.settings = replace(self.settings, feature_code_sandbox_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+        self.client.app.dependency_overrides[get_code_sandbox_provider] = lambda: (
+            FakeCodeSandboxProvider()
+        )
+        self.client.app.dependency_overrides[get_code_sandbox_execution_dispatcher] = (
+            lambda: NoopCodeSandboxDispatcher()
+        )
+
+        created = self.client.post(
+            "/api/code-sandbox/exec",
+            json={
+                "execution_mode": "async",
+                "code": "echo sandbox ok",
+                "command": "printf async",
+            },
+        )
+        self.assertEqual(202, created.status_code)
+        execution_id = created.json()["execution_id"]
+        self.assertEqual("queued", created.json()["status"])
+
+        cancel = self.client.post(f"/api/code-sandbox/executions/{execution_id}/cancel")
+        self.assertEqual(200, cancel.status_code)
+        cancel_body = cancel.json()
+        self.assertEqual("cancelled", cancel_body["status"])
+        self.assertEqual(
+            "Execution cancelled before start.", cancel_body["error_detail"]
+        )
+
+        logs = self.client.get(f"/api/code-sandbox/executions/{execution_id}/logs")
+        self.assertEqual(200, logs.status_code)
+        payloads = parse_sse_payloads(logs.text)
+        self.assertEqual(["status", "done"], [item["type"] for item in payloads])
+        self.assertEqual("cancelled", payloads[0]["status"])
+
+        events = self.client.get(f"/api/code-sandbox/executions/{execution_id}/events")
+        self.assertEqual(200, events.status_code)
+        self.assertEqual(
+            ["execution.queued", "execution.cancelled"],
+            [event["event_type"] for event in events.json()["events"]],
+        )
+
+        conflict = self.client.post(
+            f"/api/code-sandbox/executions/{execution_id}/cancel"
+        )
+        self.assertEqual(409, conflict.status_code)
+        self.assertEqual(RESOURCE_CONFLICT, conflict.json()["code"])
+
+    @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
+    def test_code_sandbox_retry_creates_new_execution_with_lineage(
+        self, _mock: object
+    ) -> None:
+        self.settings = replace(self.settings, feature_code_sandbox_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+        self.client.app.dependency_overrides[get_code_sandbox_provider] = lambda: (
+            FakeCodeSandboxProvider()
+        )
+
+        created = self.client.post(
+            "/api/code-sandbox/exec",
+            json={
+                "runtime_preset": "shell",
+                "code": "echo sandbox ok",
+                "command": "touch outputs/report.txt",
+            },
+        )
+        self.assertEqual(200, created.status_code)
+        original_id = created.json()["execution_id"]
+
+        retry = self.client.post(f"/api/code-sandbox/executions/{original_id}/retry")
+        self.assertEqual(200, retry.status_code)
+        retry_body = retry.json()
+        self.assertNotEqual(original_id, retry_body["execution_id"])
+        self.assertEqual("completed", retry_body["status"])
+        self.assertEqual(
+            [{"path": "report.txt", "byte_size": 12}], retry_body["output_files"]
+        )
+
+        original_events = self.client.get(
+            f"/api/code-sandbox/executions/{original_id}/events"
+        )
+        self.assertEqual(200, original_events.status_code)
+        self.assertEqual(
+            "execution.retry_requested",
+            original_events.json()["events"][-1]["event_type"],
+        )
+        self.assertEqual(
+            retry_body["execution_id"],
+            original_events.json()["events"][-1]["metadata"]["retry_execution_id"],
+        )
+
+        retried_events = self.client.get(
+            f"/api/code-sandbox/executions/{retry_body['execution_id']}/events"
+        )
+        self.assertEqual(200, retried_events.status_code)
+        self.assertEqual(
+            "execution.retry_created",
+            retried_events.json()["events"][1]["event_type"],
+        )
+        self.assertEqual(
+            original_id,
+            retried_events.json()["events"][1]["metadata"]["source_execution_id"],
+        )
 
     @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
     def test_code_sandbox_exec_rejects_invalid_network_policy(
@@ -1873,12 +2099,17 @@ class ApiProtectedBlackboxContractTests(unittest.TestCase):
             ("GET", "/api/system/inference", {}),
             ("GET", "/api/system/runtime-target", {}),
             ("GET", "/api/system/features", {}),
+            ("GET", "/api/system/desktop", {}),
             ("POST", "/api/code-sandbox/exec", {}),
+            ("POST", "/api/code-sandbox/executions/cs-1/cancel", {}),
+            ("POST", "/api/code-sandbox/executions/cs-1/retry", {}),
             (
                 "POST",
                 "/api/workbench/tasks",
                 {"json": {"task_kind": "plan", "prompt": "Draft a plan"}},
             ),
+            ("POST", "/api/workbench/tasks/wb-1/cancel", {}),
+            ("POST", "/api/workbench/tasks/wb-1/retry", {}),
             ("GET", "/api/workbench/sources", {}),
             ("GET", "/api/workbench/workspace-outputs?session_id=sess-1", {}),
             ("GET", "/api/workbench/workspace-outputs/wbo-1", {}),

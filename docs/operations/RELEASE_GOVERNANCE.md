@@ -78,7 +78,7 @@ That workflow covers:
 
 - the Linux desktop sidecar path by generating:
   - the built desktop sidecar artifact
-  - a SHA-256 digest manifest
+  - a Linux desktop sidecar provenance record
   - an SPDX SBOM
   - GitHub artifact attestations when the repository plan or repo variables permit it
 - the signed Windows desktop release path by generating:
@@ -92,7 +92,7 @@ Manual or local unsigned desktop builds remain internal/test-only artifacts.
 Desktop release steps:
 
 1. Trigger `.github/workflows/desktop-provenance.yml` from a release tag or manual dispatch.
-2. Build the Linux desktop sidecar provenance record.
+2. Build the Linux desktop sidecar and write its provenance record with `python -m tools.desktop.write_linux_sidecar_provenance`.
 3. Build real Windows packaged installers from the same requested ref.
 4. Sign the Windows installers when `distribution_channel=public` (the tag path always requires this).
 5. Write `desktop-windows-provenance.json` with artifact digests and signature status.

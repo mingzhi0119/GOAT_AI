@@ -16,7 +16,7 @@ from backend.types import Settings
 
 
 def _is_terminal_status(status: str) -> bool:
-    return status in {"completed", "failed", "denied"}
+    return status in {"completed", "failed", "denied", "cancelled"}
 
 
 def _utc_now() -> str:

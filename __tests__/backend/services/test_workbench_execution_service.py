@@ -368,3 +368,23 @@ class WorkbenchExecutionServiceTests(unittest.TestCase):
             "Task execution was interrupted during a previous process lifetime.",
             running.error_detail,
         )
+
+    def test_recover_workbench_tasks_skips_cancelled_tasks(self) -> None:
+        self._create_task(task_id="wb-recover-cancelled", task_kind="plan")
+        self.repository.mark_task_cancelled(
+            "wb-recover-cancelled",
+            updated_at="2026-04-11T00:00:01+00:00",
+            error_detail="Task cancelled before execution.",
+        )
+
+        recovered = recover_workbench_tasks(
+            repository=self.repository,
+            llm=_FakeLLM(),
+            settings=self.settings,
+        )
+
+        self.assertEqual([], recovered.replayed_task_ids)
+        self.assertEqual([], recovered.interrupted_task_ids)
+        cancelled = self.repository.get_task("wb-recover-cancelled")
+        assert cancelled is not None
+        self.assertEqual("cancelled", cancelled.status)

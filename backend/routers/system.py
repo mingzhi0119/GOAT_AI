@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
 
 from backend.application.system import (
+    get_desktop_diagnostics,
     get_gpu_status as read_gpu_status,
     get_inference_latency,
     get_ready,
@@ -19,6 +20,7 @@ from backend.platform.config import get_settings
 from backend.platform.dependencies import get_authorization_context
 from backend.models.common import ErrorResponse
 from backend.models.system import (
+    DesktopDiagnosticsResponse,
     GPUStatusResponse,
     InferenceLatencyResponse,
     RuntimeTargetResponse,
@@ -62,6 +64,20 @@ def get_system_features_route(
 ) -> SystemFeaturesResponse:
     """Return config + host probes for optional high-risk features (see docs/standards/ENGINEERING_STANDARDS.md §15)."""
     return get_system_features(settings, auth_context)
+
+
+@router.get(
+    "/system/desktop",
+    response_model=DesktopDiagnosticsResponse,
+    summary="Read desktop runtime diagnostics",
+    responses={401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
+)
+def get_desktop_diagnostics_route(
+    settings: Settings = Depends(get_settings),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
+) -> DesktopDiagnosticsResponse:
+    """Return desktop-only diagnostics used by the settings panel and packaged runtime triage."""
+    return get_desktop_diagnostics(settings, auth_context)
 
 
 @router.get(

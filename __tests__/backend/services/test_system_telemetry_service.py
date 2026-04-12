@@ -8,6 +8,7 @@ from unittest.mock import patch
 from backend.domain.authz_types import AuthorizationContext
 from backend.domain.authorization import PrincipalId, TenantId
 from backend.services.system_telemetry_service import (
+    build_desktop_diagnostics_response,
     build_runtime_target_response,
     build_system_features_response,
 )
@@ -46,6 +47,86 @@ def _auth_context() -> AuthorizationContext:
 
 
 class SystemTelemetryServiceTests(unittest.TestCase):
+    @patch.dict(
+        "os.environ",
+        {
+            "GOAT_DESKTOP_APP_DATA_DIR": "C:/GOAT/Desktop",
+            "GOAT_DESKTOP_SHELL_LOG_PATH": "C:/GOAT/Desktop/logs/desktop-shell.log",
+        },
+        clear=False,
+    )
+    def test_builds_desktop_diagnostics_when_running_in_desktop_mode(self) -> None:
+        with (
+            patch(
+                "backend.services.system_telemetry_service.compute_code_sandbox_snapshot",
+                return_value=CodeSandboxFeatureSnapshot(
+                    allowed_by_config=True,
+                    available_on_host=True,
+                    effective_enabled=True,
+                    provider_name="docker",
+                    isolation_level="container",
+                    network_policy_enforced=True,
+                    deny_reason=None,
+                ),
+            ),
+            patch(
+                "backend.services.system_telemetry_service.compute_agent_workbench_snapshot",
+                return_value=RuntimeFeatureSnapshot(
+                    allowed_by_config=True,
+                    available_on_host=True,
+                    effective_enabled=True,
+                    deny_reason=None,
+                ),
+            ),
+            patch(
+                "backend.services.system_telemetry_service.code_sandbox_policy_allowed",
+                return_value=True,
+            ),
+            patch(
+                "backend.services.system_telemetry_service.list_workbench_sources",
+                return_value=[],
+            ),
+            patch(
+                "backend.services.system_telemetry_service.evaluate_readiness",
+                return_value=(
+                    {
+                        "ready": False,
+                        "checks": {
+                            "sqlite": {"ok": True},
+                            "ollama": {"ok": False, "error": "offline"},
+                            "settings": {"ok": True, "skipped": True},
+                        },
+                    },
+                    503,
+                ),
+            ),
+        ):
+            response = build_desktop_diagnostics_response(_settings(), _auth_context())
+
+        self.assertTrue(response.desktop_mode)
+        self.assertEqual("http://127.0.0.1:62606", response.backend_base_url)
+        self.assertFalse(response.readiness_ok)
+        self.assertEqual(["ollama"], response.failing_checks)
+        self.assertEqual(["settings"], response.skipped_checks)
+        self.assertTrue(response.code_sandbox_effective_enabled)
+        self.assertTrue(response.workbench_effective_enabled)
+        self.assertEqual("C:/GOAT/Desktop", response.app_data_dir)
+        self.assertEqual(
+            "C:/GOAT/Desktop/logs/desktop-shell.log",
+            response.packaged_shell_log_path,
+        )
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_desktop_diagnostics_returns_empty_payload_outside_desktop_mode(
+        self,
+    ) -> None:
+        response = build_desktop_diagnostics_response(_settings(), _auth_context())
+
+        self.assertFalse(response.desktop_mode)
+        self.assertIsNone(response.backend_base_url)
+        self.assertIsNone(response.readiness_ok)
+        self.assertEqual([], response.failing_checks)
+
     def test_builds_workbench_feature_flags_from_runnable_sources(self) -> None:
         with (
             patch(
