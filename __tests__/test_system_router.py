@@ -60,7 +60,7 @@ class SystemRouterIntegrationTests(unittest.TestCase):
         self.assertIn("current", payload)
         self.assertIn("ordered_targets", payload)
         self.assertGreaterEqual(len(payload["ordered_targets"]), 1)
-        self.assertIn(payload["current"]["mode"], {"server62606", "explicit_override"})
+        self.assertEqual("server62606", payload["current"]["mode"])
 
     def test_get_system_features_includes_code_sandbox_snapshot(self) -> None:
         response = self.client.get("/api/system/features")

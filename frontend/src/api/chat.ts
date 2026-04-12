@@ -1,3 +1,4 @@
+import { buildApiHeaders } from './auth'
 import type { ChatRequest, ChatStreamEvent, ChartSpec } from './types'
 
 export interface StreamChatOptions {
@@ -62,7 +63,7 @@ export async function* streamChat(
   req: ChatRequest,
   options?: StreamChatOptions,
 ): AsyncGenerator<ChatStreamEvent> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const headers = buildApiHeaders({ 'Content-Type': 'application/json' })
   if (options?.userName) headers['X-User-Name'] = options.userName
 
   let resp: Response

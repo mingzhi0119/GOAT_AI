@@ -3,6 +3,7 @@ param(
     [string]$RepoUrl = "https://github.com/mingzhi0119/GOAT_AI.git",
     [string]$GitBranch = "main",
     [string]$GitRef = $GitBranch,
+    [string]$ExpectedGitSha = $env:EXPECTED_GIT_SHA,
     [string]$PythonBin = "python",
     [switch]$Quick,
     [switch]$SkipBuild,
@@ -261,6 +262,65 @@ function Resolve-OllamaBaseUrl {
     throw "OLLAMA_BASE_URL was not explicitly configured, and deploy.ps1 could not reach or start Ollama on $defaultUrl. Check $ollamaOutLog and $ollamaErrLog."
 }
 
+function Assert-ExpectedGitSha {
+    param([string]$ExpectedSha)
+
+    $normalized = $ExpectedSha.Trim()
+    if (-not $normalized) {
+        return
+    }
+
+    $currentSha = (& git rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to resolve current Git SHA for validation."
+    }
+
+    if ($currentSha -ne $normalized) {
+        throw "Resolved SHA $currentSha did not match EXPECTED_GIT_SHA $normalized"
+    }
+}
+
+function Sync-RequestedGitRef {
+    param(
+        [string]$Ref,
+        [string]$ExpectedSha
+    )
+
+    git fetch --all --prune --tags
+    if ($LASTEXITCODE -ne 0) {
+        throw "git fetch failed while syncing $Ref"
+    }
+
+    git show-ref --verify --quiet "refs/remotes/origin/$Ref"
+    if ($LASTEXITCODE -eq 0) {
+        Write-Step "Syncing branch ref to origin/$Ref"
+        git checkout --detach "origin/$Ref"
+        if ($LASTEXITCODE -ne 0) {
+            throw "git checkout failed for origin/$Ref"
+        }
+        git reset --hard "origin/$Ref"
+        if ($LASTEXITCODE -ne 0) {
+            throw "git reset --hard failed for origin/$Ref"
+        }
+    } else {
+        $resolvedSha = (& git rev-parse --verify "$($Ref)^{commit}").Trim()
+        if ($LASTEXITCODE -ne 0 -or -not $resolvedSha) {
+            throw "git rev-parse failed for requested ref $Ref"
+        }
+        Write-Step "Syncing immutable ref $Ref ($resolvedSha)"
+        git checkout --detach $resolvedSha
+        if ($LASTEXITCODE -ne 0) {
+            throw "git checkout failed for immutable ref $Ref"
+        }
+        git reset --hard $resolvedSha
+        if ($LASTEXITCODE -ne 0) {
+            throw "git reset --hard failed for immutable ref $Ref"
+        }
+    }
+
+    Assert-ExpectedGitSha -ExpectedSha $ExpectedSha
+}
+
 $ProjectDir = [System.IO.Path]::GetFullPath($ProjectDir)
 $VenvDir = Join-Path $ProjectDir ".venv"
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
@@ -286,14 +346,16 @@ if (-not (Test-Path -LiteralPath (Join-Path $ProjectDir ".git"))) {
 
 Set-Location -LiteralPath $ProjectDir
 New-Item -ItemType Directory -Path $LogsDir -Force | Out-Null
-git checkout $GitRef
 
 if ($SyncGit.IsPresent) {
-    Write-Step "Syncing to origin/$GitBranch"
-    git fetch --all --prune
-    git reset --hard "origin/$GitBranch"
+    Sync-RequestedGitRef -Ref $GitRef -ExpectedSha $ExpectedGitSha
 } else {
-    Write-Step "Deploying current local checkout on $GitBranch (SYNC_GIT=0)"
+    git checkout $GitRef
+    if ($LASTEXITCODE -ne 0) {
+        throw "git checkout failed for requested ref $GitRef"
+    }
+    Assert-ExpectedGitSha -ExpectedSha $ExpectedGitSha
+    Write-Step "Deploying current local checkout for ref $GitRef (SYNC_GIT=0)"
 }
 
 if ($Quick.IsPresent) {
@@ -367,14 +429,17 @@ $startInfo = @{
     PassThru = $true
 }
 
-$previousGoatPort = $env:GOAT_PORT
+$previousGoatServerPort = $env:GOAT_SERVER_PORT
+$previousGoatLocalPort = $env:GOAT_LOCAL_PORT
 $previousOllamaBaseUrl = $env:OLLAMA_BASE_URL
 try {
-    $env:GOAT_PORT = $ServerPort.ToString()
+    $env:GOAT_SERVER_PORT = $ServerPort.ToString()
+    $env:GOAT_LOCAL_PORT = $ServerPort.ToString()
     $env:OLLAMA_BASE_URL = $ResolvedOllamaBaseUrl
     $process = Start-Process @startInfo
 } finally {
-    $env:GOAT_PORT = $previousGoatPort
+    $env:GOAT_SERVER_PORT = $previousGoatServerPort
+    $env:GOAT_LOCAL_PORT = $previousGoatLocalPort
     $env:OLLAMA_BASE_URL = $previousOllamaBaseUrl
 }
 

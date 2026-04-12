@@ -54,6 +54,11 @@ npm ci
 npm run dev
 ```
 
+If the backend is protected with `GOAT_API_KEY` or `GOAT_REQUIRE_SESSION_OWNER=1`,
+open the browser UI settings menu and populate `Protected access` with the shared
+API key and, when required, the owner ID. The SPA stores those values locally in
+the browser and attaches `X-GOAT-API-Key` / `X-GOAT-Owner-Id` to runtime API calls.
+
 ### Windows desktop prerequisites
 
 This remains a normal Windows-native flow for the Tauri-based desktop shell and future packaged Windows app path. Use the bootstrap script instead of manually clicking through installers:
@@ -149,6 +154,8 @@ Important behavior:
 
 - Deploy defaults to the current checkout
 - `SYNC_GIT=1` is explicit opt-in
+- `GIT_REF` is authoritative: branch refs sync to `origin/$GIT_REF`, while tag/commit refs deploy in detached mode without drifting back to `main`
+- `EXPECTED_GIT_SHA` may be supplied by release automation to hard-fail if the host resolves any SHA other than the requested release commit
 - `deploy.sh` keeps the `nohup` + `logs/fastapi.pid` fallback path
 - `deploy.sh` and `deploy.ps1` now stop the current FastAPI process gracefully first, then force cleanup only if the drain window expires
 - Rollback uses an explicit ref: see [ROLLBACK.md](ROLLBACK.md)

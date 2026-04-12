@@ -58,6 +58,9 @@ jobs:
     environment: staging
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_ref }}
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
@@ -76,15 +79,17 @@ jobs:
         run: |
           set -euo pipefail
           ssh "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" \
-            "cd '${{ secrets.STAGING_APP_DIR }}' && SYNC_GIT=1 GIT_REF='${{ inputs.release_ref }}' bash deploy.sh"
+            "cd '${{ secrets.STAGING_APP_DIR }}' && SYNC_GIT=1 GIT_REF='${{ inputs.release_ref }}' EXPECTED_GIT_SHA='${{ needs.release-manifest.outputs.resolved_sha }}' bash deploy.sh"
       - name: Run staging post-deploy check
         env:
           STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
           STAGING_API_KEY: ${{ secrets.STAGING_API_KEY }}
+          STAGING_OWNER_ID: ${{ secrets.STAGING_OWNER_ID }}
         run: |
           python scripts/post_deploy_check.py \
             --base-url "${STAGING_BASE_URL}" \
-            --api-key "${STAGING_API_KEY}"
+            --api-key "${STAGING_API_KEY}" \
+            --owner-id "${STAGING_OWNER_ID}"
 
   deploy-production:
     if: ${{ inputs.deploy_production }}
@@ -95,6 +100,9 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_ref }}
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
@@ -113,12 +121,14 @@ jobs:
         run: |
           set -euo pipefail
           ssh "${{ secrets.PRODUCTION_SSH_USER }}@${{ secrets.PRODUCTION_SSH_HOST }}" \
-            "cd '${{ secrets.PRODUCTION_APP_DIR }}' && SYNC_GIT=1 GIT_REF='${{ inputs.release_ref }}' bash deploy.sh"
+            "cd '${{ secrets.PRODUCTION_APP_DIR }}' && SYNC_GIT=1 GIT_REF='${{ inputs.release_ref }}' EXPECTED_GIT_SHA='${{ needs.release-manifest.outputs.resolved_sha }}' bash deploy.sh"
       - name: Run production post-deploy check
         env:
           PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL }}
           PRODUCTION_API_KEY: ${{ secrets.PRODUCTION_API_KEY }}
+          PRODUCTION_OWNER_ID: ${{ secrets.PRODUCTION_OWNER_ID }}
         run: |
           python scripts/post_deploy_check.py \
             --base-url "${PRODUCTION_BASE_URL}" \
-            --api-key "${PRODUCTION_API_KEY}"
+            --api-key "${PRODUCTION_API_KEY}" \
+            --owner-id "${PRODUCTION_OWNER_ID}"

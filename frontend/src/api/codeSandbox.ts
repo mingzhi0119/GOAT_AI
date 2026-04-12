@@ -1,3 +1,4 @@
+import { buildApiHeaders } from './auth'
 import type {
   CodeSandboxExecRequest,
   CodeSandboxExecutionEventsResponse,
@@ -27,7 +28,7 @@ export async function executeCodeSandbox(
 ): Promise<CodeSandboxExecutionResponse> {
   const resp = await fetch('./api/code-sandbox/exec', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildApiHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(request),
   })
   if (!resp.ok) throw new Error(await parseErrorResponse(resp))
@@ -37,7 +38,9 @@ export async function executeCodeSandbox(
 export async function fetchCodeSandboxExecution(
   executionId: string,
 ): Promise<CodeSandboxExecutionResponse> {
-  const resp = await fetch(`./api/code-sandbox/executions/${executionId}`)
+  const resp = await fetch(`./api/code-sandbox/executions/${executionId}`, {
+    headers: buildApiHeaders(),
+  })
   if (!resp.ok) throw new Error(await parseErrorResponse(resp))
   return (await resp.json()) as CodeSandboxExecutionResponse
 }
@@ -45,7 +48,9 @@ export async function fetchCodeSandboxExecution(
 export async function fetchCodeSandboxExecutionEvents(
   executionId: string,
 ): Promise<CodeSandboxExecutionEventsResponse> {
-  const resp = await fetch(`./api/code-sandbox/executions/${executionId}/events`)
+  const resp = await fetch(`./api/code-sandbox/executions/${executionId}/events`, {
+    headers: buildApiHeaders(),
+  })
   if (!resp.ok) throw new Error(await parseErrorResponse(resp))
   return (await resp.json()) as CodeSandboxExecutionEventsResponse
 }

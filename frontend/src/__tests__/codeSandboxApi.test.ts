@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { API_KEY_STORAGE_KEY, OWNER_ID_STORAGE_KEY } from '../api/auth'
 import {
   executeCodeSandbox,
   fetchCodeSandboxExecution,
@@ -8,10 +9,13 @@ import {
 
 describe('code sandbox api', () => {
   afterEach(() => {
+    localStorage.clear()
     vi.restoreAllMocks()
   })
 
   it('executes a code sandbox request', async () => {
+    localStorage.setItem(API_KEY_STORAGE_KEY, 'secret-123')
+    localStorage.setItem(OWNER_ID_STORAGE_KEY, 'alice')
     const mockedFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -39,7 +43,17 @@ describe('code sandbox api', () => {
 
     const payload = await executeCodeSandbox({ code: 'echo ok' })
     expect(payload.execution_id).toBe('cs-1')
-    expect(mockedFetch).toHaveBeenCalledWith('./api/code-sandbox/exec', expect.any(Object))
+    expect(mockedFetch).toHaveBeenCalledWith(
+      './api/code-sandbox/exec',
+      expect.objectContaining({
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-GOAT-API-Key': 'secret-123',
+          'X-GOAT-Owner-Id': 'alice',
+        },
+      }),
+    )
   })
 
   it('parses detail from error responses', async () => {
@@ -56,6 +70,8 @@ describe('code sandbox api', () => {
   })
 
   it('reads an execution and event timeline', async () => {
+    localStorage.setItem(API_KEY_STORAGE_KEY, 'secret-123')
+    localStorage.setItem(OWNER_ID_STORAGE_KEY, 'alice')
     const mockedFetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -104,6 +120,18 @@ describe('code sandbox api', () => {
 
     expect(execution.status).toBe('completed')
     expect(events.events[0]?.event_type).toBe('execution.queued')
+    expect(mockedFetch).toHaveBeenNthCalledWith(1, './api/code-sandbox/executions/cs-1', {
+      headers: {
+        'X-GOAT-API-Key': 'secret-123',
+        'X-GOAT-Owner-Id': 'alice',
+      },
+    })
+    expect(mockedFetch).toHaveBeenNthCalledWith(2, './api/code-sandbox/executions/cs-1/events', {
+      headers: {
+        'X-GOAT-API-Key': 'secret-123',
+        'X-GOAT-Owner-Id': 'alice',
+      },
+    })
   })
 
   it('opens an EventSource log stream with cursor replay support', () => {

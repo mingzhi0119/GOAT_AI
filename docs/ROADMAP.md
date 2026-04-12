@@ -17,6 +17,147 @@ Completed phases, landed slices, and historical closeout notes live in:
 
 ## Open Work
 
+### Audit remediation backlog
+
+These items come from the April 2026 lifecycle audit and should take priority over
+new capability expansion. The goal is to close industrial-score gaps before
+widening product promises.
+
+No open P0 audit items remain after the 2026-04-11 remediation pass. Active
+follow-on work now starts at P1 and focuses on broader contract, release,
+desktop, and observability maturity.
+
+#### P1: immutable artifact promotion and richer release evidence
+
+- Problem:
+  - release correctness now verifies exact refs / SHAs, but deploys still build from mutable hosts instead of promoting immutable artifacts
+  - release evidence still stops short of a full artifact-first provenance trail across staging and production
+- Solution:
+  - build release artifacts once in CI, attest/sign them, and promote the same immutable payload through staging and production
+  - extend release evidence so operators can answer "which artifact digest reached which environment, and when?" without host forensics
+  - add rollback drills for artifact promotion, not only source-ref deployment
+- Exit criteria:
+  - staging and production promote the same immutable artifact, not independent host builds
+  - release evidence captures artifact digest, environment promotion, and rollback target
+  - rollback drills validate artifact-first recovery
+
+#### P1: frontend contract governance and end-to-end confidence
+
+- Problem:
+  - frontend API types are still maintained by hand against backend schemas
+  - frontend CI lacks a contract-sync gate and browser-level end-to-end coverage
+  - complex user paths are still validated mostly through component and hook tests
+- Solution:
+  - add an explicit frontend contract generation or verification step against `docs/openapi.json`
+  - add browser-level integration coverage for chat, history, uploads, auth-enabled flows, and feature-gated UI
+  - add lint and accessibility/performance checks to the frontend gate
+- Exit criteria:
+  - frontend CI fails on contract drift before runtime breakage reaches users
+  - protected-path browser tests exist for the highest-risk flows
+  - lint and basic accessibility checks are part of the standard frontend gate
+
+#### P1: desktop release maturity, installer validation, and native recovery
+
+- Problem:
+  - desktop CI validates sidecar build and Rust tests, but not a full packaged installer/bundle path
+  - signing, installer verification, and cross-platform packaged validation are still incomplete
+  - desktop runtime supervision is still thin: one-shot health wait, limited child-exit handling, and weak durable logging
+- Solution:
+  - add CI validation for real packaged desktop artifacts, not only the sidecar
+  - extend provenance from Linux sidecar evidence to shipped installers/bundles
+  - land signing/notarization workflows for supported release targets
+  - harden the Rust bridge for child-exit handling, restart/backoff, and durable packaged-app log sinks
+  - add desktop release-path tests, packaged smoke tests, and clearer operator/user recovery guidance
+- Exit criteria:
+  - supported desktop artifacts are built, validated, and provenance-recorded in CI
+  - signed release artifacts are the default public distribution path
+  - packaged-app failures are diagnosable without manual stdout/stderr scraping
+
+#### P1: deploy/ops asset test coverage and stale artifact cleanup
+
+- Problem:
+  - several operational assets have drifted outside the tested governance boundary
+  - legacy scripts and service files still reflect obsolete Node, port, or log-path assumptions
+- Solution:
+  - add direct tests for deploy scripts, service/unit files, health checks, and watchdog paths where practical
+  - explicitly deprecate or remove stale assets that no longer match the supported runtime
+  - reconcile service/log locations with current operations docs and deploy behavior
+- Exit criteria:
+  - supported ops artifacts are either tested or intentionally retired
+  - stale operational guidance no longer competes with the real deploy/recovery path
+
+#### P1: backend startup side effects, provider drift, and runtime seam hardening
+
+- Problem:
+  - importing `backend.main` still performs real startup work such as DB initialization
+  - some provider/config paths, such as the OpenAI client seam, remain partially landed and undocumented
+  - critical runtime seams still rely on process-local assumptions
+- Solution:
+  - separate app construction from import-time side effects so tooling can inspect contracts without mutating runtime state
+  - either wire unfinished provider paths all the way through settings/docs/tests or remove them until needed
+  - clarify which runtime seams remain intentionally single-process and add stronger guards/tests around those assumptions
+- Exit criteria:
+  - tooling can read API contracts without touching real runtime state
+  - provider/config surfaces are either fully supported or removed from the active code path
+  - the repo is explicit about which seams are single-instance by design
+
+#### P1: observability and request correlation across backend, frontend, and desktop
+
+- Problem:
+  - backend observability is much stronger than frontend and desktop observability
+  - request IDs, stable error codes, and packaged-app diagnostics are not surfaced consistently to users or operators
+- Solution:
+  - expose request correlation and stable error codes in frontend-visible error states
+  - add desktop log sink and failure-reporting paths that survive packaged runtime failures
+  - keep dashboards, alerts, runbooks, and emitted metrics aligned whenever operator-facing telemetry changes
+- Exit criteria:
+  - user-visible failures can be correlated to backend logs without guesswork
+  - desktop incidents have durable local diagnostic artifacts
+  - observability assets remain version-aligned with emitted metrics and recovery runbooks
+
+#### P1: performance governance and single-instance boundary clarity
+
+- Problem:
+  - performance smoke exists, but not as a standard PR-blocking gate
+  - some heavy paths remain synchronous and local-file-backed
+  - rate limiting, background jobs, and some telemetry remain process-local
+- Solution:
+  - define which performance budgets should block PRs versus only scheduled monitoring
+  - harden heavy ingestion/retrieval paths with clearer limits, async/offline boundaries, or better isolation
+  - document and enforce the current single-writer/single-instance boundary until a deliberate storage/runtime decision changes it
+- Exit criteria:
+  - the highest-risk latency regressions are caught before merge
+  - heavy ingestion/runtime paths no longer rely on accidental best-effort behavior
+  - operational boundaries are explicit enough that scaling expectations stay honest
+
+#### P2: frontend modularity, accessibility, and bundle discipline
+
+- Problem:
+  - top-level orchestration hotspots are growing in `App`, `useChatSession`, and `ChatWindow`
+  - bundle size warnings and continuous polling still create avoidable UX/perf drag
+  - accessibility coverage is partial rather than systematic
+- Solution:
+  - continue extracting feature-specific controllers from the largest frontend hotspots
+  - add bundle-budget monitoring and reduce long-lived polling where event- or visibility-driven refresh is enough
+  - expand accessibility review and automated checks beyond the currently tested components
+- Exit criteria:
+  - major frontend hotspots are smaller and easier to reason about
+  - bundle growth and polling cost are visible and governed
+  - accessibility regressions are less likely to escape by accident
+
+#### P2: documentation truth maintenance and semantic drift prevention
+
+- Problem:
+  - some docs, examples, and status narratives lag real implementation state
+  - roadmap/status/doc files need stronger rules to keep feature claims honest
+- Solution:
+  - keep `README.md`, `.env.example`, `PROJECT_STATUS.md`, and operations docs aligned in the same change whenever runtime semantics change
+  - add targeted checks for high-risk doc drift such as env vars, release-manifest schema, and feature-status claims
+  - remove or archive stale guidance once a new source of truth exists
+- Exit criteria:
+  - operators and contributors can trust the primary docs without cross-referencing legacy files
+  - high-risk semantic drift is caught by CI instead of review luck
+
 ### Active priorities
 
 1. **Real web retrieval for workbench**

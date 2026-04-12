@@ -1,12 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { API_KEY_STORAGE_KEY, OWNER_ID_STORAGE_KEY } from '../api/auth'
 import { uploadMediaImage } from '../api/media'
 
 describe('media api', () => {
   afterEach(() => {
+    localStorage.clear()
     vi.restoreAllMocks()
   })
 
   it('uploads an image file through multipart form data', async () => {
+    localStorage.setItem(API_KEY_STORAGE_KEY, 'secret-123')
+    localStorage.setItem(OWNER_ID_STORAGE_KEY, 'alice')
     const mockedFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -26,7 +30,14 @@ describe('media api', () => {
     expect(payload.attachment_id).toBe('att-1')
     expect(mockedFetch).toHaveBeenCalledWith(
       './api/media/uploads',
-      expect.objectContaining({ method: 'POST', body: expect.any(FormData) }),
+      expect.objectContaining({
+        method: 'POST',
+        headers: {
+          'X-GOAT-API-Key': 'secret-123',
+          'X-GOAT-Owner-Id': 'alice',
+        },
+        body: expect.any(FormData),
+      }),
     )
   })
 

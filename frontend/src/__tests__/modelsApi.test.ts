@@ -1,12 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { API_KEY_STORAGE_KEY, OWNER_ID_STORAGE_KEY } from '../api/auth'
 import { fetchModelCapabilities, fetchModels } from '../api/models'
 
 describe('models api', () => {
   afterEach(() => {
+    localStorage.clear()
     vi.restoreAllMocks()
   })
 
   it('fetches model list and model capabilities', async () => {
+    localStorage.setItem(API_KEY_STORAGE_KEY, 'secret-123')
+    localStorage.setItem(OWNER_ID_STORAGE_KEY, 'alice')
     const mockedFetch = vi
       .fn()
       .mockResolvedValueOnce({
@@ -32,7 +36,18 @@ describe('models api', () => {
 
     expect(models).toEqual(['gemma4:26b', 'llama3:8b'])
     expect(capabilities.supports_vision).toBe(true)
-    expect(mockedFetch).toHaveBeenNthCalledWith(2, './api/models/capabilities?model=gemma4%3A26b')
+    expect(mockedFetch).toHaveBeenNthCalledWith(1, './api/models', {
+      headers: {
+        'X-GOAT-API-Key': 'secret-123',
+        'X-GOAT-Owner-Id': 'alice',
+      },
+    })
+    expect(mockedFetch).toHaveBeenNthCalledWith(2, './api/models/capabilities?model=gemma4%3A26b', {
+      headers: {
+        'X-GOAT-API-Key': 'secret-123',
+        'X-GOAT-Owner-Id': 'alice',
+      },
+    })
   })
 
   it('throws typed errors when endpoints fail', async () => {

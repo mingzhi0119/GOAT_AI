@@ -21,6 +21,8 @@ describe('TopBarPanels', () => {
   })
 
   it('keeps settings callbacks wired through the extracted panel', () => {
+    const onApiKeyChange = vi.fn()
+    const onOwnerIdChange = vi.fn()
     const onSystemInstructionChange = vi.fn()
     const onAdvancedOpenChange = vi.fn()
     const onTemperatureChange = vi.fn()
@@ -34,10 +36,14 @@ describe('TopBarPanels', () => {
       <SettingsPanel
         appearanceSummary="Classic System"
         advancedOpen={true}
+        apiKey="secret-123"
+        ownerId="alice"
         systemInstruction="Be clear."
         temperature={0.7}
         maxTokens={1024}
         topP={0.9}
+        onApiKeyChange={onApiKeyChange}
+        onOwnerIdChange={onOwnerIdChange}
         onSystemInstructionChange={onSystemInstructionChange}
         onAdvancedOpenChange={onAdvancedOpenChange}
         onTemperatureChange={onTemperatureChange}
@@ -52,6 +58,12 @@ describe('TopBarPanels', () => {
     fireEvent.change(screen.getByPlaceholderText(/optional: tone/i), {
       target: { value: 'Use bullets.' },
     })
+    fireEvent.change(screen.getByLabelText('API key'), {
+      target: { value: 'next-key' },
+    })
+    fireEvent.change(screen.getByLabelText('Owner ID'), {
+      target: { value: 'owner-42' },
+    })
 
     const inputs = screen.getAllByRole('spinbutton')
     fireEvent.change(inputs[0]!, { target: { value: '1.1' } })
@@ -61,6 +73,8 @@ describe('TopBarPanels', () => {
     fireEvent.click(screen.getByText('Classic System').closest('button') as HTMLButtonElement)
 
     expect(onSystemInstructionChange).toHaveBeenCalledWith('Use bullets.')
+    expect(onApiKeyChange).toHaveBeenCalledWith('next-key')
+    expect(onOwnerIdChange).toHaveBeenCalledWith('owner-42')
     expect(onTemperatureChange).toHaveBeenCalledWith(1.1)
     expect(onMaxTokensChange).toHaveBeenCalledWith(131072)
     expect(onTopPChange).toHaveBeenCalledWith(0.8)

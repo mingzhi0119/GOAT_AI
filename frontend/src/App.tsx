@@ -2,10 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useBranding } from './config/branding'
 import { useAdvancedSettings } from './hooks/useAdvancedSettings'
 import { useAppearance } from './hooks/useAppearance'
+import { useApiKey } from './hooks/useApiKey'
 import { useChatLayoutMode } from './hooks/useChatLayoutMode'
 import { useChatSession } from './hooks/useChatSession'
 import { useGpuStatus } from './hooks/useGpuStatus'
 import { useModels } from './hooks/useModels'
+import { useOwnerId } from './hooks/useOwnerId'
 import { useSystemInstruction } from './hooks/useSystemInstruction'
 import { useSystemFeatures } from './hooks/useSystemFeatures'
 import { useUserName } from './hooks/useUserName'
@@ -33,6 +35,8 @@ export default function App() {
   const chatLayout = useMemo(() => getChatLayoutDecisions(layoutMode), [layoutMode])
   const supportsThinking = models.capabilities?.supports_thinking ?? false
   const effectiveThinkingEnabled = supportsThinking && thinkingEnabled
+  const { apiKey, setApiKey } = useApiKey()
+  const { ownerId, setOwnerId } = useOwnerId()
   const { userName, setUserName } = useUserName()
   const { systemInstruction, setSystemInstruction } = useSystemInstruction()
   const advanced = useAdvancedSettings()
@@ -168,6 +172,10 @@ export default function App() {
           onOpenAppearance={() => setAppearanceOpen(true)}
           onRenameConversation={handleRenameConversation}
           thinkingEnabled={effectiveThinkingEnabled}
+          apiKey={apiKey}
+          ownerId={ownerId}
+          onApiKeyChange={setApiKey}
+          onOwnerIdChange={setOwnerId}
           systemInstruction={systemInstruction}
           onSystemInstructionChange={setSystemInstruction}
           onExportMarkdown={() =>

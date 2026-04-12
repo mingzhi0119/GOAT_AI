@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { API_KEY_STORAGE_KEY, OWNER_ID_STORAGE_KEY } from '../api/auth'
 import { streamChat } from '../api/chat'
 import type { ChatRequest } from '../api/types'
 
@@ -24,10 +25,13 @@ const request: ChatRequest = {
 
 describe('chat api', () => {
   afterEach(() => {
+    localStorage.clear()
     vi.restoreAllMocks()
   })
 
   it('parses chunked SSE frames into typed stream events', async () => {
+    localStorage.setItem(API_KEY_STORAGE_KEY, 'secret-123')
+    localStorage.setItem(OWNER_ID_STORAGE_KEY, 'alice')
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -80,7 +84,12 @@ describe('chat api', () => {
       './api/chat',
       expect.objectContaining({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-User-Name': 'Simon' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-GOAT-API-Key': 'secret-123',
+          'X-GOAT-Owner-Id': 'alice',
+          'X-User-Name': 'Simon',
+        },
       }),
     )
   })

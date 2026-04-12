@@ -23,6 +23,10 @@ function renderTopBar() {
       onOpenAppearance={onOpenAppearance}
       onRenameConversation={onRenameConversation}
       thinkingEnabled={true}
+      apiKey="secret-123"
+      ownerId="alice"
+      onApiKeyChange={vi.fn()}
+      onOwnerIdChange={vi.fn()}
       systemInstruction="Be concise."
       onSystemInstructionChange={onSystemInstructionChange}
       onExportMarkdown={onExportMarkdown}
@@ -78,6 +82,8 @@ describe('TopBar options callout', () => {
     expect(screen.getByRole('dialog', { name: /settings/i })).toBeInTheDocument()
     expect(screen.queryByText(/Enter sends the message/i)).not.toBeInTheDocument()
     expect(screen.getByText(/^Generation$/)).toBeInTheDocument()
+    expect(screen.getByLabelText('API key')).toHaveValue('secret-123')
+    expect(screen.getByLabelText('Owner ID')).toHaveValue('alice')
   })
 
   it('removes the max-token helper copy from the options panel', () => {
@@ -97,6 +103,47 @@ describe('TopBar options callout', () => {
 
     expect(onSystemInstructionChange).toHaveBeenCalledWith('Use bullets.')
     expect(onSystemInstructionChange).toHaveBeenCalledWith('')
+  })
+
+  it('keeps protected-access settings wired', () => {
+    const onApiKeyChange = vi.fn()
+    const onOwnerIdChange = vi.fn()
+
+    render(
+      <TopBar
+        sessionTitle="Strategy Sync"
+        hasSession={true}
+        modelCapabilities={['completion', 'tools']}
+        appearanceSummary="Classic System"
+        onOpenAppearance={vi.fn()}
+        onRenameConversation={vi.fn()}
+        thinkingEnabled={false}
+        apiKey=""
+        ownerId=""
+        onApiKeyChange={onApiKeyChange}
+        onOwnerIdChange={onOwnerIdChange}
+        systemInstruction=""
+        onSystemInstructionChange={vi.fn()}
+        onExportMarkdown={vi.fn()}
+        onDeleteConversation={vi.fn()}
+        advancedOpen={true}
+        onAdvancedOpenChange={vi.fn()}
+        temperature={0.7}
+        onTemperatureChange={vi.fn()}
+        maxTokens={4096}
+        onMaxTokensChange={vi.fn()}
+        topP={0.9}
+        onTopPChange={vi.fn()}
+        onResetAdvanced={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+    fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'next-key' } })
+    fireEvent.change(screen.getByLabelText('Owner ID'), { target: { value: 'owner-42' } })
+
+    expect(onApiKeyChange).toHaveBeenCalledWith('next-key')
+    expect(onOwnerIdChange).toHaveBeenCalledWith('owner-42')
   })
 
   it('keeps generation settings, appearance, rename, export, and delete actions wired', () => {
@@ -158,6 +205,10 @@ describe('TopBar options callout', () => {
         onOpenAppearance={vi.fn()}
         onRenameConversation={vi.fn()}
         thinkingEnabled={true}
+        apiKey=""
+        ownerId=""
+        onApiKeyChange={vi.fn()}
+        onOwnerIdChange={vi.fn()}
         systemInstruction="Be concise."
         onSystemInstructionChange={vi.fn()}
         onExportMarkdown={vi.fn()}

@@ -7,6 +7,7 @@ Base path: `/api`
 - If `GOAT_API_KEY` is configured, every endpoint except `GET /api/health` and `GET /api/ready` requires `X-GOAT-API-Key`
 - If `GOAT_API_KEY_WRITE` is configured, mutating routes (`POST`, `PATCH`, `DELETE`) require the write key or an equivalent write-scoped credential; otherwise the API returns `403` with `code = AUTH_WRITE_KEY_REQUIRED`
 - If `GOAT_REQUIRE_SESSION_OWNER` is enabled, chat and history routes require `X-GOAT-Owner-Id`; owner-mismatched protected reads resolve as `404` to avoid leaking resource existence
+- The bundled browser UI exposes these protected headers in `Settings -> Protected access` and stores them locally in the browser for subsequent API calls
 - Responses include `X-Request-ID`
 - Rate-limited requests return `429` with `Retry-After`
 - Standard error shape:

@@ -12,7 +12,10 @@ from functools import lru_cache
 from goat_ai.config import Settings, load_settings
 
 # ── Server-only config (not part of goat_ai shared layer) ────────────────────
-BACKEND_PORT: int = int(os.environ.get("GOAT_PORT", "8002"))
+_legacy_backend_port = os.environ.get("GOAT_PORT", "").strip()
+BACKEND_PORT: int = int(
+    os.environ.get("GOAT_SERVER_PORT", _legacy_backend_port or "62606")
+)
 BACKEND_HOST: str = os.environ.get("GOAT_HOST", "0.0.0.0")
 
 # Comma-separated list of allowed CORS origins (dev: React dev server on :3000)

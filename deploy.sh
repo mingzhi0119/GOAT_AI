@@ -4,7 +4,7 @@
 #   bash deploy.sh                   # full deploy from current local working tree
 #   QUICK=1 bash deploy.sh           # quick restart: skip pip install
 #   SKIP_BUILD=1 bash deploy.sh      # skip npm build (use existing dist/)
-#   SYNC_GIT=1 bash deploy.sh        # optionally reset to origin/$GIT_BRANCH before deploy
+#   SYNC_GIT=1 bash deploy.sh        # sync and deploy the exact requested branch/ref
 #   GIT_REF=<ref> bash deploy.sh     # deploy a specific branch, tag, or commit
 #
 # Override any variable before running, for example:
@@ -32,6 +32,7 @@ EFFECTIVE_OLLAMA_URL="${OLLAMA_BASE_URL:-${LOCAL_OLLAMA_URL}}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
 QUICK="${QUICK:-0}"
 SYNC_GIT="${SYNC_GIT:-0}"
+EXPECTED_GIT_SHA="${EXPECTED_GIT_SHA:-}"
 
 echo "GOAT AI deploy starting (branch: ${GIT_BRANCH}, ref: ${GIT_REF})${QUICK:+ [QUICK mode]}"
 
@@ -86,6 +87,31 @@ stop_pidfile() {
   fi
 }
 
+verify_expected_git_sha() {
+  local current_sha
+  current_sha="$(git rev-parse HEAD)"
+  if [ -n "${EXPECTED_GIT_SHA}" ] && [ "${current_sha}" != "${EXPECTED_GIT_SHA}" ]; then
+    echo "Resolved SHA ${current_sha} did not match EXPECTED_GIT_SHA ${EXPECTED_GIT_SHA}"
+    exit 1
+  fi
+}
+
+sync_requested_ref() {
+  git fetch --all --prune --tags
+  if git show-ref --verify --quiet "refs/remotes/origin/${GIT_REF}"; then
+    echo "Syncing branch ref to origin/${GIT_REF}"
+    git checkout --detach "origin/${GIT_REF}"
+    git reset --hard "origin/${GIT_REF}"
+  else
+    local resolved_sha
+    resolved_sha="$(git rev-parse --verify "${GIT_REF}^{commit}")"
+    echo "Syncing immutable ref ${GIT_REF} (${resolved_sha})"
+    git checkout --detach "${resolved_sha}"
+    git reset --hard "${resolved_sha}"
+  fi
+  verify_expected_git_sha
+}
+
 echo "1. Project checkout"
 if [ ! -d "${PROJECT_DIR}/.git" ]; then
   echo "Cloning repository"
@@ -93,7 +119,6 @@ if [ ! -d "${PROJECT_DIR}/.git" ]; then
 fi
 
 cd "$PROJECT_DIR"
-git checkout "$GIT_REF"
 
 # Re-derive EFFECTIVE_OLLAMA_URL from project .env when not already set in shell,
 # so deploy skips local-Ollama startup when OLLAMA_BASE_URL is configured there.
@@ -106,12 +131,12 @@ if [ -z "${OLLAMA_BASE_URL:-}" ] && [ -f "${PROJECT_DIR}/.env" ]; then
 fi
 
 if [ "${SYNC_GIT}" = "1" ]; then
-  echo "Syncing to origin/${GIT_BRANCH}"
-  git fetch --all --prune
-  git reset --hard "origin/${GIT_BRANCH}"
-  echo "Repository synced to origin/${GIT_BRANCH}"
+  sync_requested_ref
+  echo "Repository synced to $(git rev-parse HEAD)"
 else
-  echo "Deploying current local checkout on ${GIT_BRANCH} (SYNC_GIT=0)"
+  git checkout "$GIT_REF"
+  verify_expected_git_sha
+  echo "Deploying current local checkout for ref ${GIT_REF} (SYNC_GIT=0)"
 fi
 
 echo "2. Python virtualenv and dependencies"
@@ -186,7 +211,7 @@ if [ "${SYSTEMD_USED}" != "1" ]; then
   echo "Freeing port ${SERVER_PORT}"
   free_port "${SERVER_PORT}"
   echo "Starting FastAPI on 0.0.0.0:${SERVER_PORT} (log: ${API_LOG})"
-  GOAT_PORT="${SERVER_PORT}" nohup "${VENV_DIR}/bin/python" -m uvicorn server:app \
+  GOAT_SERVER_PORT="${SERVER_PORT}" GOAT_LOCAL_PORT="${SERVER_PORT}" nohup "${VENV_DIR}/bin/python" -m uvicorn server:app \
     --host 0.0.0.0 \
     --port "${SERVER_PORT}" \
     --workers 2 \

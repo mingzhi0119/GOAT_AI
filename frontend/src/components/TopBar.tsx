@@ -17,6 +17,10 @@ interface Props {
   onOpenAppearance: () => void
   onRenameConversation: () => void
   thinkingEnabled?: boolean
+  apiKey: string
+  ownerId: string
+  onApiKeyChange: (value: string) => void
+  onOwnerIdChange: (value: string) => void
   systemInstruction: string
   onSystemInstructionChange: (value: string) => void
   onExportMarkdown: () => void
@@ -169,6 +173,10 @@ const TopBar: FC<Props> = ({
   onOpenAppearance,
   onRenameConversation,
   thinkingEnabled = false,
+  apiKey,
+  ownerId,
+  onApiKeyChange,
+  onOwnerIdChange,
   systemInstruction,
   onSystemInstructionChange,
   onExportMarkdown,
@@ -282,6 +290,10 @@ const TopBar: FC<Props> = ({
               <SettingsPanel
                 appearanceSummary={appearanceSummary}
                 advancedOpen={advancedOpen}
+                apiKey={apiKey}
+                ownerId={ownerId}
+                onApiKeyChange={onApiKeyChange}
+                onOwnerIdChange={onOwnerIdChange}
                 systemInstruction={systemInstruction}
                 temperature={temperature}
                 maxTokens={maxTokens}

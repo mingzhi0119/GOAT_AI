@@ -14,10 +14,13 @@ def _fail(message: str) -> int:
     return 1
 
 
-def _headers(api_key: str) -> dict[str, str]:
-    if not api_key:
-        return {}
-    return {"X-GOAT-API-Key": api_key}
+def _headers(api_key: str, owner_id: str = "") -> dict[str, str]:
+    headers: dict[str, str] = {}
+    if api_key:
+        headers["X-GOAT-API-Key"] = api_key
+    if owner_id:
+        headers["X-GOAT-Owner-Id"] = owner_id
+    return headers
 
 
 def _parse_sse_events(body: str) -> list[dict[str, Any]]:
@@ -42,10 +45,10 @@ def _first_event_timeout_sec() -> int:
     return timeout
 
 
-def _expect_runtime_target(base_url: str, api_key: str) -> int:
+def _expect_runtime_target(base_url: str, api_key: str, owner_id: str = "") -> int:
     response = requests.get(
         f"{base_url}/api/system/runtime-target",
-        headers=_headers(api_key),
+        headers=_headers(api_key, owner_id),
         timeout=10,
     )
     response.raise_for_status()
@@ -59,10 +62,10 @@ def _expect_runtime_target(base_url: str, api_key: str) -> int:
     return 0
 
 
-def _resolve_chat_check_model(base_url: str, api_key: str) -> str:
+def _resolve_chat_check_model(base_url: str, api_key: str, owner_id: str = "") -> str:
     response = requests.get(
         f"{base_url}/api/models",
-        headers=_headers(api_key),
+        headers=_headers(api_key, owner_id),
         timeout=10,
     )
     response.raise_for_status()
@@ -78,9 +81,11 @@ def _resolve_chat_check_model(base_url: str, api_key: str) -> str:
     return normalized[0]
 
 
-def _expect_chat_stream_contract(base_url: str, api_key: str) -> int:
+def _expect_chat_stream_contract(
+    base_url: str, api_key: str, owner_id: str = ""
+) -> int:
     timeout_sec = _first_event_timeout_sec()
-    model = _resolve_chat_check_model(base_url, api_key)
+    model = _resolve_chat_check_model(base_url, api_key, owner_id)
     try:
         response = requests.post(
             f"{base_url}/api/chat",
@@ -95,7 +100,7 @@ def _expect_chat_stream_contract(base_url: str, api_key: str) -> int:
                 "max_tokens": 48,
                 "temperature": 0,
             },
-            headers=_headers(api_key),
+            headers=_headers(api_key, owner_id),
             timeout=(5, timeout_sec),
         )
         response.raise_for_status()
@@ -132,13 +137,15 @@ def main() -> int:
     )
     parser.add_argument("--base-url", default="http://127.0.0.1:62606")
     parser.add_argument("--api-key", default="")
+    parser.add_argument("--owner-id", default="")
     args = parser.parse_args()
     base_url = str(args.base_url).rstrip("/")
     api_key = str(args.api_key).strip()
+    owner_id = str(args.owner_id).strip()
 
     health = requests.get(
         f"{base_url}/api/health",
-        headers=_headers(api_key),
+        headers=_headers(api_key, owner_id),
         timeout=10,
     )
     if health.status_code != 200:
@@ -146,7 +153,7 @@ def main() -> int:
 
     ready = requests.get(
         f"{base_url}/api/ready",
-        headers=_headers(api_key),
+        headers=_headers(api_key, owner_id),
         timeout=15,
     )
     if ready.status_code != 200:
@@ -162,7 +169,7 @@ def main() -> int:
 
     for check in (_expect_runtime_target, _expect_chat_stream_contract):
         try:
-            result = check(base_url, api_key)
+            result = check(base_url, api_key, owner_id)
             if result != 0:
                 return result
         except Exception as exc:

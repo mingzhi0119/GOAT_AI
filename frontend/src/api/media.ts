@@ -1,5 +1,6 @@
-/** POST /api/media/uploads — vision image attachments. */
+import { buildApiHeaders } from './auth'
 
+/** POST /api/media/uploads - vision image attachments. */
 export interface MediaUploadResponse {
   attachment_id: string
   filename: string
@@ -12,7 +13,11 @@ export interface MediaUploadResponse {
 export async function uploadMediaImage(file: File): Promise<MediaUploadResponse> {
   const body = new FormData()
   body.append('file', file)
-  const resp = await fetch('./api/media/uploads', { method: 'POST', body })
+  const resp = await fetch('./api/media/uploads', {
+    method: 'POST',
+    headers: buildApiHeaders(),
+    body,
+  })
   if (!resp.ok) {
     throw new Error(`Media upload API: HTTP ${resp.status}`)
   }

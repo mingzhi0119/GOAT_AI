@@ -13,7 +13,7 @@ This document defines the minimum P1 release process for staging and production.
 1. Run the normal CI gates on the target ref.
 2. Trigger `.github/workflows/release-governance.yml` with the release ref.
 3. Generate and retain a release manifest artifact for that ref.
-4. Deploy the same ref to the `staging` environment.
+4. Deploy the same ref and resolved SHA to the `staging` environment.
 5. Run `scripts/post_deploy_check.py` against staging.
 6. Promote to `production` only through the `production` environment gate and after staging validation is green.
 
@@ -21,10 +21,10 @@ This document defines the minimum P1 release process for staging and production.
 
 - `staging`
   - secrets: `STAGING_SSH_HOST`, `STAGING_SSH_USER`, `STAGING_SSH_KEY`, `STAGING_APP_DIR`
-  - optional secrets: `STAGING_BASE_URL`, `STAGING_API_KEY`
+  - optional secrets: `STAGING_BASE_URL`, `STAGING_API_KEY`, `STAGING_OWNER_ID`
 - `production`
   - secrets: `PRODUCTION_SSH_HOST`, `PRODUCTION_SSH_USER`, `PRODUCTION_SSH_KEY`, `PRODUCTION_APP_DIR`
-  - optional secrets: `PRODUCTION_BASE_URL`, `PRODUCTION_API_KEY`
+  - optional secrets: `PRODUCTION_BASE_URL`, `PRODUCTION_API_KEY`, `PRODUCTION_OWNER_ID`
 
 ## Approval policy
 
@@ -40,7 +40,7 @@ Each release workflow run should retain:
 - resolved commit SHA
 - actor
 - UTC timestamp
-- staging / production job outcome
+- deploy jobs must verify the resolved commit SHA before reporting success
 
 This is enough to answer "what exactly was deployed?" during rollback or incident review.
 

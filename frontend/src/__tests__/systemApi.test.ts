@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { API_KEY_STORAGE_KEY, OWNER_ID_STORAGE_KEY } from '../api/auth'
 import {
   fetchGpuStatus,
   fetchInferenceLatency,
@@ -7,10 +8,13 @@ import {
 
 describe('system api', () => {
   afterEach(() => {
+    localStorage.clear()
     vi.restoreAllMocks()
   })
 
   it('fetches gpu status payload', async () => {
+    localStorage.setItem(API_KEY_STORAGE_KEY, 'secret-123')
+    localStorage.setItem(OWNER_ID_STORAGE_KEY, 'alice')
     const mockedFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -29,10 +33,17 @@ describe('system api', () => {
     vi.stubGlobal('fetch', mockedFetch)
     const payload = await fetchGpuStatus()
     expect(payload.available).toBe(true)
-    expect(mockedFetch).toHaveBeenCalledWith('./api/system/gpu')
+    expect(mockedFetch).toHaveBeenCalledWith('./api/system/gpu', {
+      headers: {
+        'X-GOAT-API-Key': 'secret-123',
+        'X-GOAT-Owner-Id': 'alice',
+      },
+    })
   })
 
   it('fetches inference latency payload', async () => {
+    localStorage.setItem(API_KEY_STORAGE_KEY, 'secret-123')
+    localStorage.setItem(OWNER_ID_STORAGE_KEY, 'alice')
     const mockedFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -43,10 +54,17 @@ describe('system api', () => {
     vi.stubGlobal('fetch', mockedFetch)
     const payload = await fetchInferenceLatency()
     expect(payload.chat_sample_count).toBe(3)
-    expect(mockedFetch).toHaveBeenCalledWith('./api/system/inference')
+    expect(mockedFetch).toHaveBeenCalledWith('./api/system/inference', {
+      headers: {
+        'X-GOAT-API-Key': 'secret-123',
+        'X-GOAT-Owner-Id': 'alice',
+      },
+    })
   })
 
   it('fetches system features payload', async () => {
+    localStorage.setItem(API_KEY_STORAGE_KEY, 'secret-123')
+    localStorage.setItem(OWNER_ID_STORAGE_KEY, 'alice')
     const mockedFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -110,6 +128,11 @@ describe('system api', () => {
     const payload = await fetchSystemFeatures()
     expect(payload.code_sandbox.policy_allowed).toBe(false)
     expect(payload.workbench.agent_tasks.effective_enabled).toBe(true)
-    expect(mockedFetch).toHaveBeenCalledWith('./api/system/features')
+    expect(mockedFetch).toHaveBeenCalledWith('./api/system/features', {
+      headers: {
+        'X-GOAT-API-Key': 'secret-123',
+        'X-GOAT-Owner-Id': 'alice',
+      },
+    })
   })
 })

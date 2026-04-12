@@ -1,7 +1,7 @@
 /* @vitest-environment jsdom */
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { API_KEY_STORAGE_KEY, buildApiHeaders } from '../api/auth'
+import { API_KEY_STORAGE_KEY, OWNER_ID_STORAGE_KEY, buildApiHeaders } from '../api/auth'
 import { useApiKey } from '../hooks/useApiKey'
 
 describe('useApiKey', () => {
@@ -24,6 +24,22 @@ describe('useApiKey', () => {
     expect(buildApiHeaders({ Accept: 'application/json' })).toEqual({
       Accept: 'application/json',
       'X-GOAT-API-Key': 'next-key',
+    })
+  })
+
+  it('includes a stored owner id alongside the shared API key', () => {
+    localStorage.setItem(OWNER_ID_STORAGE_KEY, 'owner-123')
+
+    const { result } = renderHook(() => useApiKey())
+    expect(result.current.apiKey).toBe('')
+
+    act(() => {
+      result.current.setApiKey('secret')
+    })
+
+    expect(buildApiHeaders()).toEqual({
+      'X-GOAT-API-Key': 'secret',
+      'X-GOAT-Owner-Id': 'owner-123',
     })
   })
 
