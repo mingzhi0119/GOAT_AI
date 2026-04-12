@@ -119,6 +119,10 @@ def test_release_docs_and_status_match_current_truth() -> None:
     assert "OTel enabled-path tests" in operations_doc
     assert "observability asset contract" in operations_doc
     assert "python -m tools.desktop.packaged_shell_fault_smoke" in operations_doc
+    assert (
+        "python -m tools.desktop.installed_windows_desktop_fault_smoke"
+        in operations_doc
+    )
     assert "Linux sidecar/provenance/cargo-audit gate" in operations_doc
     assert "does not own the Windows pre-ready retry semantics" in operations_doc
     assert "`desktop-package-windows`" in incident_triage
@@ -127,9 +131,13 @@ def test_release_docs_and_status_match_current_truth() -> None:
     assert "OTel enabled-path tests" in incident_triage
     assert "observability asset contract" in incident_triage
     assert "hang_before_ready" in incident_triage
+    assert "installer kind (`msi` vs `nsis`)" in incident_triage
     assert "EXPORTED_METRIC_FAMILIES" in observability_readme
     assert "mechanically verified" in observability_readme
     assert "`desktop-package-windows`" in security_doc
+    assert (
+        "installed-app startup evidence for both MSI and NSIS artifacts" in security_doc
+    )
     assert "`desktop-supply-chain`" in security_doc
     assert "`ops/deploy/deploy.sh`" in operations_doc
     assert "`ops/systemd/goat-ai.service`" in operations_doc
@@ -138,3 +146,4 @@ def test_release_docs_and_status_match_current_truth() -> None:
     assert "artifact-first staged release governance workflow" in project_status
     assert "backend-fast -> backend-heavy -> backend" in project_status
     assert "desktop-package-windows" in project_status
+    assert "installed Windows evidence" in project_status

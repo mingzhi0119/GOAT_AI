@@ -89,6 +89,9 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     desktop_provenance = (
         REPO_ROOT / ".github" / "workflows" / "desktop-provenance.yml"
     ).read_text(encoding="utf-8")
+    fault_injection = (
+        REPO_ROOT / ".github" / "workflows" / "fault-injection.yml"
+    ).read_text(encoding="utf-8")
     release_doc = (
         REPO_ROOT / "docs" / "operations" / "RELEASE_GOVERNANCE.md"
     ).read_text(encoding="utf-8")
@@ -123,11 +126,30 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     assert "GOAT_DESKTOP_SIGNING_CERT_BASE64" in desktop_provenance
     assert "sign_windows_desktop_artifacts.ps1" in desktop_provenance
     assert "desktop-windows-provenance.json" in desktop_provenance
+    assert (
+        desktop_provenance.count(
+            "python -m tools.desktop.installed_windows_desktop_fault_smoke"
+        )
+        == 2
+    )
+    assert "desktop-windows-installed-smoke" in desktop_provenance
     assert desktop_provenance.count("actions/attest@v4") >= 4
+    assert "windows-installed-desktop-drill" in fault_injection
+    assert (
+        fault_injection.count(
+            "python -m tools.desktop.installed_windows_desktop_fault_smoke"
+        )
+        == 2
+    )
+    assert "desktop-installed-drill" in fault_injection
+    assert "python -m tools.desktop.packaged_shell_fault_smoke" not in fault_injection
 
     assert "signed Windows desktop release path" in release_doc
     assert "Linux desktop sidecar provenance record" in release_doc
     assert "packaged-shell fault smoke" in release_doc
+    assert "installed Windows startup evidence" in release_doc
+    assert "desktop-windows-installed-smoke" not in release_doc
+    assert "fault-injection.yml" in release_doc
     assert "desktop-provenance.yml" in release_doc
     assert "Publicly distributed Windows desktop installers" in security_doc
     assert "No open P1 audit items remain" in roadmap

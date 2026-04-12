@@ -191,6 +191,20 @@ jobs:
           }
           "msi_path=$($msi.FullName)" >> $env:GITHUB_OUTPUT
           "nsis_path=$($nsis.FullName)" >> $env:GITHUB_OUTPUT
+      - name: Run installed MSI desktop smoke
+        shell: pwsh
+        run: |
+          python -m tools.desktop.installed_windows_desktop_fault_smoke `
+            --installer "${{ steps.windows_artifacts.outputs.msi_path }}" `
+            --installer-kind msi `
+            --artifact-dir "desktop-installed-smoke/msi"
+      - name: Run installed NSIS desktop smoke
+        shell: pwsh
+        run: |
+          python -m tools.desktop.installed_windows_desktop_fault_smoke `
+            --installer "${{ steps.windows_artifacts.outputs.nsis_path }}" `
+            --installer-kind nsis `
+            --artifact-dir "desktop-installed-smoke/nsis"
       - name: Upload Windows desktop release assets
         uses: actions/upload-artifact@v4
         with:
@@ -199,6 +213,11 @@ jobs:
             frontend/src-tauri/target/release/bundle/msi/*.msi
             frontend/src-tauri/target/release/bundle/nsis/*-setup.exe
             desktop-windows-provenance.json
+      - name: Upload installed Windows smoke evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows-installed-smoke
+          path: desktop-installed-smoke
       - name: Generate Windows MSI provenance attestation
         if: ${{ !github.event.repository.private || vars.ENABLE_GITHUB_ATTESTATIONS == '1' }}
         uses: actions/attest@v4

@@ -53,6 +53,7 @@ Last updated: 2026-04-12
 - desktop smoke coverage for sidecar boot and startup diagnostics
 - packaged desktop shell diagnostics persisted under the platform app-log directory
 - packaged desktop startup now uses bounded pre-ready restart/backoff before the main window is revealed, then still fails explicitly if the sidecar never becomes ready or exits unexpectedly after reveal
+- release governance now retains installed Windows evidence for both MSI and NSIS artifacts before signed installers are uploaded
 
 ### Governance and operations
 
@@ -64,6 +65,7 @@ Last updated: 2026-04-12
 - merge-blocking PR latency gate for the core in-process chat path
 - weekly quality snapshot workflow for recurring coverage, security-review, and optional performance-summary capture
 - recurring fault-injection workflow for upstream-unavailable, persistence-failure, database recovery-drill, artifact rollback drill, and desktop-boot diagnostics
+- recurring installed Windows drill in `.github/workflows/fault-injection.yml` so installer regressions are not release-only discoveries
 - backup, restore, rollback, and recovery-drill coverage
 - documented vulnerability response, dependency-refresh cadence, and credential-rotation policy
 - CI gates for lint, tests, build, contract sync, dependency audit, secret scan, and desktop supply chain
@@ -77,6 +79,7 @@ Last updated: 2026-04-12
 - future storage-shape changes require a new migration/compatibility/rollback decision log
 - Windows desktop packaging, signing, and provenance are ahead of macOS/Linux public packaged validation
 - pre-ready desktop restart/backoff is shipped, but the packaged-shell fault smoke in `desktop-package-windows` is now the critical evidence path because Rust unit tests alone were not enough to guard fail-closed startup behavior
+- installed Windows startup evidence is now split across release and scheduled workflows: signed installer validation lives in `.github/workflows/desktop-provenance.yml`, while recurring installer drift detection lives in `.github/workflows/fault-injection.yml`
 
 ## Status by active roadmap area
 

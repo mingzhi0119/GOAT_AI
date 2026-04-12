@@ -123,7 +123,10 @@ Important notes:
 - `npm run desktop:build` triggers the same sidecar build automatically through Tauri's `beforeBuildCommand`
 - merge-blocking CI now also builds real Windows packaged desktop installers and records provenance through `python -m tools.desktop.write_desktop_release_provenance`
 - `desktop-package-windows` also runs `python -m tools.desktop.packaged_shell_fault_smoke` so packaged startup stays fail-closed for missing-sidecar, early-exit-before-ready, and health-timeout paths
+- `desktop-package-windows` is still the PR packaged-binary gate only; it does not install MSI/NSIS artifacts
 - `desktop-supply-chain` remains the Linux sidecar/provenance/cargo-audit gate; it does not own the Windows pre-ready retry semantics
+- `.github/workflows/desktop-provenance.yml` now runs `python -m tools.desktop.installed_windows_desktop_fault_smoke` against both the built `.msi` and NSIS installers before release assets are uploaded
+- `.github/workflows/fault-injection.yml` reruns the same installed Windows drill on a schedule so installer regressions do not hide behind release-only evidence
 - PyInstaller is **not** a cross-compiler; build each platform's sidecar on that platform (or an equivalent CI runner / VM)
 - on Windows developer machines, Linux-targeted desktop validation should still run from WSL when you need Linux parity; Windows-native packaging remains a Windows flow
 - packaged desktop builds move app-owned writable state out of the repository and into the platform app-local-data directory
@@ -155,6 +158,9 @@ When API protection is enabled, pass `--api-key "$GOAT_API_KEY"`.
 Public Windows desktop release path:
 
 - `.github/workflows/desktop-provenance.yml` is the public signed installer workflow
+- `desktop-package-windows` proves fail-closed startup for packaged CI binaries before merge; it is not installer-installed evidence
+- `.github/workflows/desktop-provenance.yml` is the installed Windows evidence gate for signed MSI and NSIS artifacts
+- `.github/workflows/fault-injection.yml` is the recurring installed Windows drill; it is neither a PR gate nor a signing workflow
 - local `npm run desktop:build` output remains internal/test-only unless it is rebuilt and signed through the workflow
 - signed public Windows installers require `GOAT_DESKTOP_SIGNING_CERT_BASE64` and `GOAT_DESKTOP_SIGNING_CERT_PASSWORD`
 
