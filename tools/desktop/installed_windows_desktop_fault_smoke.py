@@ -7,11 +7,15 @@ import re
 import shutil
 import subprocess
 import time
-import winreg
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from tools.desktop import packaged_shell_fault_smoke as packaged_smoke
+
+try:
+    import winreg
+except ModuleNotFoundError:  # pragma: no cover - exercised on non-Windows CI
+    winreg = None  # type: ignore[assignment]
 
 PRODUCT_DISPLAY_NAME = "GOAT AI"
 INSTALL_STATE_REG_PATH = r"Software\simonbb\GOAT AI"
@@ -24,8 +28,7 @@ DEFAULT_UNINSTALL_TIMEOUT_SEC = 90.0
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 UNINSTALL_ROOTS = (
-    winreg.HKEY_CURRENT_USER,
-    winreg.HKEY_LOCAL_MACHINE,
+    (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE) if winreg is not None else ()
 )
 
 
@@ -97,6 +100,8 @@ def _normalize_path(value: Path | str) -> str:
 
 
 def _iter_uninstall_entries() -> list[dict[str, str]]:
+    if winreg is None:
+        return []
     entries: list[dict[str, str]] = []
     for hive in UNINSTALL_ROOTS:
         try:
@@ -148,6 +153,9 @@ def _iter_uninstall_entries() -> list[dict[str, str]]:
 
 
 def _clear_install_state_registry() -> None:
+    if winreg is None:
+        return
+
     def delete_tree(hive: int, subkey_path: str) -> None:
         try:
             key = winreg.OpenKey(

@@ -9,6 +9,16 @@ import tools.desktop.installed_windows_desktop_fault_smoke as subject
 from tools.desktop import packaged_shell_fault_smoke as packaged_smoke
 
 
+def test_registry_helpers_degrade_gracefully_without_winreg(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(subject, "winreg", None)
+    monkeypatch.setattr(subject, "UNINSTALL_ROOTS", ())
+
+    assert subject._iter_uninstall_entries() == []
+    subject._clear_install_state_registry()
+
+
 def test_match_uninstall_entry_uses_install_root(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
