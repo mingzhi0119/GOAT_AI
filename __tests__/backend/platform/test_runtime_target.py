@@ -12,7 +12,7 @@ from goat_ai.runtime.runtime_target import (
 
 def make_settings(**overrides: object) -> Settings:
     defaults: dict[str, object] = {
-        "ollama_base_url": "http://127.0.0.1:11435",
+        "ollama_base_url": "http://127.0.0.1:11434",
         "generate_timeout": 120,
         "max_upload_mb": 20,
         "max_upload_bytes": 20 * 1024 * 1024,

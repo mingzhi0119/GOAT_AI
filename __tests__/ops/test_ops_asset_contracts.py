@@ -46,11 +46,13 @@ def test_goat_service_uses_supported_logs_and_factory_entrypoint() -> None:
     assert "server:create_app" in service
     assert "--factory" in service
     assert "var/logs/fastapi.log" in service
+    assert "start_ollama_local.sh" not in service
 
 
-def test_watchdog_phase0_and_local_ollama_scripts_align_with_supported_ops_contract() -> (
+def test_watchdog_phase0_and_school_ollama_assets_align_with_supported_ops_contract() -> (
     None
 ):
+    deploy_sh = (REPO_ROOT / "ops" / "deploy" / "deploy.sh").read_text(encoding="utf-8")
     healthcheck = (REPO_ROOT / "ops" / "verification" / "healthcheck.sh").read_text(
         encoding="utf-8"
     )
@@ -60,6 +62,9 @@ def test_watchdog_phase0_and_local_ollama_scripts_align_with_supported_ops_contr
     phase0 = (REPO_ROOT / "ops" / "verification" / "phase0_check.sh").read_text(
         encoding="utf-8"
     )
+    school_service = (
+        REPO_ROOT / "ops" / "systemd" / "goat-ai.school-ubuntu.service"
+    ).read_text(encoding="utf-8")
     start_ollama = (
         REPO_ROOT / "scripts" / "ollama" / "start_ollama_local.sh"
     ).read_text(encoding="utf-8")
@@ -76,6 +81,20 @@ def test_watchdog_phase0_and_local_ollama_scripts_align_with_supported_ops_contr
     assert "server:create_app --factory" in phase0
     assert "var/logs/fastapi.log" in phase0
     assert "var/logs/fastapi.pid" in phase0
+
+    assert (
+        'GOAT_USE_SCHOOL_OLLAMA_LOCAL="${GOAT_USE_SCHOOL_OLLAMA_LOCAL:-0}"' in deploy_sh
+    )
+    assert 'GOAT_OLLAMA_PROFILE="${GOAT_OLLAMA_PROFILE:-}"' in deploy_sh
+    assert "school_ollama_local_enabled() {" in deploy_sh
+    assert "School Ubuntu Ollama profile enabled" in deploy_sh
+    assert '[ "${EFFECTIVE_OLLAMA_URL}" = "${LOCAL_OLLAMA_URL}" ]' not in deploy_sh
+
+    assert (
+        "ExecStartPre=%h/GOAT_AI/scripts/ollama/start_ollama_local.sh" in school_service
+    )
+    assert "Environment=GOAT_USE_SCHOOL_OLLAMA_LOCAL=1" in school_service
+    assert "EnvironmentFile=-%h/GOAT_AI/.env.school-ubuntu" in school_service
 
     assert (
         'OLLAMA_BASE_URL_VALUE="${OLLAMA_BASE_URL:-${OLLAMA_HOST:-http://127.0.0.1:11435}}"'
@@ -118,6 +137,8 @@ def test_release_docs_and_status_match_current_truth() -> None:
     assert "`backend-heavy`" in operations_doc
     assert "OTel enabled-path tests" in operations_doc
     assert "observability asset contract" in operations_doc
+    assert "`GOAT_USE_SCHOOL_OLLAMA_LOCAL`" in operations_doc
+    assert "Simon school Ubuntu server profile" in operations_doc
     assert "python -m tools.desktop.packaged_shell_fault_smoke" in operations_doc
     assert (
         "python -m tools.desktop.installed_windows_desktop_fault_smoke"
@@ -141,6 +162,8 @@ def test_release_docs_and_status_match_current_truth() -> None:
     assert "`desktop-supply-chain`" in security_doc
     assert "`ops/deploy/deploy.sh`" in operations_doc
     assert "`ops/systemd/goat-ai.service`" in operations_doc
+    assert "`ops/systemd/goat-ai.school-ubuntu.service`" in operations_doc
+    assert "Simon school Ubuntu server profile" in operations_doc
     assert "<app_log_dir>/desktop-shell.log" in operations_doc
     assert "P0, P1, and P2 are complete" not in project_status
     assert "artifact-first staged release governance workflow" in project_status

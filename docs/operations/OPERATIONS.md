@@ -169,6 +169,7 @@ Public Windows desktop release path:
 Canonical checked-in operator assets now live under `ops/deploy/`, `ops/systemd/`, and `ops/verification/`.
 Use the canonical `ops/` entrypoints directly; repository-root deploy wrappers are no longer supported.
 The checked-in user-service unit now lives at `ops/systemd/goat-ai.service`.
+The school-only variant lives at `ops/systemd/goat-ai.school-ubuntu.service`.
 
 Linux:
 
@@ -200,6 +201,7 @@ Important behavior:
 - `ops/deploy/deploy.sh` and `ops/deploy/deploy.ps1` now stop the current FastAPI process gracefully first, then force cleanup only if the drain window expires
 - Artifact-first rollback is the preferred path; ref-based rollback remains available for manual recovery. See [ROLLBACK.md](ROLLBACK.md)
 - Windows deploy reuses Ollama on `127.0.0.1:11434` when available unless `OLLAMA_BASE_URL` is explicitly set
+- Linux deploy no longer auto-detects or auto-starts the school `ollama-local` runtime by default; only `GOAT_USE_SCHOOL_OLLAMA_LOCAL=1` or `GOAT_OLLAMA_PROFILE=school-ubuntu` enables the school-specific helper script path
 - Deploy now includes a post-deploy contract check (`tools/ops/post_deploy_check.py`) before success is reported: it exercises `GET /api/health`, `GET /api/ready`, `GET /api/system/runtime-target`, and a short `POST /api/chat` stream. The chat step passes when the SSE body includes **at least one** `token` or **`thinking`** frame (so thinking-first models still validate), and fails on HTTP errors, empty SSE, or a first-frame `error`
 
 Windows PowerShell deploy remains fully supported. Use WSL only when you specifically need Linux-targeted deploy-script parity or shell semantics.
@@ -223,11 +225,25 @@ Many production installs match an **unprivileged** server (e.g. JupyterHub-style
 
 Self-managed VMs, Docker Compose, Kubernetes, or developer laptops use the same codebase with **env-driven** ports and paths. Features that need **strong isolation** (for example Docker-backed code sandbox execution) must stay tied to explicit operator enablement and runtime probes; the shipped `localhost` provider is a weaker trusted-dev fallback, not a like-for-like isolation substitute.
 
+### Simon school Ubuntu server profile
+
+The checked-in `scripts/ollama/*local*.sh` helpers and the sibling `ollama-local` runtime
+layout are now **school-only opt-in assets**, not part of the generic deploy path.
+
+- use `GOAT_USE_SCHOOL_OLLAMA_LOCAL=1` or `GOAT_OLLAMA_PROFILE=school-ubuntu`
+- keep `OLLAMA_BASE_URL=http://127.0.0.1:11435` in the school server's `.env` or `EnvironmentFile`
+- use `ops/systemd/goat-ai.school-ubuntu.service` when the school host should start the local Ollama helper automatically
+- leave the generic `ops/systemd/goat-ai.service` and default deploy flow on the standard Ollama address instead
+
+The full school-only runbook lives in [SCHOOL_UBUNTU_SERVER.md](SCHOOL_UBUNTU_SERVER.md).
+
 ## Key environment variables
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `OLLAMA_BASE_URL` | Ollama HTTP base URL | `http://127.0.0.1:11434` |
+| `GOAT_USE_SCHOOL_OLLAMA_LOCAL` | Explicitly opt into the school Ubuntu `ollama-local` helper/runtime path | `0` |
+| `GOAT_OLLAMA_PROFILE` | Optional named profile alias; `school-ubuntu` enables the same school-only path | empty |
 | `OLLAMA_GENERATE_TIMEOUT` | LLM request timeout seconds | `120` |
 | `OLLAMA_CHAT_FIRST_EVENT_TIMEOUT` | `/api/chat` first SSE event timeout seconds | `90` |
 | `GOAT_MAX_UPLOAD_MB` | Max upload size | `20` |

@@ -17,7 +17,7 @@ class DotenvConfigTests(unittest.TestCase):
                 "\n".join(
                     [
                         "# comment",
-                        "OLLAMA_BASE_URL=http://127.0.0.1:11435",
+                        "OLLAMA_BASE_URL=http://127.0.0.1:7777",
                         "QUOTED_VALUE='hello world'",
                         'DOUBLE_QUOTED="hello again"',
                     ]
@@ -158,6 +158,36 @@ class DotenvConfigTests(unittest.TestCase):
                 self.assertEqual(11, settings.workbench_web_timeout_sec)
                 self.assertEqual("us-en", settings.workbench_web_region)
                 self.assertEqual("off", settings.workbench_web_safesearch)
+            finally:
+                _restore_many(original_env)
+
+    def test_load_settings_uses_school_ollama_profile_only_when_opted_in(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            app_root = Path(tmp)
+            runtime_root = app_root / "var"
+            dotenv_path = app_root / ".env"
+            dotenv_path.write_text(
+                "GOAT_USE_SCHOOL_OLLAMA_LOCAL=1\n",
+                encoding="utf-8",
+            )
+
+            original_env = _capture_env(
+                "GOAT_USE_SCHOOL_OLLAMA_LOCAL",
+                "GOAT_OLLAMA_PROFILE",
+                "OLLAMA_BASE_URL",
+                "GOAT_RUNTIME_ROOT",
+                "GOAT_LOG_DIR",
+                "GOAT_LOG_PATH",
+                "GOAT_DATA_DIR",
+            )
+            try:
+                _clear_env(*original_env.keys())
+                with (
+                    patch.object(config, "APP_ROOT", app_root),
+                    patch.object(config, "DEFAULT_RUNTIME_ROOT", runtime_root),
+                ):
+                    settings = config.load_settings()
+                self.assertEqual("http://127.0.0.1:11435", settings.ollama_base_url)
             finally:
                 _restore_many(original_env)
 
