@@ -572,7 +572,7 @@ schemas:
     properties:
       task_id: string
       task_kind: plan|browse|deep_research|canvas
-      status: queued|running|completed|failed
+      status: queued|running|completed|failed|cancelled
       created_at: string
   WorkbenchTaskEventPayload:
     type: object
@@ -582,9 +582,9 @@ schemas:
       - created_at
     properties:
       sequence: integer
-      event_type: task.queued|task.started|retrieval.sources_resolved|retrieval.step.completed|retrieval.step.skipped|workspace_output.created|workspace_output.exported|task.completed|task.failed
+      event_type: task.queued|task.started|task.cancelled|task.retry_requested|task.retry_created|retrieval.sources_resolved|retrieval.step.completed|retrieval.step.skipped|workspace_output.created|workspace_output.exported|task.completed|task.failed
       created_at: string
-      status: queued|running|completed|failed|null
+      status: queued|running|completed|failed|cancelled|null
       message: string|null
       metadata: object
   WorkbenchTaskEventsResponse:
@@ -626,7 +626,7 @@ schemas:
     properties:
       task_id: string
       task_kind: plan|browse|deep_research|canvas
-      status: queued|running|completed|failed
+      status: queued|running|completed|failed|cancelled
       created_at: string
       updated_at: string
       error_detail: string|null
@@ -1118,6 +1118,34 @@ endpoints:
       errors:
         - 401
         - 404
+        - 422
+        - 429
+        - 503
+  - op: cancel_workbench_task_route
+    method: POST
+    path: /workbench/tasks/{task_id}/cancel
+    path_params:
+      task_id: string
+    response:
+      200: WorkbenchTaskStatusResponse
+      errors:
+        - 401
+        - 404
+        - 409
+        - 422
+        - 429
+        - 503
+  - op: retry_workbench_task_route
+    method: POST
+    path: /workbench/tasks/{task_id}/retry
+    path_params:
+      task_id: string
+    response:
+      202: WorkbenchTaskAcceptedResponse
+      errors:
+        - 401
+        - 404
+        - 409
         - 422
         - 429
         - 503

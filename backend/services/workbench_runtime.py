@@ -225,6 +225,10 @@ class WorkbenchTaskRepository(Protocol):
         self, task_id: str, *, updated_at: str, error_detail: str
     ) -> None: ...
 
+    def mark_task_cancelled(
+        self, task_id: str, *, updated_at: str, error_detail: str
+    ) -> None: ...
+
     def get_task(self, task_id: str) -> WorkbenchTaskRecord | None: ...
 
     def list_task_ids_by_status(self, statuses: Iterable[str]) -> list[str]: ...
@@ -558,6 +562,40 @@ class SQLiteWorkbenchTaskRepository:
                 conn.commit()
         except Exception as exc:
             _raise_write_error("workbench_task_fail", exc)
+
+    def mark_task_cancelled(
+        self, task_id: str, *, updated_at: str, error_detail: str
+    ) -> None:
+        try:
+            with sqlite3.connect(self._db_path) as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                cursor = conn.execute(
+                    """
+                    UPDATE workbench_tasks
+                    SET status = 'cancelled',
+                        updated_at = ?,
+                        error_detail = ?,
+                        result_text = NULL,
+                        result_citations_json = NULL
+                    WHERE id = ? AND status = 'queued'
+                    """,
+                    (updated_at, error_detail, task_id),
+                )
+                if cursor.rowcount == 0:
+                    conn.rollback()
+                    return
+                self._append_event(
+                    conn,
+                    task_id=task_id,
+                    event_type="task.cancelled",
+                    created_at=updated_at,
+                    status="cancelled",
+                    message=error_detail,
+                    metadata={},
+                )
+                conn.commit()
+        except Exception as exc:
+            _raise_write_error("workbench_task_cancel", exc)
 
     def get_task(self, task_id: str) -> WorkbenchTaskRecord | None:
         try:

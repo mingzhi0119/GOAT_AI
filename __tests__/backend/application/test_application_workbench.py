@@ -5,15 +5,18 @@ from pathlib import Path
 
 from backend.application.exceptions import (
     WorkbenchSourceValidationError,
+    WorkbenchTaskConflictError,
     WorkbenchTaskNotFoundError,
     WorkbenchWorkspaceOutputNotFoundError,
 )
 from backend.application.workbench import (
+    cancel_workbench_task,
     create_and_dispatch_workbench_task,
     create_workbench_task,
     get_workbench_task,
     get_workbench_workspace_output,
     list_workbench_workspace_outputs,
+    retry_workbench_task,
 )
 from backend.domain.authz_types import AuthorizationContext
 from backend.domain.authorization import AuthorizationDecision, PrincipalId, TenantId
@@ -60,12 +63,16 @@ def _auth_context(owner_id: str = "owner-1") -> AuthorizationContext:
 class _FakeRepository:
     def __init__(self) -> None:
         self.created_payload: WorkbenchTaskCreatePayload | None = None
+        self.created_payloads: list[WorkbenchTaskCreatePayload] = []
         self.task: WorkbenchTaskRecord | None = None
+        self.tasks: dict[str, WorkbenchTaskRecord] = {}
         self.workspace_outputs: list[WorkbenchWorkspaceOutputRecord] = []
+        self.appended_events: list[dict[str, object]] = []
 
     def create_task(self, payload: WorkbenchTaskCreatePayload) -> WorkbenchTaskRecord:
         self.created_payload = payload
-        self.task = WorkbenchTaskRecord(
+        self.created_payloads.append(payload)
+        record = WorkbenchTaskRecord(
             id=payload.task_id,
             task_kind=payload.task_kind,
             status=payload.status,
@@ -84,12 +91,60 @@ class _FakeRepository:
             tenant_id=payload.tenant_id,
             principal_id=payload.principal_id,
         )
-        return self.task
+        self.task = record
+        self.tasks[record.id] = record
+        return record
+
+    def mark_task_cancelled(
+        self, task_id: str, *, updated_at: str, error_detail: str
+    ) -> None:
+        task = self.tasks.get(task_id)
+        if task is None or task.status != "queued":
+            return
+        updated = WorkbenchTaskRecord(
+            **{
+                **task.__dict__,
+                "status": "cancelled",
+                "updated_at": updated_at,
+                "error_detail": error_detail,
+                "result_text": None,
+                "result_citations": None,
+            }
+        )
+        self.tasks[task_id] = updated
+        self.task = updated
+        self.append_task_event(
+            task_id,
+            event_type="task.cancelled",
+            created_at=updated_at,
+            status="cancelled",
+            message=error_detail,
+            metadata={},
+        )
+
+    def append_task_event(
+        self,
+        task_id: str,
+        *,
+        event_type: str,
+        created_at: str,
+        status: str | None,
+        message: str | None,
+        metadata: dict[str, object] | None,
+    ) -> None:
+        self.appended_events.append(
+            {
+                "task_id": task_id,
+                "event_type": event_type,
+                "created_at": created_at,
+                "status": status,
+                "message": message,
+                "metadata": metadata,
+            }
+        )
 
     def get_task(self, task_id: str) -> WorkbenchTaskRecord | None:
-        if self.task and self.task.id == task_id:
-            return self.task
-        return None
+        return self.tasks.get(task_id)
 
     def list_task_events(self, task_id: str) -> list[object]:
         _ = task_id
@@ -98,8 +153,9 @@ class _FakeRepository:
     def list_workspace_outputs(
         self, task_id: str
     ) -> list[WorkbenchWorkspaceOutputRecord]:
-        _ = task_id
-        return list(self.workspace_outputs)
+        return [
+            output for output in self.workspace_outputs if output.task_id == task_id
+        ]
 
     def get_workspace_output(
         self, output_id: str
@@ -142,6 +198,51 @@ class _FakeSessionRepository:
 
     def create_chat_artifact(self, record: PersistedArtifactRecord) -> None:
         self.artifacts.append(record)
+
+
+def _seed_task(
+    repository: _FakeRepository,
+    *,
+    task_id: str = "wb-seeded",
+    status: str = "queued",
+    task_kind: str = "plan",
+    prompt: str = "Draft a plan",
+    session_id: str | None = None,
+    project_id: str | None = None,
+    knowledge_document_ids: list[str] | None = None,
+    connector_ids: list[str] | None = None,
+    source_ids: list[str] | None = None,
+    owner_id: str = "owner-1",
+    tenant_id: str = "tenant-1",
+    principal_id: str = "principal-1",
+    auth_scopes: list[str] | None = None,
+    credential_id: str = "cred-1",
+    auth_mode: str = "api_key",
+) -> WorkbenchTaskRecord:
+    task = WorkbenchTaskRecord(
+        id=task_id,
+        task_kind=task_kind,
+        status=status,
+        prompt=prompt,
+        session_id=session_id,
+        project_id=project_id,
+        knowledge_document_ids=list(knowledge_document_ids or []),
+        connector_ids=list(connector_ids or []),
+        source_ids=list(source_ids or []),
+        created_at="2026-04-11T00:00:00+00:00",
+        updated_at="2026-04-11T00:00:00+00:00",
+        error_detail="Task failed." if status == "failed" else None,
+        result_text="## Goal\n- done" if status == "completed" else None,
+        auth_scopes=list(auth_scopes or ["knowledge:read"]),
+        credential_id=credential_id,
+        auth_mode=auth_mode,
+        owner_id=owner_id,
+        tenant_id=tenant_id,
+        principal_id=principal_id,
+    )
+    repository.tasks[task.id] = task
+    repository.task = task
+    return task
 
 
 class ApplicationWorkbenchTests(unittest.TestCase):
@@ -265,25 +366,7 @@ class ApplicationWorkbenchTests(unittest.TestCase):
 
     def test_get_workbench_task_conceals_unauthorized_records(self) -> None:
         repository = _FakeRepository()
-        repository.task = WorkbenchTaskRecord(
-            id="wb-1",
-            task_kind="plan",
-            status="queued",
-            prompt="Plan",
-            session_id=None,
-            project_id=None,
-            knowledge_document_ids=[],
-            connector_ids=[],
-            source_ids=[],
-            created_at="2026-04-11T00:00:00+00:00",
-            updated_at="2026-04-11T00:00:00+00:00",
-            auth_scopes=["knowledge:read"],
-            credential_id="cred-1",
-            auth_mode="api_key",
-            owner_id="owner-1",
-            tenant_id="tenant-1",
-            principal_id="principal-1",
-        )
+        _seed_task(repository, task_id="wb-1", status="queued", prompt="Plan")
 
         from unittest.mock import patch
 
@@ -305,25 +388,20 @@ class ApplicationWorkbenchTests(unittest.TestCase):
 
     def test_get_workbench_task_includes_workspace_outputs(self) -> None:
         repository = _FakeRepository()
-        repository.task = WorkbenchTaskRecord(
-            id="wb-2",
+        _seed_task(
+            repository,
+            task_id="wb-2",
             task_kind="canvas",
             status="completed",
             prompt="Draft",
             session_id="session-1",
-            project_id=None,
-            knowledge_document_ids=[],
-            connector_ids=[],
-            source_ids=[],
-            created_at="2026-04-11T00:00:00+00:00",
-            updated_at="2026-04-11T00:00:02+00:00",
-            result_text="# Draft\n\nBody",
-            auth_scopes=["knowledge:read"],
-            credential_id="cred-1",
-            auth_mode="api_key",
-            owner_id="owner-1",
-            tenant_id="tenant-1",
-            principal_id="principal-1",
+        )
+        repository.tasks["wb-2"] = WorkbenchTaskRecord(
+            **{
+                **repository.tasks["wb-2"].__dict__,
+                "updated_at": "2026-04-11T00:00:02+00:00",
+                "result_text": "# Draft\n\nBody",
+            }
         )
         repository.workspace_outputs = [
             WorkbenchWorkspaceOutputRecord(
@@ -360,6 +438,121 @@ class ApplicationWorkbenchTests(unittest.TestCase):
         self.assertEqual(1, len(response.workspace_outputs))
         self.assertEqual("wbo-1", response.workspace_outputs[0].output_id)
         self.assertEqual("canvas_document", response.workspace_outputs[0].output_kind)
+
+    def test_cancel_workbench_task_marks_queued_task_cancelled(self) -> None:
+        repository = _FakeRepository()
+        _seed_task(repository, status="queued")
+
+        response = cancel_workbench_task(
+            task_id="wb-seeded",
+            repository=repository,
+            settings=_settings(),
+            auth_context=_auth_context(),
+        )
+
+        self.assertEqual("cancelled", response.status)
+        self.assertEqual("Task cancelled before execution.", response.error_detail)
+        self.assertEqual("task.cancelled", repository.appended_events[-1]["event_type"])
+
+    def test_cancel_workbench_task_rejects_non_queued_state(self) -> None:
+        repository = _FakeRepository()
+        _seed_task(repository, status="running")
+
+        with self.assertRaises(WorkbenchTaskConflictError):
+            cancel_workbench_task(
+                task_id="wb-seeded",
+                repository=repository,
+                settings=_settings(),
+                auth_context=_auth_context(),
+            )
+
+    def test_retry_workbench_task_reuses_original_auth_snapshot(self) -> None:
+        repository = _FakeRepository()
+        dispatcher = _FakeDispatcher()
+        seeded = _seed_task(
+            repository,
+            task_id="wb-original",
+            status="completed",
+            task_kind="deep_research",
+            prompt="Investigate launches",
+            session_id="session-1",
+            project_id="project-1",
+            knowledge_document_ids=["doc-1"],
+            connector_ids=["connector-a"],
+            source_ids=["web", "knowledge"],
+            owner_id="owner-original",
+            tenant_id="tenant-original",
+            principal_id="principal-original",
+            auth_scopes=["knowledge:read", "history:read"],
+            credential_id="cred-original",
+            auth_mode="scoped_key",
+        )
+
+        accepted = retry_workbench_task(
+            task_id=seeded.id,
+            repository=repository,
+            dispatcher=dispatcher,
+            settings=_settings(),
+            auth_context=AuthorizationContext(
+                principal_id=PrincipalId("principal-original"),
+                tenant_id=TenantId("tenant-original"),
+                scopes=frozenset({"knowledge:read"}),
+                credential_id="cred-current",
+                legacy_owner_id="owner-original",
+                auth_mode="api_key",
+            ),
+            request_id="req-456",
+        )
+
+        self.assertEqual("queued", accepted.status)
+        self.assertEqual(1, len(dispatcher.calls))
+        self.assertEqual((accepted.task_id, "req-456"), dispatcher.calls[0])
+        retried_payload = repository.created_payloads[-1]
+        self.assertNotEqual(seeded.id, retried_payload.task_id)
+        self.assertEqual("deep_research", retried_payload.task_kind)
+        self.assertEqual("Investigate launches", retried_payload.prompt)
+        self.assertEqual("session-1", retried_payload.session_id)
+        self.assertEqual("project-1", retried_payload.project_id)
+        self.assertEqual(["doc-1"], retried_payload.knowledge_document_ids)
+        self.assertEqual(["connector-a"], retried_payload.connector_ids)
+        self.assertEqual(["web", "knowledge"], retried_payload.source_ids)
+        self.assertEqual("owner-original", retried_payload.owner_id)
+        self.assertEqual("tenant-original", retried_payload.tenant_id)
+        self.assertEqual("principal-original", retried_payload.principal_id)
+        self.assertEqual(
+            ["knowledge:read", "history:read"], retried_payload.auth_scopes
+        )
+        self.assertEqual("cred-original", retried_payload.credential_id)
+        self.assertEqual("scoped_key", retried_payload.auth_mode)
+        self.assertEqual(
+            "task.retry_requested",
+            repository.appended_events[-2]["event_type"],
+        )
+        self.assertEqual(
+            accepted.task_id,
+            repository.appended_events[-2]["metadata"]["retry_task_id"],
+        )
+        self.assertEqual(
+            "task.retry_created",
+            repository.appended_events[-1]["event_type"],
+        )
+        self.assertEqual(
+            seeded.id,
+            repository.appended_events[-1]["metadata"]["source_task_id"],
+        )
+
+    def test_retry_workbench_task_rejects_non_terminal_state(self) -> None:
+        repository = _FakeRepository()
+        _seed_task(repository, status="running")
+
+        with self.assertRaises(WorkbenchTaskConflictError):
+            retry_workbench_task(
+                task_id="wb-seeded",
+                repository=repository,
+                dispatcher=_FakeDispatcher(),
+                settings=_settings(),
+                auth_context=_auth_context(),
+            )
 
     def test_get_workbench_workspace_output_conceals_unauthorized_records(self) -> None:
         repository = _FakeRepository()

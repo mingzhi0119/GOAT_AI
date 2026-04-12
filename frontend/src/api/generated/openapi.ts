@@ -621,6 +621,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workbench/tasks/{task_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel one queued durable workbench task
+         * @description Cancel one visible queued workbench task.
+         */
+        post: operations["cancel_workbench_task_route_api_workbench_tasks__task_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workbench/tasks/{task_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry one terminal durable workbench task
+         * @description Retry one visible terminal workbench task as a new queued task.
+         */
+        post: operations["retry_workbench_task_route_api_workbench_tasks__task_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workbench/workspace-outputs": {
         parameters: {
             query?: never;
@@ -1807,7 +1847,7 @@ export interface components {
              * @description Current durable task lifecycle state.
              * @enum {string}
              */
-            status: "queued" | "running" | "completed" | "failed";
+            status: "queued" | "running" | "completed" | "failed" | "cancelled";
             /**
              * Created At
              * @description UTC ISO-8601 creation timestamp.
@@ -1829,7 +1869,7 @@ export interface components {
              * @description Stable event name for this task lifecycle update.
              * @enum {string}
              */
-            event_type: "task.queued" | "task.started" | "retrieval.sources_resolved" | "retrieval.step.completed" | "retrieval.step.skipped" | "workspace_output.created" | "workspace_output.exported" | "task.completed" | "task.failed";
+            event_type: "task.queued" | "task.started" | "task.cancelled" | "task.retry_requested" | "task.retry_created" | "retrieval.sources_resolved" | "retrieval.step.completed" | "retrieval.step.skipped" | "workspace_output.created" | "workspace_output.exported" | "task.completed" | "task.failed";
             /**
              * Created At
              * @description UTC ISO-8601 event timestamp.
@@ -1839,7 +1879,7 @@ export interface components {
              * Status
              * @description Optional task lifecycle status associated with this event.
              */
-            status?: ("queued" | "running" | "completed" | "failed") | null;
+            status?: ("queued" | "running" | "completed" | "failed" | "cancelled") | null;
             /**
              * Message
              * @description Optional stable human-readable event summary.
@@ -1955,7 +1995,7 @@ export interface components {
              * @description Current durable task lifecycle state.
              * @enum {string}
              */
-            status: "queued" | "running" | "completed" | "failed";
+            status: "queued" | "running" | "completed" | "failed" | "cancelled";
             /**
              * Created At
              * @description UTC ISO-8601 creation timestamp.
@@ -3999,6 +4039,158 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Workbench runtime is not available on this deployment. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_workbench_task_route_api_workbench_tasks__task_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkbenchTaskStatusResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Workbench runtime is not available on this deployment. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    retry_workbench_task_route_api_workbench_tasks__task_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkbenchTaskAcceptedResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

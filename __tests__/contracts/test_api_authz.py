@@ -31,6 +31,7 @@ if TestClient is not None:
         get_code_sandbox_provider,
         get_llm_client,
         get_title_generator,
+        get_workbench_task_dispatcher,
     )
     from backend.main import create_app
     from backend.models.chat import ChatMessage
@@ -64,6 +65,11 @@ class AuthzFakeCodeSandboxProvider:
 class AuthzNoopCodeSandboxDispatcher:
     def dispatch_execution(self, *, execution_id: str, request_id: str = "") -> None:
         _ = (execution_id, request_id)
+
+
+class AuthzNoopWorkbenchTaskDispatcher:
+    def dispatch_task(self, *, task_id: str, request_id: str = "") -> None:
+        _ = (task_id, request_id)
 
 
 @unittest.skipUnless(TestClient is not None, "fastapi not installed")
@@ -235,6 +241,51 @@ class ApiAuthzTests(unittest.TestCase):
             headers={"X-GOAT-API-Key": "read-key", "X-GOAT-Owner-Id": "bob"},
         )
         self.assertEqual(404, events_response.status_code)
+
+    def test_workbench_cancel_owner_mismatch_returns_404(self) -> None:
+        self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+        self.client.app.dependency_overrides[get_workbench_task_dispatcher] = lambda: (
+            AuthzNoopWorkbenchTaskDispatcher()
+        )
+
+        create = self.client.post(
+            "/api/workbench/tasks",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+            json={"task_kind": "plan", "prompt": "Draft a plan"},
+        )
+        self.assertEqual(202, create.status_code)
+        task_id = create.json()["task_id"]
+
+        cancel = self.client.post(
+            f"/api/workbench/tasks/{task_id}/cancel",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "bob"},
+        )
+        self.assertEqual(404, cancel.status_code)
+
+    def test_workbench_retry_owner_mismatch_returns_404(self) -> None:
+        self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        create = self.client.post(
+            "/api/workbench/tasks",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+            json={"task_kind": "plan", "prompt": "Draft a plan"},
+        )
+        self.assertEqual(202, create.status_code)
+        task_id = create.json()["task_id"]
+
+        status = self.client.get(
+            f"/api/workbench/tasks/{task_id}",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+        )
+        self.assertEqual(200, status.status_code)
+
+        retry = self.client.post(
+            f"/api/workbench/tasks/{task_id}/retry",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "bob"},
+        )
+        self.assertEqual(404, retry.status_code)
 
     def test_workbench_workspace_output_owner_mismatch_returns_404(self) -> None:
         self.settings = replace(self.settings, feature_agent_workbench_enabled=True)

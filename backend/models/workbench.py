@@ -9,13 +9,16 @@ from backend.models.artifact import ChatArtifact
 from backend.models.knowledge import KnowledgeCitation
 
 WorkbenchTaskKind = Literal["plan", "browse", "deep_research", "canvas"]
-WorkbenchTaskStatus = Literal["queued", "running", "completed", "failed"]
+WorkbenchTaskStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
 WorkbenchWorkspaceOutputKind = Literal["canvas_document"]
 WorkbenchWorkspaceOutputFormat = Literal["markdown"]
 WorkbenchWorkspaceExportFormat = Literal["markdown", "text", "csv", "xlsx", "docx"]
 WorkbenchTaskEventType = Literal[
     "task.queued",
     "task.started",
+    "task.cancelled",
+    "task.retry_requested",
+    "task.retry_created",
     "retrieval.sources_resolved",
     "retrieval.step.completed",
     "retrieval.step.skipped",

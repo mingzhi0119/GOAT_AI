@@ -62,6 +62,10 @@ class WorkbenchSourceValidationError(ValueError):
     """Raised when a workbench task references unknown or unavailable sources."""
 
 
+class WorkbenchTaskConflictError(RuntimeError):
+    """Raised when a workbench task transition is invalid for its current state."""
+
+
 class CodeSandboxExecutionNotFoundError(LookupError):
     """Raised when a durable code sandbox execution cannot be found or is not visible."""
 
@@ -96,6 +100,7 @@ __all__ = [
     "UploadIdempotencyInProgressError",
     "VisionNotSupported",
     "WorkbenchSourceValidationError",
+    "WorkbenchTaskConflictError",
     "WorkbenchTaskNotFoundError",
     "WorkbenchWorkspaceOutputNotFoundError",
 ]

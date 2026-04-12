@@ -61,6 +61,8 @@ Base path: `/api`
 | `GET` | `/api/workbench/workspace-outputs/{output_id}` | Read one durable workspace output |
 | `POST` | `/api/workbench/workspace-outputs/{output_id}/exports` | Export one durable workspace output into a downloadable artifact |
 | `GET` | `/api/workbench/tasks/{task_id}` | Read one durable workbench task status |
+| `POST` | `/api/workbench/tasks/{task_id}/cancel` | Cancel one queued durable workbench task |
+| `POST` | `/api/workbench/tasks/{task_id}/retry` | Retry one terminal durable workbench task as a new queued task |
 | `GET` | `/api/workbench/tasks/{task_id}/events` | Read one durable workbench task event timeline |
 
 ## `GET /api/health`
@@ -369,6 +371,7 @@ Notes:
 - current deployments return `503` with `FEATURE_UNAVAILABLE` when the shared workbench runtime is operator-disabled
 - task creation persists a durable queued task, then workbench launches best-effort in-process execution
 - the task record is stored in SQLite so polling survives process restarts
+- terminal task statuses are `completed`, `failed`, and `cancelled`
 - lifecycle updates are also written to a durable event timeline for future long-running browse/research execution
 - `source_ids` are resolved through the shared source registry instead of being treated as opaque strings
 - legacy `connector_ids` is still accepted as a deprecated alias for `source_ids`
@@ -577,9 +580,34 @@ Current behavior:
 ```
 
 - queued and running tasks return `result = null`
-- failed tasks return `result = null` plus a stable `error_detail`
+- failed and cancelled tasks return `result = null` plus a stable `error_detail`
 - missing or caller-invisible task ids return `404`
 - the same runtime gate still applies: if workbench is disabled for the deployment, the route returns `503` with `FEATURE_UNAVAILABLE`
+
+## `POST /api/workbench/tasks/{task_id}/cancel`
+
+Cancels one visible `queued` workbench task.
+
+Current behavior:
+
+- only `queued` tasks can be cancelled
+- success returns `200` with the normal task status payload and `status = cancelled`
+- cancelled tasks return `result = null` and `error_detail = "Task cancelled before execution."`
+- running or terminal tasks return `409` with `code = RESOURCE_CONFLICT`
+- missing or caller-invisible task ids return `404`
+
+## `POST /api/workbench/tasks/{task_id}/retry`
+
+Creates a brand-new durable task from one visible terminal task.
+
+Current behavior:
+
+- only terminal tasks can be retried: `completed`, `failed`, or `cancelled`
+- retry always creates a new `task_id`; the original task is preserved and only gains a lineage event
+- the new task reuses the original `task_kind`, `prompt`, `session_id`, `project_id`, `knowledge_document_ids`, `source_ids`, `connector_ids`, and persisted auth snapshot
+- success returns `202 Accepted` with the same accepted-task payload shape as `POST /api/workbench/tasks`
+- queued or running tasks return `409` with `code = RESOURCE_CONFLICT`
+- missing or caller-invisible task ids return `404`
 
 ## `GET /api/workbench/tasks/{task_id}/events`
 
@@ -598,6 +626,9 @@ Current behavior:
 - current lifecycle event names are:
   - `task.queued`
   - `task.started`
+  - `task.cancelled`
+  - `task.retry_requested`
+  - `task.retry_created`
   - `retrieval.sources_resolved`
   - `retrieval.step.completed`
   - `retrieval.step.skipped`

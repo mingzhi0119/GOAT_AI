@@ -215,10 +215,47 @@ class WorkbenchRuntimeTests(unittest.TestCase):
         )
         self.assertEqual("AI backend unavailable.", events[-1].message)
 
+    def test_mark_cancelled_persists_error_detail(self) -> None:
+        self.repository.create_task(
+            WorkbenchTaskCreatePayload(
+                task_id="wb-cancelled",
+                task_kind="plan",
+                prompt="Draft a plan",
+                session_id=None,
+                project_id=None,
+                knowledge_document_ids=[],
+                connector_ids=[],
+                source_ids=[],
+                created_at="2026-04-10T18:00:00+00:00",
+                updated_at="2026-04-10T18:00:00+00:00",
+                auth_scopes=["history:write"],
+                credential_id="cred-3",
+                auth_mode="api_key",
+            )
+        )
+        self.repository.mark_task_cancelled(
+            "wb-cancelled",
+            updated_at="2026-04-10T18:00:01+00:00",
+            error_detail="Task cancelled before execution.",
+        )
+
+        stored = self.repository.get_task("wb-cancelled")
+        assert stored is not None
+        self.assertEqual("cancelled", stored.status)
+        self.assertEqual("Task cancelled before execution.", stored.error_detail)
+        self.assertIsNone(stored.result_text)
+        events = self.repository.list_task_events("wb-cancelled")
+        self.assertEqual(
+            ["task.queued", "task.cancelled"],
+            [event.event_type for event in events],
+        )
+        self.assertEqual("cancelled", events[-1].status)
+
     def test_list_task_ids_by_status_returns_created_order(self) -> None:
         for task_id, status, created_at in [
             ("wb-queued-1", "queued", "2026-04-10T18:00:01+00:00"),
             ("wb-running-1", "running", "2026-04-10T18:00:02+00:00"),
+            ("wb-cancelled-1", "cancelled", "2026-04-10T18:00:02.500000+00:00"),
             ("wb-queued-2", "queued", "2026-04-10T18:00:03+00:00"),
         ]:
             self.repository.create_task(
@@ -244,6 +281,10 @@ class WorkbenchRuntimeTests(unittest.TestCase):
         self.assertEqual(
             ["wb-queued-1", "wb-running-1", "wb-queued-2"],
             self.repository.list_task_ids_by_status(["queued", "running"]),
+        )
+        self.assertEqual(
+            ["wb-cancelled-1"],
+            self.repository.list_task_ids_by_status(["cancelled"]),
         )
 
 
