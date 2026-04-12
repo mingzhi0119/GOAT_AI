@@ -836,7 +836,7 @@ Returns deploy target resolution information:
 
 ## `GET /api/system/features`
 
-Returns machine-readable flags for optional high-risk features (see `docs/ENGINEERING_STANDARDS.md` Section 15). Example:
+Returns machine-readable flags for optional high-risk features (see `docs/standards/ENGINEERING_STANDARDS.md` Section 15). Example:
 
 ```json
 {

@@ -23,11 +23,11 @@ A later phase may stop duplicating message text in JSON or make `session_message
 
 ## Rollback
 
-- **Schema:** restore from backup per [BACKUP_RESTORE.md](BACKUP_RESTORE.md); do not drop `sessions` without a plan.
+- **Schema:** restore from backup per [BACKUP_RESTORE.md](../operations/BACKUP_RESTORE.md); do not drop `sessions` without a plan.
 - **App rollback:** older binaries that do not touch `session_messages` still read `sessions.messages`; rows in `session_messages` are ignored by those builds if they never query the table.
 
 ## Related
 
 - [SESSION_SCHEMA.md](SESSION_SCHEMA.md) - versioned JSON shape.
-- [BACKUP_RESTORE.md](BACKUP_RESTORE.md) - SQLite backup discipline.
+- [BACKUP_RESTORE.md](../operations/BACKUP_RESTORE.md) - SQLite backup discipline.
 

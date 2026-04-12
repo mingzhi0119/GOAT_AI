@@ -81,5 +81,5 @@ Values must use `YYYY-MM-DD`.
 ## Related docs
 
 - [SECURITY.md](SECURITY.md)
-- [RELEASE_GOVERNANCE.md](RELEASE_GOVERNANCE.md)
+- [RELEASE_GOVERNANCE.md](../operations/RELEASE_GOVERNANCE.md)
 - [QUALITY_TRENDS.md](QUALITY_TRENDS.md)

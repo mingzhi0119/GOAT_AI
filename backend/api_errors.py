@@ -1,7 +1,7 @@
 """Stable API error codes, request correlation context, and JSON error bodies.
 
 Phase 13 §13.0 — single module to satisfy import-layer rules (no sibling cross-imports).
-See ``docs/API_ERRORS.md`` for the registry.
+See ``docs/api/API_ERRORS.md`` for the registry.
 """
 
 from __future__ import annotations

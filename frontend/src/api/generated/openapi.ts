@@ -1,5 +1,5 @@
 /*
- * This file is auto-generated from ../docs/openapi.json.
+ * This file is auto-generated from ../../../../docs/api/openapi.json.
  * Do not edit it manually; run `npm run contract:generate` instead.
  */
 
@@ -370,7 +370,7 @@ export interface paths {
         };
         /**
          * Read capability-gated feature flags
-         * @description Return config + host probes for optional high-risk features (see docs/ENGINEERING_STANDARDS.md §15).
+         * @description Return config + host probes for optional high-risk features (see docs/standards/ENGINEERING_STANDARDS.md §15).
          */
         get: operations["get_system_features_route_api_system_features_get"];
         put?: never;

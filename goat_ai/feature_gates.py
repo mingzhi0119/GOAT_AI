@@ -1,4 +1,4 @@
-"""Pure feature-gate resolution (no FastAPI). See docs/ENGINEERING_STANDARDS.md §15."""
+"""Pure feature-gate resolution (no FastAPI). See docs/standards/ENGINEERING_STANDARDS.md §15."""
 
 from __future__ import annotations
 

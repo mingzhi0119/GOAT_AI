@@ -1,5 +1,5 @@
 ---
-description: Python and TypeScript testing boundaries, mocks, and runners aligned with docs/ENGINEERING_STANDARDS.md
+description: Python and TypeScript testing boundaries, mocks, and runners aligned with docs/standards/ENGINEERING_STANDARDS.md
 globs: __tests__/**,**/__tests__/**,**/*.test.*,**/conftest.py
 alwaysApply: false
 ---
@@ -51,5 +51,5 @@ Run the full CI-equivalent suite from repo root `AGENTS.md` **before every code 
 - **Backend:** `ruff check` and `ruff format --check` on `backend`, `goat_ai`, `scripts`, `tools`, `__tests__`; `pip-audit -r requirements-ci.txt`; `lint-imports`; `python -m tools.quality.run_rag_eval`; `python -m tools.contracts.check_api_contract_sync`; `python -m pytest __tests__/ -v --tb=short`.
 - **Frontend** (if `frontend/` changed): `cd frontend && npm ci && npm test -- --run && npm run build`.
 
-- Python **3.14** for parity with the CI backend job and `docs/openapi.json` / API contract sync (see `ENGINEERING_STANDARDS.md`).
+- Python **3.14** for parity with the CI backend job and `docs/api/openapi.json` / API contract sync (see `ENGINEERING_STANDARDS.md`).
 - Node **24.14.x** (match CI workflow and `frontend/package-lock.json`).

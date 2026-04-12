@@ -1,4 +1,4 @@
-"""Generate ``docs/api.llm.yaml`` from ``docs/openapi.json``.
+"""Generate ``docs/api/api.llm.yaml`` from ``docs/api/openapi.json``.
 
 Run from the repository root::
 
@@ -13,8 +13,8 @@ from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-OPENAPI_PATH = REPO_ROOT / "docs" / "openapi.json"
-OUTPUT_PATH = REPO_ROOT / "docs" / "api.llm.yaml"
+OPENAPI_PATH = REPO_ROOT / "docs" / "api" / "openapi.json"
+OUTPUT_PATH = REPO_ROOT / "docs" / "api" / "api.llm.yaml"
 
 COMMON_ERRORS: dict[str, dict[str, str]] = {
     "400": {"detail": "bad request"},
@@ -315,7 +315,7 @@ def _build_compact_spec(openapi: dict[str, Any]) -> dict[str, Any]:
     compact: dict[str, Any] = {
         "format": "llm-compact-api",
         "source": {
-            "canonical_openapi": "docs/openapi.json",
+            "canonical_openapi": "docs/api/openapi.json",
             "openapi_version": openapi_version,
             "generated_from": "backend.main:app",
             "purpose": "Minimal API context for LLM consumption",

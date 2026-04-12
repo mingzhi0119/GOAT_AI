@@ -1,7 +1,7 @@
 """Controlled, documentable deny_reason values for feature gates (API-safe).
 
 Do not expose raw exception text or internal diagnostics as ``deny_reason``.
-See docs/ENGINEERING_STANDARDS.md §15.
+See docs/standards/ENGINEERING_STANDARDS.md §15.
 """
 
 from __future__ import annotations

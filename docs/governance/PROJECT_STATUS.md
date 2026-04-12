@@ -86,11 +86,11 @@ Last updated: 2026-04-11
 ## Recommended live references
 
 - [ROADMAP.md](ROADMAP.md)
-- [OPERATIONS.md](OPERATIONS.md)
-- [API_REFERENCE.md](API_REFERENCE.md)
-- [API_ERRORS.md](API_ERRORS.md)
+- [OPERATIONS.md](../operations/OPERATIONS.md)
+- [API_REFERENCE.md](../api/API_REFERENCE.md)
+- [API_ERRORS.md](../api/API_ERRORS.md)
 - [SECURITY.md](SECURITY.md)
-- [BACKUP_RESTORE.md](BACKUP_RESTORE.md)
-- [ROLLBACK.md](ROLLBACK.md)
-- [RELEASE_GOVERNANCE.md](RELEASE_GOVERNANCE.md)
+- [BACKUP_RESTORE.md](../operations/BACKUP_RESTORE.md)
+- [ROLLBACK.md](../operations/ROLLBACK.md)
+- [RELEASE_GOVERNANCE.md](../operations/RELEASE_GOVERNANCE.md)
 - [AGENTS.md](../AGENTS.md)

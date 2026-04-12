@@ -41,9 +41,9 @@ JSON error responses use a **stable envelope** so logs, metrics, and clients sha
 
 - Constants: `backend/api_errors.py` (request correlation: `goat_ai.request_context`)
 - Handler registration: `backend/exception_handlers.py`
-- OpenAPI schema: `ErrorResponse` in `backend/models/common.py` -> `docs/openapi.json`
+- OpenAPI schema: `ErrorResponse` in `backend/models/common.py` -> `docs/api/openapi.json`
 
 ## Related
 
-- [ROADMAP.md](ROADMAP.md) Phase 13 Section 13.0  
-- [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) - [AGENTS.md](../AGENTS.md) (agent memory and collaboration guide)
+- [ROADMAP.md](../governance/ROADMAP.md) Phase 13 Section 13.0  
+- [ENGINEERING_STANDARDS.md](../standards/ENGINEERING_STANDARDS.md) - [AGENTS.md](../AGENTS.md) (agent memory and collaboration guide)

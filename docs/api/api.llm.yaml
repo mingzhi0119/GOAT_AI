@@ -1,6 +1,6 @@
 format: llm-compact-api
 source:
-  canonical_openapi: docs/openapi.json
+  canonical_openapi: docs/api/openapi.json
   openapi_version: 3.2.0
   generated_from: backend.main:app
   purpose: Minimal API context for LLM consumption

@@ -1,5 +1,5 @@
 ---
-description: Docs update rules, commit hygiene, and recovery notes aligned with docs/ENGINEERING_STANDARDS.md
+description: Docs update rules, commit hygiene, and recovery notes aligned with docs/standards/ENGINEERING_STANDARDS.md
 globs: README.md,docs/**,AGENTS.md
 alwaysApply: false
 ---
@@ -18,16 +18,16 @@ Update docs when behavior changes:
 
 | Change type | File |
 |-------------|------|
-| Ubiquitous domain terms (chat/chart/safeguard semantics) | `docs/DOMAIN.md` |
+| Ubiquitous domain terms (chat/chart/safeguard semantics) | `docs/architecture/DOMAIN.md` |
 | Architecture, structure, developer workflow | `README.md` |
-| Committed OpenAPI from FastAPI | `docs/openapi.json` |
-| LLM-optimized compact API | `docs/api.llm.yaml` (regenerate via `python -m tools.contracts.generate_llm_api_yaml` from repo root) |
-| Human-readable endpoints | `docs/API_REFERENCE.md` |
-| Env vars, deploy, startup, host ops | `docs/OPERATIONS.md` |
-| Current shipped state | `docs/PROJECT_STATUS.md` |
-| Phase completion / future work | `docs/ROADMAP.md` |
+| Committed OpenAPI from FastAPI | `docs/api/openapi.json` |
+| LLM-optimized compact API | `docs/api/api.llm.yaml` (regenerate via `python -m tools.contracts.generate_llm_api_yaml` from repo root) |
+| Human-readable endpoints | `docs/api/API_REFERENCE.md` |
+| Env vars, deploy, startup, host ops | `docs/operations/OPERATIONS.md` |
+| Current shipped state | `docs/governance/PROJECT_STATUS.md` |
+| Phase completion / future work | `docs/governance/ROADMAP.md` |
 
-- Canonical workflow or verification rules belong in `docs/ENGINEERING_STANDARDS.md`; `AGENTS.md` may carry agent memory and current collaboration guidance, but it should stay aligned with the canonical standards.
+- Canonical workflow or verification rules belong in `docs/standards/ENGINEERING_STANDARDS.md`; `AGENTS.md` may carry agent memory and current collaboration guidance, but it should stay aligned with the canonical standards.
 - If the canonical standards change, keep relevant `.cursor/rules/*.mdc` files aligned in the same change.
 
 ## Commit hygiene

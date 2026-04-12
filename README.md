@@ -4,14 +4,14 @@ Strategic Intelligence assistant for Simon Business School, University of Roches
 
 - Example public deployment: <https://ai.simonbb.com/mingzhi/> (not the only environment the app can run in)
 - Repo: <https://github.com/mingzhi0119/GOAT_AI>
-- Current snapshot: [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md)
-- API contract: [docs/API_REFERENCE.md](docs/API_REFERENCE.md)
-- Frontend appearance hand-off: [docs/APPEARANCE.md](docs/APPEARANCE.md)
+- Current snapshot: [docs/governance/PROJECT_STATUS.md](docs/governance/PROJECT_STATUS.md)
+- API contract: [docs/api/API_REFERENCE.md](docs/api/API_REFERENCE.md)
+- Frontend appearance hand-off: [docs/standards/APPEARANCE.md](docs/standards/APPEARANCE.md)
 
 ## Environments
 
-- **Portable by design:** the same repo is meant to run on **Windows, macOS, and Linux** for development, and on **various Linux (or container) server layouts** for production, not tied to a single school-owned Ubuntu image. Paths, ports, GPU selection, and secrets are **environment-driven** (see `.env.example` and [docs/OPERATIONS.md](docs/OPERATIONS.md)); avoid hardcoding host-specific assumptions in code.
-- **Reference vs local:** a documented production URL in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) is a **reference deployment**, not a constraint on where you may install or develop.
+- **Portable by design:** the same repo is meant to run on **Windows, macOS, and Linux** for development, and on **various Linux (or container) server layouts** for production, not tied to a single school-owned Ubuntu image. Paths, ports, GPU selection, and secrets are **environment-driven** (see `.env.example` and [docs/operations/OPERATIONS.md](docs/operations/OPERATIONS.md)); avoid hardcoding host-specific assumptions in code.
+- **Reference vs local:** a documented production URL in [docs/governance/PROJECT_STATUS.md](docs/governance/PROJECT_STATUS.md) is a **reference deployment**, not a constraint on where you may install or develop.
 
 ### Windows development
 
@@ -21,7 +21,7 @@ Windows-native development remains a supported and normal path for this reposito
 - Use WSL selectively when you need Linux semantics that must match Ubuntu CI or production behavior.
 - Typical WSL-only or WSL-preferred cases are Linux-targeted compile/package checks, shell-script validation, Linux desktop validation, or dependency/tooling gaps on Windows.
 
-See [docs/WSL_DEVELOPMENT.md](docs/WSL_DEVELOPMENT.md) for the selective WSL workflow guidance and exception list.
+See [docs/operations/WSL_DEVELOPMENT.md](docs/operations/WSL_DEVELOPMENT.md) for the selective WSL workflow guidance and exception list.
 
 ### Capability-based / high-risk features
 
@@ -40,7 +40,7 @@ Some capabilities (for example the shipped **provider-backed code execution runt
 
 This is now the shipped model for the Phase 18 Docker-first sandbox MVP: **high-risk operations are gated by explicit configuration and runtime readiness**, not on by default; **per-caller policy** remains separate from deployment/runtime readiness.
 
-**Industrial implementation pattern** (config + probe + API + service enforcement + tests): see [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md) **Section 15 Feature enable/disable and gating**.
+**Industrial implementation pattern** (config + probe + API + service enforcement + tests): see [docs/standards/ENGINEERING_STANDARDS.md](docs/standards/ENGINEERING_STANDARDS.md) **Section 15 Feature enable/disable and gating**.
 
 ## Stack
 
@@ -55,7 +55,7 @@ This is now the shipped model for the Phase 18 Docker-first sandbox MVP: **high-
 
 ## Architecture
 
-Typical production path: **browser -> reverse proxy (e.g. nginx) -> FastAPI/Uvicorn** on a configured port (default **62606** via `GOAT_SERVER_PORT` / runtime target; see [docs/OPERATIONS.md](docs/OPERATIONS.md)). Local development often uses the same app process without nginx.
+Typical production path: **browser -> reverse proxy (e.g. nginx) -> FastAPI/Uvicorn** on a configured port (default **62606** via `GOAT_SERVER_PORT` / runtime target; see [docs/operations/OPERATIONS.md](docs/operations/OPERATIONS.md)). Local development often uses the same app process without nginx.
 
 FastAPI serves:
 - React SPA from `frontend/dist/`
@@ -102,7 +102,7 @@ Core API surface:
 - Charts are created only from native Ollama tool calls during chat
 - Session history is persisted in SQLite and can restore chart state plus attached knowledge documents
 - Chat now includes a lightweight safeguard layer for clearly unsafe sexual or violent misuse requests
-- Request/error correlation uses `X-Request-ID`, with a stable JSON error envelope documented in [`docs/API_ERRORS.md`](docs/API_ERRORS.md)
+- Request/error correlation uses `X-Request-ID`, with a stable JSON error envelope documented in [`docs/api/API_ERRORS.md`](docs/api/API_ERRORS.md)
 - Liveness and readiness are split into `GET /api/health` and `GET /api/ready`
 - Prometheus-style metrics are exposed at `GET /api/system/metrics`
 - Idempotent retries are supported for `POST /api/upload/analyze` and chat session append requests (`POST /api/chat` with `session_id`)
@@ -111,7 +111,7 @@ Core API surface:
 - Generated non-executed chat files now download through persisted artifact ids under `/api/artifacts/{artifact_id}`
 - Code sandbox execution is now a real gated capability: `POST /api/code-sandbox/exec` runs provider-backed shell work in `sync` or `async` mode, `GET /api/code-sandbox/executions/{execution_id}` and `/events` expose durable state/auditability, and `GET /api/code-sandbox/executions/{execution_id}/logs` streams replayable stdout/stderr over SSE. Docker is the default isolated backend; `localhost` is a trusted-dev fallback with weaker isolation.
 - Workbench tasks now persist durable task rows, support polling and event timelines, and provide minimal execution for `plan`, `browse`, and `deep_research`; `canvas` remains unimplemented
-- **RAG-ready gate:** the product may be described as **RAG-ready** only when `python -m tools.quality.run_rag_eval` exits 0 (checked-in `evaldata/rag_eval_cases.jsonl`; see [evaldata/README.md](evaldata/README.md)) and retrieval quality notes in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) stay aligned with that runner. CI runs the same command on every backend build.
+- **RAG-ready gate:** the product may be described as **RAG-ready** only when `python -m tools.quality.run_rag_eval` exits 0 (checked-in `evaldata/rag_eval_cases.jsonl`; see [evaldata/README.md](evaldata/README.md)) and retrieval quality notes in [docs/governance/PROJECT_STATUS.md](docs/governance/PROJECT_STATUS.md) stay aligned with that runner. CI runs the same command on every backend build.
 
 ## Quick Start
 
@@ -127,7 +127,7 @@ python3 -m uvicorn server:create_app --factory --host 0.0.0.0 --port 62606 --rel
 
 Use **Python 3.14** for the venv when you can so `python -m tools.contracts.check_api_contract_sync` matches the CI backend job.
 
-If you are on Windows and hit a Linux-targeted validation or packaging path, use the WSL guidance in [docs/WSL_DEVELOPMENT.md](docs/WSL_DEVELOPMENT.md).
+If you are on Windows and hit a Linux-targeted validation or packaging path, use the WSL guidance in [docs/operations/WSL_DEVELOPMENT.md](docs/operations/WSL_DEVELOPMENT.md).
 
 Frontend dev server:
 
@@ -244,14 +244,14 @@ This repo uses four long-lived Codex owner lanes for parallel work:
 
 Default directory ownership lives in [`.github/CODEOWNERS`](.github/CODEOWNERS). Each owner thread should work primarily inside its owned paths and rebase from the latest `main`; `main` itself rebases `origin/main`. Shared-boundary changes such as API contracts, CI, and cross-layer tests should be explicitly coordinated by Lead/Platform.
 
-Merges to `main` should be gated by GitHub branch protection, required checks, and code owner review. Lead/Platform gives the final merge recommendation after the relevant owner lanes review the change. Operational details for Codex threads live in [AGENTS.md](AGENTS.md), with repo-wide standards in [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md).
+Merges to `main` should be gated by GitHub branch protection, required checks, and code owner review. Lead/Platform gives the final merge recommendation after the relevant owner lanes review the change. Operational details for Codex threads live in [AGENTS.md](AGENTS.md), with repo-wide standards in [docs/standards/ENGINEERING_STANDARDS.md](docs/standards/ENGINEERING_STANDARDS.md).
 
 P1 governance assets now live in-repo too:
 
-- release workflow and approval policy: [docs/RELEASE_GOVERNANCE.md](docs/RELEASE_GOVERNANCE.md)
-- security response / dependency refresh / credential rotation policy: [docs/SECURITY_RESPONSE.md](docs/SECURITY_RESPONSE.md)
+- release workflow and approval policy: [docs/operations/RELEASE_GOVERNANCE.md](docs/operations/RELEASE_GOVERNANCE.md)
+- security response / dependency refresh / credential rotation policy: [docs/governance/SECURITY_RESPONSE.md](docs/governance/SECURITY_RESPONSE.md)
 - observability assets: [ops/observability/README.md](ops/observability/README.md)
-- incident response starter runbook: [docs/INCIDENT_TRIAGE.md](docs/INCIDENT_TRIAGE.md)
+- incident response starter runbook: [docs/operations/INCIDENT_TRIAGE.md](docs/operations/INCIDENT_TRIAGE.md)
 - scheduled performance smoke: [`.github/workflows/performance-nightly.yml`](.github/workflows/performance-nightly.yml)
 - scheduled quality + security evidence capture: [`.github/workflows/quality-trends.yml`](.github/workflows/quality-trends.yml)
 - scheduled fault-injection drills: [`.github/workflows/fault-injection.yml`](.github/workflows/fault-injection.yml)
@@ -259,23 +259,23 @@ P1 governance assets now live in-repo too:
 
 ## Docs
 
-- [AGENTS.md](AGENTS.md): short index for agents; **canonical rules:** [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md)
-- [docs/WSL_DEVELOPMENT.md](docs/WSL_DEVELOPMENT.md): selective WSL workflows for Linux-targeted validation on Windows
-- [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md): current shipped state
-- [docs/APPEARANCE.md](docs/APPEARANCE.md): appearance/theme architecture, controls, and extension rules
-- [docs/API_REFERENCE.md](docs/API_REFERENCE.md): endpoint contract
-- [docs/API_ERRORS.md](docs/API_ERRORS.md): stable error envelope and error-code rules
-- [docs/OPERATIONS.md](docs/OPERATIONS.md): deploy, env vars, ops notes
-- [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md): SQLite backup/restore drill
-- [docs/ROLLBACK.md](docs/ROLLBACK.md): rollback procedure for shared-host deploys
-- [docs/SECURITY.md](docs/SECURITY.md): upload/API threat notes and CI security posture
-- [docs/SECURITY_RESPONSE.md](docs/SECURITY_RESPONSE.md): vulnerability response windows, dependency refresh cadence, and credential rotation policy
-- [docs/QUALITY_TRENDS.md](docs/QUALITY_TRENDS.md): recurring quality snapshot workflow and current trend baseline
-- [docs/RELEASE_GOVERNANCE.md](docs/RELEASE_GOVERNANCE.md): staged release and production approval policy
-- [docs/INCIDENT_TRIAGE.md](docs/INCIDENT_TRIAGE.md): first-response runbook for readiness, latency, retrieval, and feature-gate failures
-- [docs/ROADMAP.md](docs/ROADMAP.md): unfinished backlog and priority queue
-- [docs/ROADMAP_ARCHIVE.md](docs/ROADMAP_ARCHIVE.md): historical roadmap content and phase closeouts
-- [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md): coding and process standards (single source of truth)
+- [AGENTS.md](AGENTS.md): short index for agents; **canonical rules:** [docs/standards/ENGINEERING_STANDARDS.md](docs/standards/ENGINEERING_STANDARDS.md)
+- [docs/operations/WSL_DEVELOPMENT.md](docs/operations/WSL_DEVELOPMENT.md): selective WSL workflows for Linux-targeted validation on Windows
+- [docs/governance/PROJECT_STATUS.md](docs/governance/PROJECT_STATUS.md): current shipped state
+- [docs/standards/APPEARANCE.md](docs/standards/APPEARANCE.md): appearance/theme architecture, controls, and extension rules
+- [docs/api/API_REFERENCE.md](docs/api/API_REFERENCE.md): endpoint contract
+- [docs/api/API_ERRORS.md](docs/api/API_ERRORS.md): stable error envelope and error-code rules
+- [docs/operations/OPERATIONS.md](docs/operations/OPERATIONS.md): deploy, env vars, ops notes
+- [docs/operations/BACKUP_RESTORE.md](docs/operations/BACKUP_RESTORE.md): SQLite backup/restore drill
+- [docs/operations/ROLLBACK.md](docs/operations/ROLLBACK.md): rollback procedure for shared-host deploys
+- [docs/governance/SECURITY.md](docs/governance/SECURITY.md): upload/API threat notes and CI security posture
+- [docs/governance/SECURITY_RESPONSE.md](docs/governance/SECURITY_RESPONSE.md): vulnerability response windows, dependency refresh cadence, and credential rotation policy
+- [docs/governance/QUALITY_TRENDS.md](docs/governance/QUALITY_TRENDS.md): recurring quality snapshot workflow and current trend baseline
+- [docs/operations/RELEASE_GOVERNANCE.md](docs/operations/RELEASE_GOVERNANCE.md): staged release and production approval policy
+- [docs/operations/INCIDENT_TRIAGE.md](docs/operations/INCIDENT_TRIAGE.md): first-response runbook for readiness, latency, retrieval, and feature-gate failures
+- [docs/governance/ROADMAP.md](docs/governance/ROADMAP.md): unfinished backlog and priority queue
+- [docs/governance/ROADMAP_ARCHIVE.md](docs/governance/ROADMAP_ARCHIVE.md): historical roadmap content and phase closeouts
+- [docs/standards/ENGINEERING_STANDARDS.md](docs/standards/ENGINEERING_STANDARDS.md): coding and process standards (single source of truth)
 - [ops/observability/README.md](ops/observability/README.md): versioned scrape config, alert rules, and dashboards
 - [`examples/`](examples): demo/example assets kept out of canonical docs
 

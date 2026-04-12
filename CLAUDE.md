@@ -3,7 +3,7 @@
 Strategic Intelligence assistant for Simon Business School, University of Rochester.
 Backend: FastAPI + Python 3.14 · Frontend: React 19 + TypeScript + Vite 8 · LLM: Ollama · DB: SQLite · Port: 62606
 
-Canonical rules live in [`docs/ENGINEERING_STANDARDS.md`](docs/ENGINEERING_STANDARDS.md). This file is a durable working reference — keep it aligned with ENGINEERING_STANDARDS, not a replacement for it.
+Canonical rules live in [`docs/standards/ENGINEERING_STANDARDS.md`](docs/standards/ENGINEERING_STANDARDS.md). This file is a durable working reference — keep it aligned with ENGINEERING_STANDARDS, not a replacement for it.
 
 ---
 
@@ -34,7 +34,7 @@ Run `lint-imports` (configured in `pyproject.toml`) before pytest — CI does th
 
 Key contract face: `backend.application.ports` exports `Settings`, `LLMClient`, `SessionRepository`, `ConversationLogger`, `TitleGenerator`, `SafeguardService`, `TabularContextExtractor`, and stable shared exceptions. Routers and application modules import from here, not from `backend.services.*` directly.
 
-Details: [`docs/DEPENDENCY_GRAPH.md`](docs/DEPENDENCY_GRAPH.md) · [`docs/PORTS.md`](docs/PORTS.md)
+Details: [`docs/architecture/DEPENDENCY_GRAPH.md`](docs/architecture/DEPENDENCY_GRAPH.md) · [`docs/architecture/PORTS.md`](docs/architecture/PORTS.md)
 
 ---
 
@@ -112,9 +112,9 @@ Run from the repo root — `tools/` is a package, no `PYTHONPATH` tricks needed.
 | Command | Purpose |
 |---------|---------|
 | `python -m tools.quality.run_rag_eval` | RAG quality gate (CI runs this on every backend build) |
-| `python -m tools.contracts.check_api_contract_sync` | Verify `docs/openapi.json` matches the live FastAPI app |
-| `python -m tools.contracts.generate_llm_api_yaml` | Regenerate `docs/api.llm.yaml` |
-| `python -m tools.contracts.regenerate_openapi_json` | Regenerate `docs/openapi.json` (use Python 3.14 to match CI) |
+| `python -m tools.contracts.check_api_contract_sync` | Verify `docs/api/openapi.json` matches the live FastAPI app |
+| `python -m tools.contracts.generate_llm_api_yaml` | Regenerate `docs/api/api.llm.yaml` |
+| `python -m tools.contracts.regenerate_openapi_json` | Regenerate `docs/api/openapi.json` (use Python 3.14 to match CI) |
 | `python -m tools.quality.load_chat_smoke --base-url http://127.0.0.1:62606 --model <model>` | p50/p95 load smoke |
 
 ---
@@ -123,16 +123,16 @@ Run from the repo root — `tools/` is a package, no `PYTHONPATH` tricks needed.
 
 | Task | Start here |
 |------|-----------|
-| API behavior / endpoint contracts | `__tests__/test_api_blackbox_contract.py`, `docs/openapi.json`, `docs/api.llm.yaml` |
-| Auth / security rules | `__tests__/test_api_authz.py`, `docs/SECURITY.md` |
-| Domain terms (session, turn, chart, safeguard) | [`docs/DOMAIN.md`](docs/DOMAIN.md) |
-| Layer import rules | [`docs/DEPENDENCY_GRAPH.md`](docs/DEPENDENCY_GRAPH.md), `pyproject.toml` `[tool.importlinter]` |
-| Session JSON shape / versioning | [`docs/SESSION_SCHEMA.md`](docs/SESSION_SCHEMA.md) |
-| Injectable ports (Protocols) | [`docs/PORTS.md`](docs/PORTS.md) |
-| Env vars, deploy, ops | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) |
-| Current shipped state | [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) |
-| Phase history and next work | [`docs/ROADMAP.md`](docs/ROADMAP.md) |
-| Error codes / envelope | [`docs/API_ERRORS.md`](docs/API_ERRORS.md) |
+| API behavior / endpoint contracts | `__tests__/test_api_blackbox_contract.py`, `docs/api/openapi.json`, `docs/api/api.llm.yaml` |
+| Auth / security rules | `__tests__/test_api_authz.py`, `docs/governance/SECURITY.md` |
+| Domain terms (session, turn, chart, safeguard) | [`docs/architecture/DOMAIN.md`](docs/architecture/DOMAIN.md) |
+| Layer import rules | [`docs/architecture/DEPENDENCY_GRAPH.md`](docs/architecture/DEPENDENCY_GRAPH.md), `pyproject.toml` `[tool.importlinter]` |
+| Session JSON shape / versioning | [`docs/architecture/SESSION_SCHEMA.md`](docs/architecture/SESSION_SCHEMA.md) |
+| Injectable ports (Protocols) | [`docs/architecture/PORTS.md`](docs/architecture/PORTS.md) |
+| Env vars, deploy, ops | [`docs/operations/OPERATIONS.md`](docs/operations/OPERATIONS.md) |
+| Current shipped state | [`docs/governance/PROJECT_STATUS.md`](docs/governance/PROJECT_STATUS.md) |
+| Phase history and next work | [`docs/governance/ROADMAP.md`](docs/governance/ROADMAP.md) |
+| Error codes / envelope | [`docs/api/API_ERRORS.md`](docs/api/API_ERRORS.md) |
 
 ---
 
@@ -152,13 +152,13 @@ Phase 16 items (code sandbox, Postgres, multi-tenant AuthN) each require a Decis
 
 | Changed | Update |
 |---------|--------|
-| HTTP endpoints or schemas | `docs/openapi.json`, `docs/api.llm.yaml`, `docs/API_REFERENCE.md` |
-| Domain terms, chart/safeguard/session semantics | `docs/DOMAIN.md` |
-| Session JSON shape or `SESSION_PAYLOAD_VERSION` | `docs/SESSION_SCHEMA.md` |
-| Injectable ports or import-layer rules | `docs/PORTS.md`, `docs/DEPENDENCY_GRAPH.md` |
-| New env var or startup step | `docs/OPERATIONS.md`, `.env.example` |
-| Current shipped state | `docs/PROJECT_STATUS.md` |
-| Phase completion or new planned work | `docs/ROADMAP.md` |
+| HTTP endpoints or schemas | `docs/api/openapi.json`, `docs/api/api.llm.yaml`, `docs/api/API_REFERENCE.md` |
+| Domain terms, chart/safeguard/session semantics | `docs/architecture/DOMAIN.md` |
+| Session JSON shape or `SESSION_PAYLOAD_VERSION` | `docs/architecture/SESSION_SCHEMA.md` |
+| Injectable ports or import-layer rules | `docs/architecture/PORTS.md`, `docs/architecture/DEPENDENCY_GRAPH.md` |
+| New env var or startup step | `docs/operations/OPERATIONS.md`, `.env.example` |
+| Current shipped state | `docs/governance/PROJECT_STATUS.md` |
+| Phase completion or new planned work | `docs/governance/ROADMAP.md` |
 | RAG retrieval / rerank / eval cases | `evaldata/README.md`, `evaldata/VERSION` |
 
 ---
@@ -172,7 +172,7 @@ Two distinct gates — do not conflate them:
 | **Policy / AuthZ** | 403 | `FEATURE_DISABLED` | Caller not permitted |
 | **Runtime / capability** | 503 | `FEATURE_UNAVAILABLE` | Deployment not configured or dependency missing |
 
-Enforcement is **layered** (config → startup probe → service → route → frontend). Frontend is UX only, not a security boundary. Full pattern: [ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md) Section 15.
+Enforcement is **layered** (config → startup probe → service → route → frontend). Frontend is UX only, not a security boundary. Full pattern: [ENGINEERING_STANDARDS.md](docs/standards/ENGINEERING_STANDARDS.md) Section 15.
 
 ---
 
@@ -192,4 +192,4 @@ Enforcement is **layered** (config → startup probe → service → route → f
 - **`nohup` + `var/logs/fastapi.pid`** is the permanent fallback for process management.
 - Preferred GPU: A100 via `GOAT_GPU_UUID`.
 - `deploy.sh` deploys the current checkout by default; `SYNC_GIT=1` to pull first.
-- Backup/restore runbook: [`docs/BACKUP_RESTORE.md`](docs/BACKUP_RESTORE.md) · Rollback: [`docs/ROLLBACK.md`](docs/ROLLBACK.md)
+- Backup/restore runbook: [`docs/operations/BACKUP_RESTORE.md`](docs/operations/BACKUP_RESTORE.md) · Rollback: [`docs/operations/ROLLBACK.md`](docs/operations/ROLLBACK.md)

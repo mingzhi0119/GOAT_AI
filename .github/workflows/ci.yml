@@ -15,7 +15,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
-          # Match local dev when using Python 3.14; docs/openapi.json must match app.openapi() for this interpreter.
+          # Match local dev when using Python 3.14; docs/api/openapi.json must match app.openapi() for this interpreter.
           python-version: "3.14"
       - uses: astral-sh/setup-uv@v8.0.0
         with:

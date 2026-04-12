@@ -1,5 +1,5 @@
 ---
-description: Python typing, Pydantic, logging, layered errors, and backend folder boundaries aligned with docs/ENGINEERING_STANDARDS.md
+description: Python typing, Pydantic, logging, layered errors, and backend folder boundaries aligned with docs/standards/ENGINEERING_STANDARDS.md
 globs: **/*.py
 alwaysApply: false
 ---

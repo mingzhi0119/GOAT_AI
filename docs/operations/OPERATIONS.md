@@ -38,13 +38,13 @@ python3 -m uvicorn server:create_app --factory --host 0.0.0.0 --port 62606 --rel
 
 `lint-imports` enforces backend package layering (`pyproject.toml`); run it after dependency or router/service refactors.
 
-**Repository tools:** run CLI modules from the **repository root** with `python -m tools.<module>` (for example `python -m tools.quality.run_rag_eval`, `python -m tools.contracts.check_api_contract_sync`). This avoids setting `PYTHONPATH` manually; `.env` is for app runtime, not your shell. For **`python -m tools.contracts.check_api_contract_sync`**, use the **same Python minor as CI (3.14)** so `docs/openapi.json` matches `app.openapi()`. On Windows hosts, use WSL when a tool or dependency path needs Linux parity. `bash scripts/wsl/wsl_api_contract_refresh.sh` remains the preferred artifact-refresh path when Windows packaging availability differs from CI.
+**Repository tools:** run CLI modules from the **repository root** with `python -m tools.<module>` (for example `python -m tools.quality.run_rag_eval`, `python -m tools.contracts.check_api_contract_sync`). This avoids setting `PYTHONPATH` manually; `.env` is for app runtime, not your shell. For **`python -m tools.contracts.check_api_contract_sync`**, use the **same Python minor as CI (3.14)** so `docs/api/openapi.json` matches `app.openapi()`. On Windows hosts, use WSL when a tool or dependency path needs Linux parity. `bash scripts/wsl/wsl_api_contract_refresh.sh` remains the preferred artifact-refresh path when Windows packaging availability differs from CI.
 
 ### SQLite schema migrations (Phase 13 Section 13.0)
 
 On startup, `log_service.init_db` runs **`backend/services/db_migrations.apply_migrations`**, which executes `backend/migrations/NNN_*.sql` in order and records each file's SHA-256 in the `schema_migrations` table. If a migration file changes after apply, the process **refuses to start** on checksum mismatch. Add new DDL only as a new numbered SQL file.
 
-API error responses use a stable envelope (`detail`, `code`, optional `request_id`); see [API_ERRORS.md](API_ERRORS.md).
+API error responses use a stable envelope (`detail`, `code`, optional `request_id`); see [API_ERRORS.md](../api/API_ERRORS.md).
 
 Frontend:
 
@@ -64,7 +64,7 @@ If the backend is protected with `GOAT_API_KEY` or `GOAT_REQUIRE_SESSION_OWNER=1
 open the browser UI settings menu and populate `Protected access` with the shared
 API key and, when required, the owner ID. The SPA stores those values locally in
 the browser and attaches `X-GOAT-API-Key` / `X-GOAT-Owner-Id` to runtime API calls.
-Frontend API contract types are generated from `docs/openapi.json`; refresh them
+Frontend API contract types are generated from `docs/api/openapi.json`; refresh them
 with `npm run contract:generate` whenever the backend contract changes.
 
 ### Windows desktop prerequisites
@@ -580,5 +580,5 @@ Treat the following as operational stop signs during Phase 13 rollout work:
 | GET | `/api/system/inference` |
 | GET | `/api/system/runtime-target` |
 
-For exact request and response details, use [API_REFERENCE.md](API_REFERENCE.md).  
-For current upload/API threat notes, use [SECURITY.md](SECURITY.md).
+For exact request and response details, use [API_REFERENCE.md](../api/API_REFERENCE.md).  
+For current upload/API threat notes, use [SECURITY.md](../governance/SECURITY.md).

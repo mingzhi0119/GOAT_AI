@@ -69,7 +69,7 @@ Phase 16B is complete with a conservative outcome:
 ## Required sequence before any future storage-shape change
 
 1. Approve the target storage shape and ownership story.
-2. Document compatibility and rollback in `docs/OPERATIONS.md`.
+2. Document compatibility and rollback in `docs/operations/OPERATIONS.md`.
 3. Introduce additive schema changes only.
 4. Land dual-read logic if required.
 5. Land write-path changes only after black-box and migration tests prove rollback safety.

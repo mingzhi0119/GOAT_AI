@@ -8,13 +8,14 @@ from pathlib import Path
 class DocsLanguageTests(unittest.TestCase):
     def test_docs_and_memory_remain_english_only(self) -> None:
         root = Path(__file__).resolve().parents[1]
+        docs_root = root / "docs"
         targets = [
             root / "README.md",
             root / "AGENTS.md",
-            *sorted((root / "docs").glob("*.md")),
-            *sorted((root / "docs").glob("*.json")),
-            *sorted((root / "docs").glob("*.yaml")),
-            *sorted((root / "docs").glob("*.yml")),
+            *sorted(docs_root.rglob("*.md")),
+            *sorted(docs_root.rglob("*.json")),
+            *sorted(docs_root.rglob("*.yaml")),
+            *sorted(docs_root.rglob("*.yml")),
             *sorted((root / ".cursor" / "rules").glob("*.mdc")),
         ]
 

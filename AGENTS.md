@@ -4,9 +4,9 @@ Short index for coding agents. Canonical rules live in the docs below.
 
 ## Read if Needed
 
-- [`docs/ENGINEERING_STANDARDS.md`](docs/ENGINEERING_STANDARDS.md)
-- [`docs/DOMAIN.md`](docs/DOMAIN.md)
-- [`docs/APPEARANCE.md`](docs/APPEARANCE.md)
+- [`docs/standards/ENGINEERING_STANDARDS.md`](docs/standards/ENGINEERING_STANDARDS.md)
+- [`docs/architecture/DOMAIN.md`](docs/architecture/DOMAIN.md)
+- [`docs/standards/APPEARANCE.md`](docs/standards/APPEARANCE.md)
 
 - Frontend UI icons use `lucide-react`; default stroke width is `2` unless a dense or cramped case needs an exception.
 
@@ -29,14 +29,14 @@ Short index for coding agents. Canonical rules live in the docs below.
 - For frontend changes, run `cd frontend && npm ci && npm test -- --run`.
 - CI also runs `cd frontend && npm run build`; run the local build for frontend changes that touch types, build inputs, packaging, test utilities, or any build-only failure path.
 - For Linux-targeted validation from Windows, prefer the repo-local skills under [`.agents/skills`](.agents/skills): `$wsl-linux-build`, `$wsl-linux-rust-desktop`, and `$wsl-linux-ops-checks`.
-- Skills are the reusable workflow layer; `AGENTS.md` and [`docs/ENGINEERING_STANDARDS.md`](docs/ENGINEERING_STANDARDS.md) remain the enforcement point for permanent repository policy.
+- Skills are the reusable workflow layer; `AGENTS.md` and [`docs/standards/ENGINEERING_STANDARDS.md`](docs/standards/ENGINEERING_STANDARDS.md) remain the enforcement point for permanent repository policy.
 - Add or update tests for happy path, failure path, and at least one boundary case when you touch core behavior.
 - Do not treat a red local CI-equivalent gate as follow-up work.
 - Do not run manual visual verification unless the user asks.
 
 ## Quick pointers
 
-- API work: `__tests__/test_api_blackbox_contract.py`, `docs/openapi.json`, `docs/api.llm.yaml`
+- API work: `__tests__/test_api_blackbox_contract.py`, `docs/api/openapi.json`, `docs/api/api.llm.yaml`
 - CLI helpers: `python -m tools.<module>`
 - Keep `.cursor/rules/` aligned with these standards
 - Directory ownership lives in [`.github/CODEOWNERS`](.github/CODEOWNERS)
@@ -94,7 +94,7 @@ Each subagent should return:
 - `AGENTS.md` defines operating rules and escalation, not the canonical path table.
 
 2. **Treat shared-boundary files as explicit assignments.**
-- Files such as `frontend/src/api/types.ts`, `docs/openapi.json`, `docs/api.llm.yaml`, `backend/application/ports.py`, and cross-layer tests must have a named owner for that task.
+- Files such as `frontend/src/api/types.ts`, `docs/api/openapi.json`, `docs/api/api.llm.yaml`, `backend/application/ports.py`, and cross-layer tests must have a named owner for that task.
 
 3. **Do not overlap edits** unless the Lead Agent explicitly assigns a shared boundary.
 

@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url'
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const frontendRoot = path.resolve(scriptDir, '..')
 const repoRoot = path.resolve(frontendRoot, '..')
-const inputPath = path.join(repoRoot, 'docs', 'openapi.json')
+const inputPath = path.join(repoRoot, 'docs', 'api', 'openapi.json')
 const outputPath = path.join(frontendRoot, 'src', 'api', 'generated', 'openapi.ts')
 const cliPath = path.join(frontendRoot, 'node_modules', 'openapi-typescript', 'bin', 'cli.js')
 const isCheckMode = process.argv.includes('--check')
@@ -52,7 +52,7 @@ function generateOpenApiTypes(tempInputPath, tempOutputPath) {
 function buildGeneratedFile(contents) {
   return [
     '/*',
-    ' * This file is auto-generated from ../docs/openapi.json.',
+    ' * This file is auto-generated from ../../../../docs/api/openapi.json.',
     ' * Do not edit it manually; run `npm run contract:generate` instead.',
     ' */',
     '',
@@ -85,6 +85,6 @@ try {
   writeFileSync(outputPath, generated, 'utf8')
   console.log(`Generated ${path.relative(frontendRoot, outputPath)}`)
 } finally {
-  unlinkSync(tempInputPath)
+  rmSync(tempInputPath, { force: true })
   rmSync(tempDir, { recursive: true, force: true })
 }

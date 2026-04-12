@@ -1,5 +1,5 @@
 ---
-description: Strict TypeScript, React/hooks/api layers, SSE, charts, and theme aligned with docs/ENGINEERING_STANDARDS.md
+description: Strict TypeScript, React/hooks/api layers, SSE, charts, and theme aligned with docs/standards/ENGINEERING_STANDARDS.md
 globs: **/*.{ts,tsx}
 alwaysApply: false
 ---
@@ -49,7 +49,7 @@ const resp = await fetch("/api/chat", ...);
 
 ## Manual UI verification
 
-- For frontend UI/layout-affecting changes, follow the canonical verification loop in `docs/ENGINEERING_STANDARDS.md` Section 3.4.
+- For frontend UI/layout-affecting changes, follow the canonical verification loop in `docs/standards/ENGINEERING_STANDARDS.md` Section 3.4.
 - Prefer the FastAPI-served SPA path on the configured app port (default `62606` via `GOAT_SERVER_PORT`) instead of the Vite dev server for final manual verification.
 
 ## Module layout

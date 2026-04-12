@@ -10,6 +10,6 @@ This directory keeps production-facing observability assets versioned in-repo so
 
 ## Update rules
 
-- Keep metric names aligned with `backend/prometheus_metrics.py` and `docs/OPERATIONS.md`.
+- Keep metric names aligned with `backend/prometheus_metrics.py` and `docs/operations/OPERATIONS.md`.
 - When adding or renaming an operator-facing metric, update the relevant dashboard and alert rules in the same change.
 - Treat these files as release assets, not ad hoc examples.

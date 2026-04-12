@@ -23,5 +23,5 @@ JSONL cases consumed by **`python -m tools.quality.run_rag_eval`** (from the rep
 
 ## Related docs
 
-- [docs/OPERATIONS.md](../docs/OPERATIONS.md) — `GOAT_RAG_RERANK_MODE`, `retrieval_profile`, metrics.
-- [docs/ROADMAP.md](../docs/ROADMAP.md) — §14.7 RAG quality closure.
+- [docs/operations/OPERATIONS.md](../docs/operations/OPERATIONS.md) — `GOAT_RAG_RERANK_MODE`, `retrieval_profile`, metrics.
+- [docs/governance/ROADMAP.md](../docs/governance/ROADMAP.md) — §14.7 RAG quality closure.

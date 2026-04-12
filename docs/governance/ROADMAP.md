@@ -9,8 +9,8 @@ This file tracks **unfinished work only**.
 Completed phases, landed slices, and historical closeout notes live in:
 
 - [PROJECT_STATUS.md](PROJECT_STATUS.md)
-- [OPERATIONS.md](OPERATIONS.md)
-- [DOMAIN.md](DOMAIN.md)
+- [OPERATIONS.md](../operations/OPERATIONS.md)
+- [DOMAIN.md](../architecture/DOMAIN.md)
 - [ROADMAP_ARCHIVE.md](ROADMAP_ARCHIVE.md)
 
 ---

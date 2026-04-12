@@ -84,7 +84,7 @@ jobs:
             --pip-audit-json pip-audit.json \
             --npm-audit-json npm-audit.json \
             --cargo-audit-json cargo-audit.json \
-            --desktop-cargo-exceptions-doc docs/DESKTOP_CARGO_AUDIT_EXCEPTIONS.md \
+            --desktop-cargo-exceptions-doc docs/operations/DESKTOP_CARGO_AUDIT_EXCEPTIONS.md \
             --output security-review-snapshot.json \
             --workflow-name quality-trends \
             --sha "${GITHUB_SHA}" \

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regenerate docs/openapi.json and docs/api.llm.yaml on Linux Python 3.14 (matches GitHub Actions).
+# Regenerate docs/api/openapi.json and docs/api/api.llm.yaml on Linux Python 3.14 (matches GitHub Actions).
 # Run from WSL: bash scripts/wsl/wsl_api_contract_refresh.sh
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,4 +14,4 @@ fi
 uv run --no-project --python 3.14 --with-requirements requirements-ci.txt python -m tools.contracts.regenerate_openapi_json
 uv run --no-project --python 3.14 --with-requirements requirements-ci.txt python -m tools.contracts.generate_llm_api_yaml
 uv run --no-project --python 3.14 --with-requirements requirements-ci.txt python -m tools.contracts.check_api_contract_sync
-echo "OK: docs/openapi.json and docs/api.llm.yaml refreshed; contract check passed."
+echo "OK: docs/api/openapi.json and docs/api/api.llm.yaml refreshed; contract check passed."

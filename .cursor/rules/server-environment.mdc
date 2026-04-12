@@ -1,6 +1,6 @@
 ---
-description: Project snapshot, production host constraints, and deploy rules aligned with docs/ENGINEERING_STANDARDS.md
-globs: ops/deploy/deploy.sh,ops/deploy/deploy.ps1,ops/verification/phase0_check.sh,docs/OPERATIONS.md,docs/PROJECT_STATUS.md,ops/systemd/goat-ai.service,tools/ops/rotate_fastapi_log.py,tools/ops/backup_chat_db.py,ops/verification/healthcheck.sh,ops/verification/watchdog.sh
+description: Project snapshot, production host constraints, and deploy rules aligned with docs/standards/ENGINEERING_STANDARDS.md
+globs: ops/deploy/deploy.sh,ops/deploy/deploy.ps1,ops/verification/phase0_check.sh,docs/operations/OPERATIONS.md,docs/governance/PROJECT_STATUS.md,ops/systemd/goat-ai.service,tools/ops/rotate_fastapi_log.py,tools/ops/backup_chat_db.py,ops/verification/healthcheck.sh,ops/verification/watchdog.sh
 alwaysApply: false
 ---
 
@@ -33,9 +33,9 @@ Use this when changing deploy scripts, process management, host-only docs, or ru
 
 ## Doc source of truth
 
-- Full table: `docs/OPERATIONS.md` - Shared host permissions (JupyterHub / unprivileged user).
-- Short snapshot: `docs/PROJECT_STATUS.md` - server permissions snapshot.
-- User-space log backup and health: `docs/OPERATIONS.md` - user-space ops (no root) and related scripts.
+- Full table: `docs/operations/OPERATIONS.md` - Shared host permissions (JupyterHub / unprivileged user).
+- Short snapshot: `docs/governance/PROJECT_STATUS.md` - server permissions snapshot.
+- User-space log backup and health: `docs/operations/OPERATIONS.md` - user-space ops (no root) and related scripts.
 
 ## Deploy rules
 

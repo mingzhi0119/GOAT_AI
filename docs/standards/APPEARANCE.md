@@ -193,7 +193,7 @@ Current automated coverage includes:
 - `Sidebar.test.tsx`
 - `MessageBubble.test.tsx`
 
-For layout-affecting changes, still follow the manual verification loop from `docs/ENGINEERING_STANDARDS.md`.
+For layout-affecting changes, still follow the manual verification loop from `docs/standards/ENGINEERING_STANDARDS.md`.
 
 ## Safe extension patterns
 

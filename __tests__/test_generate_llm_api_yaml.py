@@ -29,7 +29,7 @@ class GenerateLlmApiYamlTests(unittest.TestCase):
     def test_write_yaml_outputs_expected_header(self) -> None:
         document = {
             "format": "llm-compact-api",
-            "source": {"canonical_openapi": "docs/openapi.json"},
+            "source": {"canonical_openapi": "docs/api/openapi.json"},
         }
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -38,7 +38,7 @@ class GenerateLlmApiYamlTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
 
         self.assertIn("format: llm-compact-api", text)
-        self.assertIn("canonical_openapi: docs/openapi.json", text)
+        self.assertIn("canonical_openapi: docs/api/openapi.json", text)
 
 
 if __name__ == "__main__":

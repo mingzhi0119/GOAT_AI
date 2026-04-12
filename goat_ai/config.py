@@ -194,7 +194,7 @@ def _ensure_directory(path: Path, *, label: str) -> Path:
 
 @dataclass(frozen=True)
 class Settings:
-    """Runtime configuration (env-first; see docs/OPERATIONS.md)."""
+    """Runtime configuration (env-first; see docs/operations/OPERATIONS.md)."""
 
     ollama_base_url: str
     generate_timeout: int

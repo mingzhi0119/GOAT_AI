@@ -107,7 +107,7 @@ Wave B evidence anchors in this repo:
 - `backend/services/idempotency_service.py` + `backend/migrations/005_add_idempotency_keys.sql`
 - `backend/routers/upload.py` + `backend/routers/chat.py`
 - `__tests__/test_upload_router.py` + `__tests__/test_api_blackbox_contract.py`
-- `docs/OPERATIONS.md` (multi-instance limitations + mitigations)
+- `docs/operations/OPERATIONS.md` (multi-instance limitations + mitigations)
 
 Phase 16A / 17 evidence anchors in this repo:
 
@@ -119,7 +119,7 @@ Phase 16A / 17 evidence anchors in this repo:
 - `__tests__/test_workbench_runtime.py`
 - `__tests__/test_workbench_source_registry.py`
 - `__tests__/test_api_blackbox_contract.py`
-- `docs/API_REFERENCE.md` + `docs/WORKBENCH_TERMINOLOGY_DECISION.md`
+- `docs/api/API_REFERENCE.md` + `docs/architecture/WORKBENCH_TERMINOLOGY_DECISION.md`
 
 ---
 
@@ -155,8 +155,8 @@ The differentiator is not the stack list; it is **the documented path from demo-
 ## Related documents
 
 - [ROADMAP.md](ROADMAP.md) -Phase 13 (Section 13.0, Wave A/B), Phase 14 RAG-first sequencing, and Phase 15 structural semantics.
-- [OPERATIONS.md](OPERATIONS.md) -deploy, env, host constraints (keep aligned with claims on your homepage).
-- [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md) - canonical engineering contract.
+- [OPERATIONS.md](../operations/OPERATIONS.md) -deploy, env, host constraints (keep aligned with claims on your homepage).
+- [ENGINEERING_STANDARDS.md](../standards/ENGINEERING_STANDARDS.md) - canonical engineering contract.
 - [AGENTS.md](../AGENTS.md) - agent memory and collaboration guide; canonical engineering rules stay in ENGINEERING_STANDARDS.
 
 ---

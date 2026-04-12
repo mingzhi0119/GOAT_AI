@@ -66,7 +66,7 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 
 - Keep TypeScript strict.
 - Do not use `any` or `@ts-ignore`.
-- Keep generated contract types under `src/api/generated/` and regenerate them from `docs/openapi.json`.
+- Keep generated contract types under `src/api/generated/` and regenerate them from `docs/api/openapi.json`.
 - Use `src/api/types.ts` only for frontend-specific adapters or UI-only unions that cannot come straight from OpenAPI.
 - Keep network calls inside `src/api/`.
 - Keep components focused and hooks typed.
@@ -117,7 +117,7 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 - Keep request and response schemas explicit.
 - Return structured errors, not ad hoc strings.
 - Preserve API contracts when changing behavior.
-- Update `docs/openapi.json` and `docs/api.llm.yaml` when the contract changes.
+- Update `docs/api/openapi.json` and `docs/api/api.llm.yaml` when the contract changes.
 
 ## 6. Dependency Management
 
@@ -135,8 +135,8 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 - Treat user-visible garbled text, encoding regressions, or broken diagnostics as correctness issues, not cosmetic follow-ups.
 - Flag growing hotspot files early; if a touched mixed-concern file is already oversized, prefer extraction over further inline expansion.
 - Keep `.github/CODEOWNERS` as the source of truth for default directory ownership.
-- Keep `.github/workflows/release-governance.yml` and the GitHub Environment approval rules aligned with the documented release process in `docs/RELEASE_GOVERNANCE.md`.
-- Keep `.github/workflows/quality-trends.yml`, `tools/quality_snapshot.py`, and `docs/QUALITY_TRENDS.md` aligned when quality-trend inputs change.
+- Keep `.github/workflows/release-governance.yml` and the GitHub Environment approval rules aligned with the documented release process in `docs/operations/RELEASE_GOVERNANCE.md`.
+- Keep `.github/workflows/quality-trends.yml`, `tools/quality_snapshot.py`, and `docs/governance/QUALITY_TRENDS.md` aligned when quality-trend inputs change.
 - Keep `.github/workflows/fault-injection.yml` aligned with the targeted resilience drills it is expected to prove.
 - Use four long-lived Codex owner lanes: Lead/Platform, Frontend, Backend, Docs/Assets.
 - Shared contracts and cross-layer boundaries must be jointly reviewed by the owning lanes.
@@ -148,13 +148,13 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 - Prefer contracts and tests over source spelunking.
 - Check black-box tests first for API work.
 - Keep generated artifacts in sync with the implementation.
-- Treat `docs/openapi.json`, `docs/api.llm.yaml`, and other shared contract surfaces as joint review boundaries, not single-owner files.
+- Treat `docs/api/openapi.json`, `docs/api/api.llm.yaml`, and other shared contract surfaces as joint review boundaries, not single-owner files.
 - Do not merge public API behavior changes without matching boundary tests and updated error semantics where applicable.
 
 ## 9. Project Snapshot
 
-- Follow the current repo layout and shipped inventory in `docs/PROJECT_STATUS.md`.
-- Use `docs/ROADMAP.md` and `docs/OPERATIONS.md` for planning and ops context.
+- Follow the current repo layout and shipped inventory in `docs/governance/PROJECT_STATUS.md`.
+- Use `docs/governance/ROADMAP.md` and `docs/operations/OPERATIONS.md` for planning and ops context.
 
 ## 10. Production Constraints
 
@@ -165,7 +165,7 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 
 ## 11. Theme
 
-- Keep frontend appearance behavior aligned with `docs/APPEARANCE.md`.
+- Keep frontend appearance behavior aligned with `docs/standards/APPEARANCE.md`.
 - Theme state persists in `localStorage`.
 - Theme additions must extend the token registry and remain consistent across light and dark modes.
 
@@ -175,16 +175,16 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 - Keep docs UTF-8 without BOM.
 - Update related docs when user-visible semantics change.
 - Update roadmap, operations, or project-status docs when release gates, runbooks, or score-protection policies materially change.
-- Update `docs/SECURITY_RESPONSE.md` when vulnerability response targets, dependency-refresh cadence, or credential-rotation expectations change.
+- Update `docs/governance/SECURITY_RESPONSE.md` when vulnerability response targets, dependency-refresh cadence, or credential-rotation expectations change.
 - When changing operator-facing metrics, update the versioned observability assets under `ops/observability/` and any affected incident runbooks in the same change.
-- When changing performance budgets or smoke-test semantics, update `tools/load_chat_smoke.py`, the scheduled workflow, and `docs/OPERATIONS.md` together.
-- When changing coverage output paths or recurring quality-capture semantics, update `tools/quality_snapshot.py`, `.github/workflows/quality-trends.yml`, and `docs/QUALITY_TRENDS.md` together.
-- When changing dependency-audit evidence or credential-rotation review inputs, update `tools/security_review_snapshot.py`, `.github/workflows/quality-trends.yml`, and `docs/SECURITY_RESPONSE.md` together.
+- When changing performance budgets or smoke-test semantics, update `tools/load_chat_smoke.py`, the scheduled workflow, and `docs/operations/OPERATIONS.md` together.
+- When changing coverage output paths or recurring quality-capture semantics, update `tools/quality_snapshot.py`, `.github/workflows/quality-trends.yml`, and `docs/governance/QUALITY_TRENDS.md` together.
+- When changing dependency-audit evidence or credential-rotation review inputs, update `tools/security_review_snapshot.py`, `.github/workflows/quality-trends.yml`, and `docs/governance/SECURITY_RESPONSE.md` together.
 - When changing backup, restore, rollback, or SQLite persistence semantics, update the recovery drill (`tools/ops/exercise_recovery_drill.py`), its tests, and the linked runbooks in the same change.
 
 ## 13. API Artifacts
 
-- Keep `docs/openapi.json` and `docs/api.llm.yaml` in sync with the codebase.
+- Keep `docs/api/openapi.json` and `docs/api/api.llm.yaml` in sync with the codebase.
 - Treat contract drift as a bug.
 
 ## 14. Recovery and Commit Hygiene

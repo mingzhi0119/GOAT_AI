@@ -10,14 +10,14 @@ Use this skill for Linux-oriented operational validation in this repository.
 ## Read First
 
 - [`references/common-commands.md`](references/common-commands.md)
-- [`docs/OPERATIONS.md`](../../../../docs/OPERATIONS.md)
+- [`docs/operations/OPERATIONS.md`](../../../../docs/operations/OPERATIONS.md)
 
 ## Workflow
 
 1. Run shell scripts and Linux-facing helper commands through `.agents/skills/wsl-linux-build/scripts/invoke-wsl-command.ps1`.
 2. Validate bash semantics, shebang behavior, path handling, exit codes, and service assumptions under WSL instead of inferring them from PowerShell.
 3. Prefer explicit commands that can be repeated by teammates and CI.
-4. If the work changes repository policy rather than just executing a workflow, also update [`AGENTS.md`](../../../../AGENTS.md) and [`docs/ENGINEERING_STANDARDS.md`](../../../../docs/ENGINEERING_STANDARDS.md).
+4. If the work changes repository policy rather than just executing a workflow, also update [`AGENTS.md`](../../../../AGENTS.md) and [`docs/standards/ENGINEERING_STANDARDS.md`](../../../../docs/standards/ENGINEERING_STANDARDS.md).
 
 ## Guardrails
 

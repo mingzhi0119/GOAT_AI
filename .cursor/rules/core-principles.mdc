@@ -1,11 +1,11 @@
 ---
-description: Project direction, five non-negotiables, and cross-environment rules aligned with docs/ENGINEERING_STANDARDS.md
+description: Project direction, five non-negotiables, and cross-environment rules aligned with docs/standards/ENGINEERING_STANDARDS.md
 alwaysApply: true
 ---
 
 # GOAT AI - Core principles
 
-Canonical engineering rules: `docs/ENGINEERING_STANDARDS.md`. Repo root `AGENTS.md` carries agent memory and collaboration guidance; keep `.cursor/rules/` aligned when standards change.
+Canonical engineering rules: `docs/standards/ENGINEERING_STANDARDS.md`. Repo root `AGENTS.md` carries agent memory and collaboration guidance; keep `.cursor/rules/` aligned when standards change.
 
 ## Purpose
 

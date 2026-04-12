@@ -223,7 +223,7 @@ def get_safeguard_service(
 ) -> SafeguardService | None:
     """Return the active safeguard service, or None when moderation is disabled.
 
-    Controlled by two env vars (see docs/OPERATIONS.md — Safeguard configuration):
+    Controlled by two env vars (see docs/operations/OPERATIONS.md — Safeguard configuration):
       GOAT_SAFEGUARD_ENABLED=false  → always returns None (master kill-switch)
       GOAT_SAFEGUARD_MODE=off       → also returns None
       GOAT_SAFEGUARD_MODE=input_only|output_only|full → returns a ModeScopedSafeguardService

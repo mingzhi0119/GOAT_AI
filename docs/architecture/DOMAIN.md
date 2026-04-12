@@ -69,4 +69,4 @@ Concrete modules: `backend.domain.authz_types` (`AuthorizationContext`), `backen
 ## PR checklist (user-visible behavior)
 
 - [ ] Updated this file if any term above changed meaning, or added a new ubiquitous term.
-- [ ] Contract artifacts (`docs/openapi.json`, `docs/api.llm.yaml`) regenerated if HTTP schemas changed.
+- [ ] Contract artifacts (`docs/api/openapi.json`, `docs/api/api.llm.yaml`) regenerated if HTTP schemas changed.

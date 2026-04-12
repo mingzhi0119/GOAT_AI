@@ -138,5 +138,5 @@ The remaining frontend work items were intentionally left roadmap-only until sup
 The following topics were kept in the live docs and are no longer repeated in the active roadmap:
 
 - shipped state and release inventory: [PROJECT_STATUS.md](PROJECT_STATUS.md)
-- deployment and operational constraints: [OPERATIONS.md](OPERATIONS.md)
-- ubiquitous language and domain semantics: [DOMAIN.md](DOMAIN.md)
+- deployment and operational constraints: [OPERATIONS.md](../operations/OPERATIONS.md)
+- ubiquitous language and domain semantics: [DOMAIN.md](../architecture/DOMAIN.md)
