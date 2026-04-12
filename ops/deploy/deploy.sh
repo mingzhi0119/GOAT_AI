@@ -38,6 +38,8 @@ SCHOOL_LOCAL_OLLAMA_URL="${SCHOOL_LOCAL_OLLAMA_URL:-http://127.0.0.1:11435}"
 GOAT_USE_SCHOOL_OLLAMA_LOCAL="${GOAT_USE_SCHOOL_OLLAMA_LOCAL:-0}"
 GOAT_OLLAMA_PROFILE="${GOAT_OLLAMA_PROFILE:-}"
 EFFECTIVE_OLLAMA_URL="${OLLAMA_BASE_URL:-${STANDARD_OLLAMA_URL}}"
+PRIMARY_DOTENV_PATH="${PROJECT_DIR}/.env"
+SCHOOL_DOTENV_PATH="${PROJECT_DIR}/.env.school-ubuntu"
 
 RELEASE_BUNDLE="${RELEASE_BUNDLE:-}"
 RELEASE_MANIFEST="${RELEASE_MANIFEST:-}"
@@ -73,6 +75,21 @@ read_dotenv_value() {
   line="${line%\'}"
   line="${line#\'}"
   printf '%s\n' "${line}"
+}
+
+read_first_dotenv_value() {
+  local key="$1"
+  shift
+  local dotenv_path=""
+  local value=""
+  for dotenv_path in "$@"; do
+    value="$(read_dotenv_value "${key}" "${dotenv_path}")"
+    if [ -n "${value}" ]; then
+      printf '%s\n' "${value}"
+      return 0
+    fi
+  done
+  return 0
 }
 
 school_ollama_local_enabled() {
@@ -206,24 +223,26 @@ fi
 
 cd "$PROJECT_DIR"
 
-if [ -f "${PROJECT_DIR}/.env" ]; then
-  if [ -z "${OLLAMA_BASE_URL:-}" ]; then
-    _dotenv_ollama="$(read_dotenv_value "OLLAMA_BASE_URL" "${PROJECT_DIR}/.env")"
-    if [ -n "${_dotenv_ollama}" ]; then
-      OLLAMA_BASE_URL="${_dotenv_ollama}"
-    fi
+if [ "${GOAT_USE_SCHOOL_OLLAMA_LOCAL}" = "0" ]; then
+  _dotenv_school_switch="$(read_first_dotenv_value "GOAT_USE_SCHOOL_OLLAMA_LOCAL" "${SCHOOL_DOTENV_PATH}" "${PRIMARY_DOTENV_PATH}")"
+  if [ -n "${_dotenv_school_switch}" ]; then
+    GOAT_USE_SCHOOL_OLLAMA_LOCAL="${_dotenv_school_switch}"
   fi
-  if [ "${GOAT_USE_SCHOOL_OLLAMA_LOCAL}" = "0" ]; then
-    _dotenv_school_switch="$(read_dotenv_value "GOAT_USE_SCHOOL_OLLAMA_LOCAL" "${PROJECT_DIR}/.env")"
-    if [ -n "${_dotenv_school_switch}" ]; then
-      GOAT_USE_SCHOOL_OLLAMA_LOCAL="${_dotenv_school_switch}"
-    fi
+fi
+if [ -z "${GOAT_OLLAMA_PROFILE}" ]; then
+  _dotenv_ollama_profile="$(read_first_dotenv_value "GOAT_OLLAMA_PROFILE" "${SCHOOL_DOTENV_PATH}" "${PRIMARY_DOTENV_PATH}")"
+  if [ -n "${_dotenv_ollama_profile}" ]; then
+    GOAT_OLLAMA_PROFILE="${_dotenv_ollama_profile}"
   fi
-  if [ -z "${GOAT_OLLAMA_PROFILE}" ]; then
-    _dotenv_ollama_profile="$(read_dotenv_value "GOAT_OLLAMA_PROFILE" "${PROJECT_DIR}/.env")"
-    if [ -n "${_dotenv_ollama_profile}" ]; then
-      GOAT_OLLAMA_PROFILE="${_dotenv_ollama_profile}"
-    fi
+fi
+if [ -z "${OLLAMA_BASE_URL:-}" ]; then
+  if school_ollama_local_enabled; then
+    _dotenv_ollama="$(read_first_dotenv_value "OLLAMA_BASE_URL" "${SCHOOL_DOTENV_PATH}" "${PRIMARY_DOTENV_PATH}")"
+  else
+    _dotenv_ollama="$(read_dotenv_value "OLLAMA_BASE_URL" "${PRIMARY_DOTENV_PATH}")"
+  fi
+  if [ -n "${_dotenv_ollama}" ]; then
+    OLLAMA_BASE_URL="${_dotenv_ollama}"
   fi
 fi
 
@@ -294,14 +313,28 @@ _goat_systemd_restart() {
 
 SYSTEMD_USED=0
 SELECTED_PORT="${SERVER_PORT}"
+SELECTED_SYSTEMD_UNIT=""
 stop_pidfile "$API_PID"
-if _goat_systemd_restart goat-ai; then
+if school_ollama_local_enabled && _goat_systemd_restart goat-ai.school-ubuntu; then
   SYSTEMD_USED=1
-  echo "Waiting for FastAPI on ${SELECTED_PORT} via systemd"
+  SELECTED_SYSTEMD_UNIT="goat-ai.school-ubuntu"
+  echo "Waiting for FastAPI on ${SELECTED_PORT} via systemd (${SELECTED_SYSTEMD_UNIT})"
   if ! healthcheck_port "${SELECTED_PORT}"; then
     echo "systemd target ${SELECTED_PORT} did not become healthy; falling back to nohup."
-    systemctl --user stop goat-ai 2>/dev/null || true
+    systemctl --user stop "${SELECTED_SYSTEMD_UNIT}" 2>/dev/null || true
     SYSTEMD_USED=0
+    SELECTED_SYSTEMD_UNIT=""
+    SELECTED_PORT=""
+  fi
+elif _goat_systemd_restart goat-ai; then
+  SYSTEMD_USED=1
+  SELECTED_SYSTEMD_UNIT="goat-ai"
+  echo "Waiting for FastAPI on ${SELECTED_PORT} via systemd (${SELECTED_SYSTEMD_UNIT})"
+  if ! healthcheck_port "${SELECTED_PORT}"; then
+    echo "systemd target ${SELECTED_PORT} did not become healthy; falling back to nohup."
+    systemctl --user stop "${SELECTED_SYSTEMD_UNIT}" 2>/dev/null || true
+    SYSTEMD_USED=0
+    SELECTED_SYSTEMD_UNIT=""
     SELECTED_PORT=""
   fi
 fi
@@ -310,6 +343,9 @@ if [ "${SYSTEMD_USED}" != "1" ]; then
   echo "Freeing port ${SERVER_PORT}"
   free_port "${SERVER_PORT}"
   echo "Starting FastAPI on 0.0.0.0:${SERVER_PORT} (log: ${API_LOG})"
+  OLLAMA_BASE_URL="${EFFECTIVE_OLLAMA_URL}" \
+  GOAT_USE_SCHOOL_OLLAMA_LOCAL="${GOAT_USE_SCHOOL_OLLAMA_LOCAL}" \
+  GOAT_OLLAMA_PROFILE="${GOAT_OLLAMA_PROFILE}" \
   GOAT_SERVER_PORT="${SERVER_PORT}" \
   GOAT_LOCAL_PORT="${SERVER_PORT}" \
   GOAT_RUNTIME_ROOT="${GOAT_RUNTIME_ROOT}" \

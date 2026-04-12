@@ -202,6 +202,7 @@ Important behavior:
 - Artifact-first rollback is the preferred path; ref-based rollback remains available for manual recovery. See [ROLLBACK.md](ROLLBACK.md)
 - Windows deploy reuses Ollama on `127.0.0.1:11434` when available unless `OLLAMA_BASE_URL` is explicitly set
 - Linux deploy no longer auto-detects or auto-starts the school `ollama-local` runtime by default; only `GOAT_USE_SCHOOL_OLLAMA_LOCAL=1` or `GOAT_OLLAMA_PROFILE=school-ubuntu` enables the school-specific helper script path
+- When the school profile is enabled, `ops/deploy/deploy.sh` now prefers `.env.school-ubuntu` for `GOAT_USE_SCHOOL_OLLAMA_LOCAL`, `GOAT_OLLAMA_PROFILE`, and `OLLAMA_BASE_URL`, tries `goat-ai.school-ubuntu` before the generic `goat-ai` unit, and passes the resolved Ollama env vars through the `nohup` fallback too
 - Deploy now includes a post-deploy contract check (`tools/ops/post_deploy_check.py`) before success is reported: it exercises `GET /api/health`, `GET /api/ready`, `GET /api/system/runtime-target`, and a short `POST /api/chat` stream. The chat step passes when the SSE body includes **at least one** `token` or **`thinking`** frame (so thinking-first models still validate), and fails on HTTP errors, empty SSE, or a first-frame `error`
 
 Windows PowerShell deploy remains fully supported. Use WSL only when you specifically need Linux-targeted deploy-script parity or shell semantics.
@@ -231,7 +232,7 @@ The checked-in `scripts/ollama/*local*.sh` helpers and the sibling `ollama-local
 layout are now **school-only opt-in assets**, not part of the generic deploy path.
 
 - use `GOAT_USE_SCHOOL_OLLAMA_LOCAL=1` or `GOAT_OLLAMA_PROFILE=school-ubuntu`
-- keep `OLLAMA_BASE_URL=http://127.0.0.1:11435` in the school server's `.env` or `EnvironmentFile`
+- keep `OLLAMA_BASE_URL=http://127.0.0.1:11435` in the school server's `.env.school-ubuntu` or another dedicated `EnvironmentFile`
 - use `ops/systemd/goat-ai.school-ubuntu.service` when the school host should start the local Ollama helper automatically
 - leave the generic `ops/systemd/goat-ai.service` and default deploy flow on the standard Ollama address instead
 

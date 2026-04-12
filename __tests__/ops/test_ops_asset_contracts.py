@@ -86,8 +86,26 @@ def test_watchdog_phase0_and_school_ollama_assets_align_with_supported_ops_contr
         'GOAT_USE_SCHOOL_OLLAMA_LOCAL="${GOAT_USE_SCHOOL_OLLAMA_LOCAL:-0}"' in deploy_sh
     )
     assert 'GOAT_OLLAMA_PROFILE="${GOAT_OLLAMA_PROFILE:-}"' in deploy_sh
+    assert 'PRIMARY_DOTENV_PATH="${PROJECT_DIR}/.env"' in deploy_sh
+    assert 'SCHOOL_DOTENV_PATH="${PROJECT_DIR}/.env.school-ubuntu"' in deploy_sh
+    assert "read_first_dotenv_value() {" in deploy_sh
     assert "school_ollama_local_enabled() {" in deploy_sh
     assert "School Ubuntu Ollama profile enabled" in deploy_sh
+    assert (
+        '_dotenv_school_switch="$(read_first_dotenv_value "GOAT_USE_SCHOOL_OLLAMA_LOCAL" "${SCHOOL_DOTENV_PATH}" "${PRIMARY_DOTENV_PATH}")"'
+        in deploy_sh
+    )
+    assert (
+        '_dotenv_ollama_profile="$(read_first_dotenv_value "GOAT_OLLAMA_PROFILE" "${SCHOOL_DOTENV_PATH}" "${PRIMARY_DOTENV_PATH}")"'
+        in deploy_sh
+    )
+    assert "_goat_systemd_restart goat-ai.school-ubuntu" in deploy_sh
+    assert 'SELECTED_SYSTEMD_UNIT="goat-ai.school-ubuntu"' in deploy_sh
+    assert 'systemctl --user stop "${SELECTED_SYSTEMD_UNIT}"' in deploy_sh
+    assert (
+        'GOAT_USE_SCHOOL_OLLAMA_LOCAL="${GOAT_USE_SCHOOL_OLLAMA_LOCAL}" \\' in deploy_sh
+    )
+    assert 'GOAT_OLLAMA_PROFILE="${GOAT_OLLAMA_PROFILE}" \\' in deploy_sh
     assert '[ "${EFFECTIVE_OLLAMA_URL}" = "${LOCAL_OLLAMA_URL}" ]' not in deploy_sh
 
     assert (
@@ -139,6 +157,7 @@ def test_release_docs_and_status_match_current_truth() -> None:
     assert "observability asset contract" in operations_doc
     assert "`GOAT_USE_SCHOOL_OLLAMA_LOCAL`" in operations_doc
     assert "Simon school Ubuntu server profile" in operations_doc
+    assert "prefers `.env.school-ubuntu`" in operations_doc
     assert "python -m tools.desktop.packaged_shell_fault_smoke" in operations_doc
     assert (
         "python -m tools.desktop.installed_windows_desktop_fault_smoke"
