@@ -67,8 +67,8 @@ def build_error_body(
         else (
             default_code_for_http_status(status_code)
             if status_code is not None
-        else default_code_for_http_status(500)
-    )
+            else default_code_for_http_status(500)
+        )
     )
     body: dict[str, Any] = {"detail": detail, "code": resolved}
     rid = get_request_id()
