@@ -53,6 +53,7 @@ chat_logs.db
 chat_logs.db-*
 *.pid
 .desktop-sidecar-smoke/
+.pytest_tmp/
 
 # Build
 frontend/dist

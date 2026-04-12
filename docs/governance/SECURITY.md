@@ -44,7 +44,7 @@ This document records the current threat model and the guardrails that matter fo
 
 ## Frontend and desktop supply chain
 
-- Frontend and desktop dependency audits are release gates, not advisory checks. PRs and pushes to `main` must keep the `frontend` and `desktop-supply-chain` jobs green.
+- Frontend and desktop dependency audits are release gates, not advisory checks. PRs and pushes to `main` must keep the `frontend`, `desktop-package-windows`, and `desktop-supply-chain` jobs green.
 - Desktop artifacts produced from local developer machines or unsigned ad hoc builds are internal/test-only artifacts. They must not be presented as public production releases.
 - Publicly distributed Windows desktop installers must come from `.github/workflows/desktop-provenance.yml`, which signs the packaged installers and records provenance for the shipped files.
 - Any unsigned or locally produced desktop package remains internal/test-only and must be labeled that way even if it is byte-for-byte similar to the public release build.

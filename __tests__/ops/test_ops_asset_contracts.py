@@ -101,6 +101,9 @@ def test_release_docs_and_status_match_current_truth() -> None:
     project_status = (
         REPO_ROOT / "docs" / "governance" / "PROJECT_STATUS.md"
     ).read_text(encoding="utf-8")
+    security_doc = (REPO_ROOT / "docs" / "governance" / "SECURITY.md").read_text(
+        encoding="utf-8"
+    )
 
     assert "`STAGING_BASE_URL`" in release_doc
     assert "`PRODUCTION_BASE_URL`" in release_doc
@@ -117,6 +120,8 @@ def test_release_docs_and_status_match_current_truth() -> None:
     assert "`desktop-supply-chain`" in incident_triage
     assert "`backend-fast`" in incident_triage
     assert "hang_before_ready" in incident_triage
+    assert "`desktop-package-windows`" in security_doc
+    assert "`desktop-supply-chain`" in security_doc
     assert "`ops/deploy/deploy.sh`" in operations_doc
     assert "`ops/systemd/goat-ai.service`" in operations_doc
     assert "<app_log_dir>/desktop-shell.log" in operations_doc
