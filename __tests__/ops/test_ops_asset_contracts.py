@@ -1,0 +1,112 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+
+def _repo_root() -> Path:
+    current = Path(__file__).resolve()
+    for candidate in (current.parent, *current.parents):
+        if (candidate / "pyproject.toml").is_file():
+            return candidate
+    raise RuntimeError("Could not locate repository root from test path.")
+
+
+REPO_ROOT = _repo_root()
+
+
+def test_root_entrypoints_are_not_part_of_the_supported_ops_surface() -> None:
+    assert not (REPO_ROOT / "deploy.sh").exists()
+    assert not (REPO_ROOT / "deploy.ps1").exists()
+    assert not (REPO_ROOT / "phase0_check.sh").exists()
+
+
+def test_canonical_deploy_scripts_use_factory_entrypoint() -> None:
+    deploy_sh = (REPO_ROOT / "ops" / "deploy" / "deploy.sh").read_text(encoding="utf-8")
+    deploy_ps1 = (REPO_ROOT / "ops" / "deploy" / "deploy.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert "server:create_app" in deploy_sh
+    assert "--factory" in deploy_sh
+    assert '"server:create_app"' in deploy_ps1
+    assert '"--factory"' in deploy_ps1
+
+
+def test_goat_service_uses_supported_logs_and_factory_entrypoint() -> None:
+    service = (REPO_ROOT / "ops" / "systemd" / "goat-ai.service").read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        "ExecStartPre=/usr/bin/mkdir -p %h/GOAT_AI/var/logs %h/GOAT_AI/var/data"
+        in service
+    )
+    assert "Environment=GOAT_RUNTIME_ROOT=%h/GOAT_AI/var" in service
+    assert "Environment=GOAT_LOG_DIR=%h/GOAT_AI/var/logs" in service
+    assert "server:create_app" in service
+    assert "--factory" in service
+    assert "var/logs/fastapi.log" in service
+
+
+def test_watchdog_phase0_and_local_ollama_scripts_align_with_supported_ops_contract() -> (
+    None
+):
+    healthcheck = (REPO_ROOT / "ops" / "verification" / "healthcheck.sh").read_text(
+        encoding="utf-8"
+    )
+    watchdog = (REPO_ROOT / "ops" / "verification" / "watchdog.sh").read_text(
+        encoding="utf-8"
+    )
+    phase0 = (REPO_ROOT / "ops" / "verification" / "phase0_check.sh").read_text(
+        encoding="utf-8"
+    )
+    start_ollama = (
+        REPO_ROOT / "scripts" / "ollama" / "start_ollama_local.sh"
+    ).read_text(encoding="utf-8")
+
+    assert "GOAT_HEALTH_URL:=http://127.0.0.1:62606/api/health" in healthcheck
+    assert 'GOAT_RUNTIME_ROOT="${GOAT_RUNTIME_ROOT:-$PROJECT_DIR/var}"' in watchdog
+    assert 'GOAT_LOG_DIR="${GOAT_LOG_DIR:-$GOAT_RUNTIME_ROOT/logs}"' in watchdog
+    assert 'LOG="${GOAT_WATCHDOG_LOG:-$GOAT_LOG_DIR/watchdog.log}"' in watchdog
+    assert 'mkdir -p "$(dirname "$LOG")"' in watchdog
+    assert "bash ops/deploy/deploy.sh" in watchdog
+
+    assert "Need Node 24.x" in phase0
+    assert "npm ci --silent" in phase0
+    assert "server:create_app --factory" in phase0
+    assert "var/logs/fastapi.log" in phase0
+    assert "var/logs/fastapi.pid" in phase0
+
+    assert (
+        'OLLAMA_BASE_URL_VALUE="${OLLAMA_BASE_URL:-${OLLAMA_HOST:-http://127.0.0.1:11435}}"'
+        in start_ollama
+    )
+    assert 'OLLAMA_HOST="${OLLAMA_BASE_URL_VALUE}"' in start_ollama
+    assert "scripts/ollama/ollama_local.sh" in start_ollama
+
+
+def test_release_docs_and_status_match_current_truth() -> None:
+    release_doc = (
+        REPO_ROOT / "docs" / "operations" / "RELEASE_GOVERNANCE.md"
+    ).read_text(encoding="utf-8")
+    rollback_doc = (REPO_ROOT / "docs" / "operations" / "ROLLBACK.md").read_text(
+        encoding="utf-8"
+    )
+    operations_doc = (REPO_ROOT / "docs" / "operations" / "OPERATIONS.md").read_text(
+        encoding="utf-8"
+    )
+    project_status = (
+        REPO_ROOT / "docs" / "governance" / "PROJECT_STATUS.md"
+    ).read_text(encoding="utf-8")
+
+    assert "`STAGING_BASE_URL`" in release_doc
+    assert "`PRODUCTION_BASE_URL`" in release_doc
+    assert "immutable bundle" in release_doc
+    assert "promotion evidence" in release_doc
+    assert "exercise_release_rollback_drill" in rollback_doc
+    assert "python -m tools.quality.run_pr_latency_gate" in operations_doc
+    assert "`ops/deploy/deploy.sh`" in operations_doc
+    assert "`ops/systemd/goat-ai.service`" in operations_doc
+    assert "<app_log_dir>/desktop-shell.log" in operations_doc
+    assert "P0, P1, and P2 are complete" not in project_status
+    assert "artifact-first staged release governance workflow" in project_status

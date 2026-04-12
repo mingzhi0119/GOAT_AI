@@ -250,8 +250,9 @@ describe('App protected access integration', () => {
         'X-GOAT-Owner-Id': 'owner-99',
       },
     })
-    await waitFor(() => {
-      expect(screen.getAllByText(/^Hello back$/i).length).toBeGreaterThan(0)
+    const assistantReplies = await screen.findAllByText(/^Hello back$/i, undefined, {
+      timeout: 5000,
     })
+    expect(assistantReplies.length).toBeGreaterThan(0)
   })
 })

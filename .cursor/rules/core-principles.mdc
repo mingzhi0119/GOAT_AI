@@ -1,11 +1,11 @@
 ---
-description: Project direction, five non-negotiables, and cross-environment rules aligned with docs/ENGINEERING_STANDARDS.md
+description: Project direction, five non-negotiables, and cross-environment rules aligned with docs/standards/ENGINEERING_STANDARDS.md
 alwaysApply: true
 ---
 
 # GOAT AI - Core principles
 
-Canonical engineering rules: `docs/ENGINEERING_STANDARDS.md`. Repo root `AGENTS.md` carries agent memory and collaboration guidance; keep `.cursor/rules/` aligned when standards change.
+Canonical engineering rules: `docs/standards/ENGINEERING_STANDARDS.md`. Repo root `AGENTS.md` carries agent memory and collaboration guidance; keep `.cursor/rules/` aligned when standards change.
 
 ## Purpose
 
@@ -34,11 +34,11 @@ Canonical engineering rules: `docs/ENGINEERING_STANDARDS.md`. Repo root `AGENTS.
 - Line endings: `.gitattributes` enforces `eol=lf` where applicable.
 - Deps: exact pins in `requirements.txt` (runtime) and `requirements-ci.txt` (CI/dev includes `-r requirements.txt`); `package-lock.json` committed; CI and deploy use `npm ci`.
 - Secrets: `.env` gitignored; `.env.example` committed; never in scripts or source.
-- Startup: validate env/config at import or app factory time with `pydantic_settings.BaseSettings` for new services, or the existing `goat_ai/config.py` `@dataclass` + `load_settings()`. Crash with a clear message at startup, never lazily on first request.
+- Startup: validate env/config at import or app factory time with `pydantic_settings.BaseSettings` for new services, or the existing `goat_ai/config/settings.py` `@dataclass` + `load_settings()`. Crash with a clear message at startup, never lazily on first request.
 
 ## Before delivering code (CI parity)
 
-Before every merge or hand-off, run the same checks as `.github/workflows/ci.yml` (see repo root `AGENTS.md` for the full command list). At minimum: **ruff** (check + format on touched trees), **pip-audit**, **lint-imports**, **tools.run_rag_eval**, **tools.check_api_contract_sync**, **pytest** on `__tests__/`; any `frontend/` change also needs **`npm ci && npm test -- --run && npm run build`** under `frontend/`. Use Python **3.14** and `requirements-ci.txt` to match CI.
+Before every merge or hand-off, run the same checks as `.github/workflows/ci.yml` (see repo root `AGENTS.md` for the full command list). At minimum: **ruff** (check + format on touched trees), **pip-audit**, **lint-imports**, **tools.quality.run_rag_eval**, **tools.contracts.check_api_contract_sync**, **pytest** on `__tests__/`; any `frontend/` change also needs **`npm ci && npm test -- --run && npm run build`** under `frontend/`. Use Python **3.14** and `requirements-ci.txt` to match CI.
 
 ## Documentation language
 

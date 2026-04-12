@@ -16,8 +16,8 @@ from backend.application.ports import (
     KnowledgeValidationError,
     Settings,
 )
-from backend.config import get_settings
-from backend.dependencies import get_authorization_context
+from backend.platform.config import get_settings
+from backend.platform.dependencies import get_authorization_context
 from backend.models.common import ErrorResponse
 from backend.models.knowledge import (
     KnowledgeAnswerRequest,

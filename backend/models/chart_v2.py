@@ -1,4 +1,4 @@
-"""Versioned chart spec models; chart intent lives in ``goat_ai.chart_intent_v2``."""
+"""Versioned chart spec models; chart intent lives in ``goat_ai.charts.chart_intent_v2``."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from goat_ai.chart_intent_v2 import (
+from goat_ai.charts.chart_intent_v2 import (
     AggregateOp,
     ChartIntentFilterV2,
     ChartIntentSeriesV2,

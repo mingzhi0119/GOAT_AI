@@ -12,8 +12,8 @@ from backend.models.system import (
     RuntimeTargetResponse,
     SystemFeaturesResponse,
 )
-from backend.prometheus_metrics import render_prometheus_text
-from backend.readiness_service import evaluate_readiness
+from backend.platform.prometheus_metrics import render_prometheus_text
+from backend.platform.readiness_service import evaluate_readiness
 from backend.services.gpu_service import read_gpu_status as _read_gpu_status
 from backend.services.system_telemetry_service import (
     build_inference_latency_response,

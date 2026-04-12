@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from backend.domain.authz_types import AuthorizationContext
 from backend.services.exceptions import FeatureNotAvailable
-from goat_ai.config import Settings
-from goat_ai.feature_gates import (
+from goat_ai.config.settings import Settings
+from goat_ai.config.feature_gates import (
     CodeSandboxFeatureSnapshot,
     RuntimeFeatureSnapshot,
     compute_agent_workbench_snapshot,
     compute_code_sandbox_snapshot,
 )
-from goat_ai.telemetry_counters import inc_feature_gate_denial
+from goat_ai.telemetry.telemetry_counters import inc_feature_gate_denial
 
 
 def get_code_sandbox_snapshot(settings: Settings) -> CodeSandboxFeatureSnapshot:

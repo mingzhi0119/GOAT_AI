@@ -42,7 +42,7 @@ from backend.services.knowledge_pipeline import (
     persist_vector_index,
     search_vector_index,
 )
-from goat_ai.telemetry_counters import (
+from goat_ai.telemetry.telemetry_counters import (
     inc_knowledge_query_rewrite_applied,
     inc_knowledge_retrieval,
 )

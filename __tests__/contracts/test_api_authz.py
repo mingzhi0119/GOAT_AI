@@ -1,0 +1,415 @@
+"""Black-box tests for Phase 15.5 AuthZ: scoped API keys and session ownership."""
+
+from __future__ import annotations
+
+import tempfile
+import unittest
+from dataclasses import replace
+from datetime import datetime, timezone
+import io
+from pathlib import Path
+from unittest.mock import patch
+
+try:
+    from fastapi.testclient import TestClient
+except ImportError:  # pragma: no cover
+    TestClient = None  # type: ignore[assignment]
+
+from backend.api_errors import (
+    AUTH_SESSION_OWNER_REQUIRED,
+    AUTH_WRITE_KEY_REQUIRED,
+    FEATURE_DISABLED,
+    FEATURE_UNAVAILABLE,
+)
+from __tests__.helpers.api_contract import ContractFakeLLM, FakeTitleGenerator
+from goat_ai.config.settings import Settings
+
+if TestClient is not None:
+    from backend.platform.config import get_settings
+    from backend.platform.dependencies import (
+        get_code_sandbox_provider,
+        get_llm_client,
+        get_title_generator,
+    )
+    from backend.main import create_app
+    from backend.models.chat import ChatMessage
+    from backend.services.code_sandbox_provider import (
+        SandboxProviderRequest,
+        SandboxProviderResult,
+    )
+    from backend.services import log_service
+    from backend.services.session_message_codec import (
+        SESSION_PAYLOAD_VERSION,
+        build_session_payload,
+    )
+
+
+class AuthzFakeCodeSandboxProvider:
+    provider_name = "fake-docker"
+
+    def run_stream(self, request: SandboxProviderRequest):
+        _ = request
+        yield SandboxProviderResult(
+            provider_name=self.provider_name,
+            exit_code=0,
+            stdout="sandbox ok",
+            stderr="",
+            timed_out=False,
+            error_detail=None,
+            output_files=[],
+        )
+
+
+@unittest.skipUnless(TestClient is not None, "fastapi not installed")
+class ApiAuthzTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        root = Path(self.tmpdir.name)
+        self.settings = Settings(
+            ollama_base_url="http://127.0.0.1:11434",
+            generate_timeout=120,
+            max_upload_mb=20,
+            max_upload_bytes=20 * 1024 * 1024,
+            max_dataframe_rows=50000,
+            use_chat_api=True,
+            system_prompt="test system prompt",
+            app_root=root,
+            logo_svg=root / "logo.svg",
+            log_db_path=root / "chat_logs.db",
+            data_dir=root / "data",
+            api_key="read-key",
+            api_key_write="write-key",
+            rate_limit_window_sec=60,
+            rate_limit_max_requests=1000,
+            ready_skip_ollama_probe=True,
+        )
+        log_service.init_db(self.settings.log_db_path)
+
+        app = create_app()
+        app.dependency_overrides[get_settings] = lambda: self.settings
+        app.dependency_overrides[get_llm_client] = lambda: ContractFakeLLM()
+        app.dependency_overrides[get_title_generator] = lambda: FakeTitleGenerator()
+        self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        self.tmpdir.cleanup()
+
+    def test_read_key_forbidden_on_post_chat(self) -> None:
+        headers = {"X-GOAT-API-Key": "read-key"}
+        response = self.client.post(
+            "/api/chat",
+            headers=headers,
+            json={
+                "model": "blackbox-model",
+                "messages": [{"role": "user", "content": "hello"}],
+            },
+        )
+        self.assertEqual(403, response.status_code)
+        body = response.json()
+        self.assertEqual(AUTH_WRITE_KEY_REQUIRED, body["code"])
+
+    def test_read_key_allows_get_history(self) -> None:
+        headers = {"X-GOAT-API-Key": "read-key"}
+        response = self.client.get("/api/history", headers=headers)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({"sessions": []}, response.json())
+
+    def test_require_session_owner_chat_without_header_returns_403(self) -> None:
+        self.settings = replace(self.settings, require_session_owner=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+        headers = {"X-GOAT-API-Key": "write-key"}
+        response = self.client.post(
+            "/api/chat",
+            headers=headers,
+            json={
+                "model": "blackbox-model",
+                "messages": [{"role": "user", "content": "hello"}],
+            },
+        )
+        self.assertEqual(403, response.status_code)
+        self.assertEqual(AUTH_SESSION_OWNER_REQUIRED, response.json()["code"])
+
+    def test_owner_mismatch_returns_404_on_history_get(self) -> None:
+        ts = datetime(2026, 4, 8, 12, 0, 0, tzinfo=timezone.utc).isoformat()
+        payload = build_session_payload(
+            messages=[ChatMessage(role="user", content="hi")],
+            assistant_text="yo",
+            chart_spec=None,
+            knowledge_documents=None,
+            chart_data_source="none",
+        )
+        log_service.upsert_session(
+            db_path=self.settings.log_db_path,
+            session_id="sess-authz-1",
+            title="T",
+            model="m",
+            schema_version=SESSION_PAYLOAD_VERSION,
+            payload=payload,
+            created_at=ts,
+            updated_at=ts,
+            owner_id="alice",
+        )
+        headers = {"X-GOAT-API-Key": "read-key", "X-GOAT-Owner-Id": "bob"}
+        response = self.client.get("/api/history/sess-authz-1", headers=headers)
+        self.assertEqual(404, response.status_code)
+
+    def test_read_key_forbidden_on_knowledge_upload(self) -> None:
+        response = self.client.post(
+            "/api/knowledge/uploads",
+            headers={"X-GOAT-API-Key": "read-key"},
+            files={"file": ("notes.txt", io.BytesIO(b"alpha"), "text/plain")},
+        )
+        self.assertEqual(403, response.status_code)
+        self.assertEqual(AUTH_WRITE_KEY_REQUIRED, response.json()["code"])
+
+    def test_knowledge_owner_mismatch_returns_404(self) -> None:
+        upload = self.client.post(
+            "/api/knowledge/uploads",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+            files={"file": ("notes.txt", io.BytesIO(b"alpha beta"), "text/plain")},
+        )
+        self.assertEqual(200, upload.status_code)
+        document_id = upload.json()["document_id"]
+
+        response = self.client.get(
+            f"/api/knowledge/uploads/{document_id}",
+            headers={"X-GOAT-API-Key": "read-key", "X-GOAT-Owner-Id": "bob"},
+        )
+        self.assertEqual(404, response.status_code)
+
+    def test_media_owner_mismatch_returns_404_during_chat(self) -> None:
+        png = (
+            b"\x89PNG\r\n\x1a\n"
+            b"\x00\x00\x00\rIHDR"
+            b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00"
+            b"\x90wS\xde"
+            b"\x00\x00\x00\x0cIDATx\x9cc`\x00\x00\x00\x02\x00\x01"
+            b"\xe2!\xbc3"
+            b"\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+        upload = self.client.post(
+            "/api/media/uploads",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+            files={"file": ("tiny.png", io.BytesIO(png), "image/png")},
+        )
+        self.assertEqual(200, upload.status_code)
+        attachment_id = upload.json()["attachment_id"]
+
+        response = self.client.post(
+            "/api/chat",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "bob"},
+            json={
+                "model": "blackbox-model",
+                "messages": [{"role": "user", "content": "describe"}],
+                "image_attachment_ids": [attachment_id],
+            },
+        )
+        self.assertEqual(404, response.status_code)
+
+    def test_workbench_owner_mismatch_returns_404(self) -> None:
+        self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        create = self.client.post(
+            "/api/workbench/tasks",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+            json={"task_kind": "plan", "prompt": "Draft a plan"},
+        )
+        self.assertEqual(202, create.status_code)
+        task_id = create.json()["task_id"]
+
+        response = self.client.get(
+            f"/api/workbench/tasks/{task_id}",
+            headers={"X-GOAT-API-Key": "read-key", "X-GOAT-Owner-Id": "bob"},
+        )
+        self.assertEqual(404, response.status_code)
+
+        events_response = self.client.get(
+            f"/api/workbench/tasks/{task_id}/events",
+            headers={"X-GOAT-API-Key": "read-key", "X-GOAT-Owner-Id": "bob"},
+        )
+        self.assertEqual(404, events_response.status_code)
+
+    def test_workbench_workspace_output_owner_mismatch_returns_404(self) -> None:
+        self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        create = self.client.post(
+            "/api/workbench/tasks",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+            json={
+                "task_kind": "canvas",
+                "prompt": "Draft a canvas",
+                "session_id": "sess-output-authz",
+            },
+        )
+        self.assertEqual(202, create.status_code)
+        task_id = create.json()["task_id"]
+        task_status = self.client.get(
+            f"/api/workbench/tasks/{task_id}",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+        )
+        self.assertEqual(200, task_status.status_code)
+        output_id = task_status.json()["workspace_outputs"][0]["output_id"]
+
+        response = self.client.get(
+            f"/api/workbench/workspace-outputs/{output_id}",
+            headers={"X-GOAT-API-Key": "read-key", "X-GOAT-Owner-Id": "bob"},
+        )
+        self.assertEqual(404, response.status_code)
+
+        export_response = self.client.post(
+            f"/api/workbench/workspace-outputs/{output_id}/exports",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "bob"},
+            json={"format": "markdown"},
+        )
+        self.assertEqual(404, export_response.status_code)
+
+        history_response = self.client.get(
+            "/api/history/sess-output-authz",
+            headers={"X-GOAT-API-Key": "read-key", "X-GOAT-Owner-Id": "bob"},
+        )
+        self.assertEqual(404, history_response.status_code)
+
+    def test_workbench_sources_hide_knowledge_without_knowledge_read_scope(
+        self,
+    ) -> None:
+        self.settings = replace(
+            self.settings,
+            feature_agent_workbench_enabled=True,
+            api_key="bootstrap-auth-enabled",
+            api_key_write="",
+            api_credentials_json="""
+            [
+              {
+                "credential_id": "cred-workbench-limited",
+                "secret": "limited-workbench",
+                "principal_id": "principal:limited-workbench",
+                "tenant_id": "tenant:default",
+                "status": "active",
+                "scopes": ["history:read", "history:write"]
+              }
+            ]
+            """,
+        )
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        response = self.client.get(
+            "/api/workbench/sources",
+            headers={"X-GOAT-API-Key": "limited-workbench"},
+        )
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(
+            ["web"], [item["source_id"] for item in response.json()["sources"]]
+        )
+
+        features = self.client.get(
+            "/api/system/features",
+            headers={"X-GOAT-API-Key": "limited-workbench"},
+        )
+        self.assertEqual(200, features.status_code)
+        workbench = features.json()["workbench"]
+        self.assertTrue(workbench["agent_tasks"]["effective_enabled"])
+        self.assertFalse(workbench["browse"]["effective_enabled"])
+        self.assertFalse(workbench["deep_research"]["effective_enabled"])
+        self.assertFalse(workbench["connectors"]["effective_enabled"])
+
+    @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
+    def test_system_features_resolve_policy_gate_per_credential(
+        self, _mock: object
+    ) -> None:
+        self.settings = replace(self.settings, feature_code_sandbox_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        read_features = self.client.get(
+            "/api/system/features", headers={"X-GOAT-API-Key": "read-key"}
+        )
+        self.assertEqual(200, read_features.status_code)
+        self.assertFalse(read_features.json()["code_sandbox"]["policy_allowed"])
+        self.assertTrue(read_features.json()["code_sandbox"]["effective_enabled"])
+
+        write_features = self.client.get(
+            "/api/system/features", headers={"X-GOAT-API-Key": "write-key"}
+        )
+        self.assertEqual(200, write_features.status_code)
+        self.assertTrue(write_features.json()["code_sandbox"]["policy_allowed"])
+        self.assertTrue(write_features.json()["code_sandbox"]["effective_enabled"])
+
+    @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
+    def test_code_sandbox_exec_policy_denial_returns_403(self, _mock: object) -> None:
+        self.settings = replace(
+            self.settings,
+            feature_code_sandbox_enabled=True,
+            api_key="bootstrap-auth-enabled",
+            api_key_write="",
+            api_credentials_json="""
+            [
+              {
+                "credential_id": "cred-limited-write",
+                "secret": "limited-write",
+                "principal_id": "principal:limited-write",
+                "tenant_id": "tenant:default",
+                "status": "active",
+                "scopes": ["history:write", "history:read"]
+              }
+            ]
+            """,
+        )
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        response = self.client.post(
+            "/api/code-sandbox/exec",
+            headers={"X-GOAT-API-Key": "limited-write"},
+            json={},
+        )
+        self.assertEqual(403, response.status_code)
+        body = response.json()
+        self.assertEqual(FEATURE_DISABLED, body["code"])
+
+    @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=False)
+    def test_code_sandbox_exec_runtime_denial_returns_503_even_for_write_key(
+        self, _mock: object
+    ) -> None:
+        self.settings = replace(self.settings, feature_code_sandbox_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        response = self.client.post(
+            "/api/code-sandbox/exec",
+            headers={"X-GOAT-API-Key": "write-key"},
+            json={},
+        )
+        self.assertEqual(503, response.status_code)
+        body = response.json()
+        self.assertEqual(FEATURE_UNAVAILABLE, body["code"])
+
+    @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
+    def test_code_sandbox_execution_read_owner_mismatch_returns_404(
+        self, _mock: object
+    ) -> None:
+        self.settings = replace(
+            self.settings,
+            feature_code_sandbox_enabled=True,
+            require_session_owner=True,
+        )
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+        self.client.app.dependency_overrides[get_code_sandbox_provider] = lambda: (
+            AuthzFakeCodeSandboxProvider()
+        )
+
+        create_response = self.client.post(
+            "/api/code-sandbox/exec",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+            json={"code": "echo sandbox ok"},
+        )
+        self.assertEqual(200, create_response.status_code)
+        execution_id = create_response.json()["execution_id"]
+
+        read_response = self.client.get(
+            f"/api/code-sandbox/executions/{execution_id}",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "bob"},
+        )
+        self.assertEqual(404, read_response.status_code)
+
+
+if __name__ == "__main__":
+    unittest.main()

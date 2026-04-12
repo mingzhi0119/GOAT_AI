@@ -20,6 +20,6 @@ sudo apt-get install -y \
 Representative Linux validation commands:
 
 ```bash
-python -m tools.build_desktop_sidecar --target-triple x86_64-unknown-linux-gnu --clean
+python -m tools.desktop.build_desktop_sidecar --target-triple x86_64-unknown-linux-gnu --clean
 cargo test --manifest-path frontend/src-tauri/Cargo.toml
 ```

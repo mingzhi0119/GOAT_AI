@@ -85,7 +85,7 @@ def test_chat_with_knowledge_injects_context_and_persists_documents(
 ) -> None:
     from fastapi.testclient import TestClient
 
-    from backend.dependencies import get_llm_client, get_title_generator
+    from backend.platform.dependencies import get_llm_client, get_title_generator
 
     assert isinstance(app_client, TestClient)
     fake_llm = _KnowledgeAwareFakeLLM()

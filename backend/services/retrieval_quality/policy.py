@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 
 def resolve_rerank_mode(

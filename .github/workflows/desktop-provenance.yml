@@ -40,7 +40,7 @@ jobs:
         run: python -m pip install -r requirements-desktop-build.txt
       - uses: dtolnay/rust-toolchain@stable
       - name: Build Linux desktop sidecar
-        run: python -m tools.build_desktop_sidecar --target-triple x86_64-unknown-linux-gnu --clean
+        run: python -m tools.desktop.build_desktop_sidecar --target-triple x86_64-unknown-linux-gnu --clean
       - name: Write sidecar digest manifest
         shell: bash
         run: |
@@ -142,7 +142,7 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($timestampUrl)) {
             $timestampUrl = "http://timestamp.digicert.com"
           }
-          .\scripts\sign_windows_desktop_artifacts.ps1 `
+          .\scripts\desktop\sign_windows_desktop_artifacts.ps1 `
             -BundleRoot "frontend/src-tauri/target/release/bundle" `
             -CertificateBase64 $env:GOAT_DESKTOP_SIGNING_CERT_BASE64 `
             -CertificatePassword $env:GOAT_DESKTOP_SIGNING_CERT_PASSWORD `
@@ -152,7 +152,7 @@ jobs:
         run: |
           $args = @(
             "-m",
-            "tools.write_desktop_release_provenance",
+            "tools.desktop.write_desktop_release_provenance",
             "--bundle-root",
             "frontend/src-tauri/target/release/bundle",
             "--pattern",

@@ -2,9 +2,48 @@
 
 from __future__ import annotations
 
+import importlib
+
 import pytest
 
-from backend.config import get_settings
+
+def _clear_imported_settings_caches() -> None:
+    import backend.platform.config as backend_config
+    import backend.platform.dependencies as backend_dependencies
+    import backend.platform.http_security as backend_http_security
+    import backend.main as backend_main
+    from backend.routers import (
+        artifacts,
+        chat,
+        code_sandbox,
+        history,
+        knowledge,
+        media,
+        models,
+        system,
+        upload,
+        workbench,
+    )
+
+    backend_config.get_settings.cache_clear()
+    backend_dependencies.get_settings.cache_clear()
+    backend_http_security.get_settings.cache_clear()
+    backend_main.get_settings.cache_clear()
+
+    # Some tests reload backend.platform.config, so route modules can hold stale get_settings aliases.
+    for module in (
+        artifacts,
+        chat,
+        code_sandbox,
+        history,
+        knowledge,
+        media,
+        models,
+        system,
+        upload,
+        workbench,
+    ):
+        importlib.reload(module)
 
 
 @pytest.fixture
@@ -16,12 +55,16 @@ def integration_env(
     log_db = base / "chat_logs.db"
     data_dir = base / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("GOAT_API_KEY", "")
+    monkeypatch.setenv("GOAT_API_KEY_WRITE", "")
+    monkeypatch.setenv("GOAT_API_CREDENTIALS_JSON", "")
+    monkeypatch.setenv("GOAT_REQUIRE_SESSION_OWNER", "false")
     monkeypatch.setenv("GOAT_LOG_PATH", str(log_db))
     monkeypatch.setenv("GOAT_DATA_DIR", str(data_dir))
     monkeypatch.setenv("GOAT_READY_SKIP_OLLAMA_PROBE", "true")
-    get_settings.cache_clear()
+    _clear_imported_settings_caches()
     yield
-    get_settings.cache_clear()
+    _clear_imported_settings_caches()
 
 
 @pytest.fixture

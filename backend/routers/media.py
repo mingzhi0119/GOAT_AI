@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from backend.domain.authz_types import AuthorizationContext
 from backend.application.media import create_media_upload
 from backend.application.ports import MediaValidationError, Settings
-from backend.config import get_settings
-from backend.dependencies import get_authorization_context
+from backend.platform.config import get_settings
+from backend.platform.dependencies import get_authorization_context
 from backend.models.common import ErrorResponse
 from backend.models.media import MediaUploadResponse
 

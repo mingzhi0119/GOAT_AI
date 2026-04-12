@@ -48,7 +48,7 @@ jobs:
         env:
           PERFORMANCE_API_KEY: ${{ secrets.PERFORMANCE_API_KEY }}
         run: |
-          python -m tools.load_chat_smoke \
+          python -m tools.quality.load_chat_smoke \
             --base-url "${{ steps.target.outputs.base_url }}" \
             --model "${{ inputs.model || 'gemma4:26b' }}" \
             --runs "${{ inputs.runs || '10' }}" \

@@ -9,7 +9,7 @@ from typing import Callable
 
 from backend.domain.authz_types import AuthorizationContext
 from fastapi.responses import StreamingResponse
-from goat_ai.config import default_system_prompt_for_theme
+from goat_ai.config.settings import default_system_prompt_for_theme
 
 from backend.application.ports import (
     ConversationLogger,

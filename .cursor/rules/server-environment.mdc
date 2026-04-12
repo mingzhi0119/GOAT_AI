@@ -1,6 +1,6 @@
 ---
-description: Project snapshot, production host constraints, and deploy rules aligned with docs/ENGINEERING_STANDARDS.md
-globs: deploy.sh,docs/OPERATIONS.md,docs/PROJECT_STATUS.md,goat-ai.service,scripts/rotate_fastapi_log.py,scripts/backup_chat_db.py,scripts/healthcheck.sh,scripts/watchdog.sh
+description: Project snapshot, production host constraints, and deploy rules aligned with docs/standards/ENGINEERING_STANDARDS.md
+globs: ops/deploy/deploy.sh,ops/deploy/deploy.ps1,ops/verification/phase0_check.sh,docs/operations/OPERATIONS.md,docs/governance/PROJECT_STATUS.md,ops/systemd/goat-ai.service,tools/ops/rotate_fastapi_log.py,tools/ops/backup_chat_db.py,ops/verification/healthcheck.sh,ops/verification/watchdog.sh
 alwaysApply: false
 ---
 
@@ -21,7 +21,7 @@ Use this when changing deploy scripts, process management, host-only docs, or ru
 ## Production server constraints
 
 - Shared JupyterHub-style environment; no sudo or root. Do not assume `apt`, system `systemctl`, nginx reloads, or `/etc/*` access.
-- `systemctl --user` may work but can fail in SSH sessions. Preserve the `deploy.sh` nohup plus PID fallback.
+- `systemctl --user` may work but can fail in SSH sessions. Preserve the `ops/deploy/deploy.sh` nohup plus PID fallback.
 - Uvicorn on `0.0.0.0:62606` is valid for this user.
 - GPU: prefer `GOAT_GPU_UUID=GPU-fb2cf8f7-e9bf-f136-a3bb-e150426598e8` for the A100.
 
@@ -33,9 +33,9 @@ Use this when changing deploy scripts, process management, host-only docs, or ru
 
 ## Doc source of truth
 
-- Full table: `docs/OPERATIONS.md` - Shared host permissions (JupyterHub / unprivileged user).
-- Short snapshot: `docs/PROJECT_STATUS.md` - server permissions snapshot.
-- User-space log backup and health: `docs/OPERATIONS.md` - user-space ops (no root) and related scripts.
+- Full table: `docs/operations/OPERATIONS.md` - Shared host permissions (JupyterHub / unprivileged user).
+- Short snapshot: `docs/governance/PROJECT_STATUS.md` - server permissions snapshot.
+- User-space log backup and health: `docs/operations/OPERATIONS.md` - user-space ops (no root) and related scripts.
 
 ## Deploy rules
 
@@ -43,4 +43,4 @@ Use this when changing deploy scripts, process management, host-only docs, or ru
 - Deploy from the current local checkout unless explicit sync is requested. `SYNC_GIT=1` is explicit opt-in only.
 - Keep nohup fallback deployment behavior intact.
 - Runtime target selection is interface-driven: `GOAT_DEPLOY_TARGET=auto` prefers `GOAT_SERVER_PORT` and falls back to `GOAT_LOCAL_PORT` only when the environment cannot bind or use the server port.
-- Keep `deploy.sh` and related scripts aligned with `GET /api/system/runtime-target`.
+- Keep `ops/deploy/deploy.sh` and related scripts aligned with `GET /api/system/runtime-target`.

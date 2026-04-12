@@ -8,7 +8,7 @@ from typing import FrozenSet
 
 from backend.domain.authz_types import AuthorizationContext
 from backend.domain.authorization import PrincipalId, Scope, TenantId
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 _DEFAULT_TENANT = "tenant:default"
 _AUTH_MODE_SHARED = "shared_key_v1"

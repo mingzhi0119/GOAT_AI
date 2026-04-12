@@ -15,7 +15,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
-          # Match local dev when using Python 3.14; docs/openapi.json must match app.openapi() for this interpreter.
+          # Match local dev when using Python 3.14; docs/api/openapi.json must match app.openapi() for this interpreter.
           python-version: "3.14"
       - uses: astral-sh/setup-uv@v8.0.0
         with:
@@ -52,14 +52,14 @@ jobs:
       - name: Import layer lint
         run: lint-imports
       - name: RAG eval regression (Phase 14.7)
-        run: python -m tools.run_rag_eval
+        run: python -m tools.quality.run_rag_eval
       - name: API Contract Gate
-        run: python -m tools.check_api_contract_sync
+        run: python -m tools.contracts.check_api_contract_sync
       - name: Pytest
         run: python -m pytest __tests__/ -v --tb=short --cov=backend --cov=goat_ai --cov-report=term-missing --cov-fail-under=70
       - name: PR latency gate
         run: |
-          python -m tools.run_pr_latency_gate \
+          python -m tools.quality.run_pr_latency_gate \
             --runs 8 \
             --max-total-p95-ms 1200 \
             --max-first-token-p95-ms 400 \
@@ -126,7 +126,7 @@ jobs:
         run: python -m pip install -r requirements-desktop-build.txt
       - uses: dtolnay/rust-toolchain@stable
       - name: Build Linux desktop sidecar
-        run: python -m tools.build_desktop_sidecar --target-triple x86_64-unknown-linux-gnu --clean
+        run: python -m tools.desktop.build_desktop_sidecar --target-triple x86_64-unknown-linux-gnu --clean
       - name: Desktop Rust tests
         run: cargo test --manifest-path frontend/src-tauri/Cargo.toml
       - name: Install cargo-audit
@@ -178,7 +178,7 @@ jobs:
       - name: Write packaged desktop provenance
         shell: pwsh
         run: |
-          python -m tools.write_desktop_release_provenance `
+          python -m tools.desktop.write_desktop_release_provenance `
             --bundle-root frontend/src-tauri/target/release/bundle `
             --pattern "msi/*.msi" `
             --pattern "nsis/*-setup.exe" `

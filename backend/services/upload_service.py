@@ -18,7 +18,7 @@ from backend.services.knowledge_service import (
     start_knowledge_ingestion,
 )
 from backend.services.sse import sse_done_event, sse_error_event, sse_event
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 from backend.types import LLMClient
 
 

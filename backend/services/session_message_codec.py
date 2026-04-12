@@ -10,7 +10,7 @@ from backend.domain.chart_types import ChartDataSource
 from backend.domain.invariants import chart_spec_requires_version_field
 from backend.models.artifact import ChatArtifact
 from backend.models.chat import ChatMessage
-from goat_ai.tools import FILE_CONTEXT_UPLOAD_PREFIX, LEGACY_CSV_FENCE_SUBSTRING
+from goat_ai.chat.tools import FILE_CONTEXT_UPLOAD_PREFIX, LEGACY_CSV_FENCE_SUBSTRING
 
 
 class SessionSchemaError(ValueError):

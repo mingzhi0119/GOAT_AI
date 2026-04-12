@@ -2,7 +2,7 @@
 
 Exercises the upload → ingest → search round-trip through the full
 FastAPI TestClient stack. No live Ollama required; all assertions are
-against the HTTP API contract documented in docs/openapi.json.
+against the HTTP API contract documented in docs/api/openapi.json.
 """
 
 from __future__ import annotations

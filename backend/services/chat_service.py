@@ -24,8 +24,8 @@ from backend.services.session_service import last_user_message
 from backend.services.sse import sse_done_event, sse_error_event
 from backend.services.tabular_context import TabularContextExtractor
 from backend.types import Settings
-from goat_ai.clocks import Clock
-from goat_ai.ollama_client import LLMClient
+from goat_ai.shared.clocks import Clock
+from goat_ai.llm.ollama_client import LLMClient
 
 
 def stream_chat_sse(

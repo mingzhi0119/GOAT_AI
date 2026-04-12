@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from backend.prometheus_metrics import inc_sqlite_log_write_failure
+from backend.platform.prometheus_metrics import inc_sqlite_log_write_failure
 from backend.services.exceptions import (
     PersistenceReadError,
     PersistenceWriteError,

@@ -8,8 +8,11 @@ from fastapi.responses import FileResponse
 from backend.domain.authz_types import AuthorizationContext
 from backend.application.artifacts import download_artifact_response
 from backend.application.ports import SessionRepository, Settings
-from backend.config import get_settings
-from backend.dependencies import get_authorization_context, get_session_repository
+from backend.platform.config import get_settings
+from backend.platform.dependencies import (
+    get_authorization_context,
+    get_session_repository,
+)
 from backend.models.common import ErrorResponse
 
 router = APIRouter()

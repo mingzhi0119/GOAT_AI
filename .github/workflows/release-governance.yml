@@ -50,7 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           resolved_sha="$(git rev-parse HEAD)"
-          python -m tools.build_release_bundle \
+          python -m tools.release.build_release_bundle \
             --repo-root . \
             --output-bundle release-bundle.tar.gz \
             --output-manifest release-manifest.json \
@@ -155,7 +155,7 @@ jobs:
             RELEASE_BUNDLE='${remote_dir}/release-bundle.tar.gz' \
             RELEASE_MANIFEST='${remote_dir}/release-manifest.json' \
             EXPECTED_GIT_SHA='${{ needs.build-release.outputs.resolved_sha }}' \
-            bash \"\$stage_dir/deploy.sh\"
+            bash \"\$stage_dir/ops/deploy/deploy.sh\"
           "
       - name: Run staging post-deploy check
         env:
@@ -163,7 +163,7 @@ jobs:
           STAGING_API_KEY: ${{ secrets.STAGING_API_KEY }}
           STAGING_OWNER_ID: ${{ secrets.STAGING_OWNER_ID }}
         run: |
-          python scripts/post_deploy_check.py \
+          python -m tools.ops.post_deploy_check \
             --base-url "${STAGING_BASE_URL}" \
             --api-key "${STAGING_API_KEY}" \
             --owner-id "${STAGING_OWNER_ID}"
@@ -282,7 +282,7 @@ jobs:
             RELEASE_BUNDLE='${remote_dir}/release-bundle.tar.gz' \
             RELEASE_MANIFEST='${remote_dir}/release-manifest.json' \
             EXPECTED_GIT_SHA='${{ needs.build-release.outputs.resolved_sha }}' \
-            bash \"\$stage_dir/deploy.sh\"
+            bash \"\$stage_dir/ops/deploy/deploy.sh\"
           "
       - name: Run production post-deploy check
         env:
@@ -290,7 +290,7 @@ jobs:
           PRODUCTION_API_KEY: ${{ secrets.PRODUCTION_API_KEY }}
           PRODUCTION_OWNER_ID: ${{ secrets.PRODUCTION_OWNER_ID }}
         run: |
-          python scripts/post_deploy_check.py \
+          python -m tools.ops.post_deploy_check \
             --base-url "${PRODUCTION_BASE_URL}" \
             --api-key "${PRODUCTION_API_KEY}" \
             --owner-id "${PRODUCTION_OWNER_ID}"

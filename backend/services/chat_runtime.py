@@ -13,7 +13,7 @@ from backend.domain.resource_ownership import (
 from backend.services.artifact_service import PersistedArtifactRecord
 from backend.services import log_service
 from backend.services.session_message_codec import decode_session_payload
-from goat_ai.ollama_client import LLMClient
+from goat_ai.llm.ollama_client import LLMClient
 
 
 @dataclass(frozen=True, kw_only=True)

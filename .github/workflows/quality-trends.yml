@@ -80,11 +80,11 @@ jobs:
           exit 0
       - name: Build security review snapshot
         run: |
-          python -m tools.security_review_snapshot \
+          python -m tools.quality.security_review_snapshot \
             --pip-audit-json pip-audit.json \
             --npm-audit-json npm-audit.json \
             --cargo-audit-json cargo-audit.json \
-            --desktop-cargo-exceptions-doc docs/DESKTOP_CARGO_AUDIT_EXCEPTIONS.md \
+            --desktop-cargo-exceptions-doc docs/operations/DESKTOP_CARGO_AUDIT_EXCEPTIONS.md \
             --output security-review-snapshot.json \
             --workflow-name quality-trends \
             --sha "${GITHUB_SHA}" \
@@ -120,7 +120,7 @@ jobs:
         env:
           PERFORMANCE_API_KEY: ${{ secrets.PERFORMANCE_API_KEY }}
         run: |
-          python -m tools.load_chat_smoke \
+          python -m tools.quality.load_chat_smoke \
             --base-url "${{ steps.performance_target.outputs.base_url }}" \
             --model "gemma4:26b" \
             --runs 10 \
@@ -138,7 +138,7 @@ jobs:
           if [[ -f performance-summary.json ]]; then
             extra_args+=(--performance-summary-json performance-summary.json)
           fi
-          python -m tools.quality_snapshot \
+          python -m tools.quality.quality_snapshot \
             --backend-coverage-json backend-coverage.json \
             --frontend-lcov frontend/coverage/lcov.info \
             --output quality-snapshot.json \

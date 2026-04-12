@@ -16,7 +16,7 @@ from backend.services.knowledge_storage import (
     knowledge_document_dir,
     knowledge_vector_dir,
 )
-from goat_ai.config import Settings
+from goat_ai.config.settings import Settings
 
 _TOKEN_RE = re.compile(r"[A-Za-z0-9_]+")
 _VECTOR_DIMS = 128

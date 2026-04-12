@@ -24,6 +24,24 @@ describe("run-python", () => {
     expect(candidates[0]).toBe("C:\\Python314\\python.exe");
   });
 
+  it("prefers actions/setup-python interpreter paths on Windows runners", () => {
+    const candidates = pythonCandidates({
+      env: {
+        pythonLocation: "C:\\hostedtoolcache\\windows\\Python\\3.14.3\\x64",
+        Python3_ROOT_DIR: "C:\\hostedtoolcache\\windows\\Python\\3.14.3\\x64",
+        LOCALAPPDATA: "C:\\Users\\goat\\AppData\\Local",
+      },
+      homeDir: "C:\\Users\\goat",
+      platform: "win32",
+    });
+
+    expect(candidates[0]).toBe("C:\\hostedtoolcache\\windows\\Python\\3.14.3\\x64\\python.exe");
+    expect(
+      candidates.filter(candidate => candidate === "C:\\hostedtoolcache\\windows\\Python\\3.14.3\\x64\\python.exe"),
+    ).toHaveLength(1);
+    expect(candidates).toContain("python.exe");
+  });
+
   it("uses py launcher version args on Windows", () => {
     expect(buildPythonVersionArgs({ candidate: "py", platform: "win32" })).toEqual([
       "-3.14",
@@ -50,18 +68,28 @@ describe("run-python", () => {
       spawn,
     });
 
-    expect(found).toBe("python");
+    expect(found).toBe("python.exe");
     expect(spawn).toHaveBeenNthCalledWith(
       1,
       "C:\\Users\\goat\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
       ["--version"],
-      expect.objectContaining({ cwd: "/repo/frontend", shell: false, stdio: "ignore" }),
+      expect.objectContaining({
+        cwd: "/repo/frontend",
+        env: { LOCALAPPDATA: "C:\\Users\\goat\\AppData\\Local" },
+        shell: false,
+        stdio: "ignore",
+      }),
     );
     expect(spawn).toHaveBeenNthCalledWith(
       2,
-      "python",
+      "python.exe",
       ["--version"],
-      expect.objectContaining({ cwd: "/repo/frontend", shell: false, stdio: "ignore" }),
+      expect.objectContaining({
+        cwd: "/repo/frontend",
+        env: { LOCALAPPDATA: "C:\\Users\\goat\\AppData\\Local" },
+        shell: false,
+        stdio: "ignore",
+      }),
     );
   });
 
@@ -72,7 +100,7 @@ describe("run-python", () => {
       exists: () => false,
       homeDir: "/home/goat",
       platform: "linux",
-      rawArgs: ["../tools/build_desktop_sidecar.py"],
+      rawArgs: ["../tools/desktop/build_desktop_sidecar.py"],
       spawn: vi.fn().mockReturnValue({ status: 1 }),
     });
 
@@ -94,7 +122,7 @@ describe("run-python", () => {
       exists: () => true,
       homeDir: "/home/goat",
       platform: "linux",
-      rawArgs: ["../tools/build_desktop_sidecar.py", "--clean"],
+      rawArgs: ["../tools/desktop/build_desktop_sidecar.py", "--clean"],
       spawn,
     });
 
@@ -102,8 +130,13 @@ describe("run-python", () => {
     expect(spawn).toHaveBeenNthCalledWith(
       2,
       "python3",
-      ["../tools/build_desktop_sidecar.py", "--clean"],
-      expect.objectContaining({ cwd: "/repo/frontend", shell: false, stdio: "inherit" }),
+      ["../tools/desktop/build_desktop_sidecar.py", "--clean"],
+      expect.objectContaining({
+        cwd: "/repo/frontend",
+        env: {},
+        shell: false,
+        stdio: "inherit",
+      }),
     );
   });
 

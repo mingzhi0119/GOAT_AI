@@ -22,8 +22,8 @@ from backend.application.ports import (
     SandboxProvider,
     Settings,
 )
-from backend.config import get_settings
-from backend.dependencies import (
+from backend.platform.config import get_settings
+from backend.platform.dependencies import (
     get_authorization_context,
     get_code_sandbox_execution_dispatcher,
     get_code_sandbox_execution_repository,

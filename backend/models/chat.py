@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 
 class ChatMessage(BaseModel):
-    """A single turn in the conversation (mirrors goat_ai.types.ChatTurn)."""
+    """A single turn in the conversation (mirrors goat_ai.shared.types.ChatTurn)."""
 
     role: str = Field(..., pattern="^(user|assistant|system)$")
     content: str
