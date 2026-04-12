@@ -131,6 +131,8 @@ Important notes:
 - `desktop-supply-chain` remains the Linux sidecar/provenance/cargo-audit gate; it does not own the Windows pre-ready retry semantics
 - `.github/workflows/desktop-provenance.yml` now runs `python -m tools.desktop.installed_windows_desktop_fault_smoke` against both the built `.msi` and NSIS installers before release assets are uploaded
 - `.github/workflows/fault-injection.yml` reruns the same installed Windows drill on a schedule so installer regressions do not hide behind release-only evidence
+- installed Windows evidence now writes `summary.json` even on install or scenario failure, including installer kind/path/digest, install root, log paths, partial scenario results, uninstall outcome, and workflow metadata such as release ref, resolved SHA, and distribution channel
+- installed Windows evidence upload should use `if: always()` in both release and scheduled workflows so `desktop-installed-smoke/*/summary.json` survives the exact failures it is meant to diagnose
 - PyInstaller is **not** a cross-compiler; build each platform's sidecar on that platform (or an equivalent CI runner / VM)
 - on Windows developer machines, Linux-targeted desktop validation should still run from WSL when you need Linux parity; Windows-native packaging remains a Windows flow
 - packaged desktop builds move app-owned writable state out of the repository and into the platform app-local-data directory

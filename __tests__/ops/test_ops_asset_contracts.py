@@ -168,8 +168,11 @@ def test_release_docs_and_status_match_current_truth() -> None:
     )
     assert "desktop-windows-fault-smoke" in operations_doc
     assert "artifact should contain at least" in operations_doc
+    assert "installed Windows evidence now writes" in operations_doc
+    assert "desktop-installed-smoke/*/summary.json" in operations_doc
     assert "desktop-fault-smoke/summary.json" in incident_triage
     assert "desktop-fault-smoke/build.log" in incident_triage
+    assert "desktop-installed-smoke/*/summary.json" in incident_triage
     assert "Linux sidecar/provenance/cargo-audit gate" in operations_doc
     assert "does not own the Windows pre-ready retry semantics" in operations_doc
     assert "`desktop-package-windows`" in incident_triage

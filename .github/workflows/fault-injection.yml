@@ -72,15 +72,24 @@ jobs:
           python -m tools.desktop.installed_windows_desktop_fault_smoke `
             --installer "${{ steps.windows_artifacts.outputs.msi_path }}" `
             --installer-kind msi `
-            --artifact-dir "desktop-installed-smoke/msi"
+            --artifact-dir "desktop-installed-smoke/msi" `
+            --workflow-role fault_injection_drill `
+            --release-ref "${{ github.ref_name }}" `
+            --resolved-sha "${{ github.sha }}" `
+            --distribution-channel internal_test
       - name: Run installed NSIS desktop drill
         shell: pwsh
         run: |
           python -m tools.desktop.installed_windows_desktop_fault_smoke `
             --installer "${{ steps.windows_artifacts.outputs.nsis_path }}" `
             --installer-kind nsis `
-            --artifact-dir "desktop-installed-smoke/nsis"
+            --artifact-dir "desktop-installed-smoke/nsis" `
+            --workflow-role fault_injection_drill `
+            --release-ref "${{ github.ref_name }}" `
+            --resolved-sha "${{ github.sha }}" `
+            --distribution-channel internal_test
       - name: Upload installed Windows drill evidence
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: desktop-installed-drill

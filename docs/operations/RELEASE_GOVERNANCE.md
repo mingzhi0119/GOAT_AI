@@ -99,6 +99,11 @@ Desktop release steps:
 6. Write `desktop-windows-provenance.json` with artifact digests and signature status.
 7. Upload the installers plus provenance assets and installed-smoke evidence, then emit installer attestations when supported.
 
+The installed Windows evidence bundle should retain `desktop-installed-smoke/*/summary.json`
+even when install, startup, or uninstall fails. That summary is the audit entrypoint
+for installer kind, installer digest, install root, resolved SHA, distribution channel,
+partial scenario results, and uninstall outcome.
+
 Signed Windows installer provenance and Linux sidecar provenance are necessary release evidence, but they are not sufficient proof that pre-ready desktop startup still fails closed. Desktop-related changes must also keep the merge-blocking `desktop-package-windows` packaged-shell fault smoke green for missing-sidecar, early-exit-before-ready, and health-timeout paths.
 
 The workflow boundaries stay distinct:

@@ -131,6 +131,10 @@ def test_main_writes_summary_json(
             install_timeout_sec=30.0,
             uninstall_timeout_sec=30.0,
             app_identifier=packaged_smoke.DEFAULT_WINDOWS_APP_IDENTIFIER,
+            workflow_role="release_evidence",
+            release_ref="refs/tags/v1.2.0",
+            resolved_sha="abc123",
+            distribution_channel="public",
         ),
     )
     monkeypatch.setattr(subject, "install_desktop_artifact", lambda **_: installation)
@@ -166,9 +170,63 @@ def test_main_writes_summary_json(
     subject.main()
 
     summary = json.loads((artifact_dir / "summary.json").read_text(encoding="utf-8"))
+    assert summary["status"] == "passed"
+    assert summary["phase"] == "completed"
     assert summary["installation"]["installer_kind"] == "nsis"
+    assert summary["installer_kind"] == "nsis"
+    assert summary["workflow_context"]["workflow_role"] == "release_evidence"
+    assert summary["workflow_context"]["resolved_sha"] == "abc123"
     assert summary["results"][0]["failure_stage"] == "backend_spawn_failed"
     assert summary["uninstall"]["succeeded"] is True
+
+
+def test_main_writes_failed_summary_json_when_install_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    artifact_dir = tmp_path / "artifacts"
+    installer = tmp_path / "setup.exe"
+    installer.write_text("installer", encoding="utf-8")
+    monkeypatch.setattr(
+        subject,
+        "_build_parser",
+        lambda: _parser_with_namespace(
+            installer=installer,
+            installer_kind="nsis",
+            artifact_dir=artifact_dir,
+            scenarios=["missing_sidecar"],
+            startup_timeout_sec=15.0,
+            health_timeout_sec=2,
+            restart_limit=1,
+            backoff_ms=100,
+            hang_sec=5.0,
+            install_timeout_sec=30.0,
+            uninstall_timeout_sec=30.0,
+            app_identifier=packaged_smoke.DEFAULT_WINDOWS_APP_IDENTIFIER,
+            workflow_role="fault_injection_drill",
+            release_ref="main",
+            resolved_sha="def456",
+            distribution_channel="internal_test",
+        ),
+    )
+    monkeypatch.setattr(
+        subject,
+        "install_desktop_artifact",
+        lambda **_: (_ for _ in ()).throw(
+            SystemExit("NSIS install failed with exit code 1.")
+        ),
+    )
+    monkeypatch.setattr(subject.os, "name", "nt", raising=False)
+
+    with pytest.raises(SystemExit, match="NSIS install failed"):
+        subject.main()
+
+    summary = json.loads((artifact_dir / "summary.json").read_text(encoding="utf-8"))
+    assert summary["status"] == "failed"
+    assert summary["phase"] == "install"
+    assert summary["error"] == "NSIS install failed with exit code 1."
+    assert summary["results"] == []
+    assert summary["uninstall"] is None
+    assert summary["installer_sha256"]
 
 
 def test_main_rejects_non_windows_hosts(
@@ -193,6 +251,10 @@ def test_main_rejects_non_windows_hosts(
             install_timeout_sec=30.0,
             uninstall_timeout_sec=30.0,
             app_identifier=packaged_smoke.DEFAULT_WINDOWS_APP_IDENTIFIER,
+            workflow_role="release_evidence",
+            release_ref="refs/tags/v1.2.0",
+            resolved_sha="abc123",
+            distribution_channel="public",
         ),
     )
     monkeypatch.setattr(subject.os, "name", "posix", raising=False)

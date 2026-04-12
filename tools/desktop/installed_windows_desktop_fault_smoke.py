@@ -8,9 +8,11 @@ import shutil
 import subprocess
 import time
 from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 from tools.desktop import packaged_shell_fault_smoke as packaged_smoke
+from tools.desktop.write_desktop_release_provenance import sha256_for_path
 
 try:
     import winreg
@@ -47,13 +49,28 @@ class DesktopInstallation:
 
 @dataclass(frozen=True)
 class UninstallResult:
-    succeeded: bool
-    exit_code: int | None
-    command: str | None
     stdout_path: str
     stderr_path: str
-    log_path: str | None
-    install_root_removed: bool
+    succeeded: bool = False
+    exit_code: int | None = None
+    command: str | None = None
+    log_path: str | None = None
+    install_root_removed: bool = False
+    status: str = "passed"
+    error: str | None = None
+
+
+class InstalledWindowsFaultSmokeError(SystemExit):
+    def __init__(
+        self,
+        message: str,
+        *,
+        phase: str,
+        results: list[packaged_smoke.PackagedShellFaultResult],
+    ) -> None:
+        super().__init__(message)
+        self.phase = phase
+        self.results = results
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -92,7 +109,26 @@ def _build_parser() -> argparse.ArgumentParser:
         "--app-identifier",
         default=packaged_smoke.DEFAULT_WINDOWS_APP_IDENTIFIER,
     )
+    parser.add_argument("--workflow-role", default="unspecified")
+    parser.add_argument("--release-ref", default="")
+    parser.add_argument("--resolved-sha", default="")
+    parser.add_argument(
+        "--distribution-channel",
+        default="internal_test",
+        choices=("public", "internal_test"),
+    )
     return parser
+
+
+def utc_now() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _write_json(path: Path, payload: dict[str, object]) -> None:
+    path.write_text(
+        json.dumps(payload, indent=2) + "\n",
+        encoding="utf-8",
+    )
 
 
 def _normalize_path(value: Path | str) -> str:
@@ -388,11 +424,11 @@ def uninstall_desktop_artifact(
     install_root_removed = _remove_install_root(Path(installation.install_root))
     _clear_install_state_registry()
     return UninstallResult(
+        stdout_path=str(uninstall_stdout_path),
+        stderr_path=str(uninstall_stderr_path),
         succeeded=exit_code in (None, 0),
         exit_code=exit_code,
         command=installation.uninstall_command,
-        stdout_path=str(uninstall_stdout_path),
-        stderr_path=str(uninstall_stderr_path),
         log_path=str(uninstall_log_path) if uninstall_log_path else None,
         install_root_removed=install_root_removed,
     )
@@ -410,21 +446,126 @@ def run_installed_fault_smoke(
     hang_sec: float,
     app_identifier: str,
 ) -> list[packaged_smoke.PackagedShellFaultResult]:
-    return [
-        packaged_smoke.run_fault_scenario(
-            desktop_exe=Path(installation.desktop_exe),
-            sidecar_path=Path(installation.sidecar_path),
-            artifact_dir=artifact_dir / "scenarios",
-            scenario=scenario,
-            startup_timeout_sec=startup_timeout_sec,
-            health_timeout_sec=health_timeout_sec,
-            restart_limit=restart_limit,
-            backoff_ms=backoff_ms,
-            hang_sec=hang_sec,
-            app_identifier=app_identifier,
-        )
-        for scenario in scenarios
-    ]
+    results: list[packaged_smoke.PackagedShellFaultResult] = []
+    for scenario in scenarios:
+        try:
+            result = packaged_smoke.run_fault_scenario(
+                desktop_exe=Path(installation.desktop_exe),
+                sidecar_path=Path(installation.sidecar_path),
+                artifact_dir=artifact_dir / "scenarios",
+                scenario=scenario,
+                startup_timeout_sec=startup_timeout_sec,
+                health_timeout_sec=health_timeout_sec,
+                restart_limit=restart_limit,
+                backoff_ms=backoff_ms,
+                hang_sec=hang_sec,
+                app_identifier=app_identifier,
+            )
+            results.append(result)
+        except packaged_smoke.PackagedShellFaultScenarioError as exc:
+            results.append(exc.result)
+            raise InstalledWindowsFaultSmokeError(
+                str(exc),
+                phase=f"scenario:{scenario}",
+                results=results,
+            ) from exc
+    return results
+
+
+def _expected_install_log_path(
+    *, artifact_dir: Path, installer_kind: str
+) -> str | None:
+    if installer_kind == "msi":
+        return str(artifact_dir / "install.msiexec.log")
+    return None
+
+
+def _expected_uninstall_log_path(
+    *,
+    artifact_dir: Path,
+    installer_kind: str,
+) -> str | None:
+    if installer_kind == "msi":
+        return str(artifact_dir / "uninstall.msiexec.log")
+    return None
+
+
+def _build_failed_uninstall_result(
+    *,
+    installation: DesktopInstallation,
+    artifact_dir: Path,
+    error: str,
+) -> UninstallResult:
+    return UninstallResult(
+        stdout_path=str(artifact_dir / "uninstall.stdout.log"),
+        stderr_path=str(artifact_dir / "uninstall.stderr.log"),
+        command=installation.uninstall_command,
+        log_path=_expected_uninstall_log_path(
+            artifact_dir=artifact_dir,
+            installer_kind=installation.installer_kind,
+        ),
+        status="failed",
+        error=error,
+    )
+
+
+def _build_summary_payload(
+    *,
+    installer_path: Path,
+    installer_kind: str,
+    artifact_dir: Path,
+    workflow_role: str,
+    release_ref: str,
+    resolved_sha: str,
+    distribution_channel: str,
+    status: str,
+    phase: str,
+    error: str | None,
+    installation: DesktopInstallation | None,
+    results: list[packaged_smoke.PackagedShellFaultResult],
+    uninstall_result: UninstallResult | None,
+    started_at_utc: str,
+) -> dict[str, object]:
+    return {
+        "status": status,
+        "phase": phase,
+        "error": error,
+        "started_at_utc": started_at_utc,
+        "completed_at_utc": utc_now(),
+        "workflow_context": {
+            "workflow_role": workflow_role,
+            "release_ref": release_ref or None,
+            "resolved_sha": resolved_sha or None,
+            "distribution_channel": distribution_channel,
+        },
+        "installer_kind": installer_kind,
+        "installer_path": str(installer_path),
+        "installer_sha256": sha256_for_path(installer_path),
+        "install_root": installation.install_root if installation else None,
+        "desktop_exe": installation.desktop_exe if installation else None,
+        "sidecar_path": installation.sidecar_path if installation else None,
+        "install_stdout_path": (
+            installation.install_stdout_path
+            if installation
+            else str(artifact_dir / "install.stdout.log")
+        ),
+        "install_stderr_path": (
+            installation.install_stderr_path
+            if installation
+            else str(artifact_dir / "install.stderr.log")
+        ),
+        "install_log_path": (
+            installation.install_log_path
+            if installation
+            else _expected_install_log_path(
+                artifact_dir=artifact_dir,
+                installer_kind=installer_kind,
+            )
+        ),
+        "installation": asdict(installation) if installation else None,
+        "results": [asdict(result) for result in results],
+        "uninstall": asdict(uninstall_result) if uninstall_result else None,
+    }
 
 
 def main() -> None:
@@ -438,8 +579,13 @@ def main() -> None:
     artifact_dir = args.artifact_dir.resolve()
     artifact_dir.mkdir(parents=True, exist_ok=True)
     scenarios = args.scenarios or list(packaged_smoke.SCENARIO_EXPECTED_STAGE)
+    started_at_utc = utc_now()
     installation: DesktopInstallation | None = None
     uninstall_result: UninstallResult | None = None
+    results: list[packaged_smoke.PackagedShellFaultResult] = []
+    status = "passed"
+    phase = "completed"
+    error: str | None = None
     try:
         installation = install_desktop_artifact(
             installer_path=installer_path,
@@ -458,24 +604,53 @@ def main() -> None:
             hang_sec=args.hang_sec,
             app_identifier=args.app_identifier,
         )
+    except InstalledWindowsFaultSmokeError as exc:
+        status = "failed"
+        phase = exc.phase
+        error = str(exc)
+        results = list(exc.results)
+    except SystemExit as exc:
+        status = "failed"
+        phase = "install"
+        error = str(exc)
     finally:
         if installation is not None:
-            uninstall_result = uninstall_desktop_artifact(
-                installation=installation,
-                artifact_dir=artifact_dir,
-                uninstall_timeout_sec=args.uninstall_timeout_sec,
-            )
+            try:
+                uninstall_result = uninstall_desktop_artifact(
+                    installation=installation,
+                    artifact_dir=artifact_dir,
+                    uninstall_timeout_sec=args.uninstall_timeout_sec,
+                )
+            except SystemExit as exc:
+                status = "failed"
+                phase = "uninstall"
+                error = str(exc)
+                uninstall_result = _build_failed_uninstall_result(
+                    installation=installation,
+                    artifact_dir=artifact_dir,
+                    error=str(exc),
+                )
 
-    summary = {
-        "installation": asdict(installation) if installation else None,
-        "results": [asdict(result) for result in results],
-        "uninstall": asdict(uninstall_result) if uninstall_result else None,
-    }
-    (artifact_dir / "summary.json").write_text(
-        json.dumps(summary, indent=2),
-        encoding="utf-8",
+    summary = _build_summary_payload(
+        installer_path=installer_path,
+        installer_kind=args.installer_kind,
+        artifact_dir=artifact_dir,
+        workflow_role=args.workflow_role,
+        release_ref=args.release_ref,
+        resolved_sha=args.resolved_sha,
+        distribution_channel=args.distribution_channel,
+        status=status,
+        phase=phase,
+        error=error,
+        installation=installation,
+        results=results,
+        uninstall_result=uninstall_result,
+        started_at_utc=started_at_utc,
     )
+    _write_json(artifact_dir / "summary.json", summary)
     print(json.dumps(summary, ensure_ascii=False))
+    if status != "passed":
+        raise SystemExit(error)
 
 
 if __name__ == "__main__":

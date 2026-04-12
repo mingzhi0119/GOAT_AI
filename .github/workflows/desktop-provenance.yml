@@ -197,14 +197,22 @@ jobs:
           python -m tools.desktop.installed_windows_desktop_fault_smoke `
             --installer "${{ steps.windows_artifacts.outputs.msi_path }}" `
             --installer-kind msi `
-            --artifact-dir "desktop-installed-smoke/msi"
+            --artifact-dir "desktop-installed-smoke/msi" `
+            --workflow-role release_evidence `
+            --release-ref "${{ inputs.release_ref || github.ref_name }}" `
+            --resolved-sha "${{ github.sha }}" `
+            --distribution-channel "${{ steps.distribution.outputs.channel }}"
       - name: Run installed NSIS desktop smoke
         shell: pwsh
         run: |
           python -m tools.desktop.installed_windows_desktop_fault_smoke `
             --installer "${{ steps.windows_artifacts.outputs.nsis_path }}" `
             --installer-kind nsis `
-            --artifact-dir "desktop-installed-smoke/nsis"
+            --artifact-dir "desktop-installed-smoke/nsis" `
+            --workflow-role release_evidence `
+            --release-ref "${{ inputs.release_ref || github.ref_name }}" `
+            --resolved-sha "${{ github.sha }}" `
+            --distribution-channel "${{ steps.distribution.outputs.channel }}"
       - name: Upload Windows desktop release assets
         uses: actions/upload-artifact@v4
         with:
@@ -214,6 +222,7 @@ jobs:
             frontend/src-tauri/target/release/bundle/nsis/*-setup.exe
             desktop-windows-provenance.json
       - name: Upload installed Windows smoke evidence
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: desktop-windows-installed-smoke
