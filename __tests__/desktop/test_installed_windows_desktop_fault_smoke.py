@@ -161,6 +161,7 @@ def test_main_writes_summary_json(
             install_root_removed=True,
         ),
     )
+    monkeypatch.setattr(subject.os, "name", "nt", raising=False)
 
     subject.main()
 
@@ -168,6 +169,36 @@ def test_main_writes_summary_json(
     assert summary["installation"]["installer_kind"] == "nsis"
     assert summary["results"][0]["failure_stage"] == "backend_spawn_failed"
     assert summary["uninstall"]["succeeded"] is True
+
+
+def test_main_rejects_non_windows_hosts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    installer = tmp_path / "setup.exe"
+    installer.write_text("", encoding="utf-8")
+    artifact_dir = tmp_path / "artifacts"
+    monkeypatch.setattr(
+        subject,
+        "_build_parser",
+        lambda: _parser_with_namespace(
+            installer=installer,
+            installer_kind="nsis",
+            artifact_dir=artifact_dir,
+            scenarios=["missing_sidecar"],
+            startup_timeout_sec=15.0,
+            health_timeout_sec=2,
+            restart_limit=1,
+            backoff_ms=100,
+            hang_sec=5.0,
+            install_timeout_sec=30.0,
+            uninstall_timeout_sec=30.0,
+            app_identifier=packaged_smoke.DEFAULT_WINDOWS_APP_IDENTIFIER,
+        ),
+    )
+    monkeypatch.setattr(subject.os, "name", "posix", raising=False)
+
+    with pytest.raises(SystemExit, match="only supports Windows hosts"):
+        subject.main()
 
 
 def _parser_with_namespace(**kwargs: object):
