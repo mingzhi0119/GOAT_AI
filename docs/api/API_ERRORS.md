@@ -24,6 +24,7 @@ JSON error responses use a **stable envelope** so logs, metrics, and clients sha
 | `RATE_LIMITED` | 429 | yes (after Retry-After) | Per-key rate limit exceeded |
 | `BAD_REQUEST` | 400 | no | Bad upload / business validation |
 | `IDEMPOTENCY_CONFLICT` | 409 | no | `Idempotency-Key` reused with different payload or while original request is still pending |
+| `RESOURCE_CONFLICT` | 409 | no | Resource is visible but the requested state transition is invalid (for example retrying a non-terminal execution or cancelling a non-queued execution) |
 | `REQUEST_VALIDATION_ERROR` | 422 | no | Body / query validation failed |
 | `NOT_FOUND` | 404 | no | Resource does not exist |
 | `KNOWLEDGE_NOT_FOUND` | 404 | no | Knowledge document or ingestion record does not exist |

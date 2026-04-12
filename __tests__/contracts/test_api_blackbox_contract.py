@@ -24,6 +24,7 @@ from backend.api_errors import (
     MEDIA_NOT_FOUND,
     NOT_FOUND,
     RATE_LIMITED,
+    RESOURCE_CONFLICT,
     REQUEST_VALIDATION_ERROR,
     VISION_NOT_SUPPORTED,
 )
@@ -36,6 +37,7 @@ from backend.services.workbench_web_search import WorkbenchWebSearchHit
 if TestClient is not None:
     from backend.platform.config import get_settings
     from backend.platform.dependencies import (
+        get_code_sandbox_execution_dispatcher,
         get_code_sandbox_provider,
         get_llm_client,
         get_title_generator,
@@ -125,6 +127,11 @@ class FakeCodeSandboxProvider:
             error_detail=None,
             output_files=output_files,
         )
+
+
+class NoopCodeSandboxDispatcher:
+    def dispatch_execution(self, *, execution_id: str, request_id: str = "") -> None:
+        _ = (execution_id, request_id)
 
 
 class ContractFakeLLM:
@@ -1442,6 +1449,114 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(200, final_status.status_code)
         self.assertEqual("completed", final_status.json()["status"])
         self.assertIn("async log line", final_status.json()["stdout"])
+
+    @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
+    def test_code_sandbox_cancel_cancels_queued_execution_and_finishes_logs(
+        self, _mock: object
+    ) -> None:
+        self.settings = replace(self.settings, feature_code_sandbox_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+        self.client.app.dependency_overrides[get_code_sandbox_provider] = lambda: (
+            FakeCodeSandboxProvider()
+        )
+        self.client.app.dependency_overrides[get_code_sandbox_execution_dispatcher] = (
+            lambda: NoopCodeSandboxDispatcher()
+        )
+
+        created = self.client.post(
+            "/api/code-sandbox/exec",
+            json={
+                "execution_mode": "async",
+                "code": "echo sandbox ok",
+                "command": "printf async",
+            },
+        )
+        self.assertEqual(202, created.status_code)
+        execution_id = created.json()["execution_id"]
+        self.assertEqual("queued", created.json()["status"])
+
+        cancel = self.client.post(f"/api/code-sandbox/executions/{execution_id}/cancel")
+        self.assertEqual(200, cancel.status_code)
+        cancel_body = cancel.json()
+        self.assertEqual("cancelled", cancel_body["status"])
+        self.assertEqual(
+            "Execution cancelled before start.", cancel_body["error_detail"]
+        )
+
+        logs = self.client.get(f"/api/code-sandbox/executions/{execution_id}/logs")
+        self.assertEqual(200, logs.status_code)
+        payloads = parse_sse_payloads(logs.text)
+        self.assertEqual(["status", "done"], [item["type"] for item in payloads])
+        self.assertEqual("cancelled", payloads[0]["status"])
+
+        events = self.client.get(f"/api/code-sandbox/executions/{execution_id}/events")
+        self.assertEqual(200, events.status_code)
+        self.assertEqual(
+            ["execution.queued", "execution.cancelled"],
+            [event["event_type"] for event in events.json()["events"]],
+        )
+
+        conflict = self.client.post(
+            f"/api/code-sandbox/executions/{execution_id}/cancel"
+        )
+        self.assertEqual(409, conflict.status_code)
+        self.assertEqual(RESOURCE_CONFLICT, conflict.json()["code"])
+
+    @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
+    def test_code_sandbox_retry_creates_new_execution_with_lineage(
+        self, _mock: object
+    ) -> None:
+        self.settings = replace(self.settings, feature_code_sandbox_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+        self.client.app.dependency_overrides[get_code_sandbox_provider] = lambda: (
+            FakeCodeSandboxProvider()
+        )
+
+        created = self.client.post(
+            "/api/code-sandbox/exec",
+            json={
+                "runtime_preset": "shell",
+                "code": "echo sandbox ok",
+                "command": "touch outputs/report.txt",
+            },
+        )
+        self.assertEqual(200, created.status_code)
+        original_id = created.json()["execution_id"]
+
+        retry = self.client.post(f"/api/code-sandbox/executions/{original_id}/retry")
+        self.assertEqual(200, retry.status_code)
+        retry_body = retry.json()
+        self.assertNotEqual(original_id, retry_body["execution_id"])
+        self.assertEqual("completed", retry_body["status"])
+        self.assertEqual(
+            [{"path": "report.txt", "byte_size": 12}], retry_body["output_files"]
+        )
+
+        original_events = self.client.get(
+            f"/api/code-sandbox/executions/{original_id}/events"
+        )
+        self.assertEqual(200, original_events.status_code)
+        self.assertEqual(
+            "execution.retry_requested",
+            original_events.json()["events"][-1]["event_type"],
+        )
+        self.assertEqual(
+            retry_body["execution_id"],
+            original_events.json()["events"][-1]["metadata"]["retry_execution_id"],
+        )
+
+        retried_events = self.client.get(
+            f"/api/code-sandbox/executions/{retry_body['execution_id']}/events"
+        )
+        self.assertEqual(200, retried_events.status_code)
+        self.assertEqual(
+            "execution.retry_created",
+            retried_events.json()["events"][1]["event_type"],
+        )
+        self.assertEqual(
+            original_id,
+            retried_events.json()["events"][1]["metadata"]["source_execution_id"],
+        )
 
     @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
     def test_code_sandbox_exec_rejects_invalid_network_policy(

@@ -70,8 +70,13 @@ class CodeSandboxValidationError(ValueError):
     """Raised when a code sandbox request violates application-level validation."""
 
 
+class CodeSandboxExecutionConflictError(RuntimeError):
+    """Raised when a code sandbox execution transition is invalid for its state."""
+
+
 __all__ = [
     "CodeSandboxExecutionNotFoundError",
+    "CodeSandboxExecutionConflictError",
     "CodeSandboxValidationError",
     "ChatCapacityError",
     "ChatIdempotencyConflictError",

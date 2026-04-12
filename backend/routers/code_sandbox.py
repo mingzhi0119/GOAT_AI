@@ -5,14 +5,17 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
 
-from backend.api_errors import build_error_body
+from backend.api_errors import RESOURCE_CONFLICT, build_error_body
 from backend.application.code_sandbox import (
+    cancel_code_sandbox_execution,
     execute_code_sandbox_request,
     get_code_sandbox_execution,
     get_code_sandbox_execution_events,
+    retry_code_sandbox_execution,
     stream_code_sandbox_execution_logs,
 )
 from backend.application.exceptions import (
+    CodeSandboxExecutionConflictError,
     CodeSandboxExecutionNotFoundError,
     CodeSandboxValidationError,
 )
@@ -133,6 +136,115 @@ def get_code_sandbox_execution_route(
         raise HTTPException(
             status_code=404,
             detail=build_error_body(detail=str(exc), status_code=404),
+        ) from exc
+
+
+@router.post(
+    "/code-sandbox/executions/{execution_id}/cancel",
+    response_model=CodeSandboxExecutionResponse,
+    summary="Cancel one queued code sandbox execution",
+    responses={
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+        503: {
+            "model": ErrorResponse,
+            "description": "Runtime gate closed or sandbox provider unavailable.",
+        },
+    },
+)
+def post_code_sandbox_execution_cancel_route(
+    execution_id: str,
+    repository: CodeSandboxExecutionRepository = Depends(
+        get_code_sandbox_execution_repository
+    ),
+    settings: Settings = Depends(get_settings),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
+) -> CodeSandboxExecutionResponse:
+    """Cancel one visible queued sandbox execution."""
+    try:
+        return cancel_code_sandbox_execution(
+            execution_id=execution_id,
+            repository=repository,
+            settings=settings,
+            auth_context=auth_context,
+        )
+    except CodeSandboxExecutionNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=build_error_body(detail=str(exc), status_code=404),
+        ) from exc
+    except CodeSandboxExecutionConflictError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=build_error_body(
+                detail=str(exc),
+                code=RESOURCE_CONFLICT,
+                status_code=409,
+            ),
+        ) from exc
+
+
+@router.post(
+    "/code-sandbox/executions/{execution_id}/retry",
+    response_model=CodeSandboxExecutionResponse,
+    summary="Retry one terminal code sandbox execution",
+    responses={
+        401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+        503: {
+            "model": ErrorResponse,
+            "description": "Runtime gate closed or sandbox provider unavailable.",
+        },
+    },
+)
+def post_code_sandbox_execution_retry_route(
+    execution_id: str,
+    response: Response,
+    repository: CodeSandboxExecutionRepository = Depends(
+        get_code_sandbox_execution_repository
+    ),
+    provider: SandboxProvider = Depends(get_code_sandbox_provider),
+    dispatcher: CodeSandboxExecutionDispatcher = Depends(
+        get_code_sandbox_execution_dispatcher
+    ),
+    settings: Settings = Depends(get_settings),
+    auth_context: AuthorizationContext = Depends(get_authorization_context),
+) -> CodeSandboxExecutionResponse:
+    """Retry one visible terminal sandbox execution as a new execution."""
+    try:
+        payload = retry_code_sandbox_execution(
+            execution_id=execution_id,
+            repository=repository,
+            provider=provider,
+            dispatcher=dispatcher,
+            settings=settings,
+            auth_context=auth_context,
+        )
+        if payload.execution_mode == "async" and payload.status in {
+            "queued",
+            "running",
+        }:
+            response.status_code = 202
+        return payload
+    except CodeSandboxExecutionNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=build_error_body(detail=str(exc), status_code=404),
+        ) from exc
+    except CodeSandboxExecutionConflictError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=build_error_body(
+                detail=str(exc),
+                code=RESOURCE_CONFLICT,
+                status_code=409,
+            ),
         ) from exc
 
 

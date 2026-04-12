@@ -51,6 +51,8 @@ Base path: `/api`
 | `GET` | `/api/system/features` | Capability-gated feature flags (config + host probe) |
 | `POST` | `/api/code-sandbox/exec` | Execute one sandbox run in `sync` or `async` mode |
 | `GET` | `/api/code-sandbox/executions/{execution_id}` | Read one persisted sandbox execution |
+| `POST` | `/api/code-sandbox/executions/{execution_id}/cancel` | Cancel one queued sandbox execution |
+| `POST` | `/api/code-sandbox/executions/{execution_id}/retry` | Retry one terminal sandbox execution as a new durable run |
 | `GET` | `/api/code-sandbox/executions/{execution_id}/events` | Read one persisted sandbox execution timeline |
 | `GET` | `/api/code-sandbox/executions/{execution_id}/logs` | Stream replayable sandbox logs over SSE |
 | `POST` | `/api/workbench/tasks` | Create and enqueue a durable workbench task |
@@ -939,7 +941,34 @@ Error semantics:
 
 ## `GET /api/code-sandbox/executions/{execution_id}`
 
-Returns the same durable execution shape as `POST /api/code-sandbox/exec` after the run is persisted. Owner/tenant/principal visibility rules apply; non-visible records resolve as `404`. During `async` execution the record progresses through `queued` and `running` before reaching a terminal state.
+Returns the same durable execution shape as `POST /api/code-sandbox/exec` after the run is persisted. Owner/tenant/principal visibility rules apply; non-visible records resolve as `404`. During `async` execution the record progresses through `queued` and `running` before reaching a terminal state. Terminal statuses are `completed`, `failed`, `denied`, and `cancelled`.
+
+## `POST /api/code-sandbox/executions/{execution_id}/cancel`
+
+Cancels one visible `queued` sandbox execution.
+
+Current behavior:
+
+- only `queued` executions can be cancelled
+- success returns `200` with the normal durable execution payload and `status = cancelled`
+- cancelled executions set `finished_at` and `error_detail = "Execution cancelled before start."`
+- running or terminal executions return `409` with `code = RESOURCE_CONFLICT`
+- missing or caller-invisible execution ids return `404`
+- cancelled executions are terminal and cause `GET /logs` to emit a final `done` event
+
+## `POST /api/code-sandbox/executions/{execution_id}/retry`
+
+Creates a brand-new durable execution from one visible terminal execution.
+
+Current behavior:
+
+- only terminal executions can be retried: `completed`, `failed`, `denied`, or `cancelled`
+- retry always creates a new `execution_id`; the original record remains unchanged except for an added lineage event
+- the retried execution reuses the original request payload and persisted auth snapshot
+- retrying an originally `sync` execution returns `200` with the new terminal payload
+- retrying an originally `async` execution returns `202` when the new run is still `queued` or `running`
+- queued or running executions return `409` with `code = RESOURCE_CONFLICT`
+- missing or caller-invisible execution ids return `404`
 
 ## `GET /api/code-sandbox/executions/{execution_id}/events`
 
@@ -996,6 +1025,12 @@ Returns the durable execution timeline:
   ]
 }
 ```
+
+Additional lifecycle events include:
+
+- `execution.cancelled` when a queued execution is cancelled before start
+- `execution.retry_requested` on the original record, with `metadata.retry_execution_id`
+- `execution.retry_created` on the new record, with `metadata.source_execution_id`
 
 ## `GET /api/code-sandbox/executions/{execution_id}/logs`
 

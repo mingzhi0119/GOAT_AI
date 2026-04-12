@@ -19,6 +19,7 @@ AUTH_SESSION_OWNER_REQUIRED: Final = "AUTH_SESSION_OWNER_REQUIRED"
 RATE_LIMITED: Final = "RATE_LIMITED"
 NOT_FOUND: Final = "NOT_FOUND"
 BAD_REQUEST: Final = "BAD_REQUEST"
+RESOURCE_CONFLICT: Final = "RESOURCE_CONFLICT"
 REQUEST_VALIDATION_ERROR: Final = "REQUEST_VALIDATION_ERROR"
 IDEMPOTENCY_CONFLICT: Final = "IDEMPOTENCY_CONFLICT"
 NOT_IMPLEMENTED: Final = "NOT_IMPLEMENTED"
@@ -66,8 +67,8 @@ def build_error_body(
         else (
             default_code_for_http_status(status_code)
             if status_code is not None
-            else default_code_for_http_status(500)
-        )
+        else default_code_for_http_status(500)
+    )
     )
     body: dict[str, Any] = {"detail": detail, "code": resolved}
     rid = get_request_id()

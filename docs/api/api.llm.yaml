@@ -93,7 +93,7 @@ schemas:
       sequence: integer
       event_type: string
       created_at: string
-      status: queued|running|completed|failed|denied|null
+      status: queued|running|completed|failed|denied|cancelled|null
       message: string|null
       metadata: object
   CodeSandboxExecutionEventsResponse:
@@ -116,7 +116,7 @@ schemas:
       - updated_at
     properties:
       execution_id: string
-      status: queued|running|completed|failed|denied
+      status: queued|running|completed|failed|denied|cancelled
       execution_mode: sync|async
       runtime_preset: string
       network_policy: disabled|allowlist|enabled
@@ -1000,6 +1000,36 @@ endpoints:
         - 401
         - 403
         - 404
+        - 422
+        - 429
+        - 503
+  - op: post_code_sandbox_execution_cancel_route
+    method: POST
+    path: /code-sandbox/executions/{execution_id}/cancel
+    path_params:
+      execution_id: string
+    response:
+      200: CodeSandboxExecutionResponse
+      errors:
+        - 401
+        - 403
+        - 404
+        - 409
+        - 422
+        - 429
+        - 503
+  - op: post_code_sandbox_execution_retry_route
+    method: POST
+    path: /code-sandbox/executions/{execution_id}/retry
+    path_params:
+      execution_id: string
+    response:
+      200: CodeSandboxExecutionResponse
+      errors:
+        - 401
+        - 403
+        - 404
+        - 409
         - 422
         - 429
         - 503

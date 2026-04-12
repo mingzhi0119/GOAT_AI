@@ -12,6 +12,7 @@ from uuid import uuid4
 from fastapi.responses import StreamingResponse
 
 from backend.application.exceptions import (
+    CodeSandboxExecutionConflictError,
     CodeSandboxExecutionNotFoundError,
     CodeSandboxValidationError,
 )
@@ -195,6 +196,43 @@ def _to_event_payload(
     )
 
 
+def _build_create_payload(
+    *,
+    execution_id: str,
+    execution_mode: str,
+    provider_request: SandboxProviderRequest,
+    created_at: str,
+    provider_name: str,
+    owner_id: str,
+    tenant_id: str,
+    principal_id: str,
+    auth_scopes: list[str] | None,
+    credential_id: str,
+    auth_mode: str,
+) -> CodeSandboxExecutionCreatePayload:
+    return CodeSandboxExecutionCreatePayload(
+        execution_id=execution_id,
+        execution_mode=execution_mode,
+        runtime_preset=provider_request.runtime_preset,
+        network_policy=provider_request.network_policy,
+        timeout_sec=provider_request.timeout_sec,
+        code=provider_request.code,
+        command=provider_request.command,
+        stdin=provider_request.stdin,
+        inline_files=list(provider_request.inline_files),
+        created_at=created_at,
+        queued_at=created_at,
+        updated_at=created_at,
+        provider_name=provider_name,
+        owner_id=owner_id,
+        tenant_id=tenant_id,
+        principal_id=principal_id,
+        auth_scopes=list(auth_scopes or []),
+        credential_id=credential_id,
+        auth_mode=auth_mode,
+    )
+
+
 def _load_visible_execution(
     *,
     execution_id: str,
@@ -235,19 +273,11 @@ def execute_code_sandbox_request(
     )
     now = _utc_now()
     repository.create_execution(
-        CodeSandboxExecutionCreatePayload(
+        _build_create_payload(
             execution_id=execution_id,
             execution_mode=normalized.execution_mode,
-            runtime_preset=normalized.provider_request.runtime_preset,
-            network_policy=normalized.provider_request.network_policy,
-            timeout_sec=normalized.provider_request.timeout_sec,
-            code=normalized.provider_request.code,
-            command=normalized.provider_request.command,
-            stdin=normalized.provider_request.stdin,
-            inline_files=list(normalized.provider_request.inline_files),
+            provider_request=normalized.provider_request,
             created_at=now,
-            queued_at=now,
-            updated_at=now,
             provider_name=provider.provider_name,
             owner_id=auth_context.legacy_owner_id,
             tenant_id=auth_context.tenant_id.value,
@@ -289,6 +319,125 @@ def get_code_sandbox_execution(
             auth_context=auth_context,
         )
     )
+
+
+def cancel_code_sandbox_execution(
+    *,
+    execution_id: str,
+    repository: CodeSandboxExecutionRepository,
+    settings: Settings,
+    auth_context: AuthorizationContext,
+) -> CodeSandboxExecutionResponse:
+    """Cancel one visible queued code sandbox execution."""
+    ensure_code_sandbox_enabled(settings, auth_context)
+    record = _load_visible_execution(
+        execution_id=execution_id,
+        repository=repository,
+        settings=settings,
+        auth_context=auth_context,
+    )
+    if record.status != "queued":
+        raise CodeSandboxExecutionConflictError(
+            "Only queued code sandbox executions can be cancelled."
+        )
+    now = _utc_now()
+    repository.mark_execution_cancelled(
+        execution_id,
+        updated_at=now,
+        finished_at=now,
+        error_detail="Execution cancelled before start.",
+    )
+    updated = repository.get_execution(execution_id)
+    if updated is None:
+        raise RuntimeError("Code sandbox execution disappeared after cancellation.")
+    return _to_execution_response(updated)
+
+
+def retry_code_sandbox_execution(
+    *,
+    execution_id: str,
+    repository: CodeSandboxExecutionRepository,
+    provider: SandboxProvider,
+    dispatcher: CodeSandboxExecutionDispatcher,
+    settings: Settings,
+    auth_context: AuthorizationContext,
+) -> CodeSandboxExecutionResponse:
+    """Re-submit one visible terminal code sandbox execution as a new execution."""
+    ensure_code_sandbox_enabled(settings, auth_context)
+    record = _load_visible_execution(
+        execution_id=execution_id,
+        repository=repository,
+        settings=settings,
+        auth_context=auth_context,
+    )
+    if record.status not in {"completed", "failed", "denied", "cancelled"}:
+        raise CodeSandboxExecutionConflictError(
+            "Only terminal code sandbox executions can be retried."
+        )
+
+    retry_execution_id = f"cs-{uuid4().hex}"
+    now = _utc_now()
+    repository.create_execution(
+        _build_create_payload(
+            execution_id=retry_execution_id,
+            execution_mode=record.execution_mode,
+            provider_request=SandboxProviderRequest(
+                execution_id=retry_execution_id,
+                runtime_preset=record.runtime_preset,
+                code=record.code,
+                command=record.command,
+                stdin=record.stdin,
+                inline_files=[
+                    {
+                        "filename": str(item.get("filename", "")),
+                        "content": str(item.get("content", "")),
+                    }
+                    for item in record.inline_files
+                ],
+                timeout_sec=record.timeout_sec,
+                network_policy=record.network_policy,
+            ),
+            created_at=now,
+            provider_name=provider.provider_name,
+            owner_id=record.owner_id,
+            tenant_id=record.tenant_id,
+            principal_id=record.principal_id,
+            auth_scopes=record.auth_scopes,
+            credential_id=record.credential_id,
+            auth_mode=record.auth_mode,
+        )
+    )
+    repository.append_execution_event(
+        execution_id,
+        event_type="execution.retry_requested",
+        created_at=now,
+        status=record.status,
+        message="Retry requested.",
+        metadata={"retry_execution_id": retry_execution_id},
+    )
+    repository.append_execution_event(
+        retry_execution_id,
+        event_type="execution.retry_created",
+        created_at=now,
+        status="queued",
+        message="Execution created from retry.",
+        metadata={"source_execution_id": execution_id},
+    )
+
+    if record.execution_mode == "async":
+        dispatcher.dispatch_execution(execution_id=retry_execution_id)
+    else:
+        execute_code_sandbox_execution(
+            execution_id=retry_execution_id,
+            repository=repository,
+            provider=provider,
+            settings=settings,
+            raise_errors=True,
+        )
+    retry_record = repository.get_execution(retry_execution_id)
+    if retry_record is None:
+        raise RuntimeError("Code sandbox retry disappeared after submission.")
+    return _to_execution_response(retry_record)
 
 
 def get_code_sandbox_execution_events(
@@ -361,7 +510,7 @@ def stream_code_sandbox_execution_logs(
                 last_seq = max(last_seq, chunk.sequence)
                 yield _log_chunk_sse(chunk)
 
-            if record.status in {"completed", "failed", "denied"}:
+            if record.status in {"completed", "failed", "denied", "cancelled"}:
                 yield sse_done_event()
                 return
 

@@ -187,7 +187,13 @@ export interface SystemFeatures {
 }
 
 export type CodeSandboxRuntimePreset = 'shell'
-export type CodeSandboxExecutionStatus = 'queued' | 'running' | 'completed' | 'failed' | 'denied'
+export type CodeSandboxExecutionStatus =
+  | 'queued'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'denied'
+  | 'cancelled'
 export type CodeSandboxExecutionMode = 'sync' | 'async'
 export type CodeSandboxNetworkPolicy = 'disabled' | 'allowlist' | 'enabled'
 

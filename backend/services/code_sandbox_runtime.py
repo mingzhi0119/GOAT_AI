@@ -206,6 +206,15 @@ class CodeSandboxExecutionRepository(Protocol):
         error_detail: str,
     ) -> None: ...
 
+    def mark_execution_cancelled(
+        self,
+        execution_id: str,
+        *,
+        updated_at: str,
+        finished_at: str,
+        error_detail: str,
+    ) -> None: ...
+
     def get_execution(self, execution_id: str) -> CodeSandboxExecutionRecord | None: ...
 
     def list_execution_events(
@@ -547,6 +556,46 @@ class SQLiteCodeSandboxExecutionRepository:
                 conn.commit()
         except Exception as exc:
             _raise_write_error("code_sandbox_execution_deny", exc)
+
+    def mark_execution_cancelled(
+        self,
+        execution_id: str,
+        *,
+        updated_at: str,
+        finished_at: str,
+        error_detail: str,
+    ) -> None:
+        try:
+            with sqlite3.connect(self._db_path) as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                cursor = conn.execute(
+                    """
+                    UPDATE code_sandbox_executions
+                    SET status = 'cancelled',
+                        updated_at = ?,
+                        finished_at = ?,
+                        timed_out = 0,
+                        error_detail = ?,
+                        output_files_json = COALESCE(output_files_json, '[]')
+                    WHERE id = ? AND status = 'queued'
+                    """,
+                    (updated_at, finished_at, error_detail, execution_id),
+                )
+                if cursor.rowcount == 0:
+                    conn.rollback()
+                    return
+                self._append_event(
+                    conn,
+                    execution_id=execution_id,
+                    event_type="execution.cancelled",
+                    created_at=finished_at,
+                    status="cancelled",
+                    message=error_detail,
+                    metadata=None,
+                )
+                conn.commit()
+        except Exception as exc:
+            _raise_write_error("code_sandbox_execution_cancel", exc)
 
     def get_execution(self, execution_id: str) -> CodeSandboxExecutionRecord | None:
         try:
