@@ -1,21 +1,23 @@
 # GOAT AI Release Governance
 
-This document defines the minimum P1 release process for staging and production.
+This document defines the minimum artifact-first release process for staging and production.
 
 ## Goals
 
-- Keep releases reproducible and reviewable.
-- Make staging deployment a standard workflow instead of a one-off terminal ritual.
-- Require an explicit production approval step after staging has been exercised.
+- Build the release payload once in CI and promote the same immutable bundle through staging and production.
+- Keep release evidence reviewable without needing host-side forensics.
+- Preserve an explicit rollback target for each environment promotion.
 
 ## Release flow
 
 1. Run the normal CI gates on the target ref.
 2. Trigger `.github/workflows/release-governance.yml` with the release ref.
-3. Generate and retain a release manifest artifact for that ref.
-4. Deploy the same ref and resolved SHA to the `staging` environment.
+3. Build one `release-bundle.tar.gz` plus one `release-manifest.json` for that ref.
+4. Deploy the same bundle and manifest to `staging`.
 5. Run `scripts/post_deploy_check.py` against staging.
-6. Promote to `production` only through the `production` environment gate and after staging validation is green.
+6. Emit `staging-promotion-evidence.json` with environment, digest, resolved SHA, and rollback target.
+7. Promote the same retained bundle to `production` only through the `production` environment gate.
+8. Emit `production-promotion-evidence.json` after the production contract check passes.
 
 ## Required GitHub environment setup
 
@@ -30,37 +32,82 @@ This document defines the minimum P1 release process for staging and production.
 
 - `staging` may be operator-triggered without a second approver.
 - `production` should use GitHub Environment protection rules so the production job pauses for explicit approval.
-- Do not bypass the environment approval by rerunning deploy commands manually on the host.
+- Do not bypass the environment approval by manually copying source or rebuilding the frontend on the host.
 
-## Release manifest expectations
+## Release artifact expectations
 
-Each release workflow run should retain:
+Each workflow run retains:
 
-- requested release ref
-- resolved commit SHA
-- actor
-- UTC timestamp
-- deploy jobs must verify the resolved commit SHA before reporting success
+- the requested release ref
+- the resolved commit SHA
+- the actor and UTC timestamp
+- one immutable `release-bundle.tar.gz`
+- the bundle SHA-256 digest
+- per-environment promotion evidence JSON
 
-This is enough to answer "which ref and SHA did we ask the host to deploy?" during
-rollback or incident review. It is not yet full artifact-first provenance; richer
-artifact digest and promotion evidence remain tracked in [ROADMAP.md](ROADMAP.md).
+The deploy scripts preserve the latest deployed `release-manifest.json` under the project root and keep the prior one as `release-manifest.previous.json` so operators can identify the immediate rollback target without additional host inspection.
 
-## Supply-chain provenance follow-on
+## Manual artifact deployment
 
-P2 adds a separate provenance baseline workflow at
+The workflow is the default release path, but the same deploy scripts support manual artifact promotion when required:
+
+Linux:
+
+```bash
+PROJECT_DIR=/srv/goat-ai \
+RELEASE_BUNDLE=/tmp/release-bundle.tar.gz \
+RELEASE_MANIFEST=/tmp/release-manifest.json \
+EXPECTED_GIT_SHA=<resolved-sha> \
+bash deploy.sh
+```
+
+Windows PowerShell:
+
+```powershell
+.\deploy.ps1 -ProjectDir C:\GOAT_AI -ReleaseBundle C:\temp\release-bundle.tar.gz -ReleaseManifest C:\temp\release-manifest.json -ExpectedGitSha <resolved-sha>
+```
+
+## Desktop release flow
+
+Desktop release governance now uses a separate provenance workflow at
 [`.github/workflows/desktop-provenance.yml`](../.github/workflows/desktop-provenance.yml).
 
-That workflow currently covers the Linux desktop sidecar path by generating:
+That workflow covers:
 
-- the built desktop sidecar artifact
-- a SHA-256 digest manifest
-- an SPDX SBOM
-- GitHub artifact attestations when the repository plan or repo variables permit it
+- the Linux desktop sidecar path by generating:
+  - the built desktop sidecar artifact
+  - a SHA-256 digest manifest
+  - an SPDX SBOM
+  - GitHub artifact attestations when the repository plan or repo variables permit it
+- the signed Windows desktop release path by generating:
+  - real packaged `.msi` and NSIS installers
+  - an installer provenance manifest with digests and signature status
+  - GitHub artifact attestations for the shipped installers when supported
+
+The signed Windows desktop release path is the default public-distribution path.
+Manual or local unsigned desktop builds remain internal/test-only artifacts.
+
+Desktop release steps:
+
+1. Trigger `.github/workflows/desktop-provenance.yml` from a release tag or manual dispatch.
+2. Build the Linux desktop sidecar provenance record.
+3. Build real Windows packaged installers from the same requested ref.
+4. Sign the Windows installers when `distribution_channel=public` (the tag path always requires this).
+5. Write `desktop-windows-provenance.json` with artifact digests and signature status.
+6. Upload the installers plus provenance assets and emit installer attestations when supported.
+
+Required desktop signing secrets:
+
+- `GOAT_DESKTOP_SIGNING_CERT_BASE64`
+  - base64-encoded PFX for the Windows desktop signing certificate
+- `GOAT_DESKTOP_SIGNING_CERT_PASSWORD`
+  - password for the PFX
+- optional `GOAT_DESKTOP_SIGNING_TIMESTAMP_URL`
+  - overrides the default RFC3161 timestamp server used by `signtool`
+
+If public desktop signing secrets are missing, the public tagged workflow must
+fail closed rather than silently shipping unsigned installers.
 
 If artifact attestations are not available for the repository plan, keep the digest
-manifest and SBOM outputs as the minimum provenance record and enable attestations
+manifests and SBOM outputs as the minimum provenance record and enable attestations
 later via the `ENABLE_GITHUB_ATTESTATIONS` repository variable when support is ready.
-
-Signed public installers remain a later roadmap item; this provenance workflow is the
-baseline that should exist before release-signing automation is considered complete.

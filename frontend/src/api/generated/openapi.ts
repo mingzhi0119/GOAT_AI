@@ -1558,6 +1558,20 @@ export interface components {
             deny_reason?: string | null;
         };
         /**
+         * RuntimeOperationalContractResponse
+         * @description Operator-facing runtime contract for scaling and recovery expectations.
+         */
+        RuntimeOperationalContractResponse: {
+            /** Storage Model */
+            storage_model: string;
+            /** Concurrency Model */
+            concurrency_model: string;
+            /** Process Local Seams */
+            process_local_seams: string[];
+            /** Scaling Notes */
+            scaling_notes: string[];
+        };
+        /**
          * RuntimeTargetItemResponse
          * @description One runtime target candidate in deployment preference order.
          */
@@ -1583,6 +1597,7 @@ export interface components {
             current: components["schemas"]["RuntimeTargetItemResponse"];
             /** Ordered Targets */
             ordered_targets: components["schemas"]["RuntimeTargetItemResponse"][];
+            operational_contract: components["schemas"]["RuntimeOperationalContractResponse"];
         };
         /**
          * SystemFeaturesResponse

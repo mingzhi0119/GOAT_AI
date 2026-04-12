@@ -20,40 +20,68 @@ on:
         type: boolean
 
 jobs:
-  release-manifest:
+  build-release:
     runs-on: ubuntu-latest
     outputs:
-      resolved_sha: ${{ steps.meta.outputs.resolved_sha }}
+      resolved_sha: ${{ steps.bundle.outputs.resolved_sha }}
+      bundle_sha256: ${{ steps.bundle.outputs.bundle_sha256 }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.release_ref }}
           fetch-depth: 0
-      - name: Generate release manifest
-        id: meta
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.14.1"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Build frontend artifact
+        working-directory: frontend
+        run: npm run build
+      - name: Create immutable release bundle and manifest
+        id: bundle
         shell: bash
         run: |
           set -euo pipefail
-          sha="$(git rev-parse HEAD)"
-          ts="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-          echo "resolved_sha=${sha}" >> "${GITHUB_OUTPUT}"
-          cat > release-manifest.json <<EOF
-          {
-            "release_ref": "${{ inputs.release_ref }}",
-            "resolved_sha": "${sha}",
-            "actor": "${{ github.actor }}",
-            "generated_at_utc": "${ts}"
-          }
-          EOF
+          resolved_sha="$(git rev-parse HEAD)"
+          python -m tools.build_release_bundle \
+            --repo-root . \
+            --output-bundle release-bundle.tar.gz \
+            --output-manifest release-manifest.json \
+            --release-ref "${{ inputs.release_ref }}" \
+            --resolved-sha "${resolved_sha}" \
+            --actor "${{ github.actor }}"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          manifest = json.loads(Path("release-manifest.json").read_text(encoding="utf-8"))
+          github_output = Path(os.environ["GITHUB_OUTPUT"])
+          with github_output.open("a", encoding="utf-8") as handle:
+              handle.write(f"resolved_sha={manifest['resolved_sha']}\n")
+              handle.write(f"bundle_sha256={manifest['bundle_sha256']}\n")
+          PY
       - name: Upload release manifest
         uses: actions/upload-artifact@v4
         with:
           name: release-manifest
           path: release-manifest.json
+      - name: Upload release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-bundle
+          path: release-bundle.tar.gz
 
   deploy-staging:
     if: ${{ inputs.deploy_staging }}
-    needs: release-manifest
+    needs: build-release
     runs-on: ubuntu-latest
     environment: staging
     steps:
@@ -66,6 +94,16 @@ jobs:
           python-version: "3.14"
       - name: Install post-deploy checker dependencies
         run: python -m pip install -r requirements-ci.txt
+      - name: Download release manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: release-manifest
+          path: release/manifest
+      - name: Download release bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: release-bundle
+          path: release/bundle
       - name: Configure SSH
         shell: bash
         run: |
@@ -74,12 +112,51 @@ jobs:
           printf '%s\n' "${{ secrets.STAGING_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "${{ secrets.STAGING_SSH_HOST }}" >> ~/.ssh/known_hosts
-      - name: Deploy staging ref
+      - name: Capture staging rollback target
+        id: staging_rollback
         shell: bash
         run: |
           set -euo pipefail
-          ssh "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" \
-            "cd '${{ secrets.STAGING_APP_DIR }}' && SYNC_GIT=1 GIT_REF='${{ inputs.release_ref }}' EXPECTED_GIT_SHA='${{ needs.release-manifest.outputs.resolved_sha }}' bash deploy.sh"
+          remote="${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}"
+          app_dir="${{ secrets.STAGING_APP_DIR }}"
+          ssh "${remote}" "cat '${app_dir}/release-manifest.json' 2>/dev/null" > previous-release-manifest.json || true
+          rollback_sha="$(python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("previous-release-manifest.json")
+          if not path.is_file() or not path.read_text(encoding="utf-8").strip():
+              print("")
+          else:
+              payload = json.loads(path.read_text(encoding="utf-8"))
+              print(str(payload.get("resolved_sha", "")))
+          PY
+          )"
+          echo "rollback_sha=${rollback_sha}" >> "${GITHUB_OUTPUT}"
+      - name: Deploy staging artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote="${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}"
+          app_dir="${{ secrets.STAGING_APP_DIR }}"
+          remote_dir="/tmp/goat-release-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-staging"
+          ssh "${remote}" "rm -rf '${remote_dir}' && mkdir -p '${remote_dir}'"
+          scp \
+            release/bundle/release-bundle.tar.gz \
+            release/manifest/release-manifest.json \
+            "${remote}:${remote_dir}/"
+          ssh "${remote}" "
+            set -euo pipefail
+            stage_dir=\$(mktemp -d)
+            trap 'rm -rf \"\$stage_dir\" \"${remote_dir}\"' EXIT
+            tar -xzf '${remote_dir}/release-bundle.tar.gz' -C \"\$stage_dir\"
+            PROJECT_DIR='${app_dir}' \
+            PYTHON_BIN=python3 \
+            RELEASE_BUNDLE='${remote_dir}/release-bundle.tar.gz' \
+            RELEASE_MANIFEST='${remote_dir}/release-manifest.json' \
+            EXPECTED_GIT_SHA='${{ needs.build-release.outputs.resolved_sha }}' \
+            bash \"\$stage_dir/deploy.sh\"
+          "
       - name: Run staging post-deploy check
         env:
           STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
@@ -90,11 +167,47 @@ jobs:
             --base-url "${STAGING_BASE_URL}" \
             --api-key "${STAGING_API_KEY}" \
             --owner-id "${STAGING_OWNER_ID}"
+      - name: Write staging promotion evidence
+        shell: bash
+        env:
+          RELEASE_REF: ${{ inputs.release_ref }}
+          RESOLVED_SHA: ${{ needs.build-release.outputs.resolved_sha }}
+          BUNDLE_SHA256: ${{ needs.build-release.outputs.bundle_sha256 }}
+          ROLLBACK_SHA: ${{ steps.staging_rollback.outputs.rollback_sha }}
+          STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from datetime import UTC, datetime
+          from pathlib import Path
+
+          payload = {
+              "environment": "staging",
+              "release_ref": os.environ["RELEASE_REF"],
+              "resolved_sha": os.environ["RESOLVED_SHA"],
+              "bundle_sha256": os.environ["BUNDLE_SHA256"],
+              "base_url": os.environ["STAGING_BASE_URL"],
+              "rollback_target": os.environ.get("ROLLBACK_SHA", "").strip() or None,
+              "post_deploy_check": "passed",
+              "promoted_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+          }
+          Path("staging-promotion-evidence.json").write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+      - name: Upload staging promotion evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-promotion-evidence
+          path: staging-promotion-evidence.json
 
   deploy-production:
     if: ${{ inputs.deploy_production }}
     needs:
-      - release-manifest
+      - build-release
       - deploy-staging
     runs-on: ubuntu-latest
     environment: production
@@ -108,6 +221,16 @@ jobs:
           python-version: "3.14"
       - name: Install post-deploy checker dependencies
         run: python -m pip install -r requirements-ci.txt
+      - name: Download release manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: release-manifest
+          path: release/manifest
+      - name: Download release bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: release-bundle
+          path: release/bundle
       - name: Configure SSH
         shell: bash
         run: |
@@ -116,12 +239,51 @@ jobs:
           printf '%s\n' "${{ secrets.PRODUCTION_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "${{ secrets.PRODUCTION_SSH_HOST }}" >> ~/.ssh/known_hosts
-      - name: Deploy production ref
+      - name: Capture production rollback target
+        id: production_rollback
         shell: bash
         run: |
           set -euo pipefail
-          ssh "${{ secrets.PRODUCTION_SSH_USER }}@${{ secrets.PRODUCTION_SSH_HOST }}" \
-            "cd '${{ secrets.PRODUCTION_APP_DIR }}' && SYNC_GIT=1 GIT_REF='${{ inputs.release_ref }}' EXPECTED_GIT_SHA='${{ needs.release-manifest.outputs.resolved_sha }}' bash deploy.sh"
+          remote="${{ secrets.PRODUCTION_SSH_USER }}@${{ secrets.PRODUCTION_SSH_HOST }}"
+          app_dir="${{ secrets.PRODUCTION_APP_DIR }}"
+          ssh "${remote}" "cat '${app_dir}/release-manifest.json' 2>/dev/null" > previous-release-manifest.json || true
+          rollback_sha="$(python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("previous-release-manifest.json")
+          if not path.is_file() or not path.read_text(encoding="utf-8").strip():
+              print("")
+          else:
+              payload = json.loads(path.read_text(encoding="utf-8"))
+              print(str(payload.get("resolved_sha", "")))
+          PY
+          )"
+          echo "rollback_sha=${rollback_sha}" >> "${GITHUB_OUTPUT}"
+      - name: Deploy production artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote="${{ secrets.PRODUCTION_SSH_USER }}@${{ secrets.PRODUCTION_SSH_HOST }}"
+          app_dir="${{ secrets.PRODUCTION_APP_DIR }}"
+          remote_dir="/tmp/goat-release-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-production"
+          ssh "${remote}" "rm -rf '${remote_dir}' && mkdir -p '${remote_dir}'"
+          scp \
+            release/bundle/release-bundle.tar.gz \
+            release/manifest/release-manifest.json \
+            "${remote}:${remote_dir}/"
+          ssh "${remote}" "
+            set -euo pipefail
+            stage_dir=\$(mktemp -d)
+            trap 'rm -rf \"\$stage_dir\" \"${remote_dir}\"' EXIT
+            tar -xzf '${remote_dir}/release-bundle.tar.gz' -C \"\$stage_dir\"
+            PROJECT_DIR='${app_dir}' \
+            PYTHON_BIN=python3 \
+            RELEASE_BUNDLE='${remote_dir}/release-bundle.tar.gz' \
+            RELEASE_MANIFEST='${remote_dir}/release-manifest.json' \
+            EXPECTED_GIT_SHA='${{ needs.build-release.outputs.resolved_sha }}' \
+            bash \"\$stage_dir/deploy.sh\"
+          "
       - name: Run production post-deploy check
         env:
           PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL }}
@@ -132,3 +294,39 @@ jobs:
             --base-url "${PRODUCTION_BASE_URL}" \
             --api-key "${PRODUCTION_API_KEY}" \
             --owner-id "${PRODUCTION_OWNER_ID}"
+      - name: Write production promotion evidence
+        shell: bash
+        env:
+          RELEASE_REF: ${{ inputs.release_ref }}
+          RESOLVED_SHA: ${{ needs.build-release.outputs.resolved_sha }}
+          BUNDLE_SHA256: ${{ needs.build-release.outputs.bundle_sha256 }}
+          ROLLBACK_SHA: ${{ steps.production_rollback.outputs.rollback_sha }}
+          PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from datetime import UTC, datetime
+          from pathlib import Path
+
+          payload = {
+              "environment": "production",
+              "release_ref": os.environ["RELEASE_REF"],
+              "resolved_sha": os.environ["RESOLVED_SHA"],
+              "bundle_sha256": os.environ["BUNDLE_SHA256"],
+              "base_url": os.environ["PRODUCTION_BASE_URL"],
+              "rollback_target": os.environ.get("ROLLBACK_SHA", "").strip() or None,
+              "post_deploy_check": "passed",
+              "promoted_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+          }
+          Path("production-promotion-evidence.json").write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+      - name: Upload production promotion evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-promotion-evidence
+          path: production-promotion-evidence.json

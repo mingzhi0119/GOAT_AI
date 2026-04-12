@@ -7,7 +7,10 @@ from unittest.mock import patch
 
 from backend.domain.authz_types import AuthorizationContext
 from backend.domain.authorization import PrincipalId, TenantId
-from backend.services.system_telemetry_service import build_system_features_response
+from backend.services.system_telemetry_service import (
+    build_runtime_target_response,
+    build_system_features_response,
+)
 from goat_ai.config import Settings
 from goat_ai.feature_gates import CodeSandboxFeatureSnapshot, RuntimeFeatureSnapshot
 
@@ -137,6 +140,23 @@ class SystemTelemetryServiceTests(unittest.TestCase):
         self.assertFalse(response.code_sandbox.effective_enabled)
         self.assertEqual("disabled_by_operator", response.workbench.browse.deny_reason)
         self.assertFalse(response.workbench.connectors.effective_enabled)
+
+    def test_runtime_target_response_exposes_single_instance_contract(self) -> None:
+        response = build_runtime_target_response(_settings())
+
+        self.assertEqual("sqlite-first", response.operational_contract.storage_model)
+        self.assertEqual(
+            "single-writer", response.operational_contract.concurrency_model
+        )
+        self.assertIn(
+            "rate_limiting", response.operational_contract.process_local_seams
+        )
+        self.assertIn(
+            "background_jobs", response.operational_contract.process_local_seams
+        )
+        self.assertIn(
+            "latency_metrics", response.operational_contract.process_local_seams
+        )
 
 
 if __name__ == "__main__":

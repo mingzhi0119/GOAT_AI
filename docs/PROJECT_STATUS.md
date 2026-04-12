@@ -49,16 +49,20 @@ Last updated: 2026-04-11
 - Tauri 2 desktop shell
 - PyInstaller-built backend sidecar
 - working Windows packaging flow producing `.msi` and NSIS installers
+- signed Windows desktop release path in `.github/workflows/desktop-provenance.yml`
 - desktop smoke coverage for sidecar boot and startup diagnostics
+- packaged desktop shell diagnostics persisted under the platform app-log directory
+- packaged desktop startup now fails explicitly if the sidecar never becomes ready or exits unexpectedly
 
 ### Governance and operations
 
-- staged release governance workflow and approval gate
-- desktop provenance baseline workflow for the Linux sidecar artifact (digest + SBOM, with attestations when supported)
+- artifact-first staged release governance workflow and approval gate
+- desktop provenance workflow for the Linux sidecar artifact plus signed Windows installer digests/attestations
 - versioned observability assets in-repo
 - nightly performance smoke with explicit budgets
+- merge-blocking PR latency gate for the core in-process chat path
 - weekly quality snapshot workflow for recurring coverage, security-review, and optional performance-summary capture
-- recurring fault-injection workflow for upstream-unavailable, persistence-failure, recovery-drill, and desktop-boot diagnostics
+- recurring fault-injection workflow for upstream-unavailable, persistence-failure, database recovery-drill, artifact rollback drill, and desktop-boot diagnostics
 - backup, restore, rollback, and recovery-drill coverage
 - documented vulnerability response, dependency-refresh cadence, and credential-rotation policy
 - CI gates for lint, tests, build, contract sync, dependency audit, secret scan, and desktop supply chain
@@ -69,15 +73,15 @@ Last updated: 2026-04-11
 - project memory and connectors are not implemented yet
 - storage remains SQLite-first and single-writer by design
 - future storage-shape changes require a new migration/compatibility/rollback decision log
-- Windows desktop packaging is ahead of macOS/Linux packaged validation and signing
+- Windows desktop packaging, signing, and provenance are ahead of macOS/Linux public packaged validation
 
 ## Status by active roadmap area
 
 - **16B storage evolution:** complete; repository ownership boundaries are explicit across sessions, artifacts, knowledge, media, workbench, and sandbox, and future datastore-shape changes require a separate decision package
 - **17 runtime platform:** partial workbench runtime is landed; canvas, typed workspace outputs, session restoration, direct output reopen, and output-to-artifact export linkage are now in place, while web retrieval, project memory, and connectors remain open
 - **18 sandbox follow-ons:** MVP is landed; richer async control, egress policy, and Rust supervisor work remain open
-- **19 desktop maturity:** Windows packaging is landed; cross-platform packaged validation, signing, updater readiness, and deeper native runtime operations remain open
-- **engineering quality uplift:** P0 audit remediation is complete; recurring quality/security evidence, fault-injection coverage, and provenance baselines are shipped, while several lifecycle P1 items remain open in [ROADMAP.md](ROADMAP.md)
+- **19 desktop maturity:** signed Windows packaging and packaged validation are landed; macOS/Linux public packaged validation, updater readiness, and deeper native runtime operations remain open
+- **engineering quality uplift:** P0 and P1 audit remediation are complete; remaining follow-on work is now P2-plus roadmap scope in [ROADMAP.md](ROADMAP.md)
 
 ## Recommended live references
 

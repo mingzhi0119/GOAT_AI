@@ -6,11 +6,13 @@
 #   SKIP_BUILD=1 bash deploy.sh      # skip npm build (use existing dist/)
 #   SYNC_GIT=1 bash deploy.sh        # sync and deploy the exact requested branch/ref
 #   GIT_REF=<ref> bash deploy.sh     # deploy a specific branch, tag, or commit
+#   RELEASE_BUNDLE=/tmp/goat-release.tar.gz RELEASE_MANIFEST=/tmp/release-manifest.json bash deploy.sh
 #
 # Override any variable before running, for example:
 #   GOAT_SERVER_PORT=62606 bash deploy.sh
 
 _DEPLOY_SCRIPT="${BASH_SOURCE[0]:-$0}"
+SCRIPT_DIR="$(cd "$(dirname "${_DEPLOY_SCRIPT}")" && pwd)"
 if [[ -f "$_DEPLOY_SCRIPT" ]]; then
   chmod +x "$_DEPLOY_SCRIPT" 2>/dev/null || true
 fi
@@ -29,10 +31,20 @@ LOCAL_OLLAMA_URL="${LOCAL_OLLAMA_URL:-http://127.0.0.1:11435}"
 SERVER_PORT="${GOAT_SERVER_PORT:-62606}"
 EFFECTIVE_OLLAMA_URL="${OLLAMA_BASE_URL:-${LOCAL_OLLAMA_URL}}"
 
-SKIP_BUILD="${SKIP_BUILD:-0}"
+RELEASE_BUNDLE="${RELEASE_BUNDLE:-}"
+RELEASE_MANIFEST="${RELEASE_MANIFEST:-}"
+SKIP_BUILD="${SKIP_BUILD:-}"
 QUICK="${QUICK:-0}"
 SYNC_GIT="${SYNC_GIT:-0}"
 EXPECTED_GIT_SHA="${EXPECTED_GIT_SHA:-}"
+BUNDLE_DEPLOY=0
+
+if [ -n "${RELEASE_BUNDLE}" ]; then
+  BUNDLE_DEPLOY=1
+  : "${SKIP_BUILD:=1}"
+else
+  : "${SKIP_BUILD:=0}"
+fi
 
 echo "GOAT AI deploy starting (branch: ${GIT_BRANCH}, ref: ${GIT_REF})${QUICK:+ [QUICK mode]}"
 
@@ -88,6 +100,9 @@ stop_pidfile() {
 }
 
 verify_expected_git_sha() {
+  if [ "${BUNDLE_DEPLOY}" = "1" ]; then
+    return 0
+  fi
   local current_sha
   current_sha="$(git rev-parse HEAD)"
   if [ -n "${EXPECTED_GIT_SHA}" ] && [ "${current_sha}" != "${EXPECTED_GIT_SHA}" ]; then
@@ -113,9 +128,44 @@ sync_requested_ref() {
 }
 
 echo "1. Project checkout"
-if [ ! -d "${PROJECT_DIR}/.git" ]; then
-  echo "Cloning repository"
-  git clone "$REPO_URL" "$PROJECT_DIR"
+if [ "${BUNDLE_DEPLOY}" = "1" ]; then
+  if [ -z "${RELEASE_MANIFEST}" ]; then
+    echo "RELEASE_MANIFEST is required when RELEASE_BUNDLE is set."
+    exit 1
+  fi
+  echo "Installing immutable release bundle into ${PROJECT_DIR}"
+  mkdir -p "${PROJECT_DIR}"
+  _previous_release_manifest=""
+  if [ -f "${PROJECT_DIR}/release-manifest.json" ]; then
+    _previous_release_manifest="$(mktemp)"
+    cp "${PROJECT_DIR}/release-manifest.json" "${_previous_release_manifest}"
+  fi
+  "${PYTHON_BIN}" "${SCRIPT_DIR}/tools/install_release_bundle.py" \
+    --bundle "${RELEASE_BUNDLE}" \
+    --manifest "${RELEASE_MANIFEST}" \
+    --project-dir "${PROJECT_DIR}" \
+    --expected-sha "${EXPECTED_GIT_SHA}"
+  if [ -n "${_previous_release_manifest}" ]; then
+    cp "${_previous_release_manifest}" "${PROJECT_DIR}/release-manifest.previous.json"
+    rm -f "${_previous_release_manifest}"
+  fi
+  cp "${RELEASE_MANIFEST}" "${PROJECT_DIR}/release-manifest.json"
+else
+  if [ ! -d "${PROJECT_DIR}/.git" ]; then
+    echo "Cloning repository"
+    git clone "$REPO_URL" "$PROJECT_DIR"
+  fi
+
+  cd "$PROJECT_DIR"
+
+  if [ "${SYNC_GIT}" = "1" ]; then
+    sync_requested_ref
+    echo "Repository synced to $(git rev-parse HEAD)"
+  else
+    git checkout "$GIT_REF"
+    verify_expected_git_sha
+    echo "Deploying current local checkout for ref ${GIT_REF} (SYNC_GIT=0)"
+  fi
 fi
 
 cd "$PROJECT_DIR"
@@ -128,15 +178,6 @@ if [ -z "${OLLAMA_BASE_URL:-}" ] && [ -f "${PROJECT_DIR}/.env" ]; then
     OLLAMA_BASE_URL="$_dotenv_ollama"
     EFFECTIVE_OLLAMA_URL="$_dotenv_ollama"
   fi
-fi
-
-if [ "${SYNC_GIT}" = "1" ]; then
-  sync_requested_ref
-  echo "Repository synced to $(git rev-parse HEAD)"
-else
-  git checkout "$GIT_REF"
-  verify_expected_git_sha
-  echo "Deploying current local checkout for ref ${GIT_REF} (SYNC_GIT=0)"
 fi
 
 echo "2. Python virtualenv and dependencies"

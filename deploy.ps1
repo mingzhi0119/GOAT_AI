@@ -4,6 +4,8 @@ param(
     [string]$GitBranch = "main",
     [string]$GitRef = $GitBranch,
     [string]$ExpectedGitSha = $env:EXPECTED_GIT_SHA,
+    [string]$ReleaseBundle = $env:RELEASE_BUNDLE,
+    [string]$ReleaseManifest = $env:RELEASE_MANIFEST,
     [string]$PythonBin = "python",
     [switch]$Quick,
     [switch]$SkipBuild,
@@ -332,6 +334,8 @@ $ApiPid = Join-Path $LogsDir "fastapi.pid"
 $ServerPort = 62606
 $QuickLabel = if ($Quick.IsPresent) { " [QUICK mode]" } else { "" }
 $ResolvedOllamaBaseUrl = $null
+$BundleDeploy = -not [string]::IsNullOrWhiteSpace($ReleaseBundle)
+$SkipBuildEffective = $SkipBuild.IsPresent -or $BundleDeploy
 
 Write-Host "GOAT AI Windows deploy starting (branch: $GitBranch, ref: $GitRef)$QuickLabel"
 
@@ -339,23 +343,58 @@ Assert-CommandAvailable -Name git
 Assert-CommandAvailable -Name $PythonBin
 Assert-CommandAvailable -Name npm
 
-if (-not (Test-Path -LiteralPath (Join-Path $ProjectDir ".git"))) {
-    Write-Step "Cloning repository into $ProjectDir"
-    git clone $RepoUrl $ProjectDir
+if ($BundleDeploy) {
+    if ([string]::IsNullOrWhiteSpace($ReleaseManifest)) {
+        throw "RELEASE_MANIFEST is required when RELEASE_BUNDLE is set."
+    }
+
+    Write-Step "Installing immutable release bundle into $ProjectDir"
+    New-Item -ItemType Directory -Path $ProjectDir -Force | Out-Null
+    $previousManifestTemp = $null
+    $currentManifestPath = Join-Path $ProjectDir "release-manifest.json"
+    if (Test-Path -LiteralPath $currentManifestPath) {
+        $previousManifestTemp = [System.IO.Path]::GetTempFileName()
+        Copy-Item -LiteralPath $currentManifestPath -Destination $previousManifestTemp -Force
+    }
+
+    & $PythonBin (Join-Path $PSScriptRoot "tools\install_release_bundle.py") `
+        --bundle $ReleaseBundle `
+        --manifest $ReleaseManifest `
+        --project-dir $ProjectDir `
+        --expected-sha $ExpectedGitSha
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to install immutable release bundle."
+    }
+
+    if ($previousManifestTemp) {
+        Copy-Item `
+            -LiteralPath $previousManifestTemp `
+            -Destination (Join-Path $ProjectDir "release-manifest.previous.json") `
+            -Force
+        Remove-Item -LiteralPath $previousManifestTemp -Force -ErrorAction SilentlyContinue
+    }
+    Copy-Item -LiteralPath $ReleaseManifest -Destination $currentManifestPath -Force
+} else {
+    if (-not (Test-Path -LiteralPath (Join-Path $ProjectDir ".git"))) {
+        Write-Step "Cloning repository into $ProjectDir"
+        git clone $RepoUrl $ProjectDir
+    }
 }
 
 Set-Location -LiteralPath $ProjectDir
 New-Item -ItemType Directory -Path $LogsDir -Force | Out-Null
 
-if ($SyncGit.IsPresent) {
-    Sync-RequestedGitRef -Ref $GitRef -ExpectedSha $ExpectedGitSha
-} else {
-    git checkout $GitRef
-    if ($LASTEXITCODE -ne 0) {
-        throw "git checkout failed for requested ref $GitRef"
+if (-not $BundleDeploy) {
+    if ($SyncGit.IsPresent) {
+        Sync-RequestedGitRef -Ref $GitRef -ExpectedSha $ExpectedGitSha
+    } else {
+        git checkout $GitRef
+        if ($LASTEXITCODE -ne 0) {
+            throw "git checkout failed for requested ref $GitRef"
+        }
+        Assert-ExpectedGitSha -ExpectedSha $ExpectedGitSha
+        Write-Step "Deploying current local checkout for ref $GitRef (SYNC_GIT=0)"
     }
-    Assert-ExpectedGitSha -ExpectedSha $ExpectedGitSha
-    Write-Step "Deploying current local checkout for ref $GitRef (SYNC_GIT=0)"
 }
 
 if ($Quick.IsPresent) {
@@ -383,7 +422,7 @@ if ($Quick.IsPresent) {
     }
 }
 
-if ($SkipBuild.IsPresent -and (Test-Path -LiteralPath (Join-Path $FrontendDir "dist"))) {
+if ($SkipBuildEffective -and (Test-Path -LiteralPath (Join-Path $FrontendDir "dist"))) {
     Write-Step "Skipping npm build because -SkipBuild was provided and dist exists"
 } else {
     Write-Step "Installing Node dependencies with npm ci"

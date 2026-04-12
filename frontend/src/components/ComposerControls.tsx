@@ -93,6 +93,7 @@ export default function ComposerControls({
           type="button"
           disabled={isStreaming || attachmentUploading}
           onClick={onTogglePlusMenu}
+          aria-label={plusMenuOpen ? 'Close upload and planning actions' : 'Open upload and planning actions'}
           className={`${layoutDecisions.compactComposer ? 'h-9 w-9' : 'h-10 w-10'} flex shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40 ${plusMenuOpen ? '' : 'hover:bg-[var(--composer-control-hover-bg)]'}`}
           style={{ border: 'none', ...controlPillStyle(plusMenuOpen), color: 'var(--composer-control-icon)' }}
           title={plusMenuOpen ? 'Close actions' : 'Open upload and planning actions'}

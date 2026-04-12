@@ -44,12 +44,22 @@ class RuntimeTargetItemResponse(BaseModel):
     reason: str
 
 
+class RuntimeOperationalContractResponse(BaseModel):
+    """Operator-facing runtime contract for scaling and recovery expectations."""
+
+    storage_model: str
+    concurrency_model: str
+    process_local_seams: list[str]
+    scaling_notes: list[str]
+
+
 class RuntimeTargetResponse(BaseModel):
     """Resolved runtime target metadata used by deploy/ops tooling."""
 
     deploy_target: str
     current: RuntimeTargetItemResponse
     ordered_targets: list[RuntimeTargetItemResponse]
+    operational_contract: RuntimeOperationalContractResponse
 
 
 class CodeSandboxFeaturePayload(BaseModel):

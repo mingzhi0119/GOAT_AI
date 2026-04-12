@@ -95,8 +95,8 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 - When fixing a bug, add or update the test that would have caught it before the fix.
 - Prefer direct tests for decision-heavy modules; do not rely only on end-to-end or black-box coverage when the internal branch logic is complex.
 - Run the relevant CI-equivalent checks for the layer you changed.
-- For frontend changes, run `cd frontend && npm ci && npm run contract:check && npm test -- --run`.
-- CI also runs `cd frontend && npm run build`; run that locally for frontend changes that touch types, build inputs, packaging, test utilities, or any path that may compile differently from `vitest`.
+- For frontend changes, run `cd frontend && npm ci && npm run lint && npm run contract:check && npm test -- --run`.
+- CI also runs `cd frontend && npm run build && npm run bundle:check && npm run test:e2e`; run those locally for frontend changes that touch types, build inputs, protected browser flows, packaging, or any path that may compile differently from `vitest`.
 - Desktop shell changes must keep `cargo test --manifest-path frontend/src-tauri/Cargo.toml` green.
 - Delivery and desktop wrapper changes must keep the scripted smoke coverage green (`python -m pytest __tests__/test_desktop_smoke.py` and any affected script tests).
 - Prefer coverage reporting and fail-under thresholds for backend and frontend; do not lower thresholds without an explicit documented exception.

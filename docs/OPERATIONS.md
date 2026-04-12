@@ -51,7 +51,12 @@ Frontend:
 ```bash
 cd frontend
 npm ci
+npm run lint
 npm run contract:check
+npx playwright install --with-deps chromium
+npm run test:e2e
+npm run build
+npm run bundle:check
 npm run dev
 ```
 
@@ -108,6 +113,7 @@ Important notes:
 - `python -m tools.build_desktop_sidecar` builds a per-platform executable with **PyInstaller**
 - the output is copied to `frontend/src-tauri/binaries/goat-backend-$TARGET_TRIPLE[.exe]`
 - `npm run desktop:build` triggers the same sidecar build automatically through Tauri's `beforeBuildCommand`
+- merge-blocking CI now also builds real Windows packaged desktop installers and records provenance through `python -m tools.write_desktop_release_provenance`
 - PyInstaller is **not** a cross-compiler; build each platform's sidecar on that platform (or an equivalent CI runner / VM)
 - on Windows developer machines, Linux-targeted desktop validation should still run from WSL when you need Linux parity; Windows-native packaging remains a Windows flow
 - packaged desktop builds move app-owned writable state out of the repository and into the platform app-local-data directory
@@ -116,8 +122,9 @@ Desktop sidecar writable paths:
 
 - SQLite DB: `<app_local_data_dir>/chat_logs.db`
 - persisted app data: `<app_local_data_dir>/data`
-- desktop shell stdout/stderr are not yet persisted to a dedicated file sink; use backend SQLite/data plus the installer-run process logs for diagnostics today
-- Tauri startup now emits explicit diagnostics when sidecar spawn fails or `/api/health` does not become ready before the window reveal timeout
+- packaged desktop shell diagnostics now append to `<app_log_dir>/desktop-shell.log`
+- Tauri startup now emits explicit diagnostics when sidecar spawn fails, `/api/health` does not become ready before the window reveal timeout, or the bundled backend exits unexpectedly after startup
+- packaged desktop startup now fails closed instead of revealing the main window on a broken backend
 
 Packaged desktop runtime config:
 
@@ -133,6 +140,12 @@ python -m scripts.desktop_smoke --host 127.0.0.1 --port 62606
 
 When API protection is enabled, pass `--api-key "$GOAT_API_KEY"`.
 
+Public Windows desktop release path:
+
+- `.github/workflows/desktop-provenance.yml` is the public signed installer workflow
+- local `npm run desktop:build` output remains internal/test-only unless it is rebuilt and signed through the workflow
+- signed public Windows installers require `GOAT_DESKTOP_SIGNING_CERT_BASE64` and `GOAT_DESKTOP_SIGNING_CERT_PASSWORD`
+
 ## Deploy
 
 Linux:
@@ -142,6 +155,7 @@ bash deploy.sh
 QUICK=1 bash deploy.sh
 SKIP_BUILD=1 bash deploy.sh
 SYNC_GIT=1 bash deploy.sh
+RELEASE_BUNDLE=/tmp/release-bundle.tar.gz RELEASE_MANIFEST=/tmp/release-manifest.json bash deploy.sh
 ```
 
 Windows PowerShell:
@@ -159,9 +173,10 @@ Important behavior:
 - `SYNC_GIT=1` is explicit opt-in
 - `GIT_REF` is authoritative: branch refs sync to `origin/$GIT_REF`, while tag/commit refs deploy in detached mode without drifting back to `main`
 - `EXPECTED_GIT_SHA` may be supplied by release automation to hard-fail if the host resolves any SHA other than the requested release commit
+- `RELEASE_BUNDLE` + `RELEASE_MANIFEST` switch deploy into artifact-first mode: the shipped bundle is installed before process restart, and the host no longer rebuilds the frontend from source
 - `deploy.sh` keeps the `nohup` + `logs/fastapi.pid` fallback path
 - `deploy.sh` and `deploy.ps1` now stop the current FastAPI process gracefully first, then force cleanup only if the drain window expires
-- Rollback uses an explicit ref: see [ROLLBACK.md](ROLLBACK.md)
+- Artifact-first rollback is the preferred path; ref-based rollback remains available for manual recovery. See [ROLLBACK.md](ROLLBACK.md)
 - Windows deploy reuses Ollama on `127.0.0.1:11434` when available unless `OLLAMA_BASE_URL` is explicitly set
 - Deploy now includes a post-deploy contract check (`scripts/post_deploy_check.py`) before success is reported: it exercises `GET /api/health`, `GET /api/ready`, `GET /api/system/runtime-target`, and a short `POST /api/chat` stream. The chat step passes when the SSE body includes **at least one** `token` or **`thinking`** frame (so thinking-first models still validate), and fails on HTTP errors, empty SSE, or a first-frame `error`
 
@@ -447,17 +462,23 @@ When API protection is enabled, pass `--api-key "$GOAT_API_KEY"`.
 Performance governance:
 
 - `.github/workflows/performance-nightly.yml` runs the same smoke command on a schedule or manual dispatch.
+- `.github/workflows/ci.yml` now also runs `python -m tools.run_pr_latency_gate` with in-process fake-LLM traffic so the highest-risk chat latency regressions fail before merge.
 - The performance gate currently fails when:
   - full chat p95 exceeds `12000 ms`
   - first-token p95 exceeds `2000 ms`
+- The PR latency gate currently fails when:
+  - in-process chat total p95 exceeds `1200 ms`
+  - in-process first-token p95 exceeds `400 ms`
 - Keep those thresholds aligned with the SLO starter table unless a reviewed change updates both the workflow and this document.
 
 ## Release governance
 
 - `.github/workflows/release-governance.yml` is the P1 release workflow for:
-  - release manifest generation
-  - staging deployment
-  - production promotion behind GitHub Environment approval
+  - immutable bundle + release-manifest generation
+  - staging deployment of the exact retained bundle
+  - production promotion of the same bundle behind GitHub Environment approval
+  - per-environment promotion evidence with artifact digest and rollback target capture
+- `python -m scripts.exercise_release_rollback_drill` is the repo-level artifact rollback drill for scratch-project validation of bundle promotion + rollback semantics.
 - Release policy and required environment secrets are documented in [RELEASE_GOVERNANCE.md](RELEASE_GOVERNANCE.md).
 
 ## Process and health

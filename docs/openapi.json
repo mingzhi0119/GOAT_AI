@@ -4284,6 +4284,41 @@
         "title": "RuntimeFeaturePayload",
         "description": "Runtime / dependency readiness for optional non-policy-gated features."
       },
+      "RuntimeOperationalContractResponse": {
+        "properties": {
+          "storage_model": {
+            "type": "string",
+            "title": "Storage Model"
+          },
+          "concurrency_model": {
+            "type": "string",
+            "title": "Concurrency Model"
+          },
+          "process_local_seams": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Process Local Seams"
+          },
+          "scaling_notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Scaling Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "storage_model",
+          "concurrency_model",
+          "process_local_seams",
+          "scaling_notes"
+        ],
+        "title": "RuntimeOperationalContractResponse",
+        "description": "Operator-facing runtime contract for scaling and recovery expectations."
+      },
       "RuntimeTargetItemResponse": {
         "properties": {
           "mode": {
@@ -4333,13 +4368,17 @@
             },
             "type": "array",
             "title": "Ordered Targets"
+          },
+          "operational_contract": {
+            "$ref": "#/components/schemas/RuntimeOperationalContractResponse"
           }
         },
         "type": "object",
         "required": [
           "deploy_target",
           "current",
-          "ordered_targets"
+          "ordered_targets",
+          "operational_contract"
         ],
         "title": "RuntimeTargetResponse",
         "description": "Resolved runtime target metadata used by deploy/ops tooling."

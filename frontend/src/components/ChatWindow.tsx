@@ -177,29 +177,37 @@ const ChatWindow: FC<Props> = ({
   const sandboxPollRef = useRef<number | null>(null)
   const sandboxLogCursorRef = useRef(0)
   const previousCodeSandboxOpenRef = useRef(false)
+  const hasActiveFileContext = activeFileContext !== null
+  const activeFileContextFilename = activeFileContext?.filename ?? null
+  const activeFileContextSuffixPrompt = activeFileContext?.suffixPrompt ?? null
+  const activeFileContextTemplatePrompt = activeFileContext?.templatePrompt ?? null
 
   const starterPrompts = useMemo<EmptyChatPrompt[]>(() => {
     const basePrompts = pickRandomPromptTexts(
       STARTER_PROMPT_POOL,
-      activeFileContext ? 2 : 4,
+      hasActiveFileContext ? 2 : 4,
     ).map((text): EmptyChatPrompt => ({ text, kind: 'base' }))
-    if (!activeFileContext) {
+    if (!hasActiveFileContext || !activeFileContextFilename) {
       return basePrompts
     }
-    const filename = activeFileContext.filename
+    const filename = activeFileContextFilename
     return [
       ...basePrompts,
-      { text: activeFileContext.suffixPrompt ?? getSuffixPrompt(filename), kind: 'suffix' },
       {
-        text: activeFileContext.templatePrompt ?? getTemplateFallbackPrompt(filename),
+        text: activeFileContextSuffixPrompt ?? getSuffixPrompt(filename),
+        kind: 'suffix',
+      },
+      {
+        text:
+          activeFileContextTemplatePrompt ?? getTemplateFallbackPrompt(filename),
         kind: 'template',
       },
     ]
   }, [
-    activeFileContext?.filename,
-    activeFileContext?.id,
-    activeFileContext?.suffixPrompt,
-    activeFileContext?.templatePrompt,
+    hasActiveFileContext,
+    activeFileContextFilename,
+    activeFileContextSuffixPrompt,
+    activeFileContextTemplatePrompt,
   ])
 
   const visibleMessages = useMemo(() => messages.filter(message => !message.hidden), [messages])

@@ -455,6 +455,18 @@ schemas:
       available_on_host: boolean
       effective_enabled: boolean
       deny_reason: string|null
+  RuntimeOperationalContractResponse:
+    type: object
+    required:
+      - storage_model
+      - concurrency_model
+      - process_local_seams
+      - scaling_notes
+    properties:
+      storage_model: string
+      concurrency_model: string
+      process_local_seams: string[]
+      scaling_notes: string[]
   RuntimeTargetItemResponse:
     type: object
     required:
@@ -475,10 +487,12 @@ schemas:
       - deploy_target
       - current
       - ordered_targets
+      - operational_contract
     properties:
       deploy_target: string
       current: RuntimeTargetItemResponse
       ordered_targets: RuntimeTargetItemResponse[]
+      operational_contract: RuntimeOperationalContractResponse
   SystemFeaturesResponse:
     type: object
     required:

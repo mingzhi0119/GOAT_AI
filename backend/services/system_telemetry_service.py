@@ -8,6 +8,7 @@ from backend.models.system import (
     CodeSandboxFeaturePayload,
     InferenceLatencyResponse,
     RuntimeFeaturePayload,
+    RuntimeOperationalContractResponse,
     RuntimeTargetItemResponse,
     RuntimeTargetResponse,
     SystemFeaturesResponse,
@@ -128,4 +129,18 @@ def build_runtime_target_response(settings: Settings) -> RuntimeTargetResponse:
         ordered_targets=[
             RuntimeTargetItemResponse(**item.__dict__) for item in ordered
         ],
+        operational_contract=RuntimeOperationalContractResponse(
+            storage_model="sqlite-first",
+            concurrency_model="single-writer",
+            process_local_seams=[
+                "rate_limiting",
+                "background_jobs",
+                "latency_metrics",
+            ],
+            scaling_notes=[
+                "Keep one writable app process for SQLite-backed state.",
+                "Per-process rate limits do not provide a global quota without external coordination.",
+                "Aggregate latency and Prometheus metrics across instances externally when running more than one process.",
+            ],
+        ),
     )

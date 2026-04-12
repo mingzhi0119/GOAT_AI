@@ -2,19 +2,25 @@
 
 use std::{
     path::Path,
-    process::Child,
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
     thread,
     time::{Duration, Instant},
 };
 #[cfg(debug_assertions)]
 use std::{
     path::PathBuf,
-    process::{Command, Stdio},
+    process::{Child, Command, Stdio},
 };
 
 #[cfg(not(debug_assertions))]
-use std::fs;
+use std::{
+    fs::{self, OpenOptions},
+    io::Write,
+    path::PathBuf,
+};
 use tauri::Manager;
 #[cfg(not(debug_assertions))]
 use tauri_plugin_shell::{process::CommandChild, process::CommandEvent, ShellExt};
@@ -26,7 +32,14 @@ const HEALTH_TIMEOUT_SEC: u64 = 25;
 #[derive(Clone, Default)]
 struct BackendProcessState(Arc<Mutex<Option<BackendProcessHandle>>>);
 
+#[derive(Clone, Default)]
+struct BackendReadyState(Arc<AtomicBool>);
+
+#[derive(Clone, Default)]
+struct BackendShutdownState(Arc<AtomicBool>);
+
 enum BackendProcessHandle {
+    #[cfg(debug_assertions)]
     Dev(Child),
     #[cfg(not(debug_assertions))]
     Release(CommandChild),
@@ -78,17 +91,81 @@ fn startup_failure_diagnostic(stage: &str, health_url: &str, detail: Option<&str
     message
 }
 
+fn backend_termination_diagnostic(
+    ready: bool,
+    shutdown_requested: bool,
+    code: Option<i32>,
+    signal: Option<i32>,
+    detail: Option<&str>,
+) -> String {
+    let lifecycle = if shutdown_requested {
+        "terminated during desktop shutdown"
+    } else if ready {
+        "terminated after startup"
+    } else {
+        "terminated before startup completed"
+    };
+    let mut message = format!(
+        "GOAT desktop backend sidecar {} (code={:?}, signal={:?}).",
+        lifecycle, code, signal
+    );
+    if let Some(detail) = detail {
+        let trimmed = detail.trim();
+        if !trimmed.is_empty() {
+            message.push_str(" Detail: ");
+            message.push_str(trimmed);
+        }
+    }
+    message
+}
+
+#[cfg(not(debug_assertions))]
+fn desktop_log_path(logs_dir: &Path) -> PathBuf {
+    logs_dir.join("desktop-shell.log")
+}
+
+#[cfg(not(debug_assertions))]
+fn append_desktop_log(log_path: &Path, message: &str) {
+    if let Some(parent) = log_path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(log_path) {
+        let _ = writeln!(file, "{}", message.trim_end());
+    }
+}
+
+#[cfg(debug_assertions)]
+fn append_desktop_log(_log_path: &Path, _message: &str) {}
+
+#[cfg(not(debug_assertions))]
+fn resolve_desktop_log_path<R: tauri::Runtime>(
+    app_handle: &tauri::AppHandle<R>,
+) -> Result<PathBuf, String> {
+    let logs_dir = app_handle
+        .path()
+        .app_log_dir()
+        .map_err(|err| format!("could not resolve app log dir: {err}"))?;
+    fs::create_dir_all(&logs_dir)
+        .map_err(|err| format!("could not create app log dir {}: {err}", logs_dir.display()))?;
+    Ok(desktop_log_path(&logs_dir))
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(BackendProcessState::default())
+        .manage(BackendReadyState::default())
+        .manage(BackendShutdownState::default())
         .setup(|app| {
             let backend_host = backend_host();
             let backend_port = backend_port();
-            let window = app
-                .get_webview_window("main")
-                .ok_or("missing desktop main window")?;
+            app.get_webview_window("main")
+                .ok_or_else(|| "missing desktop main window".to_string())?;
             let health_url = backend_health_url(&backend_host, &backend_port);
+            #[cfg(not(debug_assertions))]
+            let packaged_desktop_log_path = Some(resolve_desktop_log_path(app.handle())?);
+            #[cfg(debug_assertions)]
+            let packaged_desktop_log_path: Option<PathBuf> = None;
 
             match spawn_backend(app.handle()) {
                 Ok(child) => {
@@ -96,20 +173,28 @@ fn main() {
                     if let Ok(mut slot) = state.0.lock() {
                         *slot = Some(child);
                     }
+                    let ready_state = app.state::<BackendReadyState>().inner().clone();
                     let app_handle = app.handle().clone();
+                    let desktop_log_path = packaged_desktop_log_path.clone();
                     thread::spawn(move || {
                         let ready =
                             wait_for_backend(&health_url, Duration::from_secs(HEALTH_TIMEOUT_SEC));
                         if !ready {
-                            eprintln!(
-                                "{}",
-                                startup_failure_diagnostic(
-                                    "health_wait_timeout",
-                                    &health_url,
-                                    Some("Timed out while waiting for the bundled backend to answer /api/health."),
-                                )
+                            let diagnostic = startup_failure_diagnostic(
+                                "health_wait_timeout",
+                                &health_url,
+                                Some(
+                                    "Timed out while waiting for the bundled backend to answer /api/health.",
+                                ),
                             );
+                            if let Some(log_path) = desktop_log_path.as_ref() {
+                                append_desktop_log(log_path, &diagnostic);
+                            }
+                            eprintln!("{}", diagnostic);
+                            app_handle.exit(1);
+                            return;
                         }
+                        ready_state.0.store(true, Ordering::SeqCst);
                         if let Some(window) = app_handle.get_webview_window("main") {
                             let _ = window.show();
                             let _ = window.set_focus();
@@ -117,12 +202,12 @@ fn main() {
                     });
                 }
                 Err(err) => {
-                    eprintln!(
-                        "{}",
-                        startup_failure_diagnostic("backend_spawn_failed", &health_url, Some(&err))
-                    );
-                    let _ = window.show();
-                    let _ = window.set_focus();
+                    let diagnostic =
+                        startup_failure_diagnostic("backend_spawn_failed", &health_url, Some(&err));
+                    if let Some(log_path) = packaged_desktop_log_path.as_ref() {
+                        append_desktop_log(log_path, &diagnostic);
+                    }
+                    return Err(diagnostic.into());
                 }
             }
 
@@ -130,6 +215,12 @@ fn main() {
         })
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
+                let shutdown_state = window
+                    .app_handle()
+                    .state::<BackendShutdownState>()
+                    .inner()
+                    .clone();
+                shutdown_state.0.store(true, Ordering::SeqCst);
                 let state = window.app_handle().state::<BackendProcessState>().inner().clone();
                 let lock_result = state.0.lock();
                 if let Ok(mut slot) = lock_result {
@@ -146,6 +237,7 @@ fn main() {
 impl BackendProcessHandle {
     fn kill(self) {
         match self {
+            #[cfg(debug_assertions)]
             Self::Dev(mut child) => {
                 let _ = child.kill();
             }
@@ -276,8 +368,8 @@ fn _path_exists(path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        backend_health_url, normalize_configured_value, startup_failure_diagnostic,
-        wait_for_backend_with_probe,
+        backend_health_url, backend_termination_diagnostic, normalize_configured_value,
+        startup_failure_diagnostic, wait_for_backend_with_probe,
     };
     use std::time::Duration;
 
@@ -340,6 +432,17 @@ mod tests {
         assert!(message.contains("http://127.0.0.1:62606/api/health"));
         assert!(message.contains("Timed out"));
     }
+
+    #[test]
+    fn backend_termination_diagnostic_distinguishes_startup_and_shutdown() {
+        let startup =
+            backend_termination_diagnostic(false, false, Some(1), None, Some("spawn failed"));
+        let shutdown = backend_termination_diagnostic(true, true, Some(0), None, None);
+
+        assert!(startup.contains("before startup completed"));
+        assert!(startup.contains("spawn failed"));
+        assert!(shutdown.contains("during desktop shutdown"));
+    }
 }
 
 #[cfg(not(debug_assertions))]
@@ -364,6 +467,8 @@ fn spawn_release_backend<R: tauri::Runtime>(
     })?;
     fs::create_dir_all(&logs_dir)
         .map_err(|err| format!("could not create app log dir {}: {err}", logs_dir.display()))?;
+    let desktop_log = desktop_log_path(&logs_dir);
+    append_desktop_log(&desktop_log, "Starting bundled backend sidecar.");
 
     let mut sidecar = app_handle
         .shell()
@@ -382,15 +487,58 @@ fn spawn_release_backend<R: tauri::Runtime>(
     let (mut rx, child) = sidecar
         .spawn()
         .map_err(|err| format!("failed to spawn bundled backend sidecar: {err}"))?;
+    append_desktop_log(&desktop_log, "Bundled backend sidecar spawned.");
 
+    let event_log_path = desktop_log.clone();
+    let ready_state = app_handle.state::<BackendReadyState>().inner().clone();
+    let shutdown_state = app_handle.state::<BackendShutdownState>().inner().clone();
+    let app_handle_for_events = app_handle.clone();
     tauri::async_runtime::spawn(async move {
         while let Some(event) = rx.recv().await {
             match event {
                 CommandEvent::Stdout(line) => {
-                    eprintln!("GOAT backend stdout: {}", String::from_utf8_lossy(&line));
+                    let rendered =
+                        format!("GOAT backend stdout: {}", String::from_utf8_lossy(&line));
+                    append_desktop_log(&event_log_path, &rendered);
+                    eprintln!("{rendered}");
                 }
                 CommandEvent::Stderr(line) => {
-                    eprintln!("GOAT backend stderr: {}", String::from_utf8_lossy(&line));
+                    let rendered =
+                        format!("GOAT backend stderr: {}", String::from_utf8_lossy(&line));
+                    append_desktop_log(&event_log_path, &rendered);
+                    eprintln!("{rendered}");
+                }
+                CommandEvent::Terminated(payload) => {
+                    let ready = ready_state.0.load(Ordering::SeqCst);
+                    let shutdown_requested = shutdown_state.0.load(Ordering::SeqCst);
+                    let diagnostic = backend_termination_diagnostic(
+                        ready,
+                        shutdown_requested,
+                        payload.code,
+                        payload.signal,
+                        None,
+                    );
+                    append_desktop_log(&event_log_path, &diagnostic);
+                    eprintln!("{diagnostic}");
+                    if !shutdown_requested {
+                        app_handle_for_events.exit(1);
+                    }
+                }
+                CommandEvent::Error(error) => {
+                    let ready = ready_state.0.load(Ordering::SeqCst);
+                    let shutdown_requested = shutdown_state.0.load(Ordering::SeqCst);
+                    let diagnostic = backend_termination_diagnostic(
+                        ready,
+                        shutdown_requested,
+                        None,
+                        None,
+                        Some(&error),
+                    );
+                    append_desktop_log(&event_log_path, &diagnostic);
+                    eprintln!("{diagnostic}");
+                    if !shutdown_requested {
+                        app_handle_for_events.exit(1);
+                    }
                 }
                 _ => {}
             }

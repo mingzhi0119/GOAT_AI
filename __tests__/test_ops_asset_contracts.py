@@ -56,12 +56,18 @@ def test_release_docs_and_status_match_current_truth() -> None:
     release_doc = (REPO_ROOT / "docs" / "RELEASE_GOVERNANCE.md").read_text(
         encoding="utf-8"
     )
+    rollback_doc = (REPO_ROOT / "docs" / "ROLLBACK.md").read_text(encoding="utf-8")
+    operations_doc = (REPO_ROOT / "docs" / "OPERATIONS.md").read_text(encoding="utf-8")
     project_status = (REPO_ROOT / "docs" / "PROJECT_STATUS.md").read_text(
         encoding="utf-8"
     )
 
     assert "`STAGING_BASE_URL`" in release_doc
     assert "`PRODUCTION_BASE_URL`" in release_doc
-    assert "not yet full artifact-first provenance" in release_doc
+    assert "immutable bundle" in release_doc
+    assert "promotion evidence" in release_doc
+    assert "exercise_release_rollback_drill" in rollback_doc
+    assert "python -m tools.run_pr_latency_gate" in operations_doc
+    assert "<app_log_dir>/desktop-shell.log" in operations_doc
     assert "P0, P1, and P2 are complete" not in project_status
-    assert "P0 audit remediation is complete" in project_status
+    assert "artifact-first staged release governance workflow" in project_status

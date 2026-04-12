@@ -23,100 +23,40 @@ These items come from the April 2026 lifecycle audit and should take priority ov
 new capability expansion. The goal is to close industrial-score gaps before
 widening product promises.
 
-No open P0 audit items remain after the 2026-04-11 remediation pass. Active
-follow-on work now starts at P1 and focuses on broader contract, release,
-desktop, and observability maturity.
+No open P0 audit items remain after the 2026-04-11 remediation pass.
 
 The 2026-04-11 P1 pass also closed the deploy/ops asset-governance slice
 (direct tests now cover deploy/service/health/watchdog/phase0 contracts) and
 closed the contract-tooling startup-side-effect slice (API contract tooling no
 longer needs runtime DB/telemetry initialization just to inspect OpenAPI).
 
-#### P1: immutable artifact promotion and richer release evidence
+The same 2026-04-11 remediation sequence also closed the remaining non-desktop
+P1 audit slices:
 
-- Problem:
-  - release correctness now verifies exact refs / SHAs, but deploys still build from mutable hosts instead of promoting immutable artifacts
-  - release evidence still stops short of a full artifact-first provenance trail across staging and production
-- Solution:
-  - build release artifacts once in CI, attest/sign them, and promote the same immutable payload through staging and production
-  - extend release evidence so operators can answer "which artifact digest reached which environment, and when?" without host forensics
-  - add rollback drills for artifact promotion, not only source-ref deployment
-- Exit criteria:
-  - staging and production promote the same immutable artifact, not independent host builds
-  - release evidence captures artifact digest, environment promotion, and rollback target
-  - rollback drills validate artifact-first recovery
+- immutable artifact promotion now builds once in CI, promotes the same retained
+  bundle through staging and production, records per-environment promotion
+  evidence, and exercises artifact rollback via
+  `python -m scripts.exercise_release_rollback_drill`
+- frontend browser-level protected-flow coverage, lint, bundle-budget checks,
+  and Playwright regression gates are now part of the standard CI path
+- backend provider drift is closed; the repo is now explicit that the active LLM
+  runtime is Ollama-only until a future provider decision lands end to end
+- request correlation and durable packaged-desktop diagnostics are surfaced
+  consistently enough to close the cross-surface observability P1 slice
+- the single-writer contract is now exposed via `/api/system/runtime-target`, and
+  merge-blocking latency smoke runs in CI through
+  `python -m tools.run_pr_latency_gate`
 
-#### P1: frontend browser-level coverage and broader UI quality gates
+No open P1 audit items remain after the 2026-04-11 desktop release-maturity
+closure. The final desktop slice now has:
 
-- Problem:
-  - frontend contract generation/checking is now automated, but browser-level end-to-end coverage is still missing
-  - complex protected flows are now covered in jsdom/App integration tests, not in a real browser runner
-  - lint and accessibility/performance checks are still not part of the standard frontend gate
-- Solution:
-  - add browser-level integration coverage for chat, history, uploads, auth-enabled flows, and feature-gated UI
-  - add lint and accessibility/performance checks to the frontend gate
-  - keep protected code-sandbox async log flows inside the same browser regression suite so auth/header regressions do not slip past unit tests
-- Exit criteria:
-  - protected-path browser tests exist for the highest-risk flows
-  - lint and basic accessibility checks are part of the standard frontend gate
-
-#### P1: desktop release maturity, installer validation, and native recovery
-
-- Problem:
-  - desktop CI validates sidecar build and Rust tests, but not a full packaged installer/bundle path
-  - signing, installer verification, and cross-platform packaged validation are still incomplete
-  - desktop runtime supervision is still thin: one-shot health wait, limited child-exit handling, and weak durable logging
-- Solution:
-  - add CI validation for real packaged desktop artifacts, not only the sidecar
-  - extend provenance from Linux sidecar evidence to shipped installers/bundles
-  - land signing/notarization workflows for supported release targets
-  - harden the Rust bridge for child-exit handling, restart/backoff, and durable packaged-app log sinks
-  - add desktop release-path tests, packaged smoke tests, and clearer operator/user recovery guidance
-- Exit criteria:
-  - supported desktop artifacts are built, validated, and provenance-recorded in CI
-  - signed release artifacts are the default public distribution path
-  - packaged-app failures are diagnosable without manual stdout/stderr scraping
-
-#### P1: backend provider drift and runtime seam hardening
-
-- Problem:
-  - some provider/config paths, such as the OpenAI client seam, remain partially landed and undocumented
-  - critical runtime seams still rely on process-local assumptions
-- Solution:
-  - either wire unfinished provider paths all the way through settings/docs/tests or remove them until needed
-  - clarify which runtime seams remain intentionally single-process and add stronger guards/tests around those assumptions
-- Exit criteria:
-  - provider/config surfaces are either fully supported or removed from the active code path
-  - the repo is explicit about which seams are single-instance by design
-
-#### P1: observability and request correlation across backend, frontend, and desktop
-
-- Problem:
-  - backend observability is much stronger than frontend and desktop observability
-  - request IDs, stable error codes, and packaged-app diagnostics are not surfaced consistently to users or operators
-- Solution:
-  - expose request correlation and stable error codes in frontend-visible error states
-  - add desktop log sink and failure-reporting paths that survive packaged runtime failures
-  - keep dashboards, alerts, runbooks, and emitted metrics aligned whenever operator-facing telemetry changes
-- Exit criteria:
-  - user-visible failures can be correlated to backend logs without guesswork
-  - desktop incidents have durable local diagnostic artifacts
-  - observability assets remain version-aligned with emitted metrics and recovery runbooks
-
-#### P1: performance governance and single-instance boundary clarity
-
-- Problem:
-  - performance smoke exists, but not as a standard PR-blocking gate
-  - some heavy paths remain synchronous and local-file-backed
-  - rate limiting, background jobs, and some telemetry remain process-local
-- Solution:
-  - define which performance budgets should block PRs versus only scheduled monitoring
-  - harden heavy ingestion/retrieval paths with clearer limits, async/offline boundaries, or better isolation
-  - document and enforce the current single-writer/single-instance boundary until a deliberate storage/runtime decision changes it
-- Exit criteria:
-  - the highest-risk latency regressions are caught before merge
-  - heavy ingestion/runtime paths no longer rely on accidental best-effort behavior
-  - operational boundaries are explicit enough that scaling expectations stay honest
+- merge-blocking Windows packaged-desktop validation in CI
+- a signed Windows desktop release path in
+  `.github/workflows/desktop-provenance.yml`
+- packaged-artifact provenance for Windows installers plus the existing Linux
+  sidecar digest/SBOM record
+- explicit packaged-app failure handling in the Tauri shell so startup timeout
+  and sidecar exit paths do not silently reveal a broken UI
 
 #### P2: frontend modularity, accessibility, and bundle discipline
 
@@ -158,8 +98,8 @@ longer needs runtime DB/telemetry initialization just to inspect OpenAPI).
    - they should not grow UI promises until the runtime, tenancy, and connector boundaries are real
 
 3. **Desktop distribution maturity**
-   - Windows packaging is landed
-   - signed release, cross-platform packaged validation, updater readiness, and stronger native runtime operations are still open
+   - signed Windows release and packaged CI validation are landed
+   - macOS/Linux public packaging, updater readiness, and deeper native runtime operations are still open
 
 ### Runtime platform
 
@@ -233,12 +173,12 @@ Desktop shell scaffolding and packaged backend sidecar are already landed and ar
 
 - Goal: ship real installable desktop artifacts instead of developer-only bundles.
 - Remaining work:
-  - Windows/macOS signing
+  - macOS signing
   - Linux packaged validation and release shape
   - updater readiness after signing is stable
   - explicit prerequisite/bootstrap story for end users and developers
 - Exit criteria:
-  - signed installers are produced in CI/release workflows
+  - supported public installers are produced in CI/release workflows
   - updater strategy is documented and wired only after signed release flow is stable
   - prerequisite installation paths are explicit enough for new users
 

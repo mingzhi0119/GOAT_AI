@@ -24,6 +24,7 @@ jobs:
             __tests__/test_ollama_client_cache.py \
             __tests__/test_desktop_smoke.py \
             __tests__/test_recovery_drill.py \
+            __tests__/test_release_rollback_drill.py \
             __tests__/test_api_blackbox_contract.py \
-            -k "interrupted or unavailable or persist or recovery_drill or desktop_smoke" \
+            -k "interrupted or unavailable or persist or recovery_drill or release_rollback_drill or desktop_smoke" \
             -q
