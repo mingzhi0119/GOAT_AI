@@ -38,7 +38,7 @@ Use this runbook when staging or production health regresses and you need a fast
 
 - Repeated SQLite write failures: stop new persistence work and prepare backup / restore checks.
 - Repeated readiness failures after deploy: use `ROLLBACK.md` rather than iterating hotfixes blindly on the host.
-- Repeated desktop startup failures: capture sidecar logs, Tauri shell logs, and the packaged app version before retrying.
+- Repeated desktop startup failures: capture sidecar logs, Tauri shell logs, the packaged app version, and the logged restart attempt counts before retrying.
 
 ## Required follow-up
 

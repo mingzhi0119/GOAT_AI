@@ -124,7 +124,8 @@ Desktop sidecar writable paths:
 - persisted app data: `<app_local_data_dir>/data`
 - packaged desktop shell diagnostics now append to `<app_log_dir>/desktop-shell.log`
 - Tauri startup now emits explicit diagnostics when sidecar spawn fails, `/api/health` does not become ready before the window reveal timeout, or the bundled backend exits unexpectedly after startup
-- packaged desktop startup now fails closed instead of revealing the main window on a broken backend
+- before the main window is revealed, the Rust shell now allows only a small bounded sidecar restart/backoff budget; after reveal, unexpected sidecar exits still fail closed instead of silently recovering
+- packaged desktop startup still fails closed instead of revealing the main window on a broken backend
 
 Packaged desktop runtime config:
 

@@ -52,7 +52,7 @@ Last updated: 2026-04-12
 - signed Windows desktop release path in `.github/workflows/desktop-provenance.yml`
 - desktop smoke coverage for sidecar boot and startup diagnostics
 - packaged desktop shell diagnostics persisted under the platform app-log directory
-- packaged desktop startup now fails explicitly if the sidecar never becomes ready or exits unexpectedly
+- packaged desktop startup now uses bounded pre-ready restart/backoff before the main window is revealed, then still fails explicitly if the sidecar never becomes ready or exits unexpectedly after reveal
 
 ### Governance and operations
 
