@@ -39,6 +39,28 @@ _hist_count: int = 0
 _chat_stream_completed: int = 0
 _sqlite_write_failures: dict[tuple[str, str], int] = defaultdict(int)
 
+HTTP_REQUESTS_TOTAL = "http_requests_total"
+HTTP_REQUEST_DURATION_SECONDS = "http_request_duration_seconds"
+CHAT_STREAM_COMPLETED_TOTAL = "chat_stream_completed_total"
+OLLAMA_ERRORS_TOTAL = "ollama_errors_total"
+SQLITE_LOG_WRITE_FAILURES_TOTAL = "sqlite_log_write_failures_total"
+FEATURE_GATE_DENIALS_TOTAL = "feature_gate_denials_total"
+KNOWLEDGE_RETRIEVAL_REQUESTS_TOTAL = "knowledge_retrieval_requests_total"
+KNOWLEDGE_QUERY_REWRITE_APPLIED_TOTAL = "knowledge_query_rewrite_applied_total"
+
+EXPORTED_METRIC_FAMILIES: frozenset[str] = frozenset(
+    {
+        HTTP_REQUESTS_TOTAL,
+        HTTP_REQUEST_DURATION_SECONDS,
+        CHAT_STREAM_COMPLETED_TOTAL,
+        OLLAMA_ERRORS_TOTAL,
+        SQLITE_LOG_WRITE_FAILURES_TOTAL,
+        FEATURE_GATE_DENIALS_TOTAL,
+        KNOWLEDGE_RETRIEVAL_REQUESTS_TOTAL,
+        KNOWLEDGE_QUERY_REWRITE_APPLIED_TOTAL,
+    }
+)
+
 
 def _escape_label_value(value: str) -> str:
     return value.replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
@@ -90,36 +112,36 @@ def render_prometheus_text() -> str:
     retr_copy = snapshot_knowledge_retrieval()
     rew_copy = snapshot_knowledge_query_rewrite_applied()
 
-    lines.append("# HELP http_requests_total Total HTTP requests processed.")
-    lines.append("# TYPE http_requests_total counter")
+    lines.append(f"# HELP {HTTP_REQUESTS_TOTAL} Total HTTP requests processed.")
+    lines.append(f"# TYPE {HTTP_REQUESTS_TOTAL} counter")
     for (method, route, status), count in sorted(http_copy.items()):
         rm = _escape_label_value(method)
         rr = _escape_label_value(route)
         rs = _escape_label_value(status)
         lines.append(
-            f'http_requests_total{{method="{rm}",route="{rr}",status="{rs}"}} {count}'
+            f'{HTTP_REQUESTS_TOTAL}{{method="{rm}",route="{rr}",status="{rs}"}} {count}'
         )
 
     lines.append(
-        "# HELP http_request_duration_seconds HTTP request duration in seconds."
+        f"# HELP {HTTP_REQUEST_DURATION_SECONDS} HTTP request duration in seconds."
     )
-    lines.append("# TYPE http_request_duration_seconds histogram")
+    lines.append(f"# TYPE {HTTP_REQUEST_DURATION_SECONDS} histogram")
     for i, bound in enumerate(_DURATION_BUCKETS):
         le = "+Inf" if math.isinf(bound) else str(bound)
         lines.append(
-            f'http_request_duration_seconds_bucket{{le="{le}"}} {hist_counts[i]}'
+            f'{HTTP_REQUEST_DURATION_SECONDS}_bucket{{le="{le}"}} {hist_counts[i]}'
         )
-    lines.append(f"http_request_duration_seconds_sum {h_sum}")
-    lines.append(f"http_request_duration_seconds_count {h_cnt}")
+    lines.append(f"{HTTP_REQUEST_DURATION_SECONDS}_sum {h_sum}")
+    lines.append(f"{HTTP_REQUEST_DURATION_SECONDS}_count {h_cnt}")
 
     lines.append(
-        "# HELP chat_stream_completed_total Chat SSE streams completed with done (success paths)."
+        f"# HELP {CHAT_STREAM_COMPLETED_TOTAL} Chat SSE streams completed with done (success paths)."
     )
-    lines.append("# TYPE chat_stream_completed_total counter")
-    lines.append(f"chat_stream_completed_total {chat_done}")
+    lines.append(f"# TYPE {CHAT_STREAM_COMPLETED_TOTAL} counter")
+    lines.append(f"{CHAT_STREAM_COMPLETED_TOTAL} {chat_done}")
 
-    lines.append("# HELP ollama_errors_total Ollama HTTP transport failures.")
-    lines.append("# TYPE ollama_errors_total counter")
+    lines.append(f"# HELP {OLLAMA_ERRORS_TOTAL} Ollama HTTP transport failures.")
+    lines.append(f"# TYPE {OLLAMA_ERRORS_TOTAL} counter")
     for (code, endpoint, http_status), count in sorted(
         snapshot_ollama_errors().items()
     ):
@@ -127,53 +149,53 @@ def render_prometheus_text() -> str:
         e = _escape_label_value(endpoint)
         h = _escape_label_value(http_status)
         lines.append(
-            f'ollama_errors_total{{code="{c}",endpoint="{e}",http_status="{h}"}} {count}'
+            f'{OLLAMA_ERRORS_TOTAL}{{code="{c}",endpoint="{e}",http_status="{h}"}} {count}'
         )
 
     lines.append(
-        "# HELP sqlite_log_write_failures_total SQLite log/session write failures."
+        f"# HELP {SQLITE_LOG_WRITE_FAILURES_TOTAL} SQLite log/session write failures."
     )
-    lines.append("# TYPE sqlite_log_write_failures_total counter")
+    lines.append(f"# TYPE {SQLITE_LOG_WRITE_FAILURES_TOTAL} counter")
     for (operation, code), count in sorted(sqlite_copy.items()):
         op = _escape_label_value(operation)
         c = _escape_label_value(code)
         lines.append(
-            f'sqlite_log_write_failures_total{{operation="{op}",code="{c}"}} {count}'
+            f'{SQLITE_LOG_WRITE_FAILURES_TOTAL}{{operation="{op}",code="{c}"}} {count}'
         )
 
     lines.append(
-        "# HELP feature_gate_denials_total Feature gate denials by feature, gate kind, and reason (§15)."
+        f"# HELP {FEATURE_GATE_DENIALS_TOTAL} Feature gate denials by feature, gate kind, and reason (Section 15)."
     )
-    lines.append("# TYPE feature_gate_denials_total counter")
+    lines.append(f"# TYPE {FEATURE_GATE_DENIALS_TOTAL} counter")
     for (feature, gate_kind, reason), count in sorted(fg_copy.items()):
         ff = _escape_label_value(feature)
         gg = _escape_label_value(gate_kind)
         rr = _escape_label_value(reason)
         lines.append(
-            f'feature_gate_denials_total{{feature="{ff}",gate_kind="{gg}",reason="{rr}"}} {count}'
+            f'{FEATURE_GATE_DENIALS_TOTAL}{{feature="{ff}",gate_kind="{gg}",reason="{rr}"}} {count}'
         )
 
     lines.append(
-        "# HELP knowledge_retrieval_requests_total "
+        f"# HELP {KNOWLEDGE_RETRIEVAL_REQUESTS_TOTAL} "
         "Knowledge search requests by retrieval_profile and outcome (hit=at least one chunk returned)."
     )
-    lines.append("# TYPE knowledge_retrieval_requests_total counter")
+    lines.append(f"# TYPE {KNOWLEDGE_RETRIEVAL_REQUESTS_TOTAL} counter")
     for (profile, outcome), count in sorted(retr_copy.items()):
         pp = _escape_label_value(profile)
         oo = _escape_label_value(outcome)
         lines.append(
-            f'knowledge_retrieval_requests_total{{retrieval_profile="{pp}",outcome="{oo}"}} {count}'
+            f'{KNOWLEDGE_RETRIEVAL_REQUESTS_TOTAL}{{retrieval_profile="{pp}",outcome="{oo}"}} {count}'
         )
 
     lines.append(
-        "# HELP knowledge_query_rewrite_applied_total "
+        f"# HELP {KNOWLEDGE_QUERY_REWRITE_APPLIED_TOTAL} "
         "Conservative query rewrite applied (retrieval_profile=rag3_quality) before vector search."
     )
-    lines.append("# TYPE knowledge_query_rewrite_applied_total counter")
+    lines.append(f"# TYPE {KNOWLEDGE_QUERY_REWRITE_APPLIED_TOTAL} counter")
     for profile, count in sorted(rew_copy.items()):
         pp = _escape_label_value(profile)
         lines.append(
-            f'knowledge_query_rewrite_applied_total{{retrieval_profile="{pp}"}} {count}'
+            f'{KNOWLEDGE_QUERY_REWRITE_APPLIED_TOTAL}{{retrieval_profile="{pp}"}} {count}'
         )
 
     return "\n".join(lines) + "\n"

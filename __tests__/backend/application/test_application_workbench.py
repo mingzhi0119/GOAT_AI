@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from backend.application.exceptions import (
+    WorkbenchPermissionDeniedError,
     WorkbenchSourceValidationError,
     WorkbenchTaskConflictError,
     WorkbenchTaskNotFoundError,
@@ -13,6 +14,7 @@ from backend.application.workbench import (
     cancel_workbench_task,
     create_and_dispatch_workbench_task,
     create_workbench_task,
+    export_workbench_workspace_output,
     get_workbench_task,
     get_workbench_workspace_output,
     list_workbench_workspace_outputs,
@@ -53,7 +55,17 @@ def _auth_context(owner_id: str = "owner-1") -> AuthorizationContext:
     return AuthorizationContext(
         principal_id=PrincipalId("principal-1"),
         tenant_id=TenantId("tenant-1"),
-        scopes=frozenset({"knowledge:read"}),
+        scopes=frozenset(
+            {
+                "workbench:read",
+                "workbench:write",
+                "workbench:export",
+                "knowledge:read",
+                "artifact:write",
+                "history:read",
+                "history:write",
+            }
+        ),
         credential_id="cred-1",
         legacy_owner_id=owner_id,
         auth_mode="api_key",
@@ -246,6 +258,28 @@ def _seed_task(
 
 
 class ApplicationWorkbenchTests(unittest.TestCase):
+    def test_create_workbench_task_requires_workbench_write_scope(self) -> None:
+        repository = _FakeRepository()
+        request = WorkbenchTaskRequest(
+            task_kind="plan",
+            prompt="Plan the migration",
+        )
+
+        with self.assertRaises(WorkbenchPermissionDeniedError):
+            create_workbench_task(
+                request=request,
+                repository=repository,
+                settings=_settings(),
+                auth_context=AuthorizationContext(
+                    principal_id=PrincipalId("principal-1"),
+                    tenant_id=TenantId("tenant-1"),
+                    scopes=frozenset({"workbench:read"}),
+                    credential_id="cred-limited",
+                    legacy_owner_id="owner-1",
+                    auth_mode="api_key",
+                ),
+            )
+
     def test_create_browse_task_requires_runtime_ready_source(self) -> None:
         repository = _FakeRepository()
         request = WorkbenchTaskRequest(
@@ -466,7 +500,9 @@ class ApplicationWorkbenchTests(unittest.TestCase):
                 auth_context=_auth_context(),
             )
 
-    def test_retry_workbench_task_reuses_original_auth_snapshot(self) -> None:
+    def test_retry_workbench_task_reuses_request_shape_but_refreshes_auth_snapshot(
+        self,
+    ) -> None:
         repository = _FakeRepository()
         dispatcher = _FakeDispatcher()
         seeded = _seed_task(
@@ -483,26 +519,64 @@ class ApplicationWorkbenchTests(unittest.TestCase):
             owner_id="owner-original",
             tenant_id="tenant-original",
             principal_id="principal-original",
-            auth_scopes=["knowledge:read", "history:read"],
+            auth_scopes=["workbench:read", "workbench:write", "knowledge:read"],
             credential_id="cred-original",
             auth_mode="scoped_key",
         )
 
-        accepted = retry_workbench_task(
-            task_id=seeded.id,
-            repository=repository,
-            dispatcher=dispatcher,
-            settings=_settings(),
-            auth_context=AuthorizationContext(
-                principal_id=PrincipalId("principal-original"),
-                tenant_id=TenantId("tenant-original"),
-                scopes=frozenset({"knowledge:read"}),
-                credential_id="cred-current",
-                legacy_owner_id="owner-original",
-                auth_mode="api_key",
-            ),
-            request_id="req-456",
-        )
+        from unittest.mock import patch
+
+        with patch(
+            "backend.application.workbench.resolve_requested_sources",
+            return_value=[
+                WorkbenchSourceDescriptor(
+                    source_id="web",
+                    display_name="Public Web",
+                    kind="builtin",
+                    scope_kind="global",
+                    capabilities=("search",),
+                    task_kinds=("deep_research",),
+                    read_only=True,
+                    runtime_ready=True,
+                    deny_reason=None,
+                    description="web",
+                ),
+                WorkbenchSourceDescriptor(
+                    source_id="knowledge",
+                    display_name="Knowledge Base",
+                    kind="knowledge",
+                    scope_kind="knowledge_documents",
+                    capabilities=("search",),
+                    task_kinds=("deep_research",),
+                    read_only=True,
+                    runtime_ready=True,
+                    deny_reason=None,
+                    description="knowledge",
+                    required_scope="knowledge:read",
+                ),
+            ],
+        ):
+            accepted = retry_workbench_task(
+                task_id=seeded.id,
+                repository=repository,
+                dispatcher=dispatcher,
+                settings=_settings(),
+                auth_context=AuthorizationContext(
+                    principal_id=PrincipalId("principal-original"),
+                    tenant_id=TenantId("tenant-original"),
+                    scopes=frozenset(
+                        {
+                            "workbench:read",
+                            "workbench:write",
+                            "knowledge:read",
+                        }
+                    ),
+                    credential_id="cred-current",
+                    legacy_owner_id="owner-original",
+                    auth_mode="api_key",
+                ),
+                request_id="req-456",
+            )
 
         self.assertEqual("queued", accepted.status)
         self.assertEqual(1, len(dispatcher.calls))
@@ -520,10 +594,11 @@ class ApplicationWorkbenchTests(unittest.TestCase):
         self.assertEqual("tenant-original", retried_payload.tenant_id)
         self.assertEqual("principal-original", retried_payload.principal_id)
         self.assertEqual(
-            ["knowledge:read", "history:read"], retried_payload.auth_scopes
+            ["knowledge:read", "workbench:read", "workbench:write"],
+            retried_payload.auth_scopes,
         )
-        self.assertEqual("cred-original", retried_payload.credential_id)
-        self.assertEqual("scoped_key", retried_payload.auth_mode)
+        self.assertEqual("cred-current", retried_payload.credential_id)
+        self.assertEqual("api_key", retried_payload.auth_mode)
         self.assertEqual(
             "task.retry_requested",
             repository.appended_events[-2]["event_type"],
@@ -540,6 +615,32 @@ class ApplicationWorkbenchTests(unittest.TestCase):
             seeded.id,
             repository.appended_events[-1]["metadata"]["source_task_id"],
         )
+
+    def test_retry_workbench_task_rejects_source_scope_regressions(self) -> None:
+        repository = _FakeRepository()
+        _seed_task(
+            repository,
+            task_id="wb-original",
+            status="completed",
+            task_kind="deep_research",
+            source_ids=["knowledge"],
+        )
+
+        with self.assertRaises(WorkbenchPermissionDeniedError):
+            retry_workbench_task(
+                task_id="wb-original",
+                repository=repository,
+                dispatcher=_FakeDispatcher(),
+                settings=_settings(),
+                auth_context=AuthorizationContext(
+                    principal_id=PrincipalId("principal-1"),
+                    tenant_id=TenantId("tenant-1"),
+                    scopes=frozenset({"workbench:read", "workbench:write"}),
+                    credential_id="cred-limited",
+                    legacy_owner_id="owner-1",
+                    auth_mode="api_key",
+                ),
+            )
 
     def test_retry_workbench_task_rejects_non_terminal_state(self) -> None:
         repository = _FakeRepository()
@@ -578,6 +679,43 @@ class ApplicationWorkbenchTests(unittest.TestCase):
                 repository=repository,
                 settings=_settings(),
                 auth_context=_auth_context(owner_id="other-owner"),
+            )
+
+    def test_export_workbench_workspace_output_requires_export_scope(self) -> None:
+        repository = _FakeRepository()
+        repository.workspace_outputs = [
+            WorkbenchWorkspaceOutputRecord(
+                id="wbo-1",
+                task_id="wb-2",
+                output_kind="canvas_document",
+                title="Draft",
+                content_format="markdown",
+                content_text="# Draft",
+                created_at="2026-04-11T00:00:01+00:00",
+                updated_at="2026-04-11T00:00:02+00:00",
+                owner_id="owner-1",
+                tenant_id="tenant-1",
+                principal_id="principal-1",
+            )
+        ]
+
+        from backend.models.workbench import WorkbenchWorkspaceOutputExportRequest
+
+        with self.assertRaises(WorkbenchPermissionDeniedError):
+            export_workbench_workspace_output(
+                output_id="wbo-1",
+                request=WorkbenchWorkspaceOutputExportRequest(format="markdown"),
+                task_repository=repository,
+                session_repository=_FakeSessionRepository(),
+                settings=_settings(),
+                auth_context=AuthorizationContext(
+                    principal_id=PrincipalId("principal-1"),
+                    tenant_id=TenantId("tenant-1"),
+                    scopes=frozenset({"workbench:read", "artifact:write"}),
+                    credential_id="cred-limited",
+                    legacy_owner_id="owner-1",
+                    auth_mode="api_key",
+                ),
             )
 
     def test_list_workbench_workspace_outputs_by_session_filters_visible_outputs(

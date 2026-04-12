@@ -370,6 +370,7 @@ Returns `202 Accepted`:
 Notes:
 
 - current deployments return `503` with `FEATURE_UNAVAILABLE` when the shared workbench runtime is operator-disabled
+- callers need `workbench:write` to create tasks, plus any source-specific read scopes required by the requested sources
 - task creation persists a durable queued task, then workbench launches best-effort in-process execution
 - the task record is stored in SQLite so polling survives process restarts
 - terminal task statuses are `completed`, `failed`, and `cancelled`
@@ -386,6 +387,7 @@ Notes:
   - `deep_research`: same bounded retrieval chain with more results; current runtime is still an evidence brief, not iterative autonomous long-horizon research
   - `canvas`: completes with a durable `canvas_document` workspace output plus inline markdown result content; that output can later be exported to a downloadable artifact
 - unknown or caller-invisible source ids return `422`
+- missing workbench scopes or denied requested-source scopes return `403`
 
 ## `GET /api/workbench/sources`
 
@@ -393,6 +395,7 @@ Returns the caller-visible retrieval sources that workbench tasks may reference.
 
 Current behavior:
 
+- callers need `workbench:read`
 - returns `200` with `sources`
 - current built-in source ids are:
   - `web`
@@ -412,6 +415,7 @@ Current behavior:
 - `web` is runtime-ready by default when `GOAT_WORKBENCH_WEB_PROVIDER=duckduckgo`
 - `web` reports `runtime_ready = false` with `deny_reason = "disabled_by_operator"` when `GOAT_WORKBENCH_WEB_PROVIDER=disabled`
 - current public-web retrieval is experimental and uses the DDGS DuckDuckGo-style provider to return bounded search-result evidence
+- callers without `workbench:read` receive `403`
 
 ## `GET /api/workbench/workspace-outputs`
 
@@ -424,6 +428,7 @@ Query parameters:
 
 Current behavior:
 
+- callers need `workbench:read`
 - provide exactly one of `session_id` or `project_id`
 - returns `200` with `outputs`
 - unauthorized or non-existent scope members are simply omitted from the list
@@ -459,7 +464,9 @@ Reads one durable workspace output by stable id.
 
 Current behavior:
 
+- callers need `workbench:read`
 - returns `200` with one typed output payload
+- missing workbench read scope returns `403`
 - missing or caller-invisible output ids return `404`
 - this is the canonical reopen/read endpoint for a durable workbench output
 
@@ -479,7 +486,9 @@ Request body:
 
 Current behavior:
 
+- callers need `workbench:read`, `workbench:export`, and `artifact:write`
 - returns `201` with a normal `ChatArtifact` payload
+- missing export scopes return `403`
 - missing or caller-invisible output ids return `404`
 - invalid export requests return `422`, for example when `filename` has an extension that does not match `format`
 - exported artifacts are appended to the output's `artifacts` list and are also visible through the existing `GET /api/artifacts/{artifact_id}` download route
@@ -490,6 +499,7 @@ Returns the current durable state for one workbench task.
 
 Current behavior:
 
+- callers need `workbench:read`
 - returns `200` with `task_id`, `task_kind`, `status`, `created_at`, `updated_at`, optional `error_detail`, optional `result`, and `workspace_outputs`
 - completed `plan` tasks return:
 
@@ -582,6 +592,7 @@ Current behavior:
 
 - queued and running tasks return `result = null`
 - failed and cancelled tasks return `result = null` plus a stable `error_detail`
+- missing workbench read scope returns `403`
 - missing or caller-invisible task ids return `404`
 - the same runtime gate still applies: if workbench is disabled for the deployment, the route returns `503` with `FEATURE_UNAVAILABLE`
 
@@ -591,9 +602,11 @@ Cancels one visible `queued` workbench task.
 
 Current behavior:
 
+- callers need `workbench:write`
 - only `queued` tasks can be cancelled
 - success returns `200` with the normal task status payload and `status = cancelled`
 - cancelled tasks return `result = null` and `error_detail = "Task cancelled before execution."`
+- missing workbench write scope returns `403`
 - running or terminal tasks return `409` with `code = RESOURCE_CONFLICT`
 - missing or caller-invisible task ids return `404`
 
@@ -603,10 +616,12 @@ Creates a brand-new durable task from one visible terminal task.
 
 Current behavior:
 
+- callers need `workbench:write`
 - only terminal tasks can be retried: `completed`, `failed`, or `cancelled`
 - retry always creates a new `task_id`; the original task is preserved and only gains a lineage event
-- the new task reuses the original `task_kind`, `prompt`, `session_id`, `project_id`, `knowledge_document_ids`, `source_ids`, `connector_ids`, and persisted auth snapshot
+- the new task reuses the original `task_kind`, `prompt`, `session_id`, `project_id`, `knowledge_document_ids`, and connector/source request shape, but it re-resolves sources and stores the current caller auth snapshot
 - success returns `202 Accepted` with the same accepted-task payload shape as `POST /api/workbench/tasks`
+- missing workbench write scope or source-read scope returns `403`
 - queued or running tasks return `409` with `code = RESOURCE_CONFLICT`
 - missing or caller-invisible task ids return `404`
 
@@ -616,6 +631,7 @@ Returns the current durable event timeline for one workbench task.
 
 Current behavior:
 
+- callers need `workbench:read`
 - returns `200` with `task_id` and ordered `events`
 - each event includes:
   - `sequence`
@@ -635,8 +651,9 @@ Current behavior:
   - `retrieval.step.skipped`
   - `workspace_output.created`
   - `workspace_output.exported`
-  - `task.completed`
-  - `task.failed`
+- `task.completed`
+- `task.failed`
+- missing workbench read scope returns `403`
 - missing or caller-invisible task ids return `404`
 - the same runtime gate still applies: if workbench is disabled for the deployment, the route returns `503` with `FEATURE_UNAVAILABLE`
 
@@ -789,6 +806,7 @@ Notes:
 - `messages` contains only normalized chat roles: `user`, `assistant`, `system`
 - `chart_spec`, `file_context`, and `knowledge_documents` are returned as dedicated fields instead of compatibility pseudo-roles
 - `workspace_outputs` contains visible durable workbench outputs linked through tasks that were created with the same `session_id`
+- `workspace_outputs` is only populated when the caller also has `workbench:read`; otherwise the history response still succeeds and returns an empty list
 - each workspace output may include linked downloadable `artifacts` exported from that durable output
 - session-linked restoration assumes that session id already exists in persisted history; workbench does not create chat-session stubs on its own in this slice
 - `chart_data_source` indicates where chart data came from: `uploaded`, `demo`, or `none`

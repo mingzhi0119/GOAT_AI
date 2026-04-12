@@ -8,11 +8,10 @@ from typing import Final, Literal, cast
 
 _PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 APP_ROOT = _PACKAGE_ROOT.parent
-WORKSPACE_ROOT = APP_ROOT.parent
 DEFAULT_RUNTIME_ROOT = APP_ROOT / "var"
-LOCAL_OLLAMA_INSTALL_DIR = WORKSPACE_ROOT / "ollama"
-LOCAL_OLLAMA_RUNTIME_DIR = WORKSPACE_ROOT / "ollama-local"
-LOCAL_OLLAMA_DEFAULT_URL = "http://127.0.0.1:11435"
+DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
+SCHOOL_OLLAMA_LOCAL_URL = "http://127.0.0.1:11435"
+SCHOOL_OLLAMA_PROFILE = "school-ubuntu"
 
 ThemeStyleId = Literal["classic", "urochester", "thu"]
 CodeSandboxProviderId = Literal["docker", "localhost"]
@@ -97,16 +96,17 @@ def _env_bool(name: str, default: str) -> bool:
     return os.environ.get(name, default).lower() in ("1", "true", "yes")
 
 
-def _has_local_ollama_layout() -> bool:
-    install_bin = LOCAL_OLLAMA_INSTALL_DIR / "bin" / "ollama"
-    runtime_dir = LOCAL_OLLAMA_RUNTIME_DIR
-    return install_bin.is_file() and runtime_dir.is_dir()
+def _school_ollama_local_enabled() -> bool:
+    if _env_bool("GOAT_USE_SCHOOL_OLLAMA_LOCAL", "false"):
+        return True
+    profile = os.environ.get("GOAT_OLLAMA_PROFILE", "").strip().lower()
+    return profile == SCHOOL_OLLAMA_PROFILE
 
 
 def _default_ollama_base_url() -> str:
-    if _has_local_ollama_layout():
-        return LOCAL_OLLAMA_DEFAULT_URL
-    return "http://127.0.0.1:11434"
+    if _school_ollama_local_enabled():
+        return SCHOOL_OLLAMA_LOCAL_URL
+    return DEFAULT_OLLAMA_BASE_URL
 
 
 def _resolve_env_path(value: str, *, relative_to: Path) -> Path:

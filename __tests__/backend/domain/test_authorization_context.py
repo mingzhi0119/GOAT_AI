@@ -50,6 +50,8 @@ class AuthorizationContextTests(unittest.TestCase):
         self.assertIn("history:write", ctx.scopes)
         self.assertIn("artifact:write", ctx.scopes)
         self.assertIn("sandbox:execute", ctx.scopes)
+        self.assertIn("workbench:write", ctx.scopes)
+        self.assertIn("workbench:export", ctx.scopes)
 
     def test_invalid_key_returns_none(self) -> None:
         settings = _settings(api_key="read-key")

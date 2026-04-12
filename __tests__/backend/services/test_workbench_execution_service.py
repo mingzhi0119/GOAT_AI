@@ -84,7 +84,7 @@ class WorkbenchExecutionServiceTests(unittest.TestCase):
                 owner_id="owner-1",
                 tenant_id="tenant-1",
                 principal_id="principal-1",
-                auth_scopes=["knowledge:read"],
+                auth_scopes=["workbench:read", "knowledge:read"],
                 credential_id="cred-1",
                 auth_mode="api_key",
             )

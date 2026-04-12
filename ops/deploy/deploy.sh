@@ -32,9 +32,12 @@ GOAT_LOG_DIR="${GOAT_LOG_DIR:-$GOAT_RUNTIME_ROOT/logs}"
 GOAT_LOG_PATH="${GOAT_LOG_PATH:-$GOAT_RUNTIME_ROOT/chat_logs.db}"
 GOAT_DATA_DIR="${GOAT_DATA_DIR:-$GOAT_RUNTIME_ROOT/data}"
 
-LOCAL_OLLAMA_URL="${LOCAL_OLLAMA_URL:-http://127.0.0.1:11435}"
 SERVER_PORT="${GOAT_SERVER_PORT:-62606}"
-EFFECTIVE_OLLAMA_URL="${OLLAMA_BASE_URL:-${LOCAL_OLLAMA_URL}}"
+STANDARD_OLLAMA_URL="http://127.0.0.1:11434"
+SCHOOL_LOCAL_OLLAMA_URL="${SCHOOL_LOCAL_OLLAMA_URL:-http://127.0.0.1:11435}"
+GOAT_USE_SCHOOL_OLLAMA_LOCAL="${GOAT_USE_SCHOOL_OLLAMA_LOCAL:-0}"
+GOAT_OLLAMA_PROFILE="${GOAT_OLLAMA_PROFILE:-}"
+EFFECTIVE_OLLAMA_URL="${OLLAMA_BASE_URL:-${STANDARD_OLLAMA_URL}}"
 
 RELEASE_BUNDLE="${RELEASE_BUNDLE:-}"
 RELEASE_MANIFEST="${RELEASE_MANIFEST:-}"
@@ -52,6 +55,34 @@ else
 fi
 
 echo "GOAT AI deploy starting (branch: ${GIT_BRANCH}, ref: ${GIT_REF})${QUICK:+ [QUICK mode]}"
+
+read_dotenv_value() {
+  local key="$1"
+  local dotenv_path="$2"
+  local line=""
+  if [ ! -f "${dotenv_path}" ]; then
+    return 0
+  fi
+  line="$(grep -m1 "^${key}=" "${dotenv_path}" 2>/dev/null || true)"
+  if [ -z "${line}" ]; then
+    return 0
+  fi
+  line="${line#*=}"
+  line="${line%\"}"
+  line="${line#\"}"
+  line="${line%\'}"
+  line="${line#\'}"
+  printf '%s\n' "${line}"
+}
+
+school_ollama_local_enabled() {
+  case "${GOAT_USE_SCHOOL_OLLAMA_LOCAL,,}" in
+    1|true|yes)
+      return 0
+      ;;
+  esac
+  [ "${GOAT_OLLAMA_PROFILE,,}" = "school-ubuntu" ]
+}
 
 free_port() {
   local p="$1"
@@ -175,15 +206,31 @@ fi
 
 cd "$PROJECT_DIR"
 
-# Re-derive EFFECTIVE_OLLAMA_URL from project .env when not already set in shell,
-# so deploy skips local-Ollama startup when OLLAMA_BASE_URL is configured there.
-if [ -z "${OLLAMA_BASE_URL:-}" ] && [ -f "${PROJECT_DIR}/.env" ]; then
-  _dotenv_ollama="$(grep -m1 '^OLLAMA_BASE_URL=' "${PROJECT_DIR}/.env" 2>/dev/null | cut -d= -f2- | tr -d "'\"")"
-  if [ -n "$_dotenv_ollama" ]; then
-    OLLAMA_BASE_URL="$_dotenv_ollama"
-    EFFECTIVE_OLLAMA_URL="$_dotenv_ollama"
+if [ -f "${PROJECT_DIR}/.env" ]; then
+  if [ -z "${OLLAMA_BASE_URL:-}" ]; then
+    _dotenv_ollama="$(read_dotenv_value "OLLAMA_BASE_URL" "${PROJECT_DIR}/.env")"
+    if [ -n "${_dotenv_ollama}" ]; then
+      OLLAMA_BASE_URL="${_dotenv_ollama}"
+    fi
+  fi
+  if [ "${GOAT_USE_SCHOOL_OLLAMA_LOCAL}" = "0" ]; then
+    _dotenv_school_switch="$(read_dotenv_value "GOAT_USE_SCHOOL_OLLAMA_LOCAL" "${PROJECT_DIR}/.env")"
+    if [ -n "${_dotenv_school_switch}" ]; then
+      GOAT_USE_SCHOOL_OLLAMA_LOCAL="${_dotenv_school_switch}"
+    fi
+  fi
+  if [ -z "${GOAT_OLLAMA_PROFILE}" ]; then
+    _dotenv_ollama_profile="$(read_dotenv_value "GOAT_OLLAMA_PROFILE" "${PROJECT_DIR}/.env")"
+    if [ -n "${_dotenv_ollama_profile}" ]; then
+      GOAT_OLLAMA_PROFILE="${_dotenv_ollama_profile}"
+    fi
   fi
 fi
+
+if school_ollama_local_enabled && [ -z "${OLLAMA_BASE_URL:-}" ]; then
+  OLLAMA_BASE_URL="${SCHOOL_LOCAL_OLLAMA_URL}"
+fi
+EFFECTIVE_OLLAMA_URL="${OLLAMA_BASE_URL:-${STANDARD_OLLAMA_URL}}"
 
 echo "2. Python virtualenv and dependencies"
 if [ "${QUICK}" = "1" ]; then
@@ -222,9 +269,15 @@ LOGS_DIR="${GOAT_LOG_DIR}"
 API_LOG="${LOGS_DIR}/fastapi.log"
 API_PID="${LOGS_DIR}/fastapi.pid"
 
-if [ "${EFFECTIVE_OLLAMA_URL}" = "${LOCAL_OLLAMA_URL}" ] && [ -x "${PROJECT_DIR}/scripts/ollama/start_ollama_local.sh" ]; then
-  echo "Ensuring sibling local Ollama is running at ${LOCAL_OLLAMA_URL}"
-  OLLAMA_HOST="${LOCAL_OLLAMA_URL}" "${PROJECT_DIR}/scripts/ollama/start_ollama_local.sh"
+if school_ollama_local_enabled; then
+  if [ ! -x "${PROJECT_DIR}/scripts/ollama/start_ollama_local.sh" ]; then
+    echo "School Ubuntu Ollama profile is enabled but scripts/ollama/start_ollama_local.sh is missing."
+    exit 1
+  fi
+  echo "School Ubuntu Ollama profile enabled; ensuring local Ollama is running at ${EFFECTIVE_OLLAMA_URL}"
+  OLLAMA_BASE_URL="${EFFECTIVE_OLLAMA_URL}" \
+  OLLAMA_HOST="${EFFECTIVE_OLLAMA_URL}" \
+  "${PROJECT_DIR}/scripts/ollama/start_ollama_local.sh"
 fi
 
 _goat_systemd_restart() {

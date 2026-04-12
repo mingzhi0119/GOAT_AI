@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import TopBar from '../components/TopBar'
 
@@ -198,7 +198,59 @@ describe('TopBar options callout', () => {
     expect(screen.getByRole('menuitem', { name: /delete/i })).toBeInTheDocument()
   })
 
-  it('shows only two capability badges in narrow mode and reveals the rest in a tooltip', () => {
+  it('supports keyboard navigation and Escape focus return for conversation actions', async () => {
+    renderTopBar()
+
+    const trigger = screen.getByRole('button', { name: /conversation actions/i })
+    trigger.focus()
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+
+    await waitFor(() => {
+      expect(screen.getByRole('menuitem', { name: /rename/i })).toHaveFocus()
+    })
+
+    fireEvent.keyDown(screen.getByRole('menu', { name: /conversation actions/i }), {
+      key: 'ArrowDown',
+    })
+    expect(screen.getByRole('menuitem', { name: /export to markdown/i })).toHaveFocus()
+
+    fireEvent.keyDown(screen.getByRole('menu', { name: /conversation actions/i }), {
+      key: 'End',
+    })
+    expect(screen.getByRole('menuitem', { name: /delete/i })).toHaveFocus()
+
+    fireEvent.keyDown(screen.getByRole('menu', { name: /conversation actions/i }), {
+      key: 'Escape',
+    })
+
+    await waitFor(() => {
+      expect(trigger).toHaveFocus()
+    })
+  })
+
+  it('traps focus inside settings and restores focus when it closes', async () => {
+    renderTopBar()
+
+    const settingsTrigger = screen.getByRole('button', { name: /settings/i })
+    fireEvent.click(settingsTrigger)
+
+    const dialog = screen.getByRole('dialog', { name: /settings/i })
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /close settings/i })).toHaveFocus()
+    })
+
+    fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true })
+    await waitFor(() => {
+      expect(screen.getByText('Classic System').closest('button')).toHaveFocus()
+    })
+
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    await waitFor(() => {
+      expect(settingsTrigger).toHaveFocus()
+    })
+  })
+
+  it('shows only two capability badges in narrow mode and summarizes the rest without a hover tooltip', () => {
     render(
       <TopBar
         sessionTitle="Strategy Sync"
@@ -234,11 +286,9 @@ describe('TopBar options callout', () => {
     const badges = screen.getAllByTestId('model-capability-badge')
     expect(badges).toHaveLength(2)
     expect(badges.map(node => node.textContent)).toEqual(['Thinking', 'Vision'])
-
-    fireEvent.mouseEnter(screen.getByLabelText(/model capabilities/i))
-    expect(screen.getByRole('tooltip')).toHaveTextContent('Tools')
-    expect(screen.getByRole('tooltip')).toHaveTextContent('Thinking')
-    expect(screen.getByRole('tooltip')).toHaveTextContent('Vision')
+    expect(screen.getByText('+1')).toBeInTheDocument()
+    expect(screen.getByLabelText(/model capabilities: thinking \/ vision \/ tools/i)).toBeInTheDocument()
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
   })
 
   it('passes desktop diagnostics through to the settings panel', () => {

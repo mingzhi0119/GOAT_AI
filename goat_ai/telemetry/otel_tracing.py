@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 from contextlib import contextmanager
 from typing import Any, Generator, Iterator, Mapping
 
@@ -21,11 +22,11 @@ def init_otel_if_enabled() -> None:
     if _provider_initialized or not is_otel_enabled():
         return
     from opentelemetry import trace
-    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.resources import SERVICE_NAME, Resource
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
 
-    provider = TracerProvider(resource=Resource.create({"service.name": "goat-ai"}))
+    provider = TracerProvider(resource=Resource.create({SERVICE_NAME: "goat-ai"}))
     exporter_kind = os.environ.get("GOAT_OTEL_EXPORTER", "console").strip().lower()
     if exporter_kind == "otlp":
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
@@ -37,15 +38,48 @@ def init_otel_if_enabled() -> None:
             logger.warning(
                 "GOAT_OTEL_EXPORTER=otlp but OTEL_EXPORTER_OTLP_ENDPOINT is empty; using console exporter",
             )
-            processor = BatchSpanProcessor(ConsoleSpanExporter())
+            processor = BatchSpanProcessor(ConsoleSpanExporter(out=sys.stderr))
         else:
             processor = BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint))
     else:
-        processor = BatchSpanProcessor(ConsoleSpanExporter())
+        processor = BatchSpanProcessor(ConsoleSpanExporter(out=sys.stderr))
     provider.add_span_processor(processor)
     trace.set_tracer_provider(provider)
     _provider_initialized = True
     logger.info("OpenTelemetry tracing initialized (exporter=%s)", exporter_kind)
+
+
+def reset_otel_for_tests() -> None:
+    """Reset process-global tracing state so enabled-path tests can reinitialize."""
+    global _provider_initialized
+
+    try:
+        from opentelemetry import trace
+        from opentelemetry.util._once import Once
+    except ImportError:
+        _provider_initialized = False
+        return
+
+    provider = getattr(trace, "_TRACER_PROVIDER", None)
+    shutdown = getattr(provider, "shutdown", None)
+    if callable(shutdown):
+        shutdown()
+
+    _provider_initialized = False
+    trace._TRACER_PROVIDER = None  # type: ignore[attr-defined]
+    trace._TRACER_PROVIDER_SET_ONCE = Once()  # type: ignore[attr-defined]
+
+
+def force_flush_otel_for_tests(*, timeout_millis: int = 5000) -> None:
+    """Flush any buffered spans during enabled-path tests."""
+    if not _provider_initialized:
+        return
+    from opentelemetry import trace
+
+    provider = trace.get_tracer_provider()
+    force_flush = getattr(provider, "force_flush", None)
+    if callable(force_flush):
+        force_flush(timeout_millis=timeout_millis)
 
 
 @contextmanager

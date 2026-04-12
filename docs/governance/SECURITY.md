@@ -46,7 +46,8 @@ This document records the current threat model and the guardrails that matter fo
 
 - Frontend and desktop dependency audits are release gates, not advisory checks. PRs and pushes to `main` must keep the `frontend`, `desktop-package-windows`, and `desktop-supply-chain` jobs green.
 - Desktop artifacts produced from local developer machines or unsigned ad hoc builds are internal/test-only artifacts. They must not be presented as public production releases.
-- Publicly distributed Windows desktop installers must come from `.github/workflows/desktop-provenance.yml`, which signs the packaged installers and records provenance for the shipped files.
+- Publicly distributed Windows desktop installers must come from `.github/workflows/desktop-provenance.yml`, which signs the packaged installers, records provenance for the shipped files, and now retains installed-app startup evidence for both MSI and NSIS artifacts before upload.
+- `desktop-package-windows` remains the merge-blocking packaged-binary gate for desktop-related PRs; installed Windows evidence belongs to `.github/workflows/desktop-provenance.yml` and the recurring `.github/workflows/fault-injection.yml` drill, not to local unsigned bundles.
 - Any unsigned or locally produced desktop package remains internal/test-only and must be labeled that way even if it is byte-for-byte similar to the public release build.
 
 ## Related docs

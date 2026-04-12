@@ -45,7 +45,7 @@ python3 -m uvicorn server:create_app --factory --host 0.0.0.0 --port 62606 --rel
 When merge-blocking CI is red, clear the gates in this order instead of mixing backend and desktop failures together:
 
 - `backend-fast`: treat changed-files `ruff format --check` and repo-wide `ruff check` as the first blocker; when this job is red, deeper backend results are still hidden
-- `backend-heavy`: after `backend-fast` is green, inspect dependency audit, import-layer lint, RAG regression, API contract sync, full `pytest`, and the PR latency gate
+- `backend-heavy`: after `backend-fast` is green, inspect dependency audit, import-layer lint, RAG regression, API contract sync, OTel enabled-path tests, the observability asset contract, full `pytest`, and the PR latency gate
 - desktop gates: only after backend is green should triage move to `desktop-package-windows` and `desktop-supply-chain`
 
 ### SQLite schema migrations (Phase 13 Section 13.0)
@@ -123,7 +123,10 @@ Important notes:
 - `npm run desktop:build` triggers the same sidecar build automatically through Tauri's `beforeBuildCommand`
 - merge-blocking CI now also builds real Windows packaged desktop installers and records provenance through `python -m tools.desktop.write_desktop_release_provenance`
 - `desktop-package-windows` also runs `python -m tools.desktop.packaged_shell_fault_smoke` so packaged startup stays fail-closed for missing-sidecar, early-exit-before-ready, and health-timeout paths
+- `desktop-package-windows` is still the PR packaged-binary gate only; it does not install MSI/NSIS artifacts
 - `desktop-supply-chain` remains the Linux sidecar/provenance/cargo-audit gate; it does not own the Windows pre-ready retry semantics
+- `.github/workflows/desktop-provenance.yml` now runs `python -m tools.desktop.installed_windows_desktop_fault_smoke` against both the built `.msi` and NSIS installers before release assets are uploaded
+- `.github/workflows/fault-injection.yml` reruns the same installed Windows drill on a schedule so installer regressions do not hide behind release-only evidence
 - PyInstaller is **not** a cross-compiler; build each platform's sidecar on that platform (or an equivalent CI runner / VM)
 - on Windows developer machines, Linux-targeted desktop validation should still run from WSL when you need Linux parity; Windows-native packaging remains a Windows flow
 - packaged desktop builds move app-owned writable state out of the repository and into the platform app-local-data directory
@@ -155,6 +158,9 @@ When API protection is enabled, pass `--api-key "$GOAT_API_KEY"`.
 Public Windows desktop release path:
 
 - `.github/workflows/desktop-provenance.yml` is the public signed installer workflow
+- `desktop-package-windows` proves fail-closed startup for packaged CI binaries before merge; it is not installer-installed evidence
+- `.github/workflows/desktop-provenance.yml` is the installed Windows evidence gate for signed MSI and NSIS artifacts
+- `.github/workflows/fault-injection.yml` is the recurring installed Windows drill; it is neither a PR gate nor a signing workflow
 - local `npm run desktop:build` output remains internal/test-only unless it is rebuilt and signed through the workflow
 - signed public Windows installers require `GOAT_DESKTOP_SIGNING_CERT_BASE64` and `GOAT_DESKTOP_SIGNING_CERT_PASSWORD`
 
@@ -163,6 +169,7 @@ Public Windows desktop release path:
 Canonical checked-in operator assets now live under `ops/deploy/`, `ops/systemd/`, and `ops/verification/`.
 Use the canonical `ops/` entrypoints directly; repository-root deploy wrappers are no longer supported.
 The checked-in user-service unit now lives at `ops/systemd/goat-ai.service`.
+The school-only variant lives at `ops/systemd/goat-ai.school-ubuntu.service`.
 
 Linux:
 
@@ -194,6 +201,7 @@ Important behavior:
 - `ops/deploy/deploy.sh` and `ops/deploy/deploy.ps1` now stop the current FastAPI process gracefully first, then force cleanup only if the drain window expires
 - Artifact-first rollback is the preferred path; ref-based rollback remains available for manual recovery. See [ROLLBACK.md](ROLLBACK.md)
 - Windows deploy reuses Ollama on `127.0.0.1:11434` when available unless `OLLAMA_BASE_URL` is explicitly set
+- Linux deploy no longer auto-detects or auto-starts the school `ollama-local` runtime by default; only `GOAT_USE_SCHOOL_OLLAMA_LOCAL=1` or `GOAT_OLLAMA_PROFILE=school-ubuntu` enables the school-specific helper script path
 - Deploy now includes a post-deploy contract check (`tools/ops/post_deploy_check.py`) before success is reported: it exercises `GET /api/health`, `GET /api/ready`, `GET /api/system/runtime-target`, and a short `POST /api/chat` stream. The chat step passes when the SSE body includes **at least one** `token` or **`thinking`** frame (so thinking-first models still validate), and fails on HTTP errors, empty SSE, or a first-frame `error`
 
 Windows PowerShell deploy remains fully supported. Use WSL only when you specifically need Linux-targeted deploy-script parity or shell semantics.
@@ -217,11 +225,25 @@ Many production installs match an **unprivileged** server (e.g. JupyterHub-style
 
 Self-managed VMs, Docker Compose, Kubernetes, or developer laptops use the same codebase with **env-driven** ports and paths. Features that need **strong isolation** (for example Docker-backed code sandbox execution) must stay tied to explicit operator enablement and runtime probes; the shipped `localhost` provider is a weaker trusted-dev fallback, not a like-for-like isolation substitute.
 
+### Simon school Ubuntu server profile
+
+The checked-in `scripts/ollama/*local*.sh` helpers and the sibling `ollama-local` runtime
+layout are now **school-only opt-in assets**, not part of the generic deploy path.
+
+- use `GOAT_USE_SCHOOL_OLLAMA_LOCAL=1` or `GOAT_OLLAMA_PROFILE=school-ubuntu`
+- keep `OLLAMA_BASE_URL=http://127.0.0.1:11435` in the school server's `.env` or `EnvironmentFile`
+- use `ops/systemd/goat-ai.school-ubuntu.service` when the school host should start the local Ollama helper automatically
+- leave the generic `ops/systemd/goat-ai.service` and default deploy flow on the standard Ollama address instead
+
+The full school-only runbook lives in [SCHOOL_UBUNTU_SERVER.md](SCHOOL_UBUNTU_SERVER.md).
+
 ## Key environment variables
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `OLLAMA_BASE_URL` | Ollama HTTP base URL | `http://127.0.0.1:11434` |
+| `GOAT_USE_SCHOOL_OLLAMA_LOCAL` | Explicitly opt into the school Ubuntu `ollama-local` helper/runtime path | `0` |
+| `GOAT_OLLAMA_PROFILE` | Optional named profile alias; `school-ubuntu` enables the same school-only path | empty |
 | `OLLAMA_GENERATE_TIMEOUT` | LLM request timeout seconds | `120` |
 | `OLLAMA_CHAT_FIRST_EVENT_TIMEOUT` | `/api/chat` first SSE event timeout seconds | `90` |
 | `GOAT_MAX_UPLOAD_MB` | Max upload size | `20` |
@@ -301,6 +323,7 @@ Self-managed VMs, Docker Compose, Kubernetes, or developer laptops use the same 
 - Default **`GOAT_OTEL_ENABLED=0`** - tracing is off; the app does not eagerly import the OpenTelemetry SDK.
 - Set **`GOAT_OTEL_ENABLED=1`** to enable a `TracerProvider`, W3C **`traceparent`** / **`tracestate`** extraction on incoming HTTP requests (`backend/platform/otel_middleware.py`), and spans around Ollama HTTP calls in `goat_ai/llm/ollama_client.py`.
 - **`GOAT_OTEL_EXPORTER`:** `console` (default) prints spans to stderr; `otlp` sends to **`OTEL_EXPORTER_OTLP_ENDPOINT`** (OTLP/HTTP traces URL, e.g. `http://127.0.0.1:4318/v1/traces`).
+- `backend-heavy` now runs explicit OTel enabled-path tests so provider init, `traceparent` propagation, OTLP fallback, and middleware registration stay proven instead of default-off-only.
 - Standard OpenTelemetry env vars apply alongside the above (see OpenTelemetry Python docs for OTLP tuning).
 
 ### Structured logging (Phase 13 Wave A)
@@ -381,10 +404,12 @@ curl -sS -H "X-GOAT-API-Key: $GOAT_API_KEY" http://127.0.0.1:62606/api/system/me
   - `http_request_duration_seconds_sum`
   - `http_request_duration_seconds_count`
 - Counter semantics: `chat_stream_completed_total` counts only successful assistant completions, not safeguard-blocked refusal flows
+- `backend/platform/prometheus_metrics.py::EXPORTED_METRIC_FAMILIES` is the single source of truth for operator-facing metric families.
 - Versioned observability assets live under [`ops/observability/`](../../ops/observability/README.md):
   - Prometheus scrape example: [`ops/observability/prometheus/goat-api-scrape.yml`](../../ops/observability/prometheus/goat-api-scrape.yml)
   - Alert rules: [`ops/observability/alerts/goat-api-alerts.yml`](../../ops/observability/alerts/goat-api-alerts.yml)
   - Grafana dashboard: [`ops/observability/grafana/goat-api-dashboard.json`](../../ops/observability/grafana/goat-api-dashboard.json)
+- `backend-heavy` also runs an observability asset contract so alerts, dashboards, and runbooks cannot reference metric families that the API no longer exports.
 - Checked-in deploy and verification assets live under:
   - `ops/deploy/deploy.sh`
   - `ops/deploy/deploy.ps1`

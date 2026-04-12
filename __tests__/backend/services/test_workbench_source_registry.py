@@ -63,7 +63,7 @@ class WorkbenchSourceRegistryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             sources = list_workbench_sources(
                 settings=_settings(Path(tmp)),
-                auth_context=_auth_context(scopes=frozenset({"history:read"})),
+                auth_context=_auth_context(scopes=frozenset({"workbench:read"})),
             )
         self.assertEqual(["web"], [source.source_id for source in sources])
         self.assertTrue(sources[0].runtime_ready)
@@ -78,11 +78,20 @@ class WorkbenchSourceRegistryTests(unittest.TestCase):
             )
             sources = list_workbench_sources(
                 settings=settings,
-                auth_context=_auth_context(scopes=frozenset({"history:read"})),
+                auth_context=_auth_context(scopes=frozenset({"workbench:read"})),
             )
         self.assertEqual(["web"], [source.source_id for source in sources])
         self.assertFalse(sources[0].runtime_ready)
         self.assertEqual("disabled_by_operator", sources[0].deny_reason)
+
+    def test_resolve_requested_sources_rejects_denied_known_sources(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            with self.assertRaisesRegex(PermissionError, "requested workbench sources"):
+                resolve_requested_sources(
+                    source_ids=["knowledge"],
+                    settings=_settings(Path(tmp)),
+                    auth_context=_auth_context(scopes=frozenset({"workbench:read"})),
+                )
 
     def test_resolve_requested_sources_rejects_unknown_ids(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
@@ -90,7 +99,9 @@ class WorkbenchSourceRegistryTests(unittest.TestCase):
                 resolve_requested_sources(
                     source_ids=["unknown-source"],
                     settings=_settings(Path(tmp)),
-                    auth_context=_auth_context(scopes=frozenset({"knowledge:read"})),
+                    auth_context=_auth_context(
+                        scopes=frozenset({"workbench:read", "knowledge:read"})
+                    ),
                 )
 
 

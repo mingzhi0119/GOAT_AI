@@ -62,6 +62,10 @@ class WorkbenchSourceValidationError(ValueError):
     """Raised when a workbench task references unknown or unavailable sources."""
 
 
+class WorkbenchPermissionDeniedError(PermissionError):
+    """Raised when a caller lacks the scopes required for a workbench operation."""
+
+
 class WorkbenchTaskConflictError(RuntimeError):
     """Raised when a workbench task transition is invalid for its current state."""
 
@@ -100,6 +104,7 @@ __all__ = [
     "UploadIdempotencyInProgressError",
     "VisionNotSupported",
     "WorkbenchSourceValidationError",
+    "WorkbenchPermissionDeniedError",
     "WorkbenchTaskConflictError",
     "WorkbenchTaskNotFoundError",
     "WorkbenchWorkspaceOutputNotFoundError",

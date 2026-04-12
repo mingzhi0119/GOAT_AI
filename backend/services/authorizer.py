@@ -11,10 +11,53 @@ from backend.services.workbench_runtime import (
     WorkbenchTaskRecord,
     WorkbenchWorkspaceOutputRecord,
 )
+from backend.domain.scope_catalog import (
+    WORKBENCH_EXPORT_SCOPE,
+    WORKBENCH_READ_SCOPE,
+    WORKBENCH_WRITE_SCOPE,
+)
 
 
 def _has_scope(ctx: AuthorizationContext, required_scope: str) -> bool:
     return required_scope in ctx.scopes
+
+
+def workbench_read_policy_allowed(ctx: AuthorizationContext) -> bool:
+    return _has_scope(ctx, WORKBENCH_READ_SCOPE)
+
+
+def workbench_write_policy_allowed(ctx: AuthorizationContext) -> bool:
+    return _has_scope(ctx, WORKBENCH_WRITE_SCOPE)
+
+
+def workbench_export_policy_allowed(ctx: AuthorizationContext) -> bool:
+    return _has_scope(ctx, WORKBENCH_EXPORT_SCOPE)
+
+
+def _authorize_owned_workbench_resource(
+    *,
+    ctx: AuthorizationContext,
+    resource: object,
+    require_owner_header: bool,
+    required_scopes: tuple[str, ...],
+) -> AuthorizationDecision:
+    for required_scope in required_scopes:
+        if not _has_scope(ctx, required_scope):
+            return AuthorizationDecision(False, "scope_missing")
+    ownership = ownership_from_resource(resource)
+    if ownership.tenant_id and ownership.tenant_id != ctx.tenant_id.value:
+        return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
+    if ownership.principal_id and ownership.principal_id != ctx.principal_id.value:
+        return AuthorizationDecision(
+            False, "principal_mismatch", conceal_existence=True
+        )
+    if not _owner_visible(
+        resource_owner_id=ownership.owner_id,
+        legacy_owner_id=ctx.legacy_owner_id,
+        require_owner_header=require_owner_header,
+    ):
+        return AuthorizationDecision(False, "owner_mismatch", conceal_existence=True)
+    return AuthorizationDecision(True, "ok")
 
 
 def _owner_visible(
@@ -164,26 +207,28 @@ def authorize_workbench_task_read(
     task: WorkbenchTaskRecord,
     require_owner_header: bool,
 ) -> AuthorizationDecision:
-    """Authorize visibility for a persisted workbench task.
-
-    Workbench MVP routes do not define a dedicated scope family yet, so the
-    initial status-polling contract enforces tenant/principal/legacy-owner
-    boundaries without introducing new credential scope strings.
-    """
-    ownership = ownership_from_resource(task)
-    if ownership.tenant_id and ownership.tenant_id != ctx.tenant_id.value:
-        return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
-    if ownership.principal_id and ownership.principal_id != ctx.principal_id.value:
-        return AuthorizationDecision(
-            False, "principal_mismatch", conceal_existence=True
-        )
-    if not _owner_visible(
-        resource_owner_id=ownership.owner_id,
-        legacy_owner_id=ctx.legacy_owner_id,
+    """Authorize visibility for a persisted workbench task."""
+    return _authorize_owned_workbench_resource(
+        ctx=ctx,
+        resource=task,
         require_owner_header=require_owner_header,
-    ):
-        return AuthorizationDecision(False, "owner_mismatch", conceal_existence=True)
-    return AuthorizationDecision(True, "ok")
+        required_scopes=(WORKBENCH_READ_SCOPE,),
+    )
+
+
+def authorize_workbench_task_write(
+    *,
+    ctx: AuthorizationContext,
+    task: WorkbenchTaskRecord,
+    require_owner_header: bool,
+) -> AuthorizationDecision:
+    """Authorize mutation of a persisted workbench task."""
+    return _authorize_owned_workbench_resource(
+        ctx=ctx,
+        resource=task,
+        require_owner_header=require_owner_header,
+        required_scopes=(WORKBENCH_WRITE_SCOPE,),
+    )
 
 
 def authorize_workbench_output_read(
@@ -193,20 +238,31 @@ def authorize_workbench_output_read(
     require_owner_header: bool,
 ) -> AuthorizationDecision:
     """Authorize visibility for one persisted workbench workspace output."""
-    ownership = ownership_from_resource(output)
-    if ownership.tenant_id and ownership.tenant_id != ctx.tenant_id.value:
-        return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
-    if ownership.principal_id and ownership.principal_id != ctx.principal_id.value:
-        return AuthorizationDecision(
-            False, "principal_mismatch", conceal_existence=True
-        )
-    if not _owner_visible(
-        resource_owner_id=ownership.owner_id,
-        legacy_owner_id=ctx.legacy_owner_id,
+    return _authorize_owned_workbench_resource(
+        ctx=ctx,
+        resource=output,
         require_owner_header=require_owner_header,
-    ):
-        return AuthorizationDecision(False, "owner_mismatch", conceal_existence=True)
-    return AuthorizationDecision(True, "ok")
+        required_scopes=(WORKBENCH_READ_SCOPE,),
+    )
+
+
+def authorize_workbench_output_export(
+    *,
+    ctx: AuthorizationContext,
+    output: WorkbenchWorkspaceOutputRecord,
+    require_owner_header: bool,
+) -> AuthorizationDecision:
+    """Authorize export of one persisted workbench workspace output."""
+    return _authorize_owned_workbench_resource(
+        ctx=ctx,
+        resource=output,
+        require_owner_header=require_owner_header,
+        required_scopes=(
+            WORKBENCH_READ_SCOPE,
+            WORKBENCH_EXPORT_SCOPE,
+            "artifact:write",
+        ),
+    )
 
 
 def authorize_code_sandbox_execution_read(
@@ -238,6 +294,8 @@ def authorize_workbench_source_read(
     required_scope: Scope | None,
 ) -> AuthorizationDecision:
     """Authorize visibility for a declarative workbench retrieval source."""
+    if not _has_scope(ctx, WORKBENCH_READ_SCOPE):
+        return AuthorizationDecision(False, "scope_missing")
     if required_scope is not None and not _has_scope(ctx, required_scope):
         return AuthorizationDecision(False, "scope_missing")
     return AuthorizationDecision(True, "ok")

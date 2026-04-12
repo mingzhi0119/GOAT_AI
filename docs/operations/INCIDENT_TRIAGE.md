@@ -11,9 +11,10 @@ Use this runbook when staging or production health regresses and you need a fast
 ## Merge-blocking CI is red
 
 1. Clear `backend-fast` first. Its changed-files `ruff format --check` and repo-wide `ruff check` can block the rest of backend CI before contract, audit, and `pytest` results are even visible.
-2. After `backend-fast` is green, inspect `backend-heavy` for `python -m tools.contracts.check_api_contract_sync`, `pytest`, `pip-audit`, `python -m tools.quality.run_rag_eval`, `lint-imports`, and the PR latency gate.
+2. After `backend-fast` is green, inspect `backend-heavy` for `python -m tools.contracts.check_api_contract_sync`, OTel enabled-path tests, the observability asset contract, `pytest`, `pip-audit`, `python -m tools.quality.run_rag_eval`, `lint-imports`, and the PR latency gate.
 3. Only after backend is green should triage move to `desktop-package-windows` and `desktop-supply-chain`.
 4. Treat `desktop-package-windows` as the source of truth for packaged pre-ready startup resilience because it now carries the packaged-shell fault smoke for missing-sidecar, early-exit, and health-timeout paths.
+5. Treat `.github/workflows/desktop-provenance.yml` as the source of truth for installed Windows release evidence and `.github/workflows/fault-injection.yml` as the recurring installed-desktop drill; do not mix those failures into the PR packaged gate.
 
 ## What to look at first
 
@@ -45,7 +46,8 @@ Use this runbook when staging or production health regresses and you need a fast
 
 - Repeated SQLite write failures: stop new persistence work and prepare backup / restore checks.
 - Repeated readiness failures after deploy: use `ROLLBACK.md` rather than iterating hotfixes blindly on the host.
-- Repeated desktop startup failures: capture sidecar logs, Tauri shell logs, the packaged app version, the logged restart attempt counts, the recorded failure stage, and whether `desktop-package-windows` fault smoke failed on `missing_sidecar`, `exit_before_ready`, or `hang_before_ready` before retrying.
+- Observability asset drift or OTel enabled-path failures: fix `backend-heavy` first so alerts, dashboards, runbooks, and `traceparent` propagation are back in sync before debugging higher-level symptoms.
+- Repeated desktop startup failures: capture sidecar logs, Tauri shell logs, the packaged app version, the logged restart attempt counts, the recorded failure stage, the installer kind (`msi` vs `nsis`), the install root, the uninstall result, and whether the failure came from `desktop-package-windows`, release installed evidence, or the scheduled installed drill before retrying. Call out the exact fault-smoke scenario when known: `missing_sidecar`, `exit_before_ready`, or `hang_before_ready`.
 
 ## Required follow-up
 

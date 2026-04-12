@@ -18,6 +18,7 @@ from backend.domain.credential_registry import (
     build_local_authorization_context,
     resolve_authorization_context,
 )
+from backend.domain.scope_catalog import WRITE_SCOPES
 from backend.platform.config import get_settings
 from backend.platform.prometheus_metrics import record_http_request
 from backend.services.rate_limiter import (
@@ -40,17 +41,6 @@ _RATE_LIMIT_MESSAGE = "Too many requests. Please try again shortly."
 _UNAUTHORIZED_MESSAGE = "Invalid or missing API key."
 _READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 _WRITE_KEY_DETAIL = "Write operations require the write API key."
-_WRITE_SCOPES = frozenset(
-    {
-        "chat:write",
-        "history:write",
-        "knowledge:write",
-        "media:write",
-        "artifact:write",
-        "sandbox:execute",
-    }
-)
-
 access_logger = logging.getLogger("goat_ai.access")
 
 SettingsFactory = Callable[[], Settings]
@@ -129,7 +119,7 @@ def _fingerprint_api_key(api_key: str) -> str:
 def _has_any_write_scope(scopes: object) -> bool:
     if not isinstance(scopes, frozenset):
         return False
-    return bool(_WRITE_SCOPES & scopes)
+    return bool(WRITE_SCOPES & scopes)
 
 
 def _build_rate_limit_subject(

@@ -1,0 +1,26 @@
+[Unit]
+Description=GOAT AI FastAPI server (school Ubuntu profile)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/GOAT_AI
+ExecStartPre=/usr/bin/mkdir -p %h/GOAT_AI/var/logs %h/GOAT_AI/var/data
+ExecStartPre=%h/GOAT_AI/scripts/ollama/start_ollama_local.sh
+ExecStart=%h/GOAT_AI/.venv/bin/python -m uvicorn server:create_app \
+    --factory \
+    --host 0.0.0.0 --port 62606 --workers 2
+Restart=always
+RestartSec=5
+StandardOutput=append:%h/GOAT_AI/var/logs/fastapi.log
+StandardError=append:%h/GOAT_AI/var/logs/fastapi.log
+Environment=GOAT_RUNTIME_ROOT=%h/GOAT_AI/var
+Environment=GOAT_LOG_DIR=%h/GOAT_AI/var/logs
+Environment=GOAT_LOG_PATH=%h/GOAT_AI/var/chat_logs.db
+Environment=GOAT_DATA_DIR=%h/GOAT_AI/var/data
+Environment=GOAT_USE_SCHOOL_OLLAMA_LOCAL=1
+EnvironmentFile=-%h/GOAT_AI/.env
+EnvironmentFile=-%h/GOAT_AI/.env.school-ubuntu
+
+[Install]
+WantedBy=default.target

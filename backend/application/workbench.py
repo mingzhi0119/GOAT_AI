@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from backend.application.exceptions import (
+    WorkbenchPermissionDeniedError,
     WorkbenchSourceValidationError,
     WorkbenchTaskConflictError,
     WorkbenchTaskNotFoundError,
@@ -34,8 +35,12 @@ from backend.models.workbench import (
 from backend.models.artifact import ChatArtifact
 from backend.models.knowledge import KnowledgeCitation
 from backend.services.authorizer import (
+    authorize_workbench_output_export,
     authorize_workbench_output_read,
     authorize_workbench_task_read,
+    authorize_workbench_task_write,
+    workbench_read_policy_allowed,
+    workbench_write_policy_allowed,
 )
 from backend.services.artifact_service import (
     artifact_to_wire,
@@ -208,17 +213,29 @@ def _load_visible_task(
     repository: WorkbenchTaskRepository,
     settings: Settings,
     auth_context: AuthorizationContext,
+    access_mode: str = "read",
 ) -> WorkbenchTaskRecord:
     ensure_agent_workbench_enabled(settings)
     task = repository.get_task(task_id)
     if task is None:
         raise WorkbenchTaskNotFoundError("Workbench task not found")
-    decision = authorize_workbench_task_read(
-        ctx=auth_context,
-        task=task,
-        require_owner_header=settings.require_session_owner,
-    )
+    if access_mode == "write":
+        decision = authorize_workbench_task_write(
+            ctx=auth_context,
+            task=task,
+            require_owner_header=settings.require_session_owner,
+        )
+    else:
+        decision = authorize_workbench_task_read(
+            ctx=auth_context,
+            task=task,
+            require_owner_header=settings.require_session_owner,
+        )
     if not decision.allowed:
+        if decision.reason_code == "scope_missing":
+            raise WorkbenchPermissionDeniedError(
+                "Caller lacks the scopes required for this workbench task."
+            )
         raise WorkbenchTaskNotFoundError("Workbench task not found")
     return task
 
@@ -229,9 +246,14 @@ def create_workbench_task(
     repository: WorkbenchTaskRepository,
     settings: Settings,
     auth_context: AuthorizationContext,
+    request_id: str = "",
 ) -> WorkbenchTaskAcceptedResponse:
     """Create one durable queued workbench task."""
     ensure_agent_workbench_enabled(settings)
+    if not workbench_write_policy_allowed(auth_context):
+        raise WorkbenchPermissionDeniedError(
+            "Caller lacks the scopes required to create workbench tasks."
+        )
     now = _utc_now()
     requested_source_ids = normalize_requested_source_ids(
         source_ids=request.source_ids,
@@ -245,7 +267,10 @@ def create_workbench_task(
             source_ids=requested_source_ids,
             settings=settings,
             auth_context=auth_context,
+            request_id=request_id,
         )
+    except PermissionError as exc:
+        raise WorkbenchPermissionDeniedError(str(exc)) from exc
     except ValueError as exc:
         raise WorkbenchSourceValidationError(str(exc)) from exc
     if request.task_kind in {"browse", "deep_research"} and not any(
@@ -291,6 +316,7 @@ def create_and_dispatch_workbench_task(
         repository=repository,
         settings=settings,
         auth_context=auth_context,
+        request_id=request_id,
     )
     dispatcher.dispatch_task(task_id=accepted.task_id, request_id=request_id)
     return accepted
@@ -331,6 +357,7 @@ def cancel_workbench_task(
         repository=repository,
         settings=settings,
         auth_context=auth_context,
+        access_mode="write",
     )
     if task.status != "queued":
         raise WorkbenchTaskConflictError(
@@ -367,11 +394,23 @@ def retry_workbench_task(
         repository=repository,
         settings=settings,
         auth_context=auth_context,
+        access_mode="write",
     )
     if task.status not in {"completed", "failed", "cancelled"}:
         raise WorkbenchTaskConflictError(
             "Only terminal workbench tasks can be retried."
         )
+    try:
+        resolved_sources = resolve_requested_sources(
+            source_ids=task.source_ids,
+            settings=settings,
+            auth_context=auth_context,
+            request_id=request_id,
+        )
+    except PermissionError as exc:
+        raise WorkbenchPermissionDeniedError(str(exc)) from exc
+    except ValueError as exc:
+        raise WorkbenchSourceValidationError(str(exc)) from exc
     now = _utc_now()
     retried = repository.create_task(
         _build_task_create_payload(
@@ -382,14 +421,14 @@ def retry_workbench_task(
             project_id=task.project_id,
             knowledge_document_ids=task.knowledge_document_ids,
             connector_ids=task.connector_ids,
-            source_ids=task.source_ids,
+            source_ids=[source.source_id for source in resolved_sources],
             created_at=now,
-            owner_id=task.owner_id,
-            tenant_id=task.tenant_id,
-            principal_id=task.principal_id,
-            auth_scopes=task.auth_scopes,
-            credential_id=task.credential_id,
-            auth_mode=task.auth_mode,
+            owner_id=auth_context.legacy_owner_id,
+            tenant_id=auth_context.tenant_id.value,
+            principal_id=auth_context.principal_id.value,
+            auth_scopes=sorted(auth_context.scopes),
+            credential_id=auth_context.credential_id,
+            auth_mode=auth_context.auth_mode,
         )
     )
     repository.append_task_event(
@@ -442,6 +481,10 @@ def get_workbench_sources(
 ) -> WorkbenchSourcesResponse:
     """Return the visible retrieval-source registry for workbench tasks."""
     ensure_agent_workbench_enabled(settings)
+    if not workbench_read_policy_allowed(auth_context):
+        raise WorkbenchPermissionDeniedError(
+            "Caller lacks the scopes required to read workbench sources."
+        )
     return WorkbenchSourcesResponse(
         sources=[
             _to_source_payload(source)
@@ -474,6 +517,10 @@ def get_workbench_workspace_output(
         require_owner_header=settings.require_session_owner,
     )
     if not decision.allowed:
+        if decision.reason_code == "scope_missing":
+            raise WorkbenchPermissionDeniedError(
+                "Caller lacks the scopes required for this workbench output."
+            )
         raise WorkbenchWorkspaceOutputNotFoundError(
             "Workbench workspace output not found"
         )
@@ -490,6 +537,10 @@ def list_workbench_workspace_outputs(
 ) -> WorkbenchWorkspaceOutputsResponse:
     """List durable workspace outputs that can be restored by session or project."""
     ensure_agent_workbench_enabled(settings)
+    if not workbench_read_policy_allowed(auth_context):
+        raise WorkbenchPermissionDeniedError(
+            "Caller lacks the scopes required to list workbench outputs."
+        )
     if session_id and project_id:
         raise ValueError("Provide either session_id or project_id, not both.")
     if session_id:
@@ -523,12 +574,16 @@ def export_workbench_workspace_output(
         raise WorkbenchWorkspaceOutputNotFoundError(
             "Workbench workspace output not found"
         )
-    decision = authorize_workbench_output_read(
+    export_decision = authorize_workbench_output_export(
         ctx=auth_context,
         output=output,
         require_owner_header=settings.require_session_owner,
     )
-    if not decision.allowed:
+    if not export_decision.allowed:
+        if export_decision.reason_code == "scope_missing":
+            raise WorkbenchPermissionDeniedError(
+                "Caller lacks the scopes required to export this workbench output."
+            )
         raise WorkbenchWorkspaceOutputNotFoundError(
             "Workbench workspace output not found"
         )

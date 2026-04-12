@@ -189,6 +189,10 @@ Production-style deploy:
 bash ops/deploy/deploy.sh
 ```
 
+Default deploys now use the standard Ollama address `http://127.0.0.1:11434` unless
+`OLLAMA_BASE_URL` is explicitly set. The old sibling `ollama-local` / `11435` path is
+no longer auto-detected or auto-started by the generic deploy chain.
+
 Windows PowerShell:
 
 ```powershell
@@ -196,6 +200,15 @@ Windows PowerShell:
 ```
 
 Canonical checked-in operator assets live under `ops/deploy/`, `ops/systemd/`, and `ops/verification/`. Use those paths directly.
+
+### Simon school Ubuntu server profile
+
+The school-owned Ubuntu server keeps its `ollama-local` layout and helper scripts as an
+explicit opt-in profile only.
+
+- turn it on with `GOAT_USE_SCHOOL_OLLAMA_LOCAL=1` or `GOAT_OLLAMA_PROFILE=school-ubuntu`
+- keep `OLLAMA_BASE_URL=http://127.0.0.1:11435` in the school server's `.env` or dedicated env file
+- use [docs/operations/SCHOOL_UBUNTU_SERVER.md](docs/operations/SCHOOL_UBUNTU_SERVER.md) for the school-only runbook and service unit guidance
 
 ## Testing
 
@@ -266,6 +279,7 @@ P1 governance assets now live in-repo too:
 - [docs/api/API_REFERENCE.md](docs/api/API_REFERENCE.md): endpoint contract
 - [docs/api/API_ERRORS.md](docs/api/API_ERRORS.md): stable error envelope and error-code rules
 - [docs/operations/OPERATIONS.md](docs/operations/OPERATIONS.md): deploy, env vars, ops notes
+- [docs/operations/SCHOOL_UBUNTU_SERVER.md](docs/operations/SCHOOL_UBUNTU_SERVER.md): school-only Ubuntu server profile for the `ollama-local` helper scripts and service unit
 - [docs/operations/BACKUP_RESTORE.md](docs/operations/BACKUP_RESTORE.md): SQLite backup/restore drill
 - [docs/operations/ROLLBACK.md](docs/operations/ROLLBACK.md): rollback procedure for shared-host deploys
 - [docs/governance/SECURITY.md](docs/governance/SECURITY.md): upload/API threat notes and CI security posture

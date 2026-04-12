@@ -96,6 +96,10 @@ jobs:
         run: python -m tools.quality.run_rag_eval
       - name: API Contract Gate
         run: python -m tools.contracts.check_api_contract_sync
+      - name: OTel enabled-path tests
+        run: python -m pytest __tests__/backend/platform/test_otel_tracing.py __tests__/backend/platform/test_backend_main_factory.py -q
+      - name: Observability asset contract
+        run: python -m pytest __tests__/ops/test_observability_asset_contract.py -q
       - name: Pytest
         run: python -m pytest __tests__/ -v --tb=short --cov=backend --cov=goat_ai --cov-report=term-missing --cov-fail-under=70
       - name: PR latency gate
