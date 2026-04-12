@@ -41,6 +41,7 @@ export default tseslint.config(
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
       'jsx-a11y/aria-props': 'error',
+      'jsx-a11y/aria-role': 'error',
       'jsx-a11y/aria-proptypes': 'error',
       'jsx-a11y/aria-unsupported-elements': 'error',
       'jsx-a11y/label-has-associated-control': [
@@ -54,6 +55,7 @@ export default tseslint.config(
       'prefer-const': 'off',
       'jsx-a11y/role-has-required-aria-props': 'error',
       'jsx-a11y/role-supports-aria-props': 'error',
+      'jsx-a11y/tabindex-no-positive': 'error',
       'no-console': 'off',
     },
   },

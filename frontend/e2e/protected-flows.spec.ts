@@ -377,7 +377,7 @@ test('authenticated code-sandbox log streaming works in a browser runner', async
   await page.getByRole('textbox', { name: 'Code' }).fill("echo 'hello from sandbox'")
   await page.getByRole('button', { name: 'Run' }).click()
 
-  await expect(page.getByText('hello from sandbox')).toBeVisible()
+  await expect(page.getByTestId('sandbox-stdout')).toContainText('hello from sandbox')
 
   const execHeaders = latestHeaders(capturedHeaders, '/api/code-sandbox/exec')
   expect(execHeaders['x-goat-api-key']).toBe('secret-sandbox')

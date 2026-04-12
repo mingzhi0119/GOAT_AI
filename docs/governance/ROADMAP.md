@@ -58,33 +58,20 @@ closure. The final desktop slice now has:
 - explicit packaged-app failure handling in the Tauri shell so startup timeout
   and sidecar exit paths do not silently reveal a broken UI
 
-#### P2: frontend modularity, accessibility, and bundle discipline
+No open P2 audit items remain after the 2026-04-12 closeout. That pass:
 
-- Problem:
-  - top-level orchestration hotspots are growing in `App`, `useChatSession`, and `ChatWindow`
-  - bundle size warnings and continuous polling still create avoidable UX/perf drag
-  - accessibility coverage is partial rather than systematic
-- Solution:
-  - continue extracting feature-specific controllers from the largest frontend hotspots
-  - add bundle-budget monitoring and reduce long-lived polling where event- or visibility-driven refresh is enough
-  - expand accessibility review and automated checks beyond the currently tested components
-- Exit criteria:
-  - major frontend hotspots are smaller and easier to reason about
-  - bundle growth and polling cost are visible and governed
-  - accessibility regressions are less likely to escape by accident
+- extracted remaining composer-panel and attachment-strip responsibilities out of
+  the largest frontend hotspot so `ChatWindow` no longer owns the full popover
+  state machine inline
+- tightened bundle-budget thresholds after the async chunk split reduced the main
+  entry cost to a governed baseline
+- expanded automated accessibility coverage for the plus-menu and upload-manager
+  focus contracts instead of relying on manual review alone
+- promoted repository-layout truth and industrial-score guardrails into
+  merge-blocking governance tests so docs drift and stale paths are less likely
+  to re-enter the repo unnoticed
 
-#### P2: documentation truth maintenance and semantic drift prevention
-
-- Problem:
-  - some docs, examples, and status narratives lag real implementation state
-  - roadmap/status/doc files need stronger rules to keep feature claims honest
-- Solution:
-  - keep `README.md`, `.env.example`, `PROJECT_STATUS.md`, and operations docs aligned in the same change whenever runtime semantics change
-  - add targeted checks for high-risk doc drift such as env vars, release-manifest schema, and feature-status claims
-  - remove or archive stale guidance once a new source of truth exists
-- Exit criteria:
-  - operators and contributors can trust the primary docs without cross-referencing legacy files
-  - high-risk semantic drift is caught by CI instead of review luck
+Any remaining work is now capability roadmap scope, not audit-remediation debt.
 
 ### Active priorities
 

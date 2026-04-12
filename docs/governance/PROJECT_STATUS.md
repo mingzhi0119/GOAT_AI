@@ -81,7 +81,7 @@ Last updated: 2026-04-12
 - **17 runtime platform:** partial workbench runtime is landed; canvas, typed workspace outputs, session restoration, direct output reopen, output-to-artifact export linkage, and experimental DDGS-backed public-web retrieval are now in place, while deeper multi-step research behavior, project memory, and connectors remain open
 - **18 sandbox follow-ons:** MVP is landed; richer async control, egress policy, and Rust supervisor work remain open
 - **19 desktop maturity:** signed Windows packaging and packaged validation are landed; macOS/Linux public packaged validation, updater readiness, and deeper native runtime operations remain open
-- **engineering quality uplift:** P0 and P1 audit remediation are complete; remaining follow-on work is now P2-plus roadmap scope in [ROADMAP.md](ROADMAP.md)
+- **engineering quality uplift:** audit remediation through P2 is complete; remaining follow-on work is now capability/runtime roadmap scope in [ROADMAP.md](ROADMAP.md)
 
 ## Recommended live references
 

@@ -29,6 +29,50 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 - Changes to release packaging or shipped desktop artifacts must preserve or improve provenance evidence (artifact digest, SBOM, and when available attestation) instead of weakening it.
 - If a change would knowingly reduce one of the industrial-score dimensions, document the tradeoff explicitly in the PR and add a follow-up gate or remediation item before merge.
 
+## 0B. Canonical Repository Layout
+
+Treat the repository structure as an engineering contract, not as a convenience suggestion.
+
+- Root tracked directories have fixed roles:
+  - `backend/`: FastAPI application code and backend-only layers
+  - `frontend/`: React/Vite app and `src-tauri/` desktop shell
+  - `goat_ai/`: shared runtime packages that must not import `backend/`
+  - `tools/`: canonical Python CLIs grouped by `contracts/`, `desktop/`, `ops/`, `quality/`, and `release/`
+  - `ops/`: checked-in operator assets grouped by `deploy/`, `observability/`, `systemd/`, and `verification/`
+  - `docs/`: canonical documentation grouped by `api/`, `architecture/`, `governance/`, `operations/`, and `standards/`
+  - `__tests__/`: automated checks grouped by `backend/`, `contracts/`, `desktop/`, `governance/`, `helpers/`, `integration/`, and `ops/`
+  - `scripts/`: shell or PowerShell entrypoints only; canonical Python CLIs belong under `tools/`
+- Root files should stay limited to entrypoints, manifests, and repo-governance files such as `README.md`, `AGENTS.md`, `CLAUDE.md`, `server.py`, `pyproject.toml`, `requirements*.txt`, and `.env.example`.
+- Do not add new deploy wrappers, service units, ad-hoc migration helpers, or one-off ops artifacts at the repo root when `ops/` or `tools/` already owns that concern.
+- Backend placement rules:
+  - `backend/application/`: use cases and router-facing orchestration
+  - `backend/domain/`: core policy, value, and ownership semantics
+  - `backend/platform/`: config, middleware, dependency factories, and runtime adapters
+  - `backend/routers/`: HTTP-only translation layer
+  - `backend/services/`: orchestration, persistence adapters, and integration logic
+  - `backend/models/`: API-facing Pydantic contracts
+  - `backend/migrations/`: numbered schema artifacts
+- Shared-package placement rules:
+  - `goat_ai/charts/`, `chat/`, `config/`, `llm/`, `runtime/`, `sandbox/`, `shared/`, `telemetry/`, and `uploads/` are the canonical shared-package subtrees; do not reintroduce flat `goat_ai/*.py` convenience modules for these concerns.
+- Runtime-generated paths are not canonical source locations. `var/`, `data/`, `logs/`, build outputs, package caches, and local virtualenv directories must remain disposable and must not become homes for checked-in source assets.
+- When adding a new file, place it by concern and ownership first. If no canonical home exists, extend the nearest existing subtree and update `README.md`, `AGENTS.md`, `.github/CODEOWNERS`, and any path-truth tests in the same change.
+
+## 0C. Industrial Score Gate Map
+
+Every change should preserve or improve the ten industrial-score dimensions below. The named gates are part of the repository contract, not optional hygiene.
+
+- `Correctness`: preserve boundary behavior with direct tests, black-box API contracts, and contract-sync truth (`__tests__/contracts/test_api_blackbox_contract.py`, `docs/api/openapi.json`, `docs/api/api.llm.yaml`).
+- `Testability`: keep injectable boundaries and deterministic tests; touched core paths require happy-path, failure-path, and boundary-case coverage with the relevant local CI-equivalent command green.
+- `Maintainability`: keep code in canonical directories, avoid mixed-concern hotspot growth, and prefer extraction before extending oversized modules inline.
+- `Readability`: keep routers thin, names explicit, function boundaries typed, and user-visible semantics mirrored in docs when behavior changes.
+- `Architecture & Decoupling`: keep `lint-imports` green, preserve `backend/` vs `goat_ai/` boundaries, and keep process-local seams behind replaceable interfaces.
+- `Reliability & Fault Tolerance`: preserve readiness semantics, startup recovery, rollback/runbook paths, recovery drills, and failure-state tests for durable tasks, persistence, or deploy flows.
+- `Performance & Resource Efficiency`: keep latency gates, load smoke, bundle budgets, and polling discipline healthy (`python -m tools.quality.run_pr_latency_gate`, `python -m tools.quality.load_chat_smoke`, `cd frontend && npm run bundle:check`).
+- `Security`: preserve validation, authz, secret handling, dependency-review evidence, secret scanning, and auditability; do not log raw credentials or weaken scoped capability gates.
+- `Observability`: preserve `X-Request-ID`, structured logs, metrics, smoke diagnostics, and incident/runbook evidence; changes to operator-facing telemetry must update the corresponding docs and assets together.
+- `Delivery Maturity`: keep CI, release governance, provenance, and fault-injection gates aligned (`.github/workflows/ci.yml`, `release-governance.yml`, `desktop-provenance.yml`, `fault-injection.yml`).
+- If a change touches one of these dimensions, update the matching gate, workflow, test, or runbook in the same change instead of leaving the repo in a temporarily inconsistent state.
+
 ## 1. Python Standards
 
 - Annotate every function and module-level variable.
@@ -44,11 +88,15 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 ### Backend layout
 
 - `backend/main.py`: app factory and router wiring
+- `backend/application/`: router-facing use cases and orchestration
+- `backend/domain/`: core policy and value semantics
 - `backend/platform/config.py`: validated settings
 - `backend/platform/dependencies.py`: dependency factories
+- `backend/platform/`: middleware, runtime adapters, and platform-specific boundaries
 - `backend/routers/`: HTTP layer only
 - `backend/services/`: orchestration and integrations
 - `backend/models/`: Pydantic schemas only
+- `backend/migrations/`: numbered schema artifacts
 
 ### Import boundaries
 
@@ -103,6 +151,17 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 - Do not run manual visual verification unless the user asks.
 - Keep recurring quality snapshot automation healthy when changing coverage paths, workflow names, or artifact locations.
 
+### Test layout
+
+- `__tests__/backend/`: backend unit and service/application/platform tests
+- `__tests__/contracts/`: black-box API and contract-governance tests
+- `__tests__/desktop/`: desktop shell, packaging, and release-governance tests
+- `__tests__/governance/`: structure/path-truth and docs/governance tests
+- `__tests__/helpers/`: shared test utilities only
+- `__tests__/integration/`: cross-layer integration tests
+- `__tests__/ops/`: deploy, rollback, backup, recovery, and operator-asset tests
+- Keep new tests in the narrowest canonical subtree that matches the behavior under test.
+
 ## 4. Cross-Environment Compatibility
 
 - No hardcoded localhost-only assumptions.
@@ -136,7 +195,7 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 - Flag growing hotspot files early; if a touched mixed-concern file is already oversized, prefer extraction over further inline expansion.
 - Keep `.github/CODEOWNERS` as the source of truth for default directory ownership.
 - Keep `.github/workflows/release-governance.yml` and the GitHub Environment approval rules aligned with the documented release process in `docs/operations/RELEASE_GOVERNANCE.md`.
-- Keep `.github/workflows/quality-trends.yml`, `tools/quality_snapshot.py`, and `docs/governance/QUALITY_TRENDS.md` aligned when quality-trend inputs change.
+- Keep `.github/workflows/quality-trends.yml`, `tools/quality/quality_snapshot.py`, and `docs/governance/QUALITY_TRENDS.md` aligned when quality-trend inputs change.
 - Keep `.github/workflows/fault-injection.yml` aligned with the targeted resilience drills it is expected to prove.
 - Use four long-lived Codex owner lanes: Lead/Platform, Frontend, Backend, Docs/Assets.
 - Shared contracts and cross-layer boundaries must be jointly reviewed by the owning lanes.
@@ -155,6 +214,7 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 
 - Follow the current repo layout and shipped inventory in `docs/governance/PROJECT_STATUS.md`.
 - Use `docs/governance/ROADMAP.md` and `docs/operations/OPERATIONS.md` for planning and ops context.
+- Treat Section `0B. Canonical Repository Layout` in this file as the placement authority when deciding where new code, docs, tests, tools, or ops assets belong.
 
 ## 10. Production Constraints
 
@@ -177,9 +237,9 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 - Update roadmap, operations, or project-status docs when release gates, runbooks, or score-protection policies materially change.
 - Update `docs/governance/SECURITY_RESPONSE.md` when vulnerability response targets, dependency-refresh cadence, or credential-rotation expectations change.
 - When changing operator-facing metrics, update the versioned observability assets under `ops/observability/` and any affected incident runbooks in the same change.
-- When changing performance budgets or smoke-test semantics, update `tools/load_chat_smoke.py`, the scheduled workflow, and `docs/operations/OPERATIONS.md` together.
-- When changing coverage output paths or recurring quality-capture semantics, update `tools/quality_snapshot.py`, `.github/workflows/quality-trends.yml`, and `docs/governance/QUALITY_TRENDS.md` together.
-- When changing dependency-audit evidence or credential-rotation review inputs, update `tools/security_review_snapshot.py`, `.github/workflows/quality-trends.yml`, and `docs/governance/SECURITY_RESPONSE.md` together.
+- When changing performance budgets or smoke-test semantics, update `tools/quality/load_chat_smoke.py`, the scheduled workflow, and `docs/operations/OPERATIONS.md` together.
+- When changing coverage output paths or recurring quality-capture semantics, update `tools/quality/quality_snapshot.py`, `.github/workflows/quality-trends.yml`, and `docs/governance/QUALITY_TRENDS.md` together.
+- When changing dependency-audit evidence or credential-rotation review inputs, update `tools/quality/security_review_snapshot.py`, `.github/workflows/quality-trends.yml`, and `docs/governance/SECURITY_RESPONSE.md` together.
 - When changing backup, restore, rollback, or SQLite persistence semantics, update the recovery drill (`tools/ops/exercise_recovery_drill.py`), its tests, and the linked runbooks in the same change.
 
 ## 13. API Artifacts

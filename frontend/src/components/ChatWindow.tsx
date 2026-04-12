@@ -19,6 +19,8 @@ import type {
 import type { FileBindingMode, FileContextItem } from '../hooks/useFileContext'
 import { useCodeSandboxController } from '../hooks/useCodeSandboxController'
 import { useComposerAttachments } from '../hooks/useComposerAttachments'
+import { useComposerPanels } from '../hooks/useComposerPanels'
+import ComposerAttachmentStrip from './ComposerAttachmentStrip'
 import ComposerControls from './ComposerControls'
 import EmptyChatState, { type EmptyChatPrompt } from './EmptyChatState'
 import ModelMenu from './ModelMenu'
@@ -27,13 +29,8 @@ import ReasoningMenu from './ReasoningMenu'
 import { getSuffixPrompt, getTemplateFallbackPrompt } from '../utils/uploadPrompts'
 import { pickRandomPromptTexts, STARTER_PROMPT_POOL } from '../utils/starterPrompts'
 import type { ChatLayoutDecisions } from '../utils/chatLayout'
-import MessageBubble from './MessageBubble'
 import type { ReasoningLevel } from './chatComposerPrimitives'
 import {
-  DocumentIcon,
-  ImageIcon,
-  ProcessingDot,
-  ReadyDot,
 } from './chatComposerPrimitives'
 import { brandingConfig } from '../config/branding'
 
@@ -44,9 +41,6 @@ const LazyMessageBubble = lazy(() => import('./MessageBubble'))
 
 const TEXTAREA_MAX_HEIGHT_PX = 144
 const TEXTAREA_MIN_HEIGHT_PX = 28
-
-type ComposerPanel = 'plus' | 'manage-uploads' | 'model' | 'reasoning' | 'code-sandbox' | null
-type MenuFocusStrategy = 'selected' | 'first' | 'last'
 
 interface Props {
   messages: Message[]
@@ -118,7 +112,6 @@ const ChatWindow: FC<Props> = ({
   onThinkingEnabledChange,
 }) => {
   const [input, setInput] = useState('')
-  const [activePanel, setActivePanel] = useState<ComposerPanel>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -127,16 +120,11 @@ const ChatWindow: FC<Props> = ({
   const plusButtonRef = useRef<HTMLButtonElement | null>(null)
   const modelButtonRef = useRef<HTMLButtonElement | null>(null)
   const reasoningButtonRef = useRef<HTMLButtonElement | null>(null)
-  const previousCodeSandboxOpenRef = useRef(false)
-  const previousCodeSandboxPanelRef = useRef(false)
+  const plusPanelId = useId()
   const modelMenuId = useId()
   const modelTriggerId = useId()
   const reasoningMenuId = useId()
   const reasoningTriggerId = useId()
-  const [modelMenuFocusStrategy, setModelMenuFocusStrategy] =
-    useState<MenuFocusStrategy>('selected')
-  const [reasoningMenuFocusStrategy, setReasoningMenuFocusStrategy] =
-    useState<MenuFocusStrategy>('selected')
   const hasActiveFileContext = activeFileContext !== null
   const activeFileContextFilename = activeFileContext?.filename ?? null
   const activeFileContextSuffixPrompt = activeFileContext?.suffixPrompt ?? null
@@ -172,6 +160,26 @@ const ChatWindow: FC<Props> = ({
     setSandboxStdin,
     stopCodeSandboxMonitoring,
   } = useCodeSandboxController(codeSandboxFeature)
+  const {
+    plusMenuOpen,
+    manageUploadsOpen,
+    modelMenuOpen,
+    reasoningMenuOpen,
+    codeSandboxOpen,
+    modelMenuFocusStrategy,
+    reasoningMenuFocusStrategy,
+    setActivePanel,
+    closeActivePanel,
+    toggleComposerPanel,
+    toggleModelMenu,
+    toggleReasoningMenu,
+    handleModelMenuTriggerKeyDown,
+    handleReasoningMenuTriggerKeyDown,
+  } = useComposerPanels({
+    panelBoundaryRef,
+    plusButtonRef,
+    stopCodeSandboxMonitoring,
+  })
 
   const starterPrompts = useMemo<EmptyChatPrompt[]>(() => {
     const basePrompts = pickRandomPromptTexts(
@@ -212,18 +220,6 @@ const ChatWindow: FC<Props> = ({
   }, [messages])
 
   useEffect(() => {
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!activePanel) return
-      if (!panelBoundaryRef.current?.contains(event.target as Node)) {
-        setActivePanel(null)
-      }
-    }
-
-    document.addEventListener('pointerdown', handlePointerDown)
-    return () => document.removeEventListener('pointerdown', handlePointerDown)
-  }, [activePanel])
-
-  useEffect(() => {
     const textarea = textareaRef.current
     if (!textarea) return
     textarea.style.height = 'auto'
@@ -243,7 +239,7 @@ const ChatWindow: FC<Props> = ({
     onSendMessage(text, pendingImageIds.length > 0 ? pendingImageIds : undefined)
     setInput('')
     clearPendingImages()
-    setActivePanel(null)
+    closeActivePanel()
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -255,45 +251,7 @@ const ChatWindow: FC<Props> = ({
 
   const canSend =
     (input.trim().length > 0 || pendingImages.length > 0) && !isStreaming && !attachmentUploading
-  const hasVisibleAttachments = uploadedKnowledgeFiles.length > 0 || pendingImages.length > 0
-  const plusMenuOpen = activePanel === 'plus'
-  const manageUploadsOpen = activePanel === 'manage-uploads'
-  const modelMenuOpen = activePanel === 'model'
-  const reasoningMenuOpen = activePanel === 'reasoning'
-  const codeSandboxOpen = activePanel === 'code-sandbox'
   const isNarrow = layoutDecisions.layoutMode === 'narrow'
-
-  const toggleComposerPanel = (panel: Exclude<ComposerPanel, null>) => {
-    setActivePanel(prev => (prev === panel ? null : panel))
-  }
-
-  const handleMenuTriggerKeyDown = (
-    event: KeyboardEvent<HTMLButtonElement>,
-    panel: 'model' | 'reasoning',
-    setFocusStrategy: (strategy: MenuFocusStrategy) => void,
-  ) => {
-    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
-    event.preventDefault()
-    setFocusStrategy(event.key === 'ArrowUp' ? 'last' : 'first')
-    setActivePanel(panel)
-  }
-
-  useEffect(() => {
-    if (
-      (!codeSandboxOpen && previousCodeSandboxOpenRef.current) ||
-      (!manageUploadsOpen && previousCodeSandboxOpenRef.current)
-    ) {
-      plusButtonRef.current?.focus()
-    }
-    previousCodeSandboxOpenRef.current = codeSandboxOpen || manageUploadsOpen
-  }, [codeSandboxOpen, manageUploadsOpen])
-
-  useEffect(() => {
-    if (!codeSandboxOpen && previousCodeSandboxPanelRef.current) {
-      stopCodeSandboxMonitoring()
-    }
-    previousCodeSandboxPanelRef.current = codeSandboxOpen
-  }, [codeSandboxOpen, stopCodeSandboxMonitoring])
 
   return (
     <div
@@ -382,10 +340,13 @@ const ChatWindow: FC<Props> = ({
               <PlusMenu
                 isOpen={plusMenuOpen}
                 isNarrow={isNarrow}
+                panelId={plusPanelId}
+                triggerRef={plusButtonRef}
                 codeSandboxFeature={codeSandboxFeature}
                 planModeEnabled={planModeEnabled}
                 supportsThinking={supportsThinking ?? false}
                 thinkingEnabled={thinkingEnabled}
+                onClose={closeActivePanel}
                 onOpenCodeSandbox={() => {
                   if (!codeSandboxEnabled) return
                   clearSandboxError()
@@ -404,11 +365,8 @@ const ChatWindow: FC<Props> = ({
                 focusStrategy={modelMenuFocusStrategy}
                 models={models}
                 selectedModel={selectedModel}
-                onClose={() => setActivePanel(null)}
-                onSelectModel={model => {
-                  onModelChange(model)
-                  setActivePanel(null)
-                }}
+                onClose={closeActivePanel}
+                onSelectModel={onModelChange}
               />
               <ReasoningMenu
                 isOpen={reasoningMenuOpen}
@@ -417,11 +375,8 @@ const ChatWindow: FC<Props> = ({
                 triggerRef={reasoningButtonRef}
                 focusStrategy={reasoningMenuFocusStrategy}
                 reasoningLevel={reasoningLevel}
-                onClose={() => setActivePanel(null)}
-                onSelectReasoningLevel={level => {
-                  onReasoningLevelChange(level)
-                  setActivePanel(null)
-                }}
+                onClose={closeActivePanel}
+                onSelectReasoningLevel={onReasoningLevelChange}
               />
               {manageUploadsOpen && (
                 <Suspense fallback={null}>
@@ -429,7 +384,7 @@ const ChatWindow: FC<Props> = ({
                     isOpen={manageUploadsOpen}
                     uploadedKnowledgeFiles={uploadedKnowledgeFiles}
                     pendingImages={pendingImages}
-                    onClose={() => setActivePanel(null)}
+                    onClose={closeActivePanel}
                     onRemoveFileContext={onRemoveFileContext}
                     onSetFileContextMode={onSetFileContextMode}
                     onRemovePendingImage={id => removePendingImage(id)}
@@ -451,7 +406,7 @@ const ChatWindow: FC<Props> = ({
                     result={sandboxResult}
                     liveLogs={sandboxLiveLogs}
                     streamDisconnected={sandboxStreamDisconnected}
-                    onClose={() => setActivePanel(null)}
+                    onClose={closeActivePanel}
                     onExecutionModeChange={setSandboxExecutionMode}
                     onCodeChange={setSandboxCode}
                     onCommandChange={setSandboxCommand}
@@ -472,41 +427,10 @@ const ChatWindow: FC<Props> = ({
                 onChange={handleAttachmentPick}
               />
 
-              {hasVisibleAttachments && (
-                <div
-                  className="ui-static flex flex-wrap items-center gap-2 px-1 pt-1"
-                  style={{ userSelect: 'none' }}
-                >
-                  {uploadedKnowledgeFiles.map(file => (
-                    <div
-                      key={file.id}
-                      className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium"
-                      style={{
-                        borderColor: 'var(--composer-chip-border)',
-                        background: 'transparent',
-                        color: file.status === 'ready' ? 'var(--text-main)' : 'var(--text-muted)',
-                      }}
-                    >
-                      {file.status === 'ready' ? <DocumentIcon /> : <ProcessingDot />}
-                      <span className="max-w-[180px] truncate">{file.filename}</span>
-                    </div>
-                  ))}
-                  {pendingImages.map(image => (
-                    <div
-                      key={image.id}
-                      className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium"
-                      style={{
-                        borderColor: 'var(--composer-chip-border)',
-                        background: 'transparent',
-                        color: 'var(--text-main)',
-                      }}
-                    >
-                      <ImageIcon />
-                      <span className="max-w-[180px] truncate">{image.filename}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <ComposerAttachmentStrip
+                uploadedKnowledgeFiles={uploadedKnowledgeFiles}
+                pendingImages={pendingImages}
+              />
 
               <div
                 data-testid="composer-text-surface"
@@ -558,6 +482,7 @@ const ChatWindow: FC<Props> = ({
                 gpuError={gpuError}
                 inferenceLatency={inferenceLatency}
                 plusButtonRef={plusButtonRef}
+                plusPanelId={plusMenuOpen ? plusPanelId : undefined}
                 modelButtonRef={modelButtonRef}
                 reasoningButtonRef={reasoningButtonRef}
                 modelButtonId={modelTriggerId}
@@ -567,20 +492,10 @@ const ChatWindow: FC<Props> = ({
                 onTogglePlusMenu={() => {
                   toggleComposerPanel('plus')
                 }}
-                onToggleModelMenu={() => {
-                  setModelMenuFocusStrategy('selected')
-                  toggleComposerPanel('model')
-                }}
-                onToggleReasoningMenu={() => {
-                  setReasoningMenuFocusStrategy('selected')
-                  toggleComposerPanel('reasoning')
-                }}
-                onModelMenuTriggerKeyDown={event => {
-                  handleMenuTriggerKeyDown(event, 'model', setModelMenuFocusStrategy)
-                }}
-                onReasoningMenuTriggerKeyDown={event => {
-                  handleMenuTriggerKeyDown(event, 'reasoning', setReasoningMenuFocusStrategy)
-                }}
+                onToggleModelMenu={toggleModelMenu}
+                onToggleReasoningMenu={toggleReasoningMenu}
+                onModelMenuTriggerKeyDown={handleModelMenuTriggerKeyDown}
+                onReasoningMenuTriggerKeyDown={handleReasoningMenuTriggerKeyDown}
                 onThinkingEnabledChange={onThinkingEnabledChange}
                 thinkingTooltipEnabled={false}
                 onStop={onStop}

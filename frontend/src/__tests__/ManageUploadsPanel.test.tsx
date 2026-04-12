@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import ManageUploadsPanel from '../components/ManageUploadsPanel'
 
@@ -85,5 +85,37 @@ describe('ManageUploadsPanel', () => {
     expect(
       screen.getByRole('button', { name: /sticky mode is unavailable for chart\.png/i }),
     ).toBeDisabled()
+  })
+
+  it('focuses the close button on open and traps keyboard focus inside the dialog', async () => {
+    render(
+      <ManageUploadsPanel
+        isOpen={true}
+        uploadedKnowledgeFiles={[
+          { id: 'file-1', filename: 'report.pdf', status: 'ready', bindingMode: 'single' },
+        ]}
+        pendingImages={[{ id: 'img-1', filename: 'chart.png' }]}
+        onClose={vi.fn()}
+        onRemoveFileContext={vi.fn()}
+        onSetFileContextMode={vi.fn()}
+        onRemovePendingImage={vi.fn()}
+      />,
+    )
+
+    const dialog = screen.getByRole('dialog', { name: /manage uploads/i })
+    const closeButton = screen.getByRole('button', { name: /close upload manager/i })
+    const lastFocusable = screen.getByRole('button', { name: /mark chart\.png inactive/i })
+
+    await waitFor(() => {
+      expect(closeButton).toHaveFocus()
+    })
+
+    lastFocusable.focus()
+    fireEvent.keyDown(dialog, { key: 'Tab' })
+    expect(closeButton).toHaveFocus()
+
+    closeButton.focus()
+    fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true })
+    expect(lastFocusable).toHaveFocus()
   })
 })

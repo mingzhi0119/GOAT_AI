@@ -1,4 +1,11 @@
-import type { CSSProperties } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type CSSProperties,
+  type KeyboardEvent,
+  type RefObject,
+} from 'react'
 import type { CodeSandboxFeature } from '../api/types'
 import {
   ChevronRightIcon,
@@ -12,10 +19,13 @@ import {
 interface PlusMenuProps {
   isOpen: boolean
   isNarrow: boolean
+  panelId?: string
+  triggerRef?: RefObject<HTMLButtonElement | null>
   codeSandboxFeature: CodeSandboxFeature | null
   planModeEnabled: boolean
   supportsThinking: boolean
   thinkingEnabled: boolean
+  onClose: () => void
   onOpenCodeSandbox: () => void
   onUploadFiles: () => void
   onOpenManageUploads: () => void
@@ -33,16 +43,31 @@ const menuStyle = {
 export default function PlusMenu({
   isOpen,
   isNarrow,
+  panelId,
+  triggerRef,
   codeSandboxFeature,
   planModeEnabled,
   supportsThinking,
   thinkingEnabled,
+  onClose,
   onOpenCodeSandbox,
   onUploadFiles,
   onOpenManageUploads,
   onTogglePlanMode,
   onToggleThinkingMode,
 }: PlusMenuProps) {
+  const firstActionRef = useRef<HTMLButtonElement | null>(null)
+
+  const restoreTriggerFocus = useCallback(() => {
+    window.setTimeout(() => triggerRef?.current?.focus(), 0)
+  }, [triggerRef])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const timer = window.setTimeout(() => firstActionRef.current?.focus(), 0)
+    return () => window.clearTimeout(timer)
+  }, [isOpen])
+
   if (!isOpen) return null
 
   const codeSandboxEnabled =
@@ -64,14 +89,30 @@ export default function PlusMenu({
           ? 'Run a short shell snippet on the local host shell (trusted-dev fallback)'
           : 'Run a short shell snippet in an isolated, no-network sandbox'
 
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Escape') return
+    event.preventDefault()
+    onClose()
+    restoreTriggerFocus()
+  }
+
   return (
     <div
+      id={panelId}
       className={`absolute bottom-14 left-0 z-30 rounded-2xl border p-1.5 shadow-[0_10px_20px_rgba(15,23,42,0.08)] ${isNarrow ? 'w-[min(92vw,20rem)]' : 'w-[332px]'}`}
       style={menuStyle}
+      role="dialog"
+      aria-label="Upload and planning actions"
+      onPointerDown={event => event.stopPropagation()}
+      onKeyDown={handleKeyDown}
     >
       <button
+        ref={firstActionRef}
         type="button"
-        onClick={onUploadFiles}
+        onClick={() => {
+          onUploadFiles()
+          onClose()
+        }}
         className="flex w-full items-center rounded-xl px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-slate-900/[0.04]"
         style={{ color: 'var(--text-main)' }}
       >
@@ -90,7 +131,10 @@ export default function PlusMenu({
 
       <button
         type="button"
-        onClick={onOpenCodeSandbox}
+        onClick={() => {
+          if (!codeSandboxEnabled) return
+          onOpenCodeSandbox()
+        }}
         disabled={!codeSandboxEnabled}
         className="mt-0.5 flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-slate-900/[0.04] disabled:cursor-not-allowed disabled:opacity-70"
         style={{ color: 'var(--text-main)' }}

@@ -2,8 +2,8 @@ import { readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 
 const distDir = path.resolve(process.cwd(), 'dist', 'assets')
-const maxLargestJsBytes = 850 * 1024
-const maxTotalJsBytes = 1800 * 1024
+const maxLargestJsBytes = 500 * 1024
+const maxTotalJsBytes = 1500 * 1024
 
 async function collectJavaScriptAssets(rootDir) {
   const entries = await readdir(rootDir, { withFileTypes: true })

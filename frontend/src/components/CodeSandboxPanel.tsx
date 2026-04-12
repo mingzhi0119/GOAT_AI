@@ -255,6 +255,8 @@ export default function CodeSandboxPanel({
                   Live logs
                 </span>
                 <pre
+                  data-testid="sandbox-live-logs"
+                  aria-label="Sandbox live logs"
                   className="min-h-[96px] overflow-x-auto rounded-2xl border px-3 py-2 text-xs"
                   style={{
                     ...fieldStyle,
@@ -276,6 +278,8 @@ export default function CodeSandboxPanel({
                   stdout
                 </span>
                 <pre
+                  data-testid="sandbox-stdout"
+                  aria-label="Sandbox stdout"
                   className="min-h-[96px] overflow-x-auto rounded-2xl border px-3 py-2 text-xs"
                   style={{
                     ...fieldStyle,
@@ -290,6 +294,8 @@ export default function CodeSandboxPanel({
                   stderr
                 </span>
                 <pre
+                  data-testid="sandbox-stderr"
+                  aria-label="Sandbox stderr"
                   className="min-h-[96px] overflow-x-auto rounded-2xl border px-3 py-2 text-xs"
                   style={{
                     ...fieldStyle,

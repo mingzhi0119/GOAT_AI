@@ -59,7 +59,7 @@ summarized in [SECURITY.md](SECURITY.md).
 ## 5. Evidence and review
 
 - Weekly review should include:
-  - `security-review-snapshot.json` from [`.github/workflows/quality-trends.yml`](../.github/workflows/quality-trends.yml)
+  - `security-review-snapshot.json` from [`.github/workflows/quality-trends.yml`](../../.github/workflows/quality-trends.yml)
   - current ignore lists and expiration dates
   - pending dependency refresh PRs or backlog items
 - Monthly review should include:

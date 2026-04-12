@@ -6,11 +6,11 @@ This document defines the shipped recurring engineering-quality evidence baselin
 
 ## Current baseline
 
-- Workflow: [`.github/workflows/quality-trends.yml`](../.github/workflows/quality-trends.yml)
-- Snapshot generator: [`tools/quality_snapshot.py`](../tools/quality_snapshot.py)
+- Workflow: [`.github/workflows/quality-trends.yml`](../../.github/workflows/quality-trends.yml)
+- Snapshot generator: [`tools/quality/quality_snapshot.py`](../../tools/quality/quality_snapshot.py)
 - Artifact output: `quality-snapshot`
-- Related security snapshot generator: [`tools/security_review_snapshot.py`](../tools/security_review_snapshot.py)
-- Related performance summary generator: [`tools/load_chat_smoke.py`](../tools/load_chat_smoke.py)
+- Related security snapshot generator: [`tools/quality/security_review_snapshot.py`](../../tools/quality/security_review_snapshot.py)
+- Related performance summary generator: [`tools/quality/load_chat_smoke.py`](../../tools/quality/load_chat_smoke.py)
 
 The scheduled workflow currently captures:
 

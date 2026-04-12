@@ -30,6 +30,7 @@ interface ComposerControlsProps {
   gpuError: string | null
   inferenceLatency: InferenceLatency | null
   plusButtonRef?: RefObject<HTMLButtonElement | null>
+  plusPanelId?: string
   modelButtonRef?: RefObject<HTMLButtonElement | null>
   reasoningButtonRef?: RefObject<HTMLButtonElement | null>
   modelButtonId?: string
@@ -73,6 +74,7 @@ export default function ComposerControls({
   gpuError,
   inferenceLatency,
   plusButtonRef,
+  plusPanelId,
   modelButtonRef,
   reasoningButtonRef,
   modelButtonId,
@@ -110,7 +112,9 @@ export default function ComposerControls({
           disabled={isStreaming || attachmentUploading}
           onClick={onTogglePlusMenu}
           aria-label={plusMenuOpen ? 'Close upload and planning actions' : 'Open upload and planning actions'}
+          aria-expanded={plusMenuOpen}
           aria-haspopup="dialog"
+          aria-controls={plusPanelId}
           className={`${layoutDecisions.compactComposer ? 'h-9 w-9' : 'h-10 w-10'} flex shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40 ${plusMenuOpen ? '' : 'hover:bg-[var(--composer-control-hover-bg)]'}`}
           style={{ border: 'none', ...controlPillStyle(plusMenuOpen), color: 'var(--composer-control-icon)' }}
           title={plusMenuOpen ? 'Close actions' : 'Open upload and planning actions'}

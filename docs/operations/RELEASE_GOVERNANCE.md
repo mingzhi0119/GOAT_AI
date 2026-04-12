@@ -72,7 +72,7 @@ Windows PowerShell:
 ## Desktop release flow
 
 Desktop release governance now uses a separate provenance workflow at
-[`.github/workflows/desktop-provenance.yml`](../.github/workflows/desktop-provenance.yml).
+[`.github/workflows/desktop-provenance.yml`](../../.github/workflows/desktop-provenance.yml).
 
 That workflow covers:
 

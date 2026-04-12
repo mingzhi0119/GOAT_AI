@@ -110,7 +110,7 @@ Core API surface:
 - RAG-0 is complete, and the first RAG-1/2 slice is live: `csv/xlsx` uploads now route through real ingestion/search/answer, `pdf/docx/md/txt` normalize into the same knowledge pipeline, and chat can use `knowledge_document_ids` for retrieval-backed generation instead of raw snippet dumps
 - Generated non-executed chat files now download through persisted artifact ids under `/api/artifacts/{artifact_id}`
 - Code sandbox execution is now a real gated capability: `POST /api/code-sandbox/exec` runs provider-backed shell work in `sync` or `async` mode, `GET /api/code-sandbox/executions/{execution_id}` and `/events` expose durable state/auditability, and `GET /api/code-sandbox/executions/{execution_id}/logs` streams replayable stdout/stderr over SSE. Docker is the default isolated backend; `localhost` is a trusted-dev fallback with weaker isolation.
-- Workbench tasks now persist durable task rows, support polling and event timelines, and provide minimal execution for `plan`, `browse`, and `deep_research`; `canvas` remains unimplemented
+- Workbench tasks now persist durable task rows, support polling and event timelines, and provide minimal execution for `plan`, `browse`, `deep_research`, and `canvas`; public-web retrieval is now an experimental bounded DDGS-backed evidence brief rather than a future-only placeholder
 - **RAG-ready gate:** the product may be described as **RAG-ready** only when `python -m tools.quality.run_rag_eval` exits 0 (checked-in `evaldata/rag_eval_cases.jsonl`; see [evaldata/README.md](evaldata/README.md)) and retrieval quality notes in [docs/governance/PROJECT_STATUS.md](docs/governance/PROJECT_STATUS.md) stay aligned with that runner. CI runs the same command on every backend build.
 
 ## Quick Start

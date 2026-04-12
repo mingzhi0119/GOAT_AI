@@ -422,7 +422,7 @@ Setting `GOAT_SAFEGUARD_ENABLED=false` and `GOAT_SAFEGUARD_MODE=off` are equival
 
 ### RAG retrieval quality (Phase 14.7)
 
-**Regression:** run `python -m tools.quality.run_rag_eval` (from the repository root) before merge when changing `backend/services/retrieval_quality/`, `tools/run_rag_eval.py`, or `evaldata/`. CI enforces this on every backend job.
+**Regression:** run `python -m tools.quality.run_rag_eval` (from the repository root) before merge when changing `backend/services/retrieval_quality/`, `tools/quality/run_rag_eval.py`, or `evaldata/`. CI enforces this on every backend job.
 
 **Knobs (environment + request):**
 
