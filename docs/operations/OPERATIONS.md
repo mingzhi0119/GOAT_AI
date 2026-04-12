@@ -40,6 +40,14 @@ python3 -m uvicorn server:create_app --factory --host 0.0.0.0 --port 62606 --rel
 
 **Repository tools:** run CLI modules from the **repository root** with `python -m tools.<module>` (for example `python -m tools.quality.run_rag_eval`, `python -m tools.contracts.check_api_contract_sync`). This avoids setting `PYTHONPATH` manually; `.env` is for app runtime, not your shell. For **`python -m tools.contracts.check_api_contract_sync`**, use the **same Python minor as CI (3.14)** so `docs/api/openapi.json` matches `app.openapi()`. On Windows hosts, use WSL when a tool or dependency path needs Linux parity. `bash scripts/wsl/wsl_api_contract_refresh.sh` remains the preferred artifact-refresh path when Windows packaging availability differs from CI.
 
+### CI triage order
+
+When merge-blocking CI is red, clear the gates in this order instead of mixing backend and desktop failures together:
+
+- `backend-fast`: treat changed-files `ruff format --check` and repo-wide `ruff check` as the first blocker; when this job is red, deeper backend results are still hidden
+- `backend-heavy`: after `backend-fast` is green, inspect dependency audit, import-layer lint, RAG regression, API contract sync, full `pytest`, and the PR latency gate
+- desktop gates: only after backend is green should triage move to `desktop-package-windows` and `desktop-supply-chain`
+
 ### SQLite schema migrations (Phase 13 Section 13.0)
 
 On startup, `log_service.init_db` runs **`backend/services/db_migrations.apply_migrations`**, which executes `backend/migrations/NNN_*.sql` in order and records each file's SHA-256 in the `schema_migrations` table. If a migration file changes after apply, the process **refuses to start** on checksum mismatch. Add new DDL only as a new numbered SQL file.
@@ -114,6 +122,8 @@ Important notes:
 - the output is copied to `frontend/src-tauri/binaries/goat-backend-$TARGET_TRIPLE[.exe]`
 - `npm run desktop:build` triggers the same sidecar build automatically through Tauri's `beforeBuildCommand`
 - merge-blocking CI now also builds real Windows packaged desktop installers and records provenance through `python -m tools.desktop.write_desktop_release_provenance`
+- `desktop-package-windows` also runs `python -m tools.desktop.packaged_shell_fault_smoke` so packaged startup stays fail-closed for missing-sidecar, early-exit-before-ready, and health-timeout paths
+- `desktop-supply-chain` remains the Linux sidecar/provenance/cargo-audit gate; it does not own the Windows pre-ready retry semantics
 - PyInstaller is **not** a cross-compiler; build each platform's sidecar on that platform (or an equivalent CI runner / VM)
 - on Windows developer machines, Linux-targeted desktop validation should still run from WSL when you need Linux parity; Windows-native packaging remains a Windows flow
 - packaged desktop builds move app-owned writable state out of the repository and into the platform app-local-data directory

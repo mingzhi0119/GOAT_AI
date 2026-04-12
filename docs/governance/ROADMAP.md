@@ -87,6 +87,8 @@ Any remaining work is now capability roadmap scope, not audit-remediation debt.
 3. **Desktop distribution maturity**
    - signed Windows release and packaged CI validation are landed
    - macOS/Linux public packaging, updater readiness, and deeper native runtime operations are still open
+   - current governance order is: clear `backend-fast` first, then inspect `backend-heavy`, and only then move to `desktop-package-windows` / `desktop-supply-chain`
+   - pre-ready restart/backoff is shipped, and the current residual risk is keeping the merge-blocking packaged-shell fault smoke in `desktop-package-windows` green for missing-sidecar, early-exit, and pre-ready-timeout paths
 
 ### Runtime platform
 
@@ -188,6 +190,8 @@ Desktop shell scaffolding and packaged backend sidecar are already landed and ar
   - native log sink wiring
   - restart/backoff and clearer first-run failure reporting
   - desktop-safe local data and path handling
+- Current governance focus:
+  - the runtime behavior is landed, but merge-blocking packaged-shell fault smoke still needs to remain green on desktop-related changes because Rust unit tests and local builds alone are not enough evidence for pre-ready retry behavior
 - Non-goals:
   - no SPA rewrite into Rust
   - no backend business-logic rewrite solely for desktop packaging

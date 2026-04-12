@@ -30,6 +30,12 @@ const DEFAULT_BACKEND_PORT: &str = "62606";
 const HEALTH_TIMEOUT_SEC: u64 = 25;
 const PRE_READY_RESTART_LIMIT: usize = 2;
 const PRE_READY_RESTART_BACKOFF_MS: u64 = 750;
+const INTERNAL_TEST_FLAG: &str = "GOAT_DESKTOP_INTERNAL_TEST";
+const INTERNAL_TEST_HEALTH_TIMEOUT_SEC_ENV: &str = "GOAT_DESKTOP_INTERNAL_TEST_HEALTH_TIMEOUT_SEC";
+const INTERNAL_TEST_PRE_READY_RESTART_LIMIT_ENV: &str =
+    "GOAT_DESKTOP_INTERNAL_TEST_PRE_READY_RESTART_LIMIT";
+const INTERNAL_TEST_PRE_READY_BACKOFF_MS_ENV: &str =
+    "GOAT_DESKTOP_INTERNAL_TEST_PRE_READY_BACKOFF_MS";
 
 #[derive(Clone, Default)]
 struct BackendProcessState(Arc<Mutex<Option<BackendProcessHandle>>>);
@@ -131,8 +137,58 @@ fn backend_termination_diagnostic(
     message
 }
 
+fn parse_positive_u64_override(raw: Option<String>) -> Option<u64> {
+    raw.and_then(|value| {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        trimmed.parse::<u64>().ok().filter(|parsed| *parsed > 0)
+    })
+}
+
+fn internal_test_enabled() -> bool {
+    matches!(std::env::var(INTERNAL_TEST_FLAG).ok().as_deref(), Some("1"))
+}
+
+fn internal_test_numeric_override(name: &str) -> Option<u64> {
+    if !internal_test_enabled() {
+        return None;
+    }
+    parse_positive_u64_override(std::env::var(name).ok())
+}
+
+fn configured_health_timeout_sec() -> u64 {
+    internal_test_numeric_override(INTERNAL_TEST_HEALTH_TIMEOUT_SEC_ENV)
+        .unwrap_or(HEALTH_TIMEOUT_SEC)
+}
+
+fn configured_pre_ready_restart_limit() -> usize {
+    internal_test_numeric_override(INTERNAL_TEST_PRE_READY_RESTART_LIMIT_ENV)
+        .and_then(|value| usize::try_from(value).ok())
+        .unwrap_or(PRE_READY_RESTART_LIMIT)
+}
+
+fn configured_pre_ready_restart_backoff_ms() -> u64 {
+    internal_test_numeric_override(INTERNAL_TEST_PRE_READY_BACKOFF_MS_ENV)
+        .unwrap_or(PRE_READY_RESTART_BACKOFF_MS)
+}
+
 fn pre_ready_restart_backoff(attempt_index: usize) -> Duration {
-    Duration::from_millis((attempt_index as u64) * PRE_READY_RESTART_BACKOFF_MS)
+    Duration::from_millis((attempt_index as u64) * configured_pre_ready_restart_backoff_ms())
+}
+
+fn terminate_desktop_process<R: tauri::Runtime>(app_handle: &tauri::AppHandle<R>, exit_code: i32) {
+    #[cfg(not(debug_assertions))]
+    {
+        app_handle.cleanup_before_exit();
+        std::process::exit(exit_code);
+    }
+
+    #[cfg(debug_assertions)]
+    {
+        app_handle.exit(exit_code);
+    }
 }
 
 fn store_backend_process(state: &BackendProcessState, child: BackendProcessHandle) {
@@ -149,10 +205,7 @@ fn stop_active_backend_process(state: &BackendProcessState) {
     }
 }
 
-fn next_retry_detail(
-    current_attempt_index: usize,
-    total_attempts: usize,
-) -> Option<String> {
+fn next_retry_detail(current_attempt_index: usize, total_attempts: usize) -> Option<String> {
     if current_attempt_index + 1 >= total_attempts {
         return None;
     }
@@ -221,7 +274,7 @@ fn main() {
             let app_handle = app.handle().clone();
             let desktop_log_path = packaged_desktop_log_path.clone();
             thread::spawn(move || {
-                let total_attempts = PRE_READY_RESTART_LIMIT + 1;
+                let total_attempts = configured_pre_ready_restart_limit() + 1;
                 for attempt_index in 0..total_attempts {
                     if shutdown_state.0.load(Ordering::SeqCst) {
                         stop_active_backend_process(&process_state);
@@ -246,7 +299,7 @@ fn main() {
                             }
                             eprintln!("{diagnostic}");
                             if attempt_index + 1 >= total_attempts {
-                                app_handle.exit(1);
+                                terminate_desktop_process(&app_handle, 1);
                                 return;
                             }
                             thread::sleep(pre_ready_restart_backoff(attempt_index + 1));
@@ -256,7 +309,7 @@ fn main() {
 
                     match wait_for_backend_startup(
                         &health_url,
-                        Duration::from_secs(HEALTH_TIMEOUT_SEC),
+                        Duration::from_secs(configured_health_timeout_sec()),
                         &startup_failure_state,
                     ) {
                         BackendStartupWaitOutcome::Ready => {
@@ -289,7 +342,7 @@ fn main() {
                             }
                             eprintln!("{diagnostic}");
                             if attempt_index + 1 >= total_attempts {
-                                app_handle.exit(1);
+                                terminate_desktop_process(&app_handle, 1);
                                 return;
                             }
                             thread::sleep(pre_ready_restart_backoff(attempt_index + 1));
@@ -316,7 +369,7 @@ fn main() {
                             }
                             eprintln!("{diagnostic}");
                             if attempt_index + 1 >= total_attempts {
-                                app_handle.exit(1);
+                                terminate_desktop_process(&app_handle, 1);
                                 return;
                             }
                             thread::sleep(pre_ready_restart_backoff(attempt_index + 1));
@@ -509,7 +562,7 @@ fn _path_exists(path: &Path) -> bool {
 mod tests {
     use super::{
         backend_health_url, backend_termination_diagnostic, normalize_configured_value,
-        pre_ready_restart_backoff, startup_failure_diagnostic,
+        parse_positive_u64_override, pre_ready_restart_backoff, startup_failure_diagnostic,
         wait_for_backend_startup_with_probes, wait_for_backend_with_probe,
         BackendStartupWaitOutcome,
     };
@@ -590,6 +643,16 @@ mod tests {
     fn pre_ready_restart_backoff_scales_with_attempt_number() {
         assert_eq!(pre_ready_restart_backoff(1), Duration::from_millis(750));
         assert_eq!(pre_ready_restart_backoff(2), Duration::from_millis(1500));
+    }
+
+    #[test]
+    fn parse_positive_u64_override_accepts_positive_integers_only() {
+        assert_eq!(parse_positive_u64_override(Some("5".into())), Some(5));
+        assert_eq!(parse_positive_u64_override(Some(" 7 ".into())), Some(7));
+        assert_eq!(parse_positive_u64_override(Some("0".into())), None);
+        assert_eq!(parse_positive_u64_override(Some("".into())), None);
+        assert_eq!(parse_positive_u64_override(Some("bad".into())), None);
+        assert_eq!(parse_positive_u64_override(None), None);
     }
 
     #[test]
@@ -728,7 +791,7 @@ fn spawn_release_backend<R: tauri::Runtime>(
                         startup_failure_state.0.store(true, Ordering::SeqCst);
                     }
                     if !shutdown_requested && ready {
-                        app_handle_for_events.exit(1);
+                        terminate_desktop_process(&app_handle_for_events, 1);
                     }
                 }
                 CommandEvent::Error(error) => {
@@ -747,7 +810,7 @@ fn spawn_release_backend<R: tauri::Runtime>(
                         startup_failure_state.0.store(true, Ordering::SeqCst);
                     }
                     if !shutdown_requested && ready {
-                        app_handle_for_events.exit(1);
+                        terminate_desktop_process(&app_handle_for_events, 1);
                     }
                 }
                 _ => {}

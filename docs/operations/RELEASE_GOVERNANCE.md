@@ -98,6 +98,8 @@ Desktop release steps:
 5. Write `desktop-windows-provenance.json` with artifact digests and signature status.
 6. Upload the installers plus provenance assets and emit installer attestations when supported.
 
+Signed Windows installer provenance and Linux sidecar provenance are necessary release evidence, but they are not sufficient proof that pre-ready desktop startup still fails closed. Desktop-related changes must also keep the merge-blocking `desktop-package-windows` packaged-shell fault smoke green for missing-sidecar, early-exit-before-ready, and health-timeout paths.
+
 Required desktop signing secrets:
 
 - `GOAT_DESKTOP_SIGNING_CERT_BASE64`

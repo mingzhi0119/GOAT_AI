@@ -3,9 +3,14 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import time
 from pathlib import Path
 
 import uvicorn
+
+INTERNAL_TEST_FLAG = "GOAT_DESKTOP_INTERNAL_TEST"
+INTERNAL_TEST_SCENARIO = "GOAT_DESKTOP_INTERNAL_TEST_SCENARIO"
+INTERNAL_TEST_HANG_SEC = "GOAT_DESKTOP_INTERNAL_TEST_HANG_SEC"
 
 
 def _default_desktop_data_root() -> Path:
@@ -42,6 +47,40 @@ def configure_desktop_environment(data_root: Path, port: int) -> Path:
     return resolved_root
 
 
+def _internal_test_enabled() -> bool:
+    return os.environ.get(INTERNAL_TEST_FLAG, "").strip() == "1"
+
+
+def _configured_internal_test_scenario() -> str:
+    return os.environ.get(INTERNAL_TEST_SCENARIO, "").strip()
+
+
+def _configured_internal_test_hang_sec() -> float:
+    raw = os.environ.get(INTERNAL_TEST_HANG_SEC, "").strip()
+    if not raw:
+        return 5.0
+    try:
+        parsed = float(raw)
+    except ValueError:
+        return 5.0
+    return parsed if parsed > 0 else 5.0
+
+
+def run_internal_test_scenario_if_requested() -> None:
+    if not _internal_test_enabled():
+        return
+
+    scenario = _configured_internal_test_scenario()
+    if not scenario:
+        return
+    if scenario == "exit_before_ready":
+        raise SystemExit("GOAT desktop internal test: exit_before_ready")
+    if scenario == "hang_before_ready":
+        time.sleep(_configured_internal_test_hang_sec())
+        raise SystemExit("GOAT desktop internal test: hang_before_ready")
+    raise SystemExit(f"Unsupported GOAT_DESKTOP_INTERNAL_TEST_SCENARIO: {scenario!r}")
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="goat-desktop-sidecar",
@@ -62,6 +101,7 @@ def main() -> None:
         else _default_desktop_data_root()
     )
     configure_desktop_environment(data_root, args.port)
+    run_internal_test_scenario_if_requested()
 
     uvicorn.run(
         "backend.main:create_app",

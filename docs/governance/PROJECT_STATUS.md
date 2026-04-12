@@ -58,6 +58,7 @@ Last updated: 2026-04-12
 
 - artifact-first staged release governance workflow and approval gate
 - desktop provenance workflow for the Linux sidecar artifact plus signed Windows installer digests/attestations
+- merge-blocking backend CI now stages `backend-fast -> backend-heavy -> backend`, so triage clears changed-file Ruff/format blockers before reading deeper backend failures
 - versioned observability assets in-repo
 - nightly performance smoke with explicit budgets
 - merge-blocking PR latency gate for the core in-process chat path
@@ -66,6 +67,7 @@ Last updated: 2026-04-12
 - backup, restore, rollback, and recovery-drill coverage
 - documented vulnerability response, dependency-refresh cadence, and credential-rotation policy
 - CI gates for lint, tests, build, contract sync, dependency audit, secret scan, and desktop supply chain
+- `desktop-package-windows` now also carries packaged-shell fault smoke so missing-sidecar, early-exit, and pre-ready-timeout startup regressions stay merge-blocking for desktop-related changes
 
 ## Current known boundaries
 
@@ -74,6 +76,7 @@ Last updated: 2026-04-12
 - storage remains SQLite-first and single-writer by design
 - future storage-shape changes require a new migration/compatibility/rollback decision log
 - Windows desktop packaging, signing, and provenance are ahead of macOS/Linux public packaged validation
+- pre-ready desktop restart/backoff is shipped, but the packaged-shell fault smoke in `desktop-package-windows` is now the critical evidence path because Rust unit tests alone were not enough to guard fail-closed startup behavior
 
 ## Status by active roadmap area
 

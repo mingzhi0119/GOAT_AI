@@ -8,6 +8,13 @@ Use this runbook when staging or production health regresses and you need a fast
 2. Pull the `X-Request-ID` from the client response when available.
 3. Search structured logs for the same `request_id` before changing runtime state.
 
+## Merge-blocking CI is red
+
+1. Clear `backend-fast` first. Its changed-files `ruff format --check` and repo-wide `ruff check` can block the rest of backend CI before contract, audit, and `pytest` results are even visible.
+2. After `backend-fast` is green, inspect `backend-heavy` for `python -m tools.contracts.check_api_contract_sync`, `pytest`, `pip-audit`, `python -m tools.quality.run_rag_eval`, `lint-imports`, and the PR latency gate.
+3. Only after backend is green should triage move to `desktop-package-windows` and `desktop-supply-chain`.
+4. Treat `desktop-package-windows` as the source of truth for packaged pre-ready startup resilience because it now carries the packaged-shell fault smoke for missing-sidecar, early-exit, and health-timeout paths.
+
 ## What to look at first
 
 ### Readiness is failing
@@ -38,7 +45,7 @@ Use this runbook when staging or production health regresses and you need a fast
 
 - Repeated SQLite write failures: stop new persistence work and prepare backup / restore checks.
 - Repeated readiness failures after deploy: use `ROLLBACK.md` rather than iterating hotfixes blindly on the host.
-- Repeated desktop startup failures: capture sidecar logs, Tauri shell logs, the packaged app version, and the logged restart attempt counts before retrying.
+- Repeated desktop startup failures: capture sidecar logs, Tauri shell logs, the packaged app version, the logged restart attempt counts, the recorded failure stage, and whether `desktop-package-windows` fault smoke failed on `missing_sidecar`, `exit_before_ready`, or `hang_before_ready` before retrying.
 
 ## Required follow-up
 
