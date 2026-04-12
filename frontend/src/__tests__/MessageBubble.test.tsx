@@ -87,7 +87,24 @@ describe('MessageBubble', () => {
     )
 
     expect(container.querySelector('.katex')).not.toBeInTheDocument()
-    expect(screen.getByText('Energy is $$E=mc^2')).toBeInTheDocument()
+    expect(container.textContent).toContain('Energy is$$E=mc^2')
+  })
+
+  it('renders a closed formula immediately while leaving the next incomplete formula as plain text', () => {
+    const { container } = render(
+      <MessageBubble
+        message={{
+          id: 'm5b',
+          role: 'assistant',
+          createdAt: '2026-04-10T14:22:00Z',
+          content: 'First $E=mc^2$ then $$x^2',
+          isStreaming: true,
+        }}
+      />,
+    )
+
+    expect(container.querySelector('.katex')).toBeInTheDocument()
+    expect(container.textContent).toContain('then$$x^2')
   })
 
   it('hides the thinking disclosure when the message is not marked to show thinking', () => {
