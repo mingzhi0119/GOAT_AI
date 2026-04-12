@@ -344,7 +344,7 @@ class ApiAuthzTests(unittest.TestCase):
                 "principal_id": "principal:limited-workbench",
                 "tenant_id": "tenant:default",
                 "status": "active",
-                "scopes": ["history:read", "history:write"]
+                "scopes": ["history:read", "workbench:read"]
               }
             ]
             """,
@@ -366,9 +366,10 @@ class ApiAuthzTests(unittest.TestCase):
         )
         self.assertEqual(200, features.status_code)
         workbench = features.json()["workbench"]
-        self.assertTrue(workbench["agent_tasks"]["effective_enabled"])
-        self.assertTrue(workbench["browse"]["effective_enabled"])
-        self.assertTrue(workbench["deep_research"]["effective_enabled"])
+        self.assertFalse(workbench["agent_tasks"]["effective_enabled"])
+        self.assertFalse(workbench["browse"]["effective_enabled"])
+        self.assertFalse(workbench["deep_research"]["effective_enabled"])
+        self.assertTrue(workbench["artifact_workspace"]["effective_enabled"])
         self.assertFalse(workbench["connectors"]["effective_enabled"])
 
         desktop = self.client.get(
@@ -377,6 +378,40 @@ class ApiAuthzTests(unittest.TestCase):
         )
         self.assertEqual(200, desktop.status_code)
         self.assertFalse(desktop.json()["desktop_mode"])
+
+    def test_workbench_routes_require_scope_family(self) -> None:
+        self.settings = replace(
+            self.settings,
+            feature_agent_workbench_enabled=True,
+            api_key="bootstrap-auth-enabled",
+            api_key_write="",
+            api_credentials_json="""
+            [
+              {
+                "credential_id": "cred-no-workbench",
+                "secret": "no-workbench",
+                "principal_id": "principal:no-workbench",
+                "tenant_id": "tenant:default",
+                "status": "active",
+                "scopes": ["history:read", "history:write"]
+              }
+            ]
+            """,
+        )
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        sources = self.client.get(
+            "/api/workbench/sources",
+            headers={"X-GOAT-API-Key": "no-workbench"},
+        )
+        self.assertEqual(403, sources.status_code)
+
+        create = self.client.post(
+            "/api/workbench/tasks",
+            headers={"X-GOAT-API-Key": "no-workbench"},
+            json={"task_kind": "plan", "prompt": "Draft a plan"},
+        )
+        self.assertEqual(403, create.status_code)
 
     @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
     def test_system_features_resolve_policy_gate_per_credential(

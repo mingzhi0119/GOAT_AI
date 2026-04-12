@@ -39,7 +39,14 @@ def _auth_context() -> AuthorizationContext:
     return AuthorizationContext(
         principal_id=PrincipalId("principal-1"),
         tenant_id=TenantId("tenant-1"),
-        scopes=frozenset({"sandbox:execute", "knowledge:read"}),
+        scopes=frozenset(
+            {
+                "sandbox:execute",
+                "knowledge:read",
+                "workbench:read",
+                "workbench:write",
+            }
+        ),
         credential_id="cred-1",
         legacy_owner_id="owner-1",
         auth_mode="api_key",
@@ -186,6 +193,58 @@ class SystemTelemetryServiceTests(unittest.TestCase):
         self.assertTrue(response.workbench.artifact_workspace.effective_enabled)
         self.assertIsNone(response.workbench.artifact_workspace.deny_reason)
         self.assertTrue(response.workbench.connectors.effective_enabled)
+
+    def test_workbench_features_become_scope_aware(self) -> None:
+        limited_ctx = AuthorizationContext(
+            principal_id=PrincipalId("principal-1"),
+            tenant_id=TenantId("tenant-1"),
+            scopes=frozenset({"sandbox:execute"}),
+            credential_id="cred-limited",
+            legacy_owner_id="owner-1",
+            auth_mode="api_key",
+        )
+
+        with (
+            patch(
+                "backend.services.system_telemetry_service.compute_code_sandbox_snapshot",
+                return_value=CodeSandboxFeatureSnapshot(
+                    allowed_by_config=True,
+                    available_on_host=True,
+                    effective_enabled=True,
+                    provider_name="docker",
+                    isolation_level="container",
+                    network_policy_enforced=True,
+                    deny_reason=None,
+                ),
+            ),
+            patch(
+                "backend.services.system_telemetry_service.compute_agent_workbench_snapshot",
+                return_value=RuntimeFeatureSnapshot(
+                    allowed_by_config=True,
+                    available_on_host=True,
+                    effective_enabled=True,
+                    deny_reason=None,
+                ),
+            ),
+            patch(
+                "backend.services.system_telemetry_service.code_sandbox_policy_allowed",
+                return_value=True,
+            ),
+            patch(
+                "backend.services.system_telemetry_service.list_workbench_sources",
+                return_value=[],
+            ),
+        ):
+            response = build_system_features_response(_settings(), limited_ctx)
+
+        self.assertFalse(response.workbench.agent_tasks.effective_enabled)
+        self.assertEqual(
+            "permission_denied", response.workbench.agent_tasks.deny_reason
+        )
+        self.assertFalse(response.workbench.artifact_workspace.effective_enabled)
+        self.assertEqual(
+            "permission_denied", response.workbench.artifact_workspace.deny_reason
+        )
 
     def test_preserves_operator_disabled_workbench_snapshot(self) -> None:
         with (

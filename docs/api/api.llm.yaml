@@ -1122,6 +1122,7 @@ endpoints:
       202: WorkbenchTaskAcceptedResponse
       errors:
         - 401
+        - 403
         - 422
         - 429
         - 503
@@ -1132,6 +1133,7 @@ endpoints:
       200: WorkbenchSourcesResponse
       errors:
         - 401
+        - 403
         - 429
         - 503
   - op: get_workbench_task_status
@@ -1143,6 +1145,7 @@ endpoints:
       200: WorkbenchTaskStatusResponse
       errors:
         - 401
+        - 403
         - 404
         - 422
         - 429
@@ -1156,6 +1159,7 @@ endpoints:
       200: WorkbenchTaskStatusResponse
       errors:
         - 401
+        - 403
         - 404
         - 409
         - 422
@@ -1170,6 +1174,7 @@ endpoints:
       202: WorkbenchTaskAcceptedResponse
       errors:
         - 401
+        - 403
         - 404
         - 409
         - 422
@@ -1182,6 +1187,7 @@ endpoints:
       200: WorkbenchWorkspaceOutputsResponse
       errors:
         - 401
+        - 403
         - 422
         - 429
         - 503
@@ -1194,6 +1200,7 @@ endpoints:
       200: WorkbenchWorkspaceOutputPayload
       errors:
         - 401
+        - 403
         - 404
         - 422
         - 429
@@ -1209,6 +1216,7 @@ endpoints:
       201: ChatArtifact
       errors:
         - 401
+        - 403
         - 404
         - 422
         - 429
@@ -1222,6 +1230,7 @@ endpoints:
       200: WorkbenchTaskEventsResponse
       errors:
         - 401
+        - 403
         - 404
         - 422
         - 429

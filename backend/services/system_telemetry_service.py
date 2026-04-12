@@ -19,6 +19,10 @@ from backend.models.system import (
 )
 from backend.platform.readiness_service import evaluate_readiness
 from backend.services.feature_gate_service import code_sandbox_policy_allowed
+from backend.services.authorizer import (
+    workbench_read_policy_allowed,
+    workbench_write_policy_allowed,
+)
 from backend.services.workbench_source_registry import list_workbench_sources
 from backend.types import Settings
 from goat_ai.config.feature_gate_reasons import RUNTIME_NOT_IMPLEMENTED
@@ -64,29 +68,42 @@ def build_system_features_response(
         settings=settings,
         auth_context=auth_context,
     )
+    workbench_read_allowed = workbench_read_policy_allowed(auth_context)
+    workbench_write_allowed = workbench_write_policy_allowed(auth_context)
 
     def _runtime_payload(snapshot: RuntimeFeatureSnapshot) -> RuntimeFeaturePayload:
         return RuntimeFeaturePayload(
-            allowed_by_config=snapshot.allowed_by_config,
+            allowed_by_config=snapshot.allowed_by_config and workbench_write_allowed,
             available_on_host=snapshot.available_on_host,
-            effective_enabled=snapshot.effective_enabled,
-            deny_reason=snapshot.deny_reason,
+            effective_enabled=snapshot.effective_enabled and workbench_write_allowed,
+            deny_reason=(
+                snapshot.deny_reason
+                if not snapshot.effective_enabled
+                else (None if workbench_write_allowed else "permission_denied")
+            ),
         )
 
     def _workbench_capability(
         *,
+        policy_allowed: bool,
         runtime_ready: bool,
         deny_reason: str | None = None,
     ) -> RuntimeFeaturePayload:
         if not workbench.allowed_by_config:
             return _runtime_payload(workbench)
         return RuntimeFeaturePayload(
-            allowed_by_config=True,
+            allowed_by_config=policy_allowed,
             available_on_host=runtime_ready,
-            effective_enabled=workbench.effective_enabled and runtime_ready,
-            deny_reason=None
-            if runtime_ready
-            else (deny_reason or RUNTIME_NOT_IMPLEMENTED),
+            effective_enabled=workbench.effective_enabled
+            and policy_allowed
+            and runtime_ready,
+            deny_reason=(
+                "permission_denied"
+                if not policy_allowed
+                else (
+                    None if runtime_ready else (deny_reason or RUNTIME_NOT_IMPLEMENTED)
+                )
+            ),
         )
 
     def _has_runnable_source(task_kind: str) -> bool:
@@ -109,17 +126,28 @@ def build_system_features_response(
         workbench=WorkbenchFeaturePayload(
             agent_tasks=_runtime_payload(workbench),
             plan_mode=_runtime_payload(workbench),
-            browse=_workbench_capability(runtime_ready=_has_runnable_source("browse")),
-            deep_research=_workbench_capability(
-                runtime_ready=_has_runnable_source("deep_research")
+            browse=_workbench_capability(
+                policy_allowed=workbench_write_allowed,
+                runtime_ready=_has_runnable_source("browse"),
             ),
-            artifact_workspace=_workbench_capability(runtime_ready=True),
-            project_memory=_workbench_capability(runtime_ready=False),
+            deep_research=_workbench_capability(
+                policy_allowed=workbench_write_allowed,
+                runtime_ready=_has_runnable_source("deep_research"),
+            ),
+            artifact_workspace=_workbench_capability(
+                policy_allowed=workbench_read_allowed,
+                runtime_ready=True,
+            ),
+            project_memory=_workbench_capability(
+                policy_allowed=workbench_read_allowed,
+                runtime_ready=False,
+            ),
             connectors=_workbench_capability(
+                policy_allowed=workbench_write_allowed,
                 runtime_ready=any(
                     source.runtime_ready and source.kind == "connector"
                     for source in visible_sources
-                )
+                ),
             ),
         ),
     )

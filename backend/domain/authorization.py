@@ -15,6 +15,9 @@ Scope = Literal[
     "artifact:read",
     "artifact:write",
     "sandbox:execute",
+    "workbench:read",
+    "workbench:write",
+    "workbench:export",
 ]
 
 

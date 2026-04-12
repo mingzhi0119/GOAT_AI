@@ -35,7 +35,7 @@ class WorkbenchRuntimeTests(unittest.TestCase):
                 source_ids=[],
                 created_at="2026-04-10T18:00:00+00:00",
                 updated_at="2026-04-10T18:00:00+00:00",
-                auth_scopes=["history:write"],
+                auth_scopes=["workbench:read", "workbench:write"],
                 credential_id="cred-1",
                 auth_mode="api_key",
             )
@@ -76,7 +76,7 @@ class WorkbenchRuntimeTests(unittest.TestCase):
         self.assertEqual("doc-1", stored.result_citations[0]["document_id"])
         self.assertEqual([], self.repository.list_workspace_outputs("wb-1"))
         self.assertEqual([], stored.source_ids)
-        self.assertEqual(["history:write"], stored.auth_scopes)
+        self.assertEqual(["workbench:read", "workbench:write"], stored.auth_scopes)
         self.assertEqual("cred-1", stored.credential_id)
         self.assertIsNone(stored.error_detail)
         events = self.repository.list_task_events("wb-1")
@@ -194,7 +194,7 @@ class WorkbenchRuntimeTests(unittest.TestCase):
                 source_ids=[],
                 created_at="2026-04-10T18:00:00+00:00",
                 updated_at="2026-04-10T18:00:00+00:00",
-                auth_scopes=["history:write"],
+                auth_scopes=["workbench:read", "workbench:write"],
                 credential_id="cred-2",
                 auth_mode="api_key",
             )
@@ -228,7 +228,7 @@ class WorkbenchRuntimeTests(unittest.TestCase):
                 source_ids=[],
                 created_at="2026-04-10T18:00:00+00:00",
                 updated_at="2026-04-10T18:00:00+00:00",
-                auth_scopes=["history:write"],
+                auth_scopes=["workbench:read", "workbench:write"],
                 credential_id="cred-3",
                 auth_mode="api_key",
             )

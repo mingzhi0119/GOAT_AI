@@ -8,33 +8,13 @@ from typing import FrozenSet
 
 from backend.domain.authz_types import AuthorizationContext
 from backend.domain.authorization import PrincipalId, Scope, TenantId
+from backend.domain.scope_catalog import FULL_SCOPES, READ_SCOPES
 from goat_ai.config.settings import Settings
 
 _DEFAULT_TENANT = "tenant:default"
 _AUTH_MODE_SHARED = "shared_key_v1"
 _AUTH_MODE_REGISTRY = "credential_registry_v1"
 _AUTH_MODE_LOCAL = "local_noauth_v1"
-
-_READ_SCOPES: frozenset[Scope] = frozenset(
-    {
-        "chat:read",
-        "history:read",
-        "knowledge:read",
-        "media:read",
-        "artifact:read",
-    }
-)
-_WRITE_SCOPES: frozenset[Scope] = frozenset(
-    {
-        "chat:write",
-        "history:write",
-        "knowledge:write",
-        "media:write",
-        "artifact:write",
-        "sandbox:execute",
-    }
-)
-_FULL_SCOPES: frozenset[Scope] = frozenset({*_READ_SCOPES, *_WRITE_SCOPES})
 
 
 @dataclass(frozen=True)
@@ -69,7 +49,7 @@ def _build_default_credentials(settings: Settings) -> list[ApiCredential]:
                 secret_sha256=_hash_secret(settings.api_key),
                 principal_id=PrincipalId("principal:read-default"),
                 tenant_id=TenantId(_DEFAULT_TENANT),
-                scopes=_READ_SCOPES,
+                scopes=READ_SCOPES,
                 status="active",
                 auth_mode=_AUTH_MODE_SHARED,
                 description="Derived from GOAT_API_KEY",
@@ -82,7 +62,7 @@ def _build_default_credentials(settings: Settings) -> list[ApiCredential]:
                 secret_sha256=_hash_secret(settings.api_key_write),
                 principal_id=PrincipalId("principal:write-default"),
                 tenant_id=TenantId(_DEFAULT_TENANT),
-                scopes=_FULL_SCOPES,
+                scopes=FULL_SCOPES,
                 status="active",
                 auth_mode=_AUTH_MODE_SHARED,
                 description="Derived from GOAT_API_KEY_WRITE",
@@ -181,7 +161,7 @@ def build_local_authorization_context() -> AuthorizationContext:
     return AuthorizationContext(
         principal_id=PrincipalId("principal:local-noauth"),
         tenant_id=TenantId(_DEFAULT_TENANT),
-        scopes=_FULL_SCOPES,
+        scopes=FULL_SCOPES,
         credential_id="credential:local-noauth",
         legacy_owner_id="",
         auth_mode=_AUTH_MODE_LOCAL,

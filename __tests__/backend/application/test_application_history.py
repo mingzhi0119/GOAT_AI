@@ -54,7 +54,7 @@ def _auth_context(owner_id: str = "owner-1") -> AuthorizationContext:
     return AuthorizationContext(
         principal_id=PrincipalId("principal-1"),
         tenant_id=TenantId("tenant-1"),
-        scopes=frozenset({"history:read", "history:write"}),
+        scopes=frozenset({"history:read", "history:write", "workbench:read"}),
         credential_id="cred-1",
         legacy_owner_id=owner_id,
         auth_mode="api_key",
@@ -248,3 +248,65 @@ class ApplicationHistoryTests(unittest.TestCase):
 
         self.assertEqual(1, len(detail.workspace_outputs))
         self.assertEqual("wbo-1", detail.workspace_outputs[0].output_id)
+
+    def test_get_history_session_detail_omits_workspace_outputs_without_workbench_read(
+        self,
+    ) -> None:
+        repository = InMemorySessionRepository()
+        workbench_repository = _FakeWorkbenchRepository()
+        payload = build_session_payload(
+            messages=[ChatMessage(role="user", content="hello")],
+            assistant_text="world",
+            chart_spec=None,
+            knowledge_documents=None,
+            chart_data_source="none",
+        )
+        repository.upsert_session(
+            SessionUpsertPayload(
+                session_id="sess-restore",
+                title="Original",
+                model="gemma4:26b",
+                schema_version=2,
+                payload=payload,
+                created_at="2026-04-11T00:00:00+00:00",
+                updated_at="2026-04-11T00:00:00+00:00",
+                owner_id="owner-1",
+                tenant_id="tenant-1",
+                principal_id="principal-1",
+            )
+        )
+        workbench_repository.outputs = [
+            WorkbenchWorkspaceOutputRecord(
+                id="wbo-1",
+                task_id="wb-1",
+                output_kind="canvas_document",
+                title="Canvas",
+                content_format="markdown",
+                content_text="# Canvas",
+                created_at="2026-04-11T00:00:01+00:00",
+                updated_at="2026-04-11T00:00:02+00:00",
+                session_id="sess-restore",
+                metadata={"editable": True},
+                owner_id="owner-1",
+                tenant_id="tenant-1",
+                principal_id="principal-1",
+            )
+        ]
+
+        detail = get_history_session_detail(
+            repository=repository,
+            workbench_repository=workbench_repository,
+            session_id="sess-restore",
+            settings=_settings(require_owner=True),
+            auth_context=AuthorizationContext(
+                principal_id=PrincipalId("principal-1"),
+                tenant_id=TenantId("tenant-1"),
+                scopes=frozenset({"history:read", "history:write"}),
+                credential_id="cred-1",
+                legacy_owner_id="owner-1",
+                auth_mode="api_key",
+            ),
+            request_id="req-1",
+        )
+
+        self.assertEqual([], detail.workspace_outputs)

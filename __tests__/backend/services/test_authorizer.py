@@ -3,10 +3,19 @@ from __future__ import annotations
 import unittest
 
 from backend.domain.authz_types import AuthorizationContext
-from backend.services.authorizer import authorize_artifact_read, authorize_session_read
+from backend.services.authorizer import (
+    authorize_artifact_read,
+    authorize_session_read,
+    authorize_workbench_output_export,
+    authorize_workbench_task_read,
+)
 from backend.domain.authorization import PrincipalId, TenantId
 from backend.services.artifact_service import PersistedArtifactRecord
 from backend.services.chat_runtime import SessionDetailRecord
+from backend.services.workbench_runtime import (
+    WorkbenchTaskRecord,
+    WorkbenchWorkspaceOutputRecord,
+)
 
 
 def _ctx(*, scopes: frozenset[str], owner: str = "alice") -> AuthorizationContext:
@@ -97,6 +106,58 @@ class AuthorizerTests(unittest.TestCase):
                 storage_path="a.txt",
                 source_message_index=0,
                 created_at="now",
+                tenant_id="tenant:test",
+                principal_id="principal:test",
+            ),
+            require_owner_header=False,
+        )
+        self.assertFalse(decision.allowed)
+        self.assertEqual("owner_mismatch", decision.reason_code)
+        self.assertTrue(decision.conceal_existence)
+
+    def test_workbench_scope_missing_denies_with_403_semantics(self) -> None:
+        decision = authorize_workbench_task_read(
+            ctx=_ctx(scopes=frozenset({"history:read"})),
+            task=WorkbenchTaskRecord(
+                id="wb-1",
+                task_kind="plan",
+                status="queued",
+                prompt="Plan",
+                session_id=None,
+                project_id=None,
+                knowledge_document_ids=[],
+                connector_ids=[],
+                source_ids=[],
+                created_at="a",
+                updated_at="b",
+                owner_id="alice",
+                tenant_id="tenant:test",
+                principal_id="principal:test",
+            ),
+            require_owner_header=False,
+        )
+        self.assertFalse(decision.allowed)
+        self.assertEqual("scope_missing", decision.reason_code)
+        self.assertFalse(decision.conceal_existence)
+
+    def test_workbench_export_owner_mismatch_stays_concealed(self) -> None:
+        decision = authorize_workbench_output_export(
+            ctx=_ctx(
+                scopes=frozenset(
+                    {"workbench:read", "workbench:export", "artifact:write"}
+                ),
+                owner="bob",
+            ),
+            output=WorkbenchWorkspaceOutputRecord(
+                id="wbo-1",
+                task_id="wb-1",
+                output_kind="canvas_document",
+                title="Draft",
+                content_format="markdown",
+                content_text="# Draft",
+                created_at="a",
+                updated_at="b",
+                owner_id="alice",
                 tenant_id="tenant:test",
                 principal_id="principal:test",
             ),

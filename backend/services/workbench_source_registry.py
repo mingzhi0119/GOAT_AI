@@ -83,23 +83,41 @@ def resolve_requested_sources(
     auth_context: AuthorizationContext,
     request_id: str = "",
 ) -> list[WorkbenchSourceDescriptor]:
-    """Resolve requested source ids against the visible registry entries."""
-    visible = {
+    """Resolve requested source ids and preserve auth-vs-unknown distinctions."""
+    descriptors = {
         descriptor.source_id: descriptor
-        for descriptor in list_workbench_sources(
-            settings=settings,
-            auth_context=auth_context,
-            request_id=request_id,
-        )
+        for descriptor in _all_source_descriptors(settings)
     }
     resolved: list[WorkbenchSourceDescriptor] = []
     missing: list[str] = []
+    denied: list[str] = []
     for source_id in source_ids:
-        descriptor = visible.get(source_id)
+        descriptor = descriptors.get(source_id)
         if descriptor is None:
             missing.append(source_id)
             continue
+        decision = authorize_workbench_source_read(
+            ctx=auth_context,
+            required_scope=descriptor.required_scope,
+        )
+        emit_authorization_audit(
+            ctx=auth_context,
+            action="workbench.source.read",
+            resource=ResourceRef(
+                resource_type="workbench_source", resource_id=descriptor.source_id
+            ),
+            decision=decision,
+            request_id=request_id,
+        )
+        if not decision.allowed:
+            denied.append(source_id)
+            continue
         resolved.append(descriptor)
+    if denied:
+        joined = ", ".join(sorted(dict.fromkeys(denied)))
+        raise PermissionError(
+            f"Caller lacks permission to use the requested workbench sources: {joined}"
+        )
     if missing:
         joined = ", ".join(sorted(dict.fromkeys(missing)))
         raise ValueError(f"Unknown or unavailable workbench sources: {joined}")

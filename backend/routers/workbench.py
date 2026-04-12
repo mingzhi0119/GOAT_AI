@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from backend.api_errors import RESOURCE_CONFLICT, build_error_body
 from backend.application.exceptions import (
+    WorkbenchPermissionDeniedError,
     WorkbenchSourceValidationError,
     WorkbenchTaskConflictError,
     WorkbenchTaskNotFoundError,
@@ -59,6 +60,7 @@ router = APIRouter()
     response_model=WorkbenchTaskAcceptedResponse,
     responses={
         401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
         422: {"model": ErrorResponse},
         429: {"model": ErrorResponse},
         503: {
@@ -85,6 +87,14 @@ def post_workbench_task(
             auth_context=auth_context,
             request_id=str(getattr(http_request.state, "request_id", "")),
         )
+    except WorkbenchPermissionDeniedError as exc:
+        raise HTTPException(
+            status_code=403,
+            detail=build_error_body(
+                detail=str(exc),
+                status_code=403,
+            ),
+        ) from exc
     except WorkbenchSourceValidationError as exc:
         raise HTTPException(
             status_code=422,
@@ -101,6 +111,7 @@ def post_workbench_task(
     summary="List declarative workbench retrieval sources",
     responses={
         401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
         429: {"model": ErrorResponse},
         503: {
             "model": ErrorResponse,
@@ -114,11 +125,20 @@ def get_workbench_sources_route(
     auth_context: AuthorizationContext = Depends(get_authorization_context),
 ) -> WorkbenchSourcesResponse:
     """List the current caller-visible retrieval sources for workbench tasks."""
-    return get_workbench_sources(
-        settings=settings,
-        auth_context=auth_context,
-        request_id=str(getattr(http_request.state, "request_id", "")),
-    )
+    try:
+        return get_workbench_sources(
+            settings=settings,
+            auth_context=auth_context,
+            request_id=str(getattr(http_request.state, "request_id", "")),
+        )
+    except WorkbenchPermissionDeniedError as exc:
+        raise HTTPException(
+            status_code=403,
+            detail=build_error_body(
+                detail=str(exc),
+                status_code=403,
+            ),
+        ) from exc
 
 
 @router.get(
@@ -127,6 +147,7 @@ def get_workbench_sources_route(
     summary="Read one durable workbench task status",
     responses={
         401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
         404: {"model": ErrorResponse},
         429: {"model": ErrorResponse},
         503: {
@@ -149,6 +170,14 @@ def get_workbench_task_status(
             settings=settings,
             auth_context=auth_context,
         )
+    except WorkbenchPermissionDeniedError as exc:
+        raise HTTPException(
+            status_code=403,
+            detail=build_error_body(
+                detail=str(exc),
+                status_code=403,
+            ),
+        ) from exc
     except WorkbenchTaskNotFoundError as exc:
         raise HTTPException(
             status_code=404,
@@ -165,6 +194,7 @@ def get_workbench_task_status(
     summary="Cancel one queued durable workbench task",
     responses={
         401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
         404: {"model": ErrorResponse},
         409: {"model": ErrorResponse},
         429: {"model": ErrorResponse},
@@ -188,6 +218,14 @@ def cancel_workbench_task_route(
             settings=settings,
             auth_context=auth_context,
         )
+    except WorkbenchPermissionDeniedError as exc:
+        raise HTTPException(
+            status_code=403,
+            detail=build_error_body(
+                detail=str(exc),
+                status_code=403,
+            ),
+        ) from exc
     except WorkbenchTaskNotFoundError as exc:
         raise HTTPException(
             status_code=404,
@@ -214,6 +252,7 @@ def cancel_workbench_task_route(
     summary="Retry one terminal durable workbench task",
     responses={
         401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
         404: {"model": ErrorResponse},
         409: {"model": ErrorResponse},
         429: {"model": ErrorResponse},
@@ -241,6 +280,14 @@ def retry_workbench_task_route(
             auth_context=auth_context,
             request_id=str(getattr(http_request.state, "request_id", "")),
         )
+    except WorkbenchPermissionDeniedError as exc:
+        raise HTTPException(
+            status_code=403,
+            detail=build_error_body(
+                detail=str(exc),
+                status_code=403,
+            ),
+        ) from exc
     except WorkbenchTaskNotFoundError as exc:
         raise HTTPException(
             status_code=404,
@@ -266,6 +313,7 @@ def retry_workbench_task_route(
     summary="List durable workspace outputs by session or project scope",
     responses={
         401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
         422: {"model": ErrorResponse},
         429: {"model": ErrorResponse},
         503: {
@@ -290,6 +338,14 @@ def list_workbench_workspace_outputs_route(
             session_id=session_id,
             project_id=project_id,
         )
+    except WorkbenchPermissionDeniedError as exc:
+        raise HTTPException(
+            status_code=403,
+            detail=build_error_body(
+                detail=str(exc),
+                status_code=403,
+            ),
+        ) from exc
     except ValueError as exc:
         raise HTTPException(
             status_code=422,
@@ -306,6 +362,7 @@ def list_workbench_workspace_outputs_route(
     summary="Read one durable workspace output",
     responses={
         401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
         404: {"model": ErrorResponse},
         429: {"model": ErrorResponse},
         503: {
@@ -328,6 +385,14 @@ def get_workbench_workspace_output_route(
             settings=settings,
             auth_context=auth_context,
         )
+    except WorkbenchPermissionDeniedError as exc:
+        raise HTTPException(
+            status_code=403,
+            detail=build_error_body(
+                detail=str(exc),
+                status_code=403,
+            ),
+        ) from exc
     except WorkbenchWorkspaceOutputNotFoundError as exc:
         raise HTTPException(
             status_code=404,
@@ -345,6 +410,7 @@ def get_workbench_workspace_output_route(
     summary="Export one durable workspace output into a downloadable artifact",
     responses={
         401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
         404: {"model": ErrorResponse},
         422: {"model": ErrorResponse},
         429: {"model": ErrorResponse},
@@ -372,6 +438,14 @@ def export_workbench_workspace_output_route(
             settings=settings,
             auth_context=auth_context,
         )
+    except WorkbenchPermissionDeniedError as exc:
+        raise HTTPException(
+            status_code=403,
+            detail=build_error_body(
+                detail=str(exc),
+                status_code=403,
+            ),
+        ) from exc
     except WorkbenchWorkspaceOutputNotFoundError as exc:
         raise HTTPException(
             status_code=404,
@@ -396,6 +470,7 @@ def export_workbench_workspace_output_route(
     summary="Read one durable workbench task event timeline",
     responses={
         401: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
         404: {"model": ErrorResponse},
         429: {"model": ErrorResponse},
         503: {
@@ -418,6 +493,14 @@ def get_workbench_task_event_timeline(
             settings=settings,
             auth_context=auth_context,
         )
+    except WorkbenchPermissionDeniedError as exc:
+        raise HTTPException(
+            status_code=403,
+            detail=build_error_body(
+                detail=str(exc),
+                status_code=403,
+            ),
+        ) from exc
     except WorkbenchTaskNotFoundError as exc:
         raise HTTPException(
             status_code=404,
