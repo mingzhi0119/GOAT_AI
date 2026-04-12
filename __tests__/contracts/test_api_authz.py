@@ -21,6 +21,7 @@ from backend.api_errors import (
     FEATURE_DISABLED,
     FEATURE_UNAVAILABLE,
 )
+from __tests__.helpers.api_contract import ContractFakeLLM, FakeTitleGenerator
 from goat_ai.config import Settings
 
 if TestClient is not None:
@@ -41,7 +42,6 @@ if TestClient is not None:
         SESSION_PAYLOAD_VERSION,
         build_session_payload,
     )
-    from test_api_blackbox_contract import ContractFakeLLM, FakeTitleGenerator
 
 
 class AuthzFakeCodeSandboxProvider:

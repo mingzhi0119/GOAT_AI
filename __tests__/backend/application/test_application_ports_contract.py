@@ -4,10 +4,11 @@ import ast
 from pathlib import Path
 import unittest
 
+from __tests__.helpers.repo_root import repo_root
 from backend.application import ports
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = repo_root(Path(__file__))
 _TARGET_DIRS = (
     REPO_ROOT / "backend" / "application",
     REPO_ROOT / "backend" / "routers",

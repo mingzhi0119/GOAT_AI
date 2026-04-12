@@ -86,14 +86,18 @@ def test_watchdog_phase0_and_local_ollama_scripts_align_with_supported_ops_contr
 
 
 def test_release_docs_and_status_match_current_truth() -> None:
-    release_doc = (REPO_ROOT / "docs" / "RELEASE_GOVERNANCE.md").read_text(
+    release_doc = (
+        REPO_ROOT / "docs" / "operations" / "RELEASE_GOVERNANCE.md"
+    ).read_text(encoding="utf-8")
+    rollback_doc = (REPO_ROOT / "docs" / "operations" / "ROLLBACK.md").read_text(
         encoding="utf-8"
     )
-    rollback_doc = (REPO_ROOT / "docs" / "ROLLBACK.md").read_text(encoding="utf-8")
-    operations_doc = (REPO_ROOT / "docs" / "OPERATIONS.md").read_text(encoding="utf-8")
-    project_status = (REPO_ROOT / "docs" / "PROJECT_STATUS.md").read_text(
+    operations_doc = (REPO_ROOT / "docs" / "operations" / "OPERATIONS.md").read_text(
         encoding="utf-8"
     )
+    project_status = (
+        REPO_ROOT / "docs" / "governance" / "PROJECT_STATUS.md"
+    ).read_text(encoding="utf-8")
 
     assert "`STAGING_BASE_URL`" in release_doc
     assert "`PRODUCTION_BASE_URL`" in release_doc

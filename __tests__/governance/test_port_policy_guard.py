@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from __tests__.helpers.repo_root import repo_root
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = repo_root(Path(__file__))
 
 SUPPORTED_PORT_POLICY_FILES = [
     REPO_ROOT / "backend" / "config.py",
@@ -11,8 +12,8 @@ SUPPORTED_PORT_POLICY_FILES = [
     REPO_ROOT / "frontend" / "vite.config.ts",
     REPO_ROOT / ".env.example",
     REPO_ROOT / "goat_ai" / "runtime_target.py",
-    REPO_ROOT / "scripts" / "post_deploy_check.py",
-    REPO_ROOT / "docs" / "OPERATIONS.md",
+    REPO_ROOT / "tools" / "ops" / "post_deploy_check.py",
+    REPO_ROOT / "docs" / "operations" / "OPERATIONS.md",
 ]
 
 

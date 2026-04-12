@@ -103,22 +103,22 @@ If a claim has **no** anchor in the repo or docs, do not put it on the homepage.
 
 Wave B evidence anchors in this repo:
 
-- `goat_ai/ollama_client.py` + `__tests__/test_ollama_client_cache.py`
+- `goat_ai/ollama_client.py` + `__tests__/backend/services/test_ollama_client_cache.py`
 - `backend/services/idempotency_service.py` + `backend/migrations/005_add_idempotency_keys.sql`
 - `backend/routers/upload.py` + `backend/routers/chat.py`
-- `__tests__/test_upload_router.py` + `__tests__/test_api_blackbox_contract.py`
+- `__tests__/backend/routers/test_upload_router.py` + `__tests__/contracts/test_api_blackbox_contract.py`
 - `docs/operations/OPERATIONS.md` (multi-instance limitations + mitigations)
 
 Phase 16A / 17 evidence anchors in this repo:
 
-- `backend/services/system_telemetry_service.py` + `__tests__/test_feature_gates.py`
+- `backend/services/system_telemetry_service.py` + `__tests__/backend/platform/test_feature_gates.py`
 - `backend/routers/workbench.py` + `backend/application/workbench.py`
 - `backend/services/workbench_runtime.py`
 - `backend/services/workbench_execution_service.py`
 - `backend/services/workbench_source_registry.py`
-- `__tests__/test_workbench_runtime.py`
-- `__tests__/test_workbench_source_registry.py`
-- `__tests__/test_api_blackbox_contract.py`
+- `__tests__/backend/services/test_workbench_runtime.py`
+- `__tests__/backend/services/test_workbench_source_registry.py`
+- `__tests__/contracts/test_api_blackbox_contract.py`
 - `docs/api/API_REFERENCE.md` + `docs/architecture/WORKBENCH_TERMINOLOGY_DECISION.md`
 
 ---

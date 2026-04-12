@@ -98,7 +98,7 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 - For frontend changes, run `cd frontend && npm ci && npm run lint && npm run contract:check && npm test -- --run`.
 - CI also runs `cd frontend && npm run build && npm run bundle:check && npm run test:e2e`; run those locally for frontend changes that touch types, build inputs, protected browser flows, packaging, or any path that may compile differently from `vitest`.
 - Desktop shell changes must keep `cargo test --manifest-path frontend/src-tauri/Cargo.toml` green.
-- Delivery and desktop wrapper changes must keep the scripted smoke coverage green (`python -m pytest __tests__/test_desktop_smoke.py` and any affected script tests).
+- Delivery and desktop wrapper changes must keep the scripted smoke coverage green (`python -m pytest __tests__/desktop/test_desktop_smoke.py` and any affected script tests).
 - Prefer coverage reporting and fail-under thresholds for backend and frontend; do not lower thresholds without an explicit documented exception.
 - Do not run manual visual verification unless the user asks.
 - Keep recurring quality snapshot automation healthy when changing coverage paths, workflow names, or artifact locations.

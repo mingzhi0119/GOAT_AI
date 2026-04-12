@@ -19,9 +19,8 @@ from backend.models.chat import ChatMessage
 from backend.services.chat_runtime import SessionUpsertPayload
 from backend.services.session_message_codec import build_session_payload
 from backend.services.workbench_runtime import WorkbenchWorkspaceOutputRecord
+from __tests__.helpers.session_repository import InMemorySessionRepository
 from goat_ai.config import Settings
-
-from __tests__.test_fake_session_repository import InMemorySessionRepository
 
 
 class _FakeWorkbenchRepository:

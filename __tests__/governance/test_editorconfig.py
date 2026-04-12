@@ -3,10 +3,12 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+from __tests__.helpers.repo_root import repo_root
+
 
 class EditorConfigTests(unittest.TestCase):
     def test_root_editorconfig_enforces_utf8_without_bom(self) -> None:
-        root = Path(__file__).resolve().parents[1]
+        root = repo_root(Path(__file__))
         editorconfig = root / ".editorconfig"
 
         self.assertTrue(

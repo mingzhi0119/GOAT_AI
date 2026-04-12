@@ -3,8 +3,9 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+from __tests__.helpers.repo_root import repo_root
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = repo_root(Path(__file__))
 
 
 def _read_text(path: Path) -> str:

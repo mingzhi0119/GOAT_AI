@@ -214,7 +214,7 @@ python -m unittest discover -s __tests__ -p "test_*.py" -v
 Targeted contract tests:
 
 ```bash
-python -m pytest __tests__/test_api_blackbox_contract.py -v
+python -m pytest __tests__/contracts/test_api_blackbox_contract.py -v
 ```
 
 Retrieval quality regression (RAG-3):

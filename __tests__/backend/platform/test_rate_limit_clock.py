@@ -41,8 +41,7 @@ class TestRegisterHttpSecurityClockInjection(unittest.TestCase):
         window_sec: int = 60,
         max_requests: int = 2,
     ):
-        from backend.config import get_settings
-        from backend.http_security import register_http_security
+        import backend.http_security as http_security
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
         from goat_ai.config import Settings
@@ -66,13 +65,13 @@ class TestRegisterHttpSecurityClockInjection(unittest.TestCase):
             )
 
         app = FastAPI()
-        app.dependency_overrides[get_settings] = lambda: settings
+        app.dependency_overrides[http_security.get_settings] = lambda: settings
 
         @app.get("/api/ping")
         async def _ping():
             return {"ok": True}
 
-        register_http_security(
+        http_security.register_http_security(
             app,
             clock=clock,
             rate_limit_policy_factory=lambda resolved_settings: RateLimitPolicy(

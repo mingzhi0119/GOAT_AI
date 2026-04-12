@@ -11,7 +11,10 @@ from pathlib import Path
 
 import pytest
 
-_ROUTER_DIR = Path(__file__).resolve().parent.parent / "backend" / "routers"
+from __tests__.helpers.repo_root import repo_root
+
+REPO_ROOT = repo_root(Path(__file__))
+_ROUTER_DIR = REPO_ROOT / "backend" / "routers"
 _FORBIDDEN_TOPLEVEL = frozenset({"goat_ai", "httpx", "requests", "pandas", "openpyxl"})
 
 
@@ -39,6 +42,4 @@ def test_router_files_avoid_forbidden_direct_imports(path: Path) -> None:
     source = path.read_text(encoding="utf-8")
     tree = ast.parse(source, filename=str(path))
     bad = _collect_forbidden_modules(tree)
-    assert not bad, (
-        f"{path.relative_to(path.parents[2])}: forbidden direct imports {bad}"
-    )
+    assert not bad, f"{path.relative_to(REPO_ROOT)}: forbidden direct imports {bad}"

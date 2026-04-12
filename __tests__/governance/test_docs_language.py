@@ -4,10 +4,12 @@ import re
 import unittest
 from pathlib import Path
 
+from __tests__.helpers.repo_root import repo_root
+
 
 class DocsLanguageTests(unittest.TestCase):
     def test_docs_and_memory_remain_english_only(self) -> None:
-        root = Path(__file__).resolve().parents[1]
+        root = repo_root(Path(__file__))
         docs_root = root / "docs"
         targets = [
             root / "README.md",

@@ -1018,5 +1018,5 @@ For machine-readable contract details, prefer:
 
 - [openapi.json](openapi.json)
 - [api.llm.yaml](api.llm.yaml)
-- `__tests__/test_api_blackbox_contract.py`
-- `__tests__/test_api_authz.py`
+- `__tests__/contracts/test_api_blackbox_contract.py`
+- `__tests__/contracts/test_api_authz.py`

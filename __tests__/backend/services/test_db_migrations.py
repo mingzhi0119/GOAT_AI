@@ -9,9 +9,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from __tests__.helpers.repo_root import repo_root
 from backend.services.db_migrations import apply_migrations
 
-_REPO_MIGRATIONS = Path(__file__).resolve().parents[1] / "backend" / "migrations"
+_REPO_MIGRATIONS = repo_root(Path(__file__)) / "backend" / "migrations"
 
 
 class DbMigrationsTests(unittest.TestCase):

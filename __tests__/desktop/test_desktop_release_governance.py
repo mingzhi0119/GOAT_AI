@@ -5,10 +5,11 @@ from pathlib import Path
 
 import pytest
 
+from __tests__.helpers.repo_root import repo_root
 import tools.desktop.write_desktop_release_provenance as subject
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = repo_root(Path(__file__))
 
 
 def test_build_provenance_payload_records_expected_artifacts(
@@ -77,11 +78,15 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     desktop_provenance = (
         REPO_ROOT / ".github" / "workflows" / "desktop-provenance.yml"
     ).read_text(encoding="utf-8")
-    release_doc = (REPO_ROOT / "docs" / "RELEASE_GOVERNANCE.md").read_text(
+    release_doc = (
+        REPO_ROOT / "docs" / "operations" / "RELEASE_GOVERNANCE.md"
+    ).read_text(encoding="utf-8")
+    security_doc = (REPO_ROOT / "docs" / "governance" / "SECURITY.md").read_text(
         encoding="utf-8"
     )
-    security_doc = (REPO_ROOT / "docs" / "SECURITY.md").read_text(encoding="utf-8")
-    roadmap = (REPO_ROOT / "docs" / "ROADMAP.md").read_text(encoding="utf-8")
+    roadmap = (REPO_ROOT / "docs" / "governance" / "ROADMAP.md").read_text(
+        encoding="utf-8"
+    )
 
     assert "desktop-package-windows" in ci_workflow
     assert "runs-on: windows-latest" in ci_workflow

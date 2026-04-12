@@ -36,7 +36,7 @@ Short index for coding agents. Canonical rules live in the docs below.
 
 ## Quick pointers
 
-- API work: `__tests__/test_api_blackbox_contract.py`, `docs/api/openapi.json`, `docs/api/api.llm.yaml`
+- API work: `__tests__/contracts/test_api_blackbox_contract.py`, `docs/api/openapi.json`, `docs/api/api.llm.yaml`
 - CLI helpers: `python -m tools.<module>`
 - Keep `.cursor/rules/` aligned with these standards
 - Directory ownership lives in [`.github/CODEOWNERS`](.github/CODEOWNERS)

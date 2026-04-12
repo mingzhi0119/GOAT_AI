@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from __tests__.helpers.repo_root import repo_root
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = repo_root(Path(__file__))
 
 
 def test_frontend_contract_generation_is_committed_and_wired_into_ci() -> None:
