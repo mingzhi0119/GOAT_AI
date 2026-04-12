@@ -1,6 +1,6 @@
 # GOAT AI Roadmap
 
-> Last updated: 2026-04-11
+> Last updated: 2026-04-12
 > Current release tag: **v1.2.0**
 > Shipped status: [PROJECT_STATUS.md](PROJECT_STATUS.md)
 
@@ -88,10 +88,10 @@ closure. The final desktop slice now has:
 
 ### Active priorities
 
-1. **Real web retrieval for workbench**
-   - `/api/workbench/sources` already exposes `web`
-   - the source remains declarative but runtime-unready
-   - browse/deep-research should not remain permanently partial behind a fake-ready public source
+1. **Multi-step research behavior on top of landed web retrieval**
+   - `/api/workbench/sources` now exposes runtime-ready experimental DDGS-backed `web`
+   - browse/deep-research still remain bounded single-pass evidence briefs
+   - the next step is iterative planning, fetch, synthesis, and stronger safety boundaries
 
 2. **Project memory and connectors**
    - both are already advertised as future capability slots
@@ -124,8 +124,8 @@ closure. The final desktop slice now has:
 
 - Goal: replace the currently partial retrieval runtime with real web execution and stronger multi-step research behavior.
 - Remaining work:
-  - actual public-web execution behind the `web` source
   - staged safety boundaries for public web vs private retrieval
+  - iterative multi-step research behavior instead of one bounded retrieval pass
   - remote connector adapters behind the shared source registry
 
 #### Phase 17E: project memory and connectors

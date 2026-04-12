@@ -130,6 +130,37 @@ class DotenvConfigTests(unittest.TestCase):
             finally:
                 _restore_many(original_env)
 
+    def test_load_settings_parses_workbench_web_env(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            app_root = Path(tmp)
+            runtime_root = app_root / "var"
+            original_env = _capture_env(
+                "GOAT_WORKBENCH_WEB_PROVIDER",
+                "GOAT_WORKBENCH_WEB_MAX_RESULTS",
+                "GOAT_WORKBENCH_WEB_TIMEOUT_SEC",
+                "GOAT_WORKBENCH_WEB_REGION",
+                "GOAT_WORKBENCH_WEB_SAFESEARCH",
+            )
+            try:
+                _clear_env(*original_env.keys())
+                os.environ["GOAT_WORKBENCH_WEB_PROVIDER"] = "duckduckgo"
+                os.environ["GOAT_WORKBENCH_WEB_MAX_RESULTS"] = "7"
+                os.environ["GOAT_WORKBENCH_WEB_TIMEOUT_SEC"] = "11"
+                os.environ["GOAT_WORKBENCH_WEB_REGION"] = "us-en"
+                os.environ["GOAT_WORKBENCH_WEB_SAFESEARCH"] = "off"
+                with (
+                    patch.object(config, "APP_ROOT", app_root),
+                    patch.object(config, "DEFAULT_RUNTIME_ROOT", runtime_root),
+                ):
+                    settings = config.load_settings()
+                self.assertEqual("duckduckgo", settings.workbench_web_provider)
+                self.assertEqual(7, settings.workbench_web_max_results)
+                self.assertEqual(11, settings.workbench_web_timeout_sec)
+                self.assertEqual("us-en", settings.workbench_web_region)
+                self.assertEqual("off", settings.workbench_web_safesearch)
+            finally:
+                _restore_many(original_env)
+
 
 def _capture_env(*names: str) -> dict[str, str | None]:
     return {name: os.environ.get(name) for name in names}

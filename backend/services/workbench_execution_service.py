@@ -16,6 +16,11 @@ from backend.services.knowledge_service import (
 )
 from backend.services.exceptions import KnowledgeDocumentNotFound
 from backend.services.workbench_source_registry import resolve_requested_sources
+from backend.services.workbench_web_search import (
+    WorkbenchWebSearchHit,
+    WorkbenchWebSearchError,
+    search_public_web,
+)
 from backend.services.workbench_runtime import (
     WorkbenchTaskRecord,
     WorkbenchWorkspaceOutputCreatePayload,
@@ -193,17 +198,35 @@ def _compose_retrieval_result(
     for citation in citations:
         snippet = citation.snippet.strip().replace("\n", " ")
         bounded = snippet[:220].strip()
-        lines.append(f"- {citation.filename}: {bounded}")
+        if citation.document_id.startswith(("http://", "https://")):
+            lines.append(f"- [{citation.filename}]({citation.document_id}): {bounded}")
+        else:
+            lines.append(f"- {citation.filename}: {bounded}")
     if task.task_kind == "deep_research":
         lines.extend(
             [
                 "",
                 "## Gaps",
-                "- Public web retrieval is still registered but not runtime-ready in this phase.",
-                "- Treat this as a bounded evidence brief, not a full autonomous research run.",
+                "- Current runtime performs one bounded retrieval pass rather than iterative agentic research.",
+                "- Treat this as an evidence brief, not a full autonomous long-horizon investigation.",
             ]
         )
     return "\n".join(lines)
+
+
+def _web_hit_to_citation(hit: WorkbenchWebSearchHit) -> KnowledgeCitation:
+    return KnowledgeCitation(
+        document_id=hit.url,
+        chunk_id=hit.url,
+        filename=hit.title,
+        snippet=hit.snippet,
+        score=max(0.0, 1.0 - ((hit.rank - 1) * 0.01)),
+    )
+
+
+def _resolve_web_result_limit(*, task_kind: str, settings: Settings) -> int:
+    default_limit = 8 if task_kind == "deep_research" else 5
+    return min(default_limit, settings.workbench_web_max_results)
 
 
 def _execute_retrieval_task(
@@ -262,46 +285,100 @@ def _execute_retrieval_task(
         return
 
     all_citations: list[KnowledgeCitation] = []
+    completed_sources: list[str] = []
     for source in runnable:
-        if source.source_id != "knowledge":
+        if source.source_id == "knowledge":
+            top_k = 8 if task.task_kind == "deep_research" else 5
+            retrieval_profile = (
+                "rag3_quality" if task.task_kind == "deep_research" else "default"
+            )
+            response = search_knowledge(
+                request=KnowledgeSearchRequest(
+                    query=task.prompt,
+                    document_ids=task.knowledge_document_ids,
+                    top_k=top_k,
+                    retrieval_profile=retrieval_profile,
+                ),
+                settings=settings,
+                auth_context=auth_context,
+                request_id=request_id,
+            )
+            all_citations.extend(response.hits)
+            completed_sources.append("knowledge")
             _append_task_event(
                 repository=repository,
                 task_id=task.id,
-                event_type="retrieval.step.skipped",
+                event_type="retrieval.step.completed",
                 status="running",
-                message=f"Source {source.source_id} is registered but has no executor yet.",
-                metadata={"source_id": source.source_id, "deny_reason": "no_executor"},
+                message=f"Source knowledge returned {len(response.hits)} citations.",
+                metadata={
+                    "source_id": "knowledge",
+                    "citation_count": len(response.hits),
+                    "retrieval_profile": retrieval_profile,
+                    "effective_query": response.effective_query or task.prompt,
+                },
             )
             continue
-        top_k = 8 if task.task_kind == "deep_research" else 5
-        retrieval_profile = (
-            "rag3_quality" if task.task_kind == "deep_research" else "default"
-        )
-        response = search_knowledge(
-            request=KnowledgeSearchRequest(
-                query=task.prompt,
-                document_ids=task.knowledge_document_ids,
-                top_k=top_k,
-                retrieval_profile=retrieval_profile,
-            ),
-            settings=settings,
-            auth_context=auth_context,
-            request_id=request_id,
-        )
-        all_citations.extend(response.hits)
+        if source.source_id == "web":
+            try:
+                web_hits = search_public_web(
+                    query=task.prompt,
+                    settings=settings,
+                    max_results=_resolve_web_result_limit(
+                        task_kind=task.task_kind,
+                        settings=settings,
+                    ),
+                )
+            except WorkbenchWebSearchError:
+                _append_task_event(
+                    repository=repository,
+                    task_id=task.id,
+                    event_type="retrieval.step.skipped",
+                    status="running",
+                    message="Source web failed to return results.",
+                    metadata={
+                        "source_id": "web",
+                        "deny_reason": "provider_error",
+                        "provider": settings.workbench_web_provider,
+                    },
+                )
+                continue
+            all_citations.extend(_web_hit_to_citation(hit) for hit in web_hits)
+            completed_sources.append("web")
+            _append_task_event(
+                repository=repository,
+                task_id=task.id,
+                event_type="retrieval.step.completed",
+                status="running",
+                message=f"Source web returned {len(web_hits)} citations.",
+                metadata={
+                    "source_id": "web",
+                    "citation_count": len(web_hits),
+                    "provider": settings.workbench_web_provider,
+                    "max_results": _resolve_web_result_limit(
+                        task_kind=task.task_kind,
+                        settings=settings,
+                    ),
+                    "urls": [hit.url for hit in web_hits[:5]],
+                },
+            )
+            continue
         _append_task_event(
             repository=repository,
             task_id=task.id,
-            event_type="retrieval.step.completed",
+            event_type="retrieval.step.skipped",
             status="running",
-            message=f"Source knowledge returned {len(response.hits)} citations.",
-            metadata={
-                "source_id": "knowledge",
-                "citation_count": len(response.hits),
-                "retrieval_profile": retrieval_profile,
-                "effective_query": response.effective_query or task.prompt,
-            },
+            message=f"Source {source.source_id} is registered but has no executor yet.",
+            metadata={"source_id": source.source_id, "deny_reason": "no_executor"},
         )
+
+    if not completed_sources:
+        repository.mark_task_failed(
+            task.id,
+            updated_at=_now_iso(),
+            error_detail=_RETRIEVAL_EXECUTION_FAILED,
+        )
+        return
 
     deduped = _dedupe_citations(all_citations)
     result_text = _compose_retrieval_result(

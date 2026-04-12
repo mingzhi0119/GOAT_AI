@@ -243,7 +243,12 @@ Self-managed VMs, Docker Compose, Kubernetes, or developer laptops use the same 
 | `GOAT_MAX_CHAT_MESSAGES` | Max message count accepted by `POST /api/chat` (422 if exceeded) | `120` |
 | `GOAT_MAX_CHAT_PAYLOAD_BYTES` | Max UTF-8 request payload bytes accepted by `POST /api/chat` (422 if exceeded) | `512000` |
 | `GOAT_FEATURE_CODE_SANDBOX` | Operator allows code-sandbox feature (`0`/`1`); `effective_enabled` still requires the selected provider runtime probe | `0` |
-| `GOAT_FEATURE_AGENT_WORKBENCH` | Operator exposes the shared workbench feature family; actual sub-capability readiness still depends on runtime support (`plan`, `browse`, `deep_research`, and the shipped `canvas` workspace-output baseline with session restoration, direct reopen, and export-to-artifact linkage are implemented, while real web retrieval, project memory, and connectors remain open) | `0` |
+| `GOAT_FEATURE_AGENT_WORKBENCH` | Operator exposes the shared workbench feature family; actual sub-capability readiness still depends on runtime support (`plan`, `browse`, `deep_research`, and the shipped `canvas` workspace-output baseline with session restoration, direct reopen, and export-to-artifact linkage are implemented; public-web retrieval is now experimental DDGS-backed while project memory and connectors remain open) | `0` |
+| `GOAT_WORKBENCH_WEB_PROVIDER` | Public-web provider for browse/deep-research: `duckduckgo` or `disabled` | `duckduckgo` |
+| `GOAT_WORKBENCH_WEB_MAX_RESULTS` | Upper bound for returned public-web results per task | `6` |
+| `GOAT_WORKBENCH_WEB_TIMEOUT_SEC` | Timeout for the public-web provider request | `15` |
+| `GOAT_WORKBENCH_WEB_REGION` | DDGS region hint for public-web retrieval | `wt-wt` |
+| `GOAT_WORKBENCH_WEB_SAFESEARCH` | DDGS safesearch mode: `on`, `moderate`, or `off` | `moderate` |
 | `GOAT_CODE_SANDBOX_PROVIDER` | Sandbox runtime backend: `docker` (default) or `localhost` (dev fallback) | `docker` |
 | `GOAT_DOCKER_SOCKET` | Override Docker socket/pipe path (empty = defaults: Unix `/var/run/docker.sock`, Windows `\\.\pipe\docker_engine`) | empty |
 | `GOAT_CODE_SANDBOX_LOCALHOST_SHELL` | Optional shell executable/path override for `localhost` provider | empty |

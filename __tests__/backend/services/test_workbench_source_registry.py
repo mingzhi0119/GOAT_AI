@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 from backend.domain.authorization import PrincipalId, TenantId
@@ -65,6 +66,23 @@ class WorkbenchSourceRegistryTests(unittest.TestCase):
                 auth_context=_auth_context(scopes=frozenset({"history:read"})),
             )
         self.assertEqual(["web"], [source.source_id for source in sources])
+        self.assertTrue(sources[0].runtime_ready)
+        self.assertIsNone(sources[0].deny_reason)
+        self.assertIn("DDGS", sources[0].description)
+
+    def test_list_sources_marks_web_not_ready_when_provider_disabled(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            settings = replace(
+                _settings(Path(tmp)),
+                workbench_web_provider="disabled",
+            )
+            sources = list_workbench_sources(
+                settings=settings,
+                auth_context=_auth_context(scopes=frozenset({"history:read"})),
+            )
+        self.assertEqual(["web"], [source.source_id for source in sources])
+        self.assertFalse(sources[0].runtime_ready)
+        self.assertEqual("disabled_by_operator", sources[0].deny_reason)
 
     def test_resolve_requested_sources_rejects_unknown_ids(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:

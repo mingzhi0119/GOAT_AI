@@ -310,8 +310,8 @@ class ApiAuthzTests(unittest.TestCase):
         self.assertEqual(200, features.status_code)
         workbench = features.json()["workbench"]
         self.assertTrue(workbench["agent_tasks"]["effective_enabled"])
-        self.assertFalse(workbench["browse"]["effective_enabled"])
-        self.assertFalse(workbench["deep_research"]["effective_enabled"])
+        self.assertTrue(workbench["browse"]["effective_enabled"])
+        self.assertTrue(workbench["deep_research"]["effective_enabled"])
         self.assertFalse(workbench["connectors"]["effective_enabled"])
 
     @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)

@@ -180,6 +180,45 @@ class ApplicationWorkbenchTests(unittest.TestCase):
                     auth_context=_auth_context(),
                 )
 
+    def test_create_deep_research_defaults_to_web_when_no_sources_are_provided(
+        self,
+    ) -> None:
+        repository = _FakeRepository()
+        request = WorkbenchTaskRequest(
+            task_kind="deep_research",
+            prompt="Investigate recent product launches",
+        )
+
+        from unittest.mock import patch
+
+        with patch(
+            "backend.application.workbench.resolve_requested_sources",
+            return_value=[
+                WorkbenchSourceDescriptor(
+                    source_id="web",
+                    display_name="Public Web",
+                    kind="builtin",
+                    scope_kind="global",
+                    capabilities=("search", "citations"),
+                    task_kinds=("browse", "deep_research"),
+                    read_only=True,
+                    runtime_ready=True,
+                    deny_reason=None,
+                    description="web",
+                )
+            ],
+        ):
+            accepted = create_workbench_task(
+                request=request,
+                repository=repository,
+                settings=_settings(),
+                auth_context=_auth_context(),
+            )
+
+        assert repository.created_payload is not None
+        self.assertEqual(["web"], repository.created_payload.source_ids)
+        self.assertEqual("deep_research", accepted.task_kind)
+
     def test_create_and_dispatch_workbench_task_preserves_request_context(self) -> None:
         repository = _FakeRepository()
         dispatcher = _FakeDispatcher()

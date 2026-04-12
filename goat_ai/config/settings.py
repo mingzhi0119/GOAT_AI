@@ -16,6 +16,7 @@ LOCAL_OLLAMA_DEFAULT_URL = "http://127.0.0.1:11435"
 
 ThemeStyleId = Literal["classic", "urochester", "thu"]
 CodeSandboxProviderId = Literal["docker", "localhost"]
+WorkbenchWebProviderId = Literal["disabled", "duckduckgo"]
 
 _DEFAULT_SYSTEM_PROMPTS: Final[dict[ThemeStyleId, str]] = {
     "classic": """You are GOAT AI, a helpful general-purpose assistant.
@@ -239,6 +240,11 @@ class Settings:
     feature_code_sandbox_enabled: bool = False
     feature_agent_workbench_enabled: bool = False
     code_sandbox_provider: CodeSandboxProviderId = "docker"
+    workbench_web_provider: WorkbenchWebProviderId = "duckduckgo"
+    workbench_web_max_results: int = 6
+    workbench_web_timeout_sec: int = 15
+    workbench_web_region: str = "wt-wt"
+    workbench_web_safesearch: Literal["on", "moderate", "off"] = "moderate"
     docker_socket_path: str = ""
     code_sandbox_default_image: str = "python:3.12-slim"
     code_sandbox_localhost_shell: str = ""
@@ -353,6 +359,21 @@ def load_settings() -> Settings:
         raise ValueError("GOAT_RAG_RERANK_MODE must be one of: passthrough, lexical")
     _feature_sandbox = _env_bool("GOAT_FEATURE_CODE_SANDBOX", "false")
     _feature_agent_workbench = _env_bool("GOAT_FEATURE_AGENT_WORKBENCH", "false")
+    _workbench_web_provider = (
+        os.environ.get("GOAT_WORKBENCH_WEB_PROVIDER", "duckduckgo").strip().lower()
+    )
+    _workbench_web_max_results = int(
+        os.environ.get("GOAT_WORKBENCH_WEB_MAX_RESULTS", "6")
+    )
+    _workbench_web_timeout_sec = int(
+        os.environ.get("GOAT_WORKBENCH_WEB_TIMEOUT_SEC", "15")
+    )
+    _workbench_web_region = (
+        os.environ.get("GOAT_WORKBENCH_WEB_REGION", "wt-wt").strip().lower()
+    )
+    _workbench_web_safesearch = (
+        os.environ.get("GOAT_WORKBENCH_WEB_SAFESEARCH", "moderate").strip().lower()
+    )
     _sandbox_provider = (
         os.environ.get("GOAT_CODE_SANDBOX_PROVIDER", "docker").strip().lower()
     )
@@ -393,6 +414,20 @@ def load_settings() -> Settings:
         raise ValueError("GOAT_CODE_SANDBOX_DEFAULT_IMAGE must not be empty")
     if _sandbox_provider not in {"docker", "localhost"}:
         raise ValueError("GOAT_CODE_SANDBOX_PROVIDER must be one of: docker, localhost")
+    if _workbench_web_provider not in {"disabled", "duckduckgo"}:
+        raise ValueError(
+            "GOAT_WORKBENCH_WEB_PROVIDER must be one of: disabled, duckduckgo"
+        )
+    if _workbench_web_max_results < 1 or _workbench_web_max_results > 10:
+        raise ValueError("GOAT_WORKBENCH_WEB_MAX_RESULTS must be between 1 and 10")
+    if _workbench_web_timeout_sec < 1:
+        raise ValueError("GOAT_WORKBENCH_WEB_TIMEOUT_SEC must be >= 1")
+    if not _workbench_web_region:
+        raise ValueError("GOAT_WORKBENCH_WEB_REGION must not be empty")
+    if _workbench_web_safesearch not in {"on", "moderate", "off"}:
+        raise ValueError(
+            "GOAT_WORKBENCH_WEB_SAFESEARCH must be one of: on, moderate, off"
+        )
     if _sandbox_default_timeout < 1:
         raise ValueError("GOAT_CODE_SANDBOX_DEFAULT_TIMEOUT_SEC must be >= 1")
     if _sandbox_max_timeout < _sandbox_default_timeout:
@@ -492,6 +527,13 @@ def load_settings() -> Settings:
         rag_rerank_mode=cast(Literal["passthrough", "lexical"], _rag_rerank),
         feature_code_sandbox_enabled=_feature_sandbox,
         feature_agent_workbench_enabled=_feature_agent_workbench,
+        workbench_web_provider=cast(WorkbenchWebProviderId, _workbench_web_provider),
+        workbench_web_max_results=_workbench_web_max_results,
+        workbench_web_timeout_sec=_workbench_web_timeout_sec,
+        workbench_web_region=_workbench_web_region,
+        workbench_web_safesearch=cast(
+            Literal["on", "moderate", "off"], _workbench_web_safesearch
+        ),
         code_sandbox_provider=cast(CodeSandboxProviderId, _sandbox_provider),
         docker_socket_path=_docker_sock,
         code_sandbox_default_image=_sandbox_image,

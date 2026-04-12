@@ -150,6 +150,7 @@ Notes:
 - `code_sandbox.policy_allowed` remains caller-specific and separate from runtime readiness
 - `code_sandbox.provider_name`, `isolation_level`, and `network_policy_enforced` describe the currently selected backend contract; `localhost` is a weaker trusted-dev fallback than Docker
 - `workbench.*` is reported per capability; workbench can be enabled overall while specific surfaces still remain unavailable
+- `workbench.browse` / `workbench.deep_research` report capability-level readiness, not source-specific readiness; use `GET /api/workbench/sources` to decide whether the global `web` source itself is runnable
 - `workbench.artifact_workspace` now reflects the shipped baseline for durable workspace outputs plus export-to-artifact linkage
 - frontend UI should use this endpoint to hide or disable unavailable surfaces instead of assuming that a visible button implies runtime support
 
@@ -370,12 +371,13 @@ Notes:
 - `source_ids` are resolved through the shared source registry instead of being treated as opaque strings
 - legacy `connector_ids` is still accepted as a deprecated alias for `source_ids`
 - when `knowledge_document_ids` are attached, the task implicitly includes the `knowledge` source even if the caller omitted it from `source_ids`
+- when `browse` or `deep_research` omits both `source_ids` and `knowledge_document_ids`, the task defaults to the global `web` source
 - `browse` and `deep_research` now fail fast with `422` when no runtime-ready retrieval source is available to the caller
 - request shape is intentionally forward-compatible for future task execution and output linkage
 - current task-kind behavior:
   - `plan`: completed markdown result
   - `browse`: minimal retrieval execution over runtime-ready sources; completed results may include citations
-  - `deep_research`: same minimal retrieval chain with a higher-quality retrieval profile; completed results may include citations
+  - `deep_research`: same bounded retrieval chain with more results; current runtime is still an evidence brief, not iterative autonomous long-horizon research
   - `canvas`: completes with a durable `canvas_document` workspace output plus inline markdown result content; that output can later be exported to a downloadable artifact
 - unknown or caller-invisible source ids return `422`
 
@@ -401,7 +403,9 @@ Current behavior:
   - optional `deny_reason`
   - `description`
 - `knowledge` is hidden unless the caller can read knowledge resources
-- `web` is registered for future browse/deep-research execution but currently reports `runtime_ready = false` and `deny_reason = "not_implemented"`
+- `web` is runtime-ready by default when `GOAT_WORKBENCH_WEB_PROVIDER=duckduckgo`
+- `web` reports `runtime_ready = false` with `deny_reason = "disabled_by_operator"` when `GOAT_WORKBENCH_WEB_PROVIDER=disabled`
+- current public-web retrieval is experimental and uses the DDGS DuckDuckGo-style provider to return bounded search-result evidence
 
 ## `GET /api/workbench/workspace-outputs`
 
@@ -523,6 +527,11 @@ Current behavior:
   }
 }
 ```
+
+- web-backed citations reuse the `KnowledgeCitation` shape for now:
+  - `document_id` and `chunk_id` both carry the canonical URL
+  - `filename` carries the human-readable result title
+  - `snippet` carries the normalized result excerpt
 
 - completed `canvas` tasks also include durable typed outputs:
 

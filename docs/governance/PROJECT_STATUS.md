@@ -1,6 +1,6 @@
 # GOAT AI Project Status
 
-Last updated: 2026-04-11
+Last updated: 2026-04-12
 
 ## Release snapshot
 
@@ -40,7 +40,7 @@ Last updated: 2026-04-11
 - minimal runtime execution for `plan`, `browse`, `deep_research`, and `canvas`
 - typed durable workspace outputs, with `canvas_document` as the first shipped output kind
 - session-bound workspace outputs now restore through history reads, outputs can be reopened directly by durable id, and outputs can be exported into downloadable artifacts
-- declarative workbench source registry with `knowledge` ready and `web` still runtime-incomplete
+- declarative workbench source registry with `knowledge` ready and experimental DDGS-backed `web` retrieval now runtime-ready
 - durable code sandbox execution with persisted events and replayable logs
 - Docker-first isolation with `localhost` as an explicit trusted-dev fallback
 
@@ -69,7 +69,7 @@ Last updated: 2026-04-11
 
 ## Current known boundaries
 
-- workbench `web` retrieval is still declared before it is truly runtime-ready
+- workbench public-web retrieval is now a bounded single-pass DDGS-backed evidence brief, not yet a multi-step autonomous research runtime
 - project memory and connectors are not implemented yet
 - storage remains SQLite-first and single-writer by design
 - future storage-shape changes require a new migration/compatibility/rollback decision log
@@ -78,7 +78,7 @@ Last updated: 2026-04-11
 ## Status by active roadmap area
 
 - **16B storage evolution:** complete; repository ownership boundaries are explicit across sessions, artifacts, knowledge, media, workbench, and sandbox, and future datastore-shape changes require a separate decision package
-- **17 runtime platform:** partial workbench runtime is landed; canvas, typed workspace outputs, session restoration, direct output reopen, and output-to-artifact export linkage are now in place, while web retrieval, project memory, and connectors remain open
+- **17 runtime platform:** partial workbench runtime is landed; canvas, typed workspace outputs, session restoration, direct output reopen, output-to-artifact export linkage, and experimental DDGS-backed public-web retrieval are now in place, while deeper multi-step research behavior, project memory, and connectors remain open
 - **18 sandbox follow-ons:** MVP is landed; richer async control, egress policy, and Rust supervisor work remain open
 - **19 desktop maturity:** signed Windows packaging and packaged validation are landed; macOS/Linux public packaged validation, updater readiness, and deeper native runtime operations remain open
 - **engineering quality uplift:** P0 and P1 audit remediation are complete; remaining follow-on work is now P2-plus roadmap scope in [ROADMAP.md](ROADMAP.md)

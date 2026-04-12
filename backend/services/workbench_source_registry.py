@@ -8,6 +8,10 @@ from backend.domain.authz_types import AuthorizationContext
 from backend.domain.authorization import ResourceRef, Scope
 from backend.services.authz_audit import emit_authorization_audit
 from backend.services.authorizer import authorize_workbench_source_read
+from backend.services.workbench_web_search import (
+    build_workbench_web_description,
+    get_workbench_web_runtime_status,
+)
 from backend.types import Settings
 
 
@@ -105,21 +109,19 @@ def resolve_requested_sources(
 def _all_source_descriptors(
     settings: Settings,
 ) -> tuple[WorkbenchSourceDescriptor, ...]:
-    _ = settings
+    web_runtime_ready, web_deny_reason = get_workbench_web_runtime_status(settings)
     return (
         WorkbenchSourceDescriptor(
             source_id="web",
             display_name="Public Web",
             kind="builtin",
             scope_kind="global",
-            capabilities=("search", "fetch", "citations"),
+            capabilities=("search", "citations"),
             task_kinds=("browse", "deep_research"),
             read_only=True,
-            runtime_ready=False,
-            deny_reason="not_implemented",
-            description=(
-                "Future public-web retrieval source for browse and deep research tasks."
-            ),
+            runtime_ready=web_runtime_ready,
+            deny_reason=web_deny_reason,
+            description=build_workbench_web_description(settings),
             required_scope=None,
         ),
         WorkbenchSourceDescriptor(

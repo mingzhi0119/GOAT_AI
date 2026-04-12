@@ -12,6 +12,10 @@ from backend.services.workbench_execution_service import (
     execute_workbench_task,
     recover_workbench_tasks,
 )
+from backend.services.workbench_web_search import (
+    WorkbenchWebSearchError,
+    WorkbenchWebSearchHit,
+)
 from backend.services.workbench_runtime import (
     SQLiteWorkbenchTaskRepository,
     WorkbenchTaskCreatePayload,
@@ -181,6 +185,100 @@ class WorkbenchExecutionServiceTests(unittest.TestCase):
         assert stored is not None
         self.assertEqual("failed", stored.status)
         self.assertIn("No runnable retrieval sources", stored.error_detail or "")
+
+    def test_browse_task_completes_with_web_citations(self) -> None:
+        self._create_task(task_id="wb-web", task_kind="browse", source_ids=["web"])
+        web_source = WorkbenchSourceDescriptor(
+            source_id="web",
+            display_name="Public Web",
+            kind="builtin",
+            scope_kind="global",
+            capabilities=("search", "citations"),
+            task_kinds=("browse", "deep_research"),
+            read_only=True,
+            runtime_ready=True,
+            deny_reason=None,
+            description="Web source",
+        )
+
+        with (
+            patch(
+                "backend.services.workbench_execution_service.resolve_requested_sources",
+                return_value=[web_source],
+            ),
+            patch(
+                "backend.services.workbench_execution_service.search_public_web",
+                return_value=[
+                    WorkbenchWebSearchHit(
+                        title="Example result",
+                        url="https://example.com/report",
+                        snippet="Web evidence snippet",
+                        rank=1,
+                    )
+                ],
+            ),
+        ):
+            execute_workbench_task(
+                task_id="wb-web",
+                repository=self.repository,
+                llm=_FakeLLM(),
+                settings=self.settings,
+            )
+
+        stored = self.repository.get_task("wb-web")
+        assert stored is not None
+        self.assertEqual("completed", stored.status)
+        self.assertEqual(
+            "https://example.com/report", stored.result_citations[0]["document_id"]
+        )
+        self.assertIn(
+            "[Example result](https://example.com/report)", stored.result_text or ""
+        )
+        events = self.repository.list_task_events("wb-web")
+        self.assertEqual("web", events[3].metadata["source_id"])
+        self.assertEqual("duckduckgo", events[3].metadata["provider"])
+
+    def test_retrieval_task_fails_when_web_provider_errors_without_fallback(
+        self,
+    ) -> None:
+        self._create_task(task_id="wb-web-fail", task_kind="browse", source_ids=["web"])
+        web_source = WorkbenchSourceDescriptor(
+            source_id="web",
+            display_name="Public Web",
+            kind="builtin",
+            scope_kind="global",
+            capabilities=("search", "citations"),
+            task_kinds=("browse", "deep_research"),
+            read_only=True,
+            runtime_ready=True,
+            deny_reason=None,
+            description="Web source",
+        )
+
+        with (
+            patch(
+                "backend.services.workbench_execution_service.resolve_requested_sources",
+                return_value=[web_source],
+            ),
+            patch(
+                "backend.services.workbench_execution_service.search_public_web",
+                side_effect=WorkbenchWebSearchError("boom"),
+            ),
+        ):
+            execute_workbench_task(
+                task_id="wb-web-fail",
+                repository=self.repository,
+                llm=_FakeLLM(),
+                settings=self.settings,
+            )
+
+        stored = self.repository.get_task("wb-web-fail")
+        assert stored is not None
+        self.assertEqual("failed", stored.status)
+        self.assertEqual("Retrieval execution failed.", stored.error_detail)
+        events = self.repository.list_task_events("wb-web-fail")
+        self.assertEqual("provider_error", events[3].metadata["deny_reason"])
+        self.assertEqual("task.failed", events[4].event_type)
 
     def test_plan_task_marks_knowledge_not_found_when_context_resolution_fails(
         self,

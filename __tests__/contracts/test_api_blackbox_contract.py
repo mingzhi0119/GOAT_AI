@@ -31,6 +31,7 @@ from goat_ai.config.settings import Settings
 from goat_ai.shared.exceptions import OllamaUnavailable
 from goat_ai.llm.ollama_client import ToolCallPlan
 from goat_ai.shared.types import ChatTurn
+from backend.services.workbench_web_search import WorkbenchWebSearchHit
 
 if TestClient is not None:
     from backend.platform.config import get_settings
@@ -1285,8 +1286,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
             ["web", "knowledge"],
             [source["source_id"] for source in sources_body["sources"]],
         )
-        self.assertFalse(sources_body["sources"][0]["runtime_ready"])
-        self.assertEqual("not_implemented", sources_body["sources"][0]["deny_reason"])
+        self.assertTrue(sources_body["sources"][0]["runtime_ready"])
+        self.assertIsNone(sources_body["sources"][0]["deny_reason"])
+        self.assertIn("DDGS", sources_body["sources"][0]["description"])
         self.assertTrue(sources_body["sources"][1]["runtime_ready"])
         self.assertEqual(
             ["plan", "browse", "deep_research"],
@@ -1598,26 +1600,57 @@ class ApiBlackboxContractTests(unittest.TestCase):
             events_response.json()["events"][3]["metadata"]["source_id"],
         )
 
-    def test_workbench_deep_research_with_web_only_is_rejected_up_front(
+    def test_workbench_deep_research_with_web_only_completes_with_web_citations(
         self,
     ) -> None:
         self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
         self.client.app.dependency_overrides[get_settings] = lambda: self.settings
 
-        response = self.client.post(
-            "/api/workbench/tasks",
-            json={
-                "task_kind": "deep_research",
-                "prompt": "Look something up",
-                "source_ids": ["web"],
-            },
-        )
-        self.assertEqual(422, response.status_code)
-        body = response.json()
-        self.assertEqual("REQUEST_VALIDATION_ERROR", body["code"])
+        with patch(
+            "backend.services.workbench_execution_service.search_public_web",
+            return_value=[
+                WorkbenchWebSearchHit(
+                    title="OpenClaw note",
+                    url="https://example.com/openclaw",
+                    snippet="DuckDuckGo-backed retrieval is enabled.",
+                    rank=1,
+                )
+            ],
+        ):
+            response = self.client.post(
+                "/api/workbench/tasks",
+                json={
+                    "task_kind": "deep_research",
+                    "prompt": "Look something up",
+                    "source_ids": ["web"],
+                },
+            )
+        self.assertEqual(202, response.status_code)
+        task_id = response.json()["task_id"]
+
+        status_response = self.client.get(f"/api/workbench/tasks/{task_id}")
+        self.assertEqual(200, status_response.status_code)
+        status_body = status_response.json()
+        self.assertEqual("completed", status_body["status"])
+        self.assertIn("Research Brief", status_body["result"]["content"])
         self.assertIn(
-            "At least one runtime-ready retrieval source is required",
-            body["detail"],
+            "[OpenClaw note](https://example.com/openclaw)",
+            status_body["result"]["content"],
+        )
+        self.assertEqual(
+            "https://example.com/openclaw",
+            status_body["result"]["citations"][0]["document_id"],
+        )
+
+        events_response = self.client.get(f"/api/workbench/tasks/{task_id}/events")
+        self.assertEqual(200, events_response.status_code)
+        self.assertEqual(
+            "web",
+            events_response.json()["events"][3]["metadata"]["source_id"],
+        )
+        self.assertEqual(
+            "duckduckgo",
+            events_response.json()["events"][3]["metadata"]["provider"],
         )
 
     def test_workbench_canvas_task_completes_with_workspace_output(self) -> None:

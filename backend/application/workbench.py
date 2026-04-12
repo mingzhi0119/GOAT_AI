@@ -178,6 +178,8 @@ def create_workbench_task(
         connector_ids=request.connector_ids,
         knowledge_document_ids=request.knowledge_document_ids,
     )
+    if request.task_kind in {"browse", "deep_research"} and not requested_source_ids:
+        requested_source_ids.append("web")
     try:
         resolved_sources = resolve_requested_sources(
             source_ids=requested_source_ids,
