@@ -1,4 +1,4 @@
-"""Rotate deploy.sh fastapi.log when it exceeds a size threshold (user-space, no logrotate)."""
+"""Rotate GOAT runtime fastapi.log when it exceeds a size threshold."""
 
 from __future__ import annotations
 
@@ -10,13 +10,13 @@ from pathlib import Path
 
 
 def _default_project_root() -> Path:
-    """Repo root: GOAT_AI_ROOT env, else parent of scripts/."""
+    """Repo root: GOAT_AI_ROOT env, else repository root."""
     env = os.environ.get("GOAT_AI_ROOT", "").strip()
     if env:
         p = Path(env).resolve()
         if p.is_dir():
             return p
-    return Path(__file__).resolve().parent.parent
+    return Path(__file__).resolve().parents[2]
 
 
 def resolve_log_path(project_root: Path) -> Path:
@@ -24,7 +24,7 @@ def resolve_log_path(project_root: Path) -> Path:
     override = os.environ.get("GOAT_FASTAPI_LOG", "").strip()
     if override:
         return Path(override).resolve()
-    return (project_root / "logs" / "fastapi.log").resolve()
+    return (project_root / "var" / "logs" / "fastapi.log").resolve()
 
 
 def resolve_archive_dir(project_root: Path) -> Path:
@@ -32,7 +32,7 @@ def resolve_archive_dir(project_root: Path) -> Path:
     override = os.environ.get("GOAT_LOG_ARCHIVE_DIR", "").strip()
     if override:
         return Path(override).resolve()
-    return (project_root / "logs" / "archive").resolve()
+    return (project_root / "var" / "logs" / "archive").resolve()
 
 
 def _parse_max_bytes() -> int:

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import tools.build_desktop_sidecar as subject
+import tools.desktop.build_desktop_sidecar as subject
 
 
 def test_find_rustc_prefers_path_lookup(monkeypatch: pytest.MonkeyPatch) -> None:

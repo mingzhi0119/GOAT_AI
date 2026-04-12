@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.exercise_recovery_drill import (
+from tools.ops.exercise_recovery_drill import (
     _sqlite_integrity_check,
     exercise_recovery_drill,
 )

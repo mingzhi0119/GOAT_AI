@@ -51,8 +51,8 @@ python3 -m uvicorn server:create_app --factory --host 0.0.0.0 --port 62606 --rel
 cd frontend && npm ci && npm run dev
 
 # Production deploy
-bash deploy.sh          # Linux
-.\deploy.ps1            # Windows PowerShell
+bash ops/deploy/deploy.sh          # Linux
+.\ops\deploy\deploy.ps1            # Windows PowerShell
 ```
 
 ---
@@ -61,7 +61,7 @@ bash deploy.sh          # Linux
 
 ### CI parity (run before every code delivery)
 
-These commands mirror the `backend` and `frontend` jobs in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Use **Python 3.14** and `pip install -r requirements-ci.txt` (or equivalent) so `lint-imports`, `tools.check_api_contract_sync`, and OpenAPI artifacts stay aligned with CI.
+These commands mirror the `backend` and `frontend` jobs in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Use **Python 3.14** and `pip install -r requirements-ci.txt` (or equivalent) so `lint-imports`, `tools.contracts.check_api_contract_sync`, and OpenAPI artifacts stay aligned with CI.
 
 **Backend (repository root):**
 
@@ -70,8 +70,8 @@ ruff check backend goat_ai scripts tools __tests__
 ruff format --check backend goat_ai scripts tools __tests__
 pip-audit -r requirements-ci.txt
 lint-imports
-python -m tools.run_rag_eval
-python -m tools.check_api_contract_sync
+python -m tools.quality.run_rag_eval
+python -m tools.contracts.check_api_contract_sync
 python -m pytest __tests__/ -v --tb=short
 ```
 
@@ -94,7 +94,7 @@ python -m pytest __tests__/integration/ -v -m integration
 python -m pytest __tests__/test_api_blackbox_contract.py -v
 
 # RAG eval gate (must stay green)
-python -m tools.run_rag_eval
+python -m tools.quality.run_rag_eval
 
 # Frontend tests + build only (if deps already installed)
 cd frontend && npm test -- --run && npm run build
@@ -111,11 +111,11 @@ Run from the repo root — `tools/` is a package, no `PYTHONPATH` tricks needed.
 
 | Command | Purpose |
 |---------|---------|
-| `python -m tools.run_rag_eval` | RAG quality gate (CI runs this on every backend build) |
-| `python -m tools.check_api_contract_sync` | Verify `docs/openapi.json` matches the live FastAPI app |
-| `python -m tools.generate_llm_api_yaml` | Regenerate `docs/api.llm.yaml` |
-| `python -m tools.regenerate_openapi_json` | Regenerate `docs/openapi.json` (use Python 3.14 to match CI) |
-| `python -m tools.load_chat_smoke --base-url http://127.0.0.1:62606 --model <model>` | p50/p95 load smoke |
+| `python -m tools.quality.run_rag_eval` | RAG quality gate (CI runs this on every backend build) |
+| `python -m tools.contracts.check_api_contract_sync` | Verify `docs/openapi.json` matches the live FastAPI app |
+| `python -m tools.contracts.generate_llm_api_yaml` | Regenerate `docs/api.llm.yaml` |
+| `python -m tools.contracts.regenerate_openapi_json` | Regenerate `docs/openapi.json` (use Python 3.14 to match CI) |
+| `python -m tools.quality.load_chat_smoke --base-url http://127.0.0.1:62606 --model <model>` | p50/p95 load smoke |
 
 ---
 
@@ -182,14 +182,14 @@ Enforcement is **layered** (config → startup probe → service → route → f
 - **Session messages** are dual-read/write: new `session_messages` table + legacy JSON blob. Do not break the compatibility codec.
 - **`log_service` imports** are allowed only in `backend/services/log_service.py` and `backend/services/chat_runtime.py` — enforced by `__tests__/test_architecture_boundaries.py`.
 - **Routers** must not import `goat_ai` directly or use `httpx` / `requests` / `pandas` / `openpyxl` — enforced by `__tests__/test_router_direct_imports.py`.
-- **RAG eval gate** (`python -m tools.run_rag_eval`) must stay green; do not describe the system as "RAG-ready" unless it passes.
+- **RAG eval gate** (`python -m tools.quality.run_rag_eval`) must stay green; do not describe the system as "RAG-ready" unless it passes.
 
 ---
 
 ## Ops constraints (shared host)
 
 - No root, no system nginx reloads, `systemctl --user` may be unavailable.
-- **`nohup` + `logs/fastapi.pid`** is the permanent fallback for process management.
+- **`nohup` + `var/logs/fastapi.pid`** is the permanent fallback for process management.
 - Preferred GPU: A100 via `GOAT_GPU_UUID`.
 - `deploy.sh` deploys the current checkout by default; `SYNC_GIT=1` to pull first.
 - Backup/restore runbook: [`docs/BACKUP_RESTORE.md`](docs/BACKUP_RESTORE.md) · Rollback: [`docs/ROLLBACK.md`](docs/ROLLBACK.md)

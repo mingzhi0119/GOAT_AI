@@ -20,6 +20,7 @@ DEFAULT_PRESERVE_NAMES = {
     "chat_logs.db-wal",
     "data",
     "logs",
+    "var",
 }
 
 

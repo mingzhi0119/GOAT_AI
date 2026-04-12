@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import tools.security_review_snapshot as subject
+import tools.quality.security_review_snapshot as subject
 
 
 def test_parse_npm_audit_reads_severity_counts_and_ids(tmp_path: Path) -> None:

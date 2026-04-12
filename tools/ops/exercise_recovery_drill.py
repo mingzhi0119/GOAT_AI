@@ -11,7 +11,7 @@ import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from scripts.backup_chat_db import backup_chat_db
+from tools.ops.backup_chat_db import backup_chat_db
 
 
 def _build_parser() -> argparse.ArgumentParser:

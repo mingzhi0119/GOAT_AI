@@ -1,7 +1,7 @@
 from __future__ import annotations
 from pathlib import Path
 
-import scripts.desktop_smoke as subject
+import tools.desktop.desktop_smoke as subject
 
 
 def test_build_sidecar_command_includes_module_and_data_root(tmp_path: Path) -> None:

@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_ROOT = REPO_ROOT / "frontend"
 TAURI_ROOT = FRONTEND_ROOT / "src-tauri"
 BINARIES_DIR = TAURI_ROOT / "binaries"
@@ -33,7 +33,7 @@ def _detect_target_triple() -> str:
     if rustc is None:
         raise SystemExit(
             "Could not find rustc. Install the desktop prerequisites first "
-            "(see scripts/install_desktop_prereqs.ps1 -Profile Dev)."
+            "(see scripts/desktop/install_desktop_prereqs.ps1 -Profile Dev)."
         )
     completed = subprocess.run(
         [str(rustc), "--print", "host-tuple"],

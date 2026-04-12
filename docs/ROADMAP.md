@@ -36,7 +36,7 @@ P1 audit slices:
 - immutable artifact promotion now builds once in CI, promotes the same retained
   bundle through staging and production, records per-environment promotion
   evidence, and exercises artifact rollback via
-  `python -m scripts.exercise_release_rollback_drill`
+  `python -m tools.release.exercise_release_rollback_drill`
 - frontend browser-level protected-flow coverage, lint, bundle-budget checks,
   and Playwright regression gates are now part of the standard CI path
 - backend provider drift is closed; the repo is now explicit that the active LLM
@@ -45,7 +45,7 @@ P1 audit slices:
   consistently enough to close the cross-surface observability P1 slice
 - the single-writer contract is now exposed via `/api/system/runtime-target`, and
   merge-blocking latency smoke runs in CI through
-  `python -m tools.run_pr_latency_gate`
+  `python -m tools.quality.run_pr_latency_gate`
 
 No open P1 audit items remain after the 2026-04-11 desktop release-maturity
 closure. The final desktop slice now has:

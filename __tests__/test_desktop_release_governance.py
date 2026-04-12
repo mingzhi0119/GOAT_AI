@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-import tools.write_desktop_release_provenance as subject
+import tools.desktop.write_desktop_release_provenance as subject
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -86,7 +86,7 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     assert "desktop-package-windows" in ci_workflow
     assert "runs-on: windows-latest" in ci_workflow
     assert "npm run desktop:build" in ci_workflow
-    assert "python -m tools.write_desktop_release_provenance" in ci_workflow
+    assert "python -m tools.desktop.write_desktop_release_provenance" in ci_workflow
 
     assert "GOAT_DESKTOP_SIGNING_CERT_BASE64" in desktop_provenance
     assert "sign_windows_desktop_artifacts.ps1" in desktop_provenance

@@ -27,9 +27,12 @@ def _default_desktop_data_root() -> Path:
 def configure_desktop_environment(data_root: Path, port: int) -> Path:
     resolved_root = data_root.resolve()
     resolved_root.mkdir(parents=True, exist_ok=True)
+    (resolved_root / "logs").mkdir(parents=True, exist_ok=True)
     (resolved_root / "data").mkdir(parents=True, exist_ok=True)
 
     os.environ["GOAT_DESKTOP_APP_DATA_DIR"] = str(resolved_root)
+    os.environ["GOAT_RUNTIME_ROOT"] = str(resolved_root)
+    os.environ["GOAT_LOG_DIR"] = str(resolved_root / "logs")
     os.environ["GOAT_LOG_PATH"] = str(resolved_root / "chat_logs.db")
     os.environ["GOAT_DATA_DIR"] = str(resolved_root / "data")
     os.environ["GOAT_SERVER_PORT"] = str(port)

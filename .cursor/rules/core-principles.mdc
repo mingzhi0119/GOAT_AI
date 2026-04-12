@@ -38,7 +38,7 @@ Canonical engineering rules: `docs/ENGINEERING_STANDARDS.md`. Repo root `AGENTS.
 
 ## Before delivering code (CI parity)
 
-Before every merge or hand-off, run the same checks as `.github/workflows/ci.yml` (see repo root `AGENTS.md` for the full command list). At minimum: **ruff** (check + format on touched trees), **pip-audit**, **lint-imports**, **tools.run_rag_eval**, **tools.check_api_contract_sync**, **pytest** on `__tests__/`; any `frontend/` change also needs **`npm ci && npm test -- --run && npm run build`** under `frontend/`. Use Python **3.14** and `requirements-ci.txt` to match CI.
+Before every merge or hand-off, run the same checks as `.github/workflows/ci.yml` (see repo root `AGENTS.md` for the full command list). At minimum: **ruff** (check + format on touched trees), **pip-audit**, **lint-imports**, **tools.quality.run_rag_eval**, **tools.contracts.check_api_contract_sync**, **pytest** on `__tests__/`; any `frontend/` change also needs **`npm ci && npm test -- --run && npm run build`** under `frontend/`. Use Python **3.14** and `requirements-ci.txt` to match CI.
 
 ## Documentation language
 

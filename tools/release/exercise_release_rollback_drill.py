@@ -10,7 +10,7 @@ import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from tools.install_release_bundle import (
+from tools.release.install_release_bundle import (
     DEFAULT_PRESERVE_NAMES,
     install_release_bundle,
     load_release_manifest,

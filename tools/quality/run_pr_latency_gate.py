@@ -93,6 +93,7 @@ def _percentile(values: list[float], q: float) -> float:
 
 
 def _build_settings(root: Path) -> Settings:
+    runtime_root = root / "var"
     return Settings(
         ollama_base_url="http://127.0.0.1:11434",
         generate_timeout=120,
@@ -103,8 +104,10 @@ def _build_settings(root: Path) -> Settings:
         system_prompt="latency gate system prompt",
         app_root=root,
         logo_svg=root / "logo.svg",
-        log_db_path=root / "chat_logs.db",
-        data_dir=root / "data",
+        runtime_root=runtime_root,
+        log_dir=runtime_root / "logs",
+        log_db_path=runtime_root / "chat_logs.db",
+        data_dir=runtime_root / "data",
         ready_skip_ollama_probe=True,
     )
 

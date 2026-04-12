@@ -24,7 +24,7 @@ Last updated: 2026-04-11
 - retrieval-backed chat and `/api/knowledge/*` contract family
 - local `simple_local_v1` vector index with optional lexical rerank and conservative query rewrite
 - image uploads for vision-capable chat via `POST /api/media/uploads`
-- RAG quality regression runner in CI via `python -m tools.run_rag_eval`
+- RAG quality regression runner in CI via `python -m tools.quality.run_rag_eval`
 
 ### Sessions, artifacts, and authorization
 

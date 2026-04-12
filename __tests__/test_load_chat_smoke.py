@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import tools.load_chat_smoke as subject
+import tools.quality.load_chat_smoke as subject
 
 
 def test_build_summary_reports_percentiles() -> None:

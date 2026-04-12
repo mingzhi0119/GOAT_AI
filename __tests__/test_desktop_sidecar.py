@@ -12,6 +12,8 @@ def test_configure_desktop_environment_seeds_runtime_paths(
 ) -> None:
     monkeypatch.delenv("GOAT_LOG_PATH", raising=False)
     monkeypatch.delenv("GOAT_DATA_DIR", raising=False)
+    monkeypatch.delenv("GOAT_RUNTIME_ROOT", raising=False)
+    monkeypatch.delenv("GOAT_LOG_DIR", raising=False)
     monkeypatch.delenv("GOAT_SERVER_PORT", raising=False)
     monkeypatch.delenv("GOAT_LOCAL_PORT", raising=False)
     monkeypatch.delenv("GOAT_DEPLOY_TARGET", raising=False)
@@ -21,7 +23,10 @@ def test_configure_desktop_environment_seeds_runtime_paths(
 
     assert resolved == (tmp_path / "desktop-data").resolve()
     assert (resolved / "data").is_dir()
+    assert (resolved / "logs").is_dir()
     assert os.environ["GOAT_DESKTOP_APP_DATA_DIR"] == str(resolved)
+    assert os.environ["GOAT_RUNTIME_ROOT"] == str(resolved)
+    assert os.environ["GOAT_LOG_DIR"] == str(resolved / "logs")
     assert os.environ["GOAT_LOG_PATH"] == str(resolved / "chat_logs.db")
     assert os.environ["GOAT_DATA_DIR"] == str(resolved / "data")
     assert os.environ["GOAT_SERVER_PORT"] == "62606"
@@ -33,6 +38,8 @@ def test_configure_desktop_environment_overrides_inherited_runtime_paths(
     monkeypatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("GOAT_DESKTOP_APP_DATA_DIR", "C:/stale/app")
+    monkeypatch.setenv("GOAT_RUNTIME_ROOT", "C:/stale/runtime")
+    monkeypatch.setenv("GOAT_LOG_DIR", "C:/stale/logs")
     monkeypatch.setenv("GOAT_LOG_PATH", "C:/stale/chat_logs.db")
     monkeypatch.setenv("GOAT_DATA_DIR", "C:/stale/data")
     monkeypatch.setenv("GOAT_SERVER_PORT", "9999")
@@ -42,6 +49,8 @@ def test_configure_desktop_environment_overrides_inherited_runtime_paths(
     resolved = subject.configure_desktop_environment(tmp_path / "desktop-data", 62616)
 
     assert os.environ["GOAT_DESKTOP_APP_DATA_DIR"] == str(resolved)
+    assert os.environ["GOAT_RUNTIME_ROOT"] == str(resolved)
+    assert os.environ["GOAT_LOG_DIR"] == str(resolved / "logs")
     assert os.environ["GOAT_LOG_PATH"] == str(resolved / "chat_logs.db")
     assert os.environ["GOAT_DATA_DIR"] == str(resolved / "data")
     assert os.environ["GOAT_SERVER_PORT"] == "62616"

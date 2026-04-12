@@ -2,7 +2,7 @@
 
 ## Purpose
 
-JSONL cases consumed by **`python -m tools.run_rag_eval`** (from the repository root) for **Phase 14.7** regression: conservative query rewrite, lexical rerank, and passthrough rerank. CI runs this module on every backend pipeline; **merge is blocked** if the runner exits non-zero.
+JSONL cases consumed by **`python -m tools.quality.run_rag_eval`** (from the repository root) for **Phase 14.7** regression: conservative query rewrite, lexical rerank, and passthrough rerank. CI runs this module on every backend pipeline; **merge is blocked** if the runner exits non-zero.
 
 ## File
 
@@ -19,7 +19,7 @@ JSONL cases consumed by **`python -m tools.run_rag_eval`** (from the repository 
 
 1. Each case has a stable string **`id`** for failure messages.
 2. **`expected`** / **`expect_top_chunk_id`** reflect **intended** product behavior, not accidental current output.
-3. Run locally: `python -m tools.run_rag_eval` (exit 0).
+3. Run locally: `python -m tools.quality.run_rag_eval` (exit 0).
 
 ## Related docs
 

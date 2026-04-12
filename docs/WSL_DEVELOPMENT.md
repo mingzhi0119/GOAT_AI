@@ -77,7 +77,7 @@ The following remain normal Windows-native flows:
 
 - ordinary day-to-day editing and local development
 - Windows installer generation and verification
-- `scripts/install_desktop_prereqs.ps1`
+- `scripts/desktop/install_desktop_prereqs.ps1`
 - `deploy.ps1`
 - WebView2 validation
 - MSVC / Visual Studio Build Tools flows

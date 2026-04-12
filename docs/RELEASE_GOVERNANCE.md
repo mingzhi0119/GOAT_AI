@@ -14,7 +14,7 @@ This document defines the minimum artifact-first release process for staging and
 2. Trigger `.github/workflows/release-governance.yml` with the release ref.
 3. Build one `release-bundle.tar.gz` plus one `release-manifest.json` for that ref.
 4. Deploy the same bundle and manifest to `staging`.
-5. Run `scripts/post_deploy_check.py` against staging.
+5. Run `tools/ops/post_deploy_check.py` against staging.
 6. Emit `staging-promotion-evidence.json` with environment, digest, resolved SHA, and rollback target.
 7. Promote the same retained bundle to `production` only through the `production` environment gate.
 8. Emit `production-promotion-evidence.json` after the production contract check passes.
@@ -52,7 +52,6 @@ The deploy scripts preserve the latest deployed `release-manifest.json` under th
 The workflow is the default release path, but the same deploy scripts support manual artifact promotion when required:
 
 - canonical checked-in deploy assets live under `ops/deploy/`
-- repository-root `deploy.sh` and `deploy.ps1` remain supported compatibility entrypoints for operators and release bundles
 
 Linux:
 
@@ -61,13 +60,13 @@ PROJECT_DIR=/srv/goat-ai \
 RELEASE_BUNDLE=/tmp/release-bundle.tar.gz \
 RELEASE_MANIFEST=/tmp/release-manifest.json \
 EXPECTED_GIT_SHA=<resolved-sha> \
-bash deploy.sh
+bash ops/deploy/deploy.sh
 ```
 
 Windows PowerShell:
 
 ```powershell
-.\deploy.ps1 -ProjectDir C:\GOAT_AI -ReleaseBundle C:\temp\release-bundle.tar.gz -ReleaseManifest C:\temp\release-manifest.json -ExpectedGitSha <resolved-sha>
+.\ops\deploy\deploy.ps1 -ProjectDir C:\GOAT_AI -ReleaseBundle C:\temp\release-bundle.tar.gz -ReleaseManifest C:\temp\release-manifest.json -ExpectedGitSha <resolved-sha>
 ```
 
 ## Desktop release flow

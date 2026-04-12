@@ -1,6 +1,6 @@
 ---
 name: wsl-linux-ops-checks
-description: Run Ubuntu-facing shell scripts, deploy helpers, and backend operational checks through WSL from a Windows checkout. Use when Codex needs Linux semantics for deploy.sh, healthcheck.sh, watchdog.sh, phase0_check.sh, WSL-specific refresh scripts, or backend checks whose behavior depends on bash, shebangs, paths, services, or Linux process behavior. Do not use for Windows-only PowerShell automation.
+description: Run Ubuntu-facing shell scripts, deploy helpers, and backend operational checks through WSL from a Windows checkout. Use when Codex needs Linux semantics for ops/deploy/deploy.sh, healthcheck.sh, watchdog.sh, ops/verification/phase0_check.sh, WSL-specific refresh scripts, or backend checks whose behavior depends on bash, shebangs, paths, services, or Linux process behavior. Do not use for Windows-only PowerShell automation.
 ---
 
 # WSL Linux Ops Checks

@@ -180,7 +180,7 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 - When changing performance budgets or smoke-test semantics, update `tools/load_chat_smoke.py`, the scheduled workflow, and `docs/OPERATIONS.md` together.
 - When changing coverage output paths or recurring quality-capture semantics, update `tools/quality_snapshot.py`, `.github/workflows/quality-trends.yml`, and `docs/QUALITY_TRENDS.md` together.
 - When changing dependency-audit evidence or credential-rotation review inputs, update `tools/security_review_snapshot.py`, `.github/workflows/quality-trends.yml`, and `docs/SECURITY_RESPONSE.md` together.
-- When changing backup, restore, rollback, or SQLite persistence semantics, update the recovery drill (`scripts/exercise_recovery_drill.py`), its tests, and the linked runbooks in the same change.
+- When changing backup, restore, rollback, or SQLite persistence semantics, update the recovery drill (`tools/ops/exercise_recovery_drill.py`), its tests, and the linked runbooks in the same change.
 
 ## 13. API Artifacts
 

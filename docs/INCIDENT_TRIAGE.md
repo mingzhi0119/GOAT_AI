@@ -13,13 +13,13 @@ Use this runbook when staging or production health regresses and you need a fast
 ### Readiness is failing
 
 - Check `GET /api/ready` and `GET /api/health`.
-- Inspect `logs/fastapi.log`.
+- Inspect `var/logs/fastapi.log`.
 - Scrape `sqlite_log_write_failures_total` and `ollama_errors_total`.
 - If only readiness is red and health is green, assume a dependency or migration issue before assuming process crash.
 
 ### Chat latency or stream failures are rising
 
-- Run `python -m tools.load_chat_smoke --base-url <base-url> --model <model> --runs 10 --show-system-inference`.
+- Run `python -m tools.quality.load_chat_smoke --base-url <base-url> --model <model> --runs 10 --show-system-inference`.
 - Check `http_request_duration_seconds`, `chat_stream_completed_total`, and `ollama_errors_total`.
 - Compare first-token p95 against the SLO in `OPERATIONS.md`.
 
@@ -27,7 +27,7 @@ Use this runbook when staging or production health regresses and you need a fast
 
 - Check `knowledge_retrieval_requests_total{outcome="hit|miss"}`.
 - Check `knowledge_query_rewrite_applied_total`.
-- Re-run `python -m tools.run_rag_eval` before changing retrieval defaults.
+- Re-run `python -m tools.quality.run_rag_eval` before changing retrieval defaults.
 
 ### Feature-gated runtime looks unavailable
 

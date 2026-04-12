@@ -2,7 +2,7 @@
 
 Run from the repository root::
 
-    python -m tools.run_rag_eval
+    python -m tools.quality.run_rag_eval
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from backend.services.retrieval_quality.query_rewrite import conservative_rewrit
 from backend.services.retrieval_quality.rerank import lexical_rerank_hits
 from backend.services.retrieval_quality.rerank import PassthroughReranker
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _load_cases(path: Path) -> list[dict[str, object]]:

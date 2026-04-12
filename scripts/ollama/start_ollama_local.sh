@@ -3,7 +3,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 WORKSPACE_ROOT="$(cd "${REPO_ROOT}/.." && pwd)"
 
 OLLAMA_RUNTIME_DIR="${OLLAMA_RUNTIME_DIR:-${WORKSPACE_ROOT}/ollama-local}"
@@ -29,7 +29,7 @@ fi
 
 if [ ! -f "${PID_FILE}" ]; then
   echo "Starting local Ollama at ${OLLAMA_BASE_URL_VALUE}..."
-  OLLAMA_HOST="${OLLAMA_BASE_URL_VALUE}" nohup bash "${REPO_ROOT}/scripts/ollama_local.sh" serve >>"${LOG_FILE}" 2>&1 &
+  OLLAMA_HOST="${OLLAMA_BASE_URL_VALUE}" nohup bash "${REPO_ROOT}/scripts/ollama/ollama_local.sh" serve >>"${LOG_FILE}" 2>&1 &
   echo $! > "${PID_FILE}"
 fi
 

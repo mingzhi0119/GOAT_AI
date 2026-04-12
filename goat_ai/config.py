@@ -9,6 +9,7 @@ from typing import Final, Literal, cast
 _PACKAGE_ROOT = Path(__file__).resolve().parent
 APP_ROOT = _PACKAGE_ROOT.parent
 WORKSPACE_ROOT = APP_ROOT.parent
+DEFAULT_RUNTIME_ROOT = APP_ROOT / "var"
 LOCAL_OLLAMA_INSTALL_DIR = WORKSPACE_ROOT / "ollama"
 LOCAL_OLLAMA_RUNTIME_DIR = WORKSPACE_ROOT / "ollama-local"
 LOCAL_OLLAMA_DEFAULT_URL = "http://127.0.0.1:11435"
@@ -34,6 +35,12 @@ _DEFAULT_SYSTEM_PROMPT = _DEFAULT_SYSTEM_PROMPTS["classic"]
 
 USER_FACING_ERROR = "Sorry, the AI service is temporarily unavailable. Please try again or check that Ollama is running."
 _DOTENV_QUOTES: Final[tuple[str, str]] = ("'", '"')
+_LEGACY_RUNTIME_COPY_NAMES: Final[tuple[str, ...]] = (
+    "chat_logs.db",
+    "chat_logs.db-shm",
+    "chat_logs.db-wal",
+)
+_LEGACY_RUNTIME_COPY_DIRS: Final[tuple[str, ...]] = ("data", "logs")
 
 
 def _strip_wrapped_quotes(value: str) -> str:
@@ -101,6 +108,90 @@ def _default_ollama_base_url() -> str:
     return "http://127.0.0.1:11434"
 
 
+def _resolve_env_path(value: str, *, relative_to: Path) -> Path:
+    path = Path(value).expanduser()
+    if path.is_absolute():
+        return path
+    return (relative_to / path).resolve()
+
+
+def _resolve_runtime_root() -> tuple[Path, bool]:
+    configured = os.environ.get("GOAT_RUNTIME_ROOT", "").strip()
+    if configured:
+        return _resolve_env_path(configured, relative_to=APP_ROOT), True
+    return DEFAULT_RUNTIME_ROOT, False
+
+
+def _verify_copied_path(source: Path, target: Path) -> None:
+    if source.is_dir():
+        if not target.is_dir():
+            raise RuntimeError(f"Expected migrated directory at {target}")
+        for nested_source in source.rglob("*"):
+            relative = nested_source.relative_to(source)
+            nested_target = target / relative
+            if nested_source.is_dir():
+                if not nested_target.is_dir():
+                    raise RuntimeError(f"Missing migrated directory {nested_target}")
+                continue
+            if not nested_target.is_file():
+                raise RuntimeError(f"Missing migrated file {nested_target}")
+            if nested_source.stat().st_size != nested_target.stat().st_size:
+                raise RuntimeError(f"Migrated file size mismatch for {nested_target}")
+        return
+
+    if not target.is_file():
+        raise RuntimeError(f"Expected migrated file at {target}")
+    if source.stat().st_size != target.stat().st_size:
+        raise RuntimeError(f"Migrated file size mismatch for {target}")
+
+
+def _copy_legacy_runtime_path(source: Path, target: Path) -> None:
+    if source.is_dir():
+        shutil.copytree(source, target)
+    else:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+    _verify_copied_path(source, target)
+
+
+def _migrate_legacy_runtime_state(runtime_root: Path) -> None:
+    if runtime_root.exists():
+        return
+
+    legacy_pairs: list[tuple[Path, Path]] = []
+    for name in _LEGACY_RUNTIME_COPY_NAMES:
+        legacy_source = APP_ROOT / name
+        if legacy_source.exists():
+            legacy_pairs.append((legacy_source, runtime_root / name))
+    for name in _LEGACY_RUNTIME_COPY_DIRS:
+        legacy_source = APP_ROOT / name
+        if legacy_source.exists():
+            legacy_pairs.append((legacy_source, runtime_root / name))
+
+    if not legacy_pairs:
+        return
+
+    runtime_root_created = False
+    try:
+        runtime_root.mkdir(parents=True, exist_ok=False)
+        runtime_root_created = True
+        for source, target in legacy_pairs:
+            _copy_legacy_runtime_path(source, target)
+    except Exception as exc:  # pragma: no cover - exercised via tests
+        if runtime_root_created and runtime_root.exists():
+            shutil.rmtree(runtime_root, ignore_errors=True)
+        raise RuntimeError(
+            "Failed to migrate legacy runtime state into GOAT_RUNTIME_ROOT."
+        ) from exc
+
+
+def _ensure_directory(path: Path, *, label: str) -> Path:
+    if path.exists() and not path.is_dir():
+        raise ValueError(f"{label} must point to a directory: {path}")
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 @dataclass(frozen=True)
 class Settings:
     """Runtime configuration (env-first; see docs/OPERATIONS.md)."""
@@ -115,8 +206,10 @@ class Settings:
     app_root: Path
     logo_svg: Path
     log_db_path: Path
+    runtime_root: Path = DEFAULT_RUNTIME_ROOT
+    log_dir: Path = DEFAULT_RUNTIME_ROOT / "logs"
     system_prompt_overridden: bool = False
-    data_dir: Path = APP_ROOT / "data"
+    data_dir: Path = DEFAULT_RUNTIME_ROOT / "data"
     api_key: str = ""
     api_key_write: str = ""
     api_credentials_json: str = ""
@@ -184,8 +277,13 @@ def load_settings() -> Settings:
     _load_dotenv_file(APP_ROOT / ".env")
     base = os.environ.get("OLLAMA_BASE_URL", _default_ollama_base_url()).rstrip("/")
     max_mb = int(os.environ.get("GOAT_MAX_UPLOAD_MB", "20"))
-    _default_log_db = str(APP_ROOT / "chat_logs.db")
-    _default_data_dir = str(APP_ROOT / "data")
+    runtime_root, runtime_root_explicit = _resolve_runtime_root()
+    if not runtime_root_explicit:
+        _migrate_legacy_runtime_state(runtime_root)
+    runtime_root = _ensure_directory(runtime_root, label="GOAT_RUNTIME_ROOT")
+    _default_log_db = runtime_root / "chat_logs.db"
+    _default_data_dir = runtime_root / "data"
+    _default_log_dir = runtime_root / "logs"
     _rate_limit_window_sec = int(os.environ.get("GOAT_RATE_LIMIT_WINDOW_SEC", "60"))
     _rate_limit_max_requests = int(os.environ.get("GOAT_RATE_LIMIT_MAX_REQUESTS", "60"))
     _deploy_target = os.environ.get("GOAT_DEPLOY_TARGET", "auto").strip().lower()
@@ -330,6 +428,27 @@ def load_settings() -> Settings:
         raise ValueError(
             "GOAT_API_KEY_WRITE requires GOAT_API_KEY (read key) to be set."
         )
+    log_db_path = _resolve_env_path(
+        os.environ.get("GOAT_LOG_PATH", str(_default_log_db)),
+        relative_to=APP_ROOT,
+    )
+    log_dir = _ensure_directory(
+        _resolve_env_path(
+            os.environ.get("GOAT_LOG_DIR", str(_default_log_dir)),
+            relative_to=APP_ROOT,
+        ),
+        label="GOAT_LOG_DIR",
+    )
+    data_dir = _ensure_directory(
+        _resolve_env_path(
+            os.environ.get("GOAT_DATA_DIR", str(_default_data_dir)),
+            relative_to=APP_ROOT,
+        ),
+        label="GOAT_DATA_DIR",
+    )
+    if log_db_path.exists() and log_db_path.is_dir():
+        raise ValueError(f"GOAT_LOG_PATH must point to a file path: {log_db_path}")
+    log_db_path.parent.mkdir(parents=True, exist_ok=True)
     return Settings(
         ollama_base_url=base,
         generate_timeout=int(os.environ.get("OLLAMA_GENERATE_TIMEOUT", "120")),
@@ -340,9 +459,11 @@ def load_settings() -> Settings:
         system_prompt=_read_system_prompt(),
         system_prompt_overridden=is_system_prompt_override_configured(),
         app_root=APP_ROOT,
+        runtime_root=runtime_root,
         logo_svg=APP_ROOT / "static" / "urochester_simon_business_horizontal.svg",
-        log_db_path=Path(os.environ.get("GOAT_LOG_PATH", _default_log_db)),
-        data_dir=Path(os.environ.get("GOAT_DATA_DIR", _default_data_dir)),
+        log_dir=log_dir,
+        log_db_path=log_db_path,
+        data_dir=data_dir,
         api_key=_api_key,
         api_key_write=_api_key_write,
         api_credentials_json=_api_credentials_json,

@@ -7,7 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from tools import check_api_contract_sync
+from tools.contracts import check_api_contract_sync
 
 
 class CheckApiContractSyncTests(unittest.TestCase):

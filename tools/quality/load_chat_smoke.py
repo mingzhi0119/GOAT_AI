@@ -2,7 +2,7 @@
 
 Run from the repository root::
 
-    python -m tools.load_chat_smoke --base-url http://127.0.0.1:62606 --model <name> --runs 20
+    python -m tools.quality.load_chat_smoke --base-url http://127.0.0.1:62606 --model <name> --runs 20
 """
 
 from __future__ import annotations

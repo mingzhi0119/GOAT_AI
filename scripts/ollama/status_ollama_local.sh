@@ -3,7 +3,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 WORKSPACE_ROOT="$(cd "${REPO_ROOT}/.." && pwd)"
 
 OLLAMA_RUNTIME_DIR="${OLLAMA_RUNTIME_DIR:-${WORKSPACE_ROOT}/ollama-local}"
@@ -28,7 +28,7 @@ fi
 
 if curl -sf "${OLLAMA_HOST_VALUE}/api/tags" >/dev/null 2>&1; then
   echo "HTTP: reachable"
-  bash "${REPO_ROOT}/scripts/ollama_local.sh" list
+  bash "${REPO_ROOT}/scripts/ollama/ollama_local.sh" list
 else
   echo "HTTP: unreachable"
 fi

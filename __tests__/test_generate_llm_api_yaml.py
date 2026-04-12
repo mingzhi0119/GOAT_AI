@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools import generate_llm_api_yaml
+from tools.contracts import generate_llm_api_yaml
 
 
 class GenerateLlmApiYamlTests(unittest.TestCase):

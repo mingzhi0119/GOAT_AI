@@ -6,7 +6,7 @@ __pycache__/
 logs/
 *.log
 
-# Local SQLite backups (scripts/backup_chat_db.py)
+# Local SQLite backups (tools/ops/backup_chat_db.py)
 backups/
 npm-debug.log*
 yarn-debug.log*
@@ -47,6 +47,7 @@ dist-ssr
 
 # Local runtime artifacts
 # Default GOAT_DATA_DIR — uploads, vector index, media (do not commit)
+var/
 data/
 chat_logs.db
 chat_logs.db-*

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import tools.run_pr_latency_gate as subject
+import tools.quality.run_pr_latency_gate as subject
 
 
 def test_evaluate_gate_reports_budget_failures() -> None:

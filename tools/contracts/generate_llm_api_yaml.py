@@ -2,7 +2,7 @@
 
 Run from the repository root::
 
-    python -m tools.generate_llm_api_yaml
+    python -m tools.contracts.generate_llm_api_yaml
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 OPENAPI_PATH = REPO_ROOT / "docs" / "openapi.json"
 OUTPUT_PATH = REPO_ROOT / "docs" / "api.llm.yaml"
 

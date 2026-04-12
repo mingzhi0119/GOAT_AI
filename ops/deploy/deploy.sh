@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # GOAT AI production deploy (FastAPI + React on :62606)
 # Usage:
-#   bash deploy.sh                   # full deploy from current local working tree
-#   QUICK=1 bash deploy.sh           # quick restart: skip pip install
-#   SKIP_BUILD=1 bash deploy.sh      # skip npm build (use existing dist/)
-#   SYNC_GIT=1 bash deploy.sh        # sync and deploy the exact requested branch/ref
-#   GIT_REF=<ref> bash deploy.sh     # deploy a specific branch, tag, or commit
-#   RELEASE_BUNDLE=/tmp/goat-release.tar.gz RELEASE_MANIFEST=/tmp/release-manifest.json bash deploy.sh
+#   bash ops/deploy/deploy.sh                   # full deploy from current local working tree
+#   QUICK=1 bash ops/deploy/deploy.sh           # quick restart: skip pip install
+#   SKIP_BUILD=1 bash ops/deploy/deploy.sh      # skip npm build (use existing dist/)
+#   SYNC_GIT=1 bash ops/deploy/deploy.sh        # sync and deploy the exact requested branch/ref
+#   GIT_REF=<ref> bash ops/deploy/deploy.sh     # deploy a specific branch, tag, or commit
+#   RELEASE_BUNDLE=/tmp/goat-release.tar.gz RELEASE_MANIFEST=/tmp/release-manifest.json bash ops/deploy/deploy.sh
 #
 # Override any variable before running, for example:
-#   GOAT_SERVER_PORT=62606 bash deploy.sh
+#   GOAT_SERVER_PORT=62606 bash ops/deploy/deploy.sh
 
 _DEPLOY_SCRIPT="${BASH_SOURCE[0]:-$0}"
 SCRIPT_DIR="$(cd "$(dirname "${_DEPLOY_SCRIPT}")" && pwd)"
@@ -27,6 +27,10 @@ GIT_BRANCH="${GIT_BRANCH:-main}"
 GIT_REF="${GIT_REF:-$GIT_BRANCH}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 VENV_DIR="${VENV_DIR:-$PROJECT_DIR/.venv}"
+GOAT_RUNTIME_ROOT="${GOAT_RUNTIME_ROOT:-$PROJECT_DIR/var}"
+GOAT_LOG_DIR="${GOAT_LOG_DIR:-$GOAT_RUNTIME_ROOT/logs}"
+GOAT_LOG_PATH="${GOAT_LOG_PATH:-$GOAT_RUNTIME_ROOT/chat_logs.db}"
+GOAT_DATA_DIR="${GOAT_DATA_DIR:-$GOAT_RUNTIME_ROOT/data}"
 
 LOCAL_OLLAMA_URL="${LOCAL_OLLAMA_URL:-http://127.0.0.1:11435}"
 SERVER_PORT="${GOAT_SERVER_PORT:-62606}"
@@ -141,7 +145,7 @@ if [ "${BUNDLE_DEPLOY}" = "1" ]; then
     _previous_release_manifest="$(mktemp)"
     cp "${PROJECT_DIR}/release-manifest.json" "${_previous_release_manifest}"
   fi
-  "${PYTHON_BIN}" "${REPO_ROOT}/tools/install_release_bundle.py" \
+  "${PYTHON_BIN}" "${REPO_ROOT}/tools/release/install_release_bundle.py" \
     --bundle "${RELEASE_BUNDLE}" \
     --manifest "${RELEASE_MANIFEST}" \
     --project-dir "${PROJECT_DIR}" \
@@ -213,14 +217,14 @@ else
 fi
 
 echo "4. Start FastAPI on port ${SERVER_PORT}"
-LOGS_DIR="${PROJECT_DIR}/logs"
-mkdir -p "${LOGS_DIR}"
+mkdir -p "${GOAT_RUNTIME_ROOT}" "${GOAT_LOG_DIR}" "${GOAT_DATA_DIR}"
+LOGS_DIR="${GOAT_LOG_DIR}"
 API_LOG="${LOGS_DIR}/fastapi.log"
 API_PID="${LOGS_DIR}/fastapi.pid"
 
-if [ "${EFFECTIVE_OLLAMA_URL}" = "${LOCAL_OLLAMA_URL}" ] && [ -x "${PROJECT_DIR}/scripts/start_ollama_local.sh" ]; then
+if [ "${EFFECTIVE_OLLAMA_URL}" = "${LOCAL_OLLAMA_URL}" ] && [ -x "${PROJECT_DIR}/scripts/ollama/start_ollama_local.sh" ]; then
   echo "Ensuring sibling local Ollama is running at ${LOCAL_OLLAMA_URL}"
-  OLLAMA_HOST="${LOCAL_OLLAMA_URL}" "${PROJECT_DIR}/scripts/start_ollama_local.sh"
+  OLLAMA_HOST="${LOCAL_OLLAMA_URL}" "${PROJECT_DIR}/scripts/ollama/start_ollama_local.sh"
 fi
 
 _goat_systemd_restart() {
@@ -253,7 +257,13 @@ if [ "${SYSTEMD_USED}" != "1" ]; then
   echo "Freeing port ${SERVER_PORT}"
   free_port "${SERVER_PORT}"
   echo "Starting FastAPI on 0.0.0.0:${SERVER_PORT} (log: ${API_LOG})"
-  GOAT_SERVER_PORT="${SERVER_PORT}" GOAT_LOCAL_PORT="${SERVER_PORT}" nohup "${VENV_DIR}/bin/python" -m uvicorn server:create_app \
+  GOAT_SERVER_PORT="${SERVER_PORT}" \
+  GOAT_LOCAL_PORT="${SERVER_PORT}" \
+  GOAT_RUNTIME_ROOT="${GOAT_RUNTIME_ROOT}" \
+  GOAT_LOG_DIR="${GOAT_LOG_DIR}" \
+  GOAT_LOG_PATH="${GOAT_LOG_PATH}" \
+  GOAT_DATA_DIR="${GOAT_DATA_DIR}" \
+  nohup "${VENV_DIR}/bin/python" -m uvicorn server:create_app \
     --factory \
     --host 0.0.0.0 \
     --port "${SERVER_PORT}" \
@@ -280,7 +290,14 @@ fi
 
 echo "5. Post-deploy checks"
 echo "Running post-deploy contract checks..."
-if ! "${VENV_DIR}/bin/python" "${PROJECT_DIR}/scripts/post_deploy_check.py" --base-url "http://127.0.0.1:${SELECTED_PORT}"; then
+if ! (
+  cd "${PROJECT_DIR}" && \
+  GOAT_RUNTIME_ROOT="${GOAT_RUNTIME_ROOT}" \
+  GOAT_LOG_DIR="${GOAT_LOG_DIR}" \
+  GOAT_LOG_PATH="${GOAT_LOG_PATH}" \
+  GOAT_DATA_DIR="${GOAT_DATA_DIR}" \
+  "${VENV_DIR}/bin/python" -m tools.ops.post_deploy_check --base-url "http://127.0.0.1:${SELECTED_PORT}"
+); then
   echo "Post-deploy contract checks failed."
   exit 1
 fi

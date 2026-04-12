@@ -17,7 +17,7 @@ def _default_project_root() -> Path:
         p = Path(env).resolve()
         if p.is_dir():
             return p
-    return Path(__file__).resolve().parent.parent
+    return Path(__file__).resolve().parents[2]
 
 
 def resolve_backup_dir(project_root: Path) -> Path:

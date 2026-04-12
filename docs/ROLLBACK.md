@@ -6,7 +6,7 @@ This runbook covers rollback on the shared-host deployment path.
 
 - Preferred rollback target: previous known-good release bundle + manifest
 - Fallback rollback target: previous known-good ref when an artifact is unavailable
-- Deploy scripts: canonical files under `ops/deploy/`, with supported repository-root wrappers `deploy.sh` and `deploy.ps1`
+- Deploy scripts: canonical files under `ops/deploy/`
 - Database rollback companion: [BACKUP_RESTORE.md](BACKUP_RESTORE.md)
 
 ## 1) Pick a known-good rollback target
@@ -28,13 +28,13 @@ Use the deploy script stop path first. It waits for a graceful drain before forc
 Linux:
 
 ```bash
-kill "$(cat logs/fastapi.pid)"
+kill "$(cat var/logs/fastapi.pid)"
 ```
 
 Windows:
 
 ```powershell
-Stop-Process -Id (Get-Content .\logs\fastapi.pid)
+Stop-Process -Id (Get-Content .\var\logs\fastapi.pid)
 ```
 
 If the process does not exit within the configured wait window, the deploy scripts fall back to forced cleanup.
@@ -48,13 +48,13 @@ PROJECT_DIR=/srv/goat-ai \
 RELEASE_BUNDLE=/tmp/release-bundle.tar.gz \
 RELEASE_MANIFEST=/tmp/release-manifest.json \
 EXPECTED_GIT_SHA=<known-good-sha> \
-bash deploy.sh
+bash ops/deploy/deploy.sh
 ```
 
 Windows:
 
 ```powershell
-.\deploy.ps1 -ProjectDir C:\GOAT_AI -ReleaseBundle C:\temp\release-bundle.tar.gz -ReleaseManifest C:\temp\release-manifest.json -ExpectedGitSha <known-good-sha>
+.\ops\deploy\deploy.ps1 -ProjectDir C:\GOAT_AI -ReleaseBundle C:\temp\release-bundle.tar.gz -ReleaseManifest C:\temp\release-manifest.json -ExpectedGitSha <known-good-sha>
 ```
 
 This path reinstalls the retained bundle and does not rebuild the frontend on the host.
@@ -66,13 +66,13 @@ If no retained artifact exists, use an explicit ref instead of `main` so the dep
 Linux:
 
 ```bash
-GIT_REF=<known-good-ref> SYNC_GIT=0 bash deploy.sh
+GIT_REF=<known-good-ref> SYNC_GIT=0 bash ops/deploy/deploy.sh
 ```
 
 Windows:
 
 ```powershell
-.\deploy.ps1 -GitRef <known-good-ref>
+.\ops\deploy\deploy.ps1 -GitRef <known-good-ref>
 ```
 
 If the rollback target is a tag or detached commit, keep `SYNC_GIT=0` and do not reset to `origin/main`.
@@ -92,19 +92,19 @@ python -m pip install -r requirements.txt
 Run the same post-deploy contract check that production uses:
 
 ```bash
-python scripts/post_deploy_check.py --base-url http://127.0.0.1:62606
+python -m tools.ops.post_deploy_check --base-url http://127.0.0.1:62606
 ```
 
 For data-bearing rollbacks, rehearse the SQLite side separately before the maintenance window:
 
 ```bash
-python -m scripts.exercise_recovery_drill --src /path/to/chat_logs.db --backup-dir /path/to/backups --required-table sessions --required-table session_messages
+python -m tools.ops.exercise_recovery_drill --src /path/to/chat_logs.db --backup-dir /path/to/backups --required-table sessions --required-table session_messages
 ```
 
 For code artifact rollback rehearsal, exercise the bundle flow against a scratch project tree:
 
 ```bash
-python -m scripts.exercise_release_rollback_drill \
+python -m tools.release.exercise_release_rollback_drill \
   --known-good-bundle /path/to/known-good-release-bundle.tar.gz \
   --known-good-manifest /path/to/known-good-release-manifest.json \
   --candidate-bundle /path/to/candidate-release-bundle.tar.gz \
@@ -116,7 +116,7 @@ Confirm at least:
 
 - `GET /api/health`
 - `GET /api/system/runtime-target`
-- `POST /api/chat` streams SSE again with at least one `token` or `thinking` frame (same rule as `scripts/post_deploy_check.py`)
+- `POST /api/chat` streams SSE again with at least one `token` or `thinking` frame (same rule as `tools/ops/post_deploy_check.py`)
 
 ## 7) If data was affected
 
@@ -127,5 +127,5 @@ Follow [BACKUP_RESTORE.md](BACKUP_RESTORE.md) for the backup and restore drill.
 ## 8) If rollback fails
 
 - Return to the last working artifact or ref
-- Inspect `logs/fastapi.log`, deploy output, and the desktop/runtime promotion evidence
+- Inspect `var/logs/fastapi.log`, deploy output, and the desktop/runtime promotion evidence
 - Re-run the post-deploy contract check before trying another rollback target

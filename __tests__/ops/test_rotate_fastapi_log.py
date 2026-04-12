@@ -1,4 +1,4 @@
-"""Tests for scripts/rotate_fastapi_log.py."""
+"""Tests for tools/ops/rotate_fastapi_log.py."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.rotate_fastapi_log import (
+from tools.ops.rotate_fastapi_log import (
     prune_old_archives,
     resolve_archive_dir,
     resolve_log_path,
@@ -19,13 +19,13 @@ class RotateFastapiLogTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             p = resolve_log_path(root)
-            self.assertEqual(root / "logs" / "fastapi.log", p)
+            self.assertEqual(root / "var" / "logs" / "fastapi.log", p)
 
     def test_resolve_archive_dir_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             d = resolve_archive_dir(root)
-            self.assertEqual(root / "logs" / "archive", d)
+            self.assertEqual(root / "var" / "logs" / "archive", d)
 
     def test_rotate_truncates_and_archives(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

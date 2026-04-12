@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import tools.quality_snapshot as subject
+import tools.quality.quality_snapshot as subject
 
 
 def test_parse_backend_coverage_reads_statement_and_branch_metrics(

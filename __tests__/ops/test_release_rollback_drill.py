@@ -3,9 +3,11 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from scripts.exercise_release_rollback_drill import exercise_release_rollback_drill
-from tools.build_release_bundle import build_release_bundle
-from tools.install_release_bundle import load_release_manifest
+from tools.release.exercise_release_rollback_drill import (
+    exercise_release_rollback_drill,
+)
+from tools.release.build_release_bundle import build_release_bundle
+from tools.release.install_release_bundle import load_release_manifest
 
 
 def _write(path: Path, content: str) -> None:
@@ -37,13 +39,19 @@ def test_release_rollback_drill_restores_known_good_bundle_and_manifest_chain() 
         artifacts_root = root / "artifacts"
         project_dir = root / "project"
 
-        _write(known_good_repo / "deploy.sh", "#!/usr/bin/env bash\n")
+        _write(
+            known_good_repo / "ops" / "deploy" / "deploy.sh",
+            "#!/usr/bin/env bash\n",
+        )
         _write(known_good_repo / "backend" / "main.py", "print('known-good')\n")
         _write(
             known_good_repo / "frontend" / "dist" / "index.html", "<!doctype html>\n"
         )
 
-        _write(candidate_repo / "deploy.sh", "#!/usr/bin/env bash\n")
+        _write(
+            candidate_repo / "ops" / "deploy" / "deploy.sh",
+            "#!/usr/bin/env bash\n",
+        )
         _write(candidate_repo / "backend" / "main.py", "print('candidate')\n")
         _write(candidate_repo / "frontend" / "dist" / "index.html", "<!doctype html>\n")
 

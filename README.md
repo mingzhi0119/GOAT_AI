@@ -111,7 +111,7 @@ Core API surface:
 - Generated non-executed chat files now download through persisted artifact ids under `/api/artifacts/{artifact_id}`
 - Code sandbox execution is now a real gated capability: `POST /api/code-sandbox/exec` runs provider-backed shell work in `sync` or `async` mode, `GET /api/code-sandbox/executions/{execution_id}` and `/events` expose durable state/auditability, and `GET /api/code-sandbox/executions/{execution_id}/logs` streams replayable stdout/stderr over SSE. Docker is the default isolated backend; `localhost` is a trusted-dev fallback with weaker isolation.
 - Workbench tasks now persist durable task rows, support polling and event timelines, and provide minimal execution for `plan`, `browse`, and `deep_research`; `canvas` remains unimplemented
-- **RAG-ready gate:** the product may be described as **RAG-ready** only when `python -m tools.run_rag_eval` exits 0 (checked-in `evaldata/rag_eval_cases.jsonl`; see [evaldata/README.md](evaldata/README.md)) and retrieval quality notes in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) stay aligned with that runner. CI runs the same command on every backend build.
+- **RAG-ready gate:** the product may be described as **RAG-ready** only when `python -m tools.quality.run_rag_eval` exits 0 (checked-in `evaldata/rag_eval_cases.jsonl`; see [evaldata/README.md](evaldata/README.md)) and retrieval quality notes in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) stay aligned with that runner. CI runs the same command on every backend build.
 
 ## Quick Start
 
@@ -125,7 +125,7 @@ cp .env.example .env
 python3 -m uvicorn server:create_app --factory --host 0.0.0.0 --port 62606 --reload
 ```
 
-Use **Python 3.14** for the venv when you can so `python -m tools.check_api_contract_sync` matches the CI backend job.
+Use **Python 3.14** for the venv when you can so `python -m tools.contracts.check_api_contract_sync` matches the CI backend job.
 
 If you are on Windows and hit a Linux-targeted validation or packaging path, use the WSL guidance in [docs/WSL_DEVELOPMENT.md](docs/WSL_DEVELOPMENT.md).
 
@@ -154,14 +154,14 @@ Packaged backend sidecar (Phase 19B):
 
 ```bash
 pip install -r requirements-desktop-build.txt
-python -m tools.build_desktop_sidecar
+python -m tools.desktop.build_desktop_sidecar
 cd frontend
 npm run desktop:build
 ```
 
 Notes:
 
-- `python -m tools.build_desktop_sidecar` freezes the backend entrypoint with **PyInstaller** and places the per-platform binary under [frontend/src-tauri/binaries](/E:/simonbb/GOAT_AI/frontend/src-tauri/binaries)
+- `python -m tools.desktop.build_desktop_sidecar` freezes the backend entrypoint with **PyInstaller** and places the per-platform binary under [frontend/src-tauri/binaries](/E:/simonbb/GOAT_AI/frontend/src-tauri/binaries)
 - `npm run desktop:build` now rebuilds the frozen sidecar before the Tauri packaging step
 - packaged desktop builds launch the bundled backend sidecar locally and store SQLite/data files in the platform app-data directory instead of the repository root
 
@@ -174,7 +174,7 @@ Packaged desktop runtime configuration:
 Windows desktop prerequisites can be bootstrapped with:
 
 ```powershell
-.\scripts\install_desktop_prereqs.ps1 -Profile Dev
+.\scripts\desktop\install_desktop_prereqs.ps1 -Profile Dev
 ```
 
 Profiles:
@@ -186,16 +186,16 @@ Profiles:
 Production-style deploy:
 
 ```bash
-bash deploy.sh
+bash ops/deploy/deploy.sh
 ```
 
 Windows PowerShell:
 
 ```powershell
-.\deploy.ps1
+.\ops\deploy\deploy.ps1
 ```
 
-Canonical checked-in operator assets now live under `ops/deploy/`, `ops/systemd/`, and `ops/verification/`. The repository-root `deploy.sh`, `deploy.ps1`, and `phase0_check.sh` files remain supported compatibility entrypoints so existing operator commands keep working during the cleanup.
+Canonical checked-in operator assets live under `ops/deploy/`, `ops/systemd/`, and `ops/verification/`. Use those paths directly.
 
 ## Testing
 
@@ -220,7 +220,7 @@ python -m pytest __tests__/test_api_blackbox_contract.py -v
 Retrieval quality regression (RAG-3):
 
 ```bash
-python -m tools.run_rag_eval
+python -m tools.quality.run_rag_eval
 ```
 
 Frontend:
@@ -282,5 +282,5 @@ P1 governance assets now live in-repo too:
 Capacity/load validation:
 
 ```bash
-python -m tools.load_chat_smoke --base-url http://127.0.0.1:62606 --model gemma4:26b --runs 20 --show-system-inference
+python -m tools.quality.load_chat_smoke --base-url http://127.0.0.1:62606 --model gemma4:26b --runs 20 --show-system-inference
 ```

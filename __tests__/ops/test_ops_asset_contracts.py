@@ -14,16 +14,10 @@ def _repo_root() -> Path:
 REPO_ROOT = _repo_root()
 
 
-def test_root_entrypoints_delegate_to_canonical_ops_assets() -> None:
-    deploy_sh_wrapper = (REPO_ROOT / "deploy.sh").read_text(encoding="utf-8")
-    deploy_ps1_wrapper = (REPO_ROOT / "deploy.ps1").read_text(encoding="utf-8")
-    phase0_wrapper = (REPO_ROOT / "phase0_check.sh").read_text(encoding="utf-8")
-
-    assert 'exec bash "${SCRIPT_DIR}/ops/deploy/deploy.sh" "$@"' in deploy_sh_wrapper
-    assert 'Join-Path $PSScriptRoot "ops\\deploy\\deploy.ps1"' in deploy_ps1_wrapper
-    assert 'exec bash "${SCRIPT_DIR}/ops/verification/phase0_check.sh" "$@"' in (
-        phase0_wrapper
-    )
+def test_root_entrypoints_are_not_part_of_the_supported_ops_surface() -> None:
+    assert not (REPO_ROOT / "deploy.sh").exists()
+    assert not (REPO_ROOT / "deploy.ps1").exists()
+    assert not (REPO_ROOT / "phase0_check.sh").exists()
 
 
 def test_canonical_deploy_scripts_use_factory_entrypoint() -> None:
@@ -43,39 +37,52 @@ def test_goat_service_uses_supported_logs_and_factory_entrypoint() -> None:
         encoding="utf-8"
     )
 
-    assert "ExecStartPre=/usr/bin/mkdir -p %h/GOAT_AI/logs" in service
+    assert (
+        "ExecStartPre=/usr/bin/mkdir -p %h/GOAT_AI/var/logs %h/GOAT_AI/var/data"
+        in service
+    )
+    assert "Environment=GOAT_RUNTIME_ROOT=%h/GOAT_AI/var" in service
+    assert "Environment=GOAT_LOG_DIR=%h/GOAT_AI/var/logs" in service
     assert "server:create_app" in service
     assert "--factory" in service
-    assert "logs/fastapi.log" in service
+    assert "var/logs/fastapi.log" in service
 
 
 def test_watchdog_phase0_and_local_ollama_scripts_align_with_supported_ops_contract() -> (
     None
 ):
-    healthcheck = (REPO_ROOT / "scripts" / "healthcheck.sh").read_text(encoding="utf-8")
-    watchdog = (REPO_ROOT / "scripts" / "watchdog.sh").read_text(encoding="utf-8")
+    healthcheck = (REPO_ROOT / "ops" / "verification" / "healthcheck.sh").read_text(
+        encoding="utf-8"
+    )
+    watchdog = (REPO_ROOT / "ops" / "verification" / "watchdog.sh").read_text(
+        encoding="utf-8"
+    )
     phase0 = (REPO_ROOT / "ops" / "verification" / "phase0_check.sh").read_text(
         encoding="utf-8"
     )
-    start_ollama = (REPO_ROOT / "scripts" / "start_ollama_local.sh").read_text(
-        encoding="utf-8"
-    )
+    start_ollama = (
+        REPO_ROOT / "scripts" / "ollama" / "start_ollama_local.sh"
+    ).read_text(encoding="utf-8")
 
     assert "GOAT_HEALTH_URL:=http://127.0.0.1:62606/api/health" in healthcheck
-    assert 'LOG="${GOAT_WATCHDOG_LOG:-$PROJECT_DIR/logs/watchdog.log}"' in watchdog
+    assert 'GOAT_RUNTIME_ROOT="${GOAT_RUNTIME_ROOT:-$PROJECT_DIR/var}"' in watchdog
+    assert 'GOAT_LOG_DIR="${GOAT_LOG_DIR:-$GOAT_RUNTIME_ROOT/logs}"' in watchdog
+    assert 'LOG="${GOAT_WATCHDOG_LOG:-$GOAT_LOG_DIR/watchdog.log}"' in watchdog
     assert 'mkdir -p "$(dirname "$LOG")"' in watchdog
+    assert "bash ops/deploy/deploy.sh" in watchdog
 
     assert "Need Node 24.x" in phase0
     assert "npm ci --silent" in phase0
     assert "server:create_app --factory" in phase0
-    assert "logs/fastapi.log" in phase0
-    assert "logs/fastapi.pid" in phase0
+    assert "var/logs/fastapi.log" in phase0
+    assert "var/logs/fastapi.pid" in phase0
 
     assert (
         'OLLAMA_BASE_URL_VALUE="${OLLAMA_BASE_URL:-${OLLAMA_HOST:-http://127.0.0.1:11435}}"'
         in start_ollama
     )
     assert 'OLLAMA_HOST="${OLLAMA_BASE_URL_VALUE}"' in start_ollama
+    assert "scripts/ollama/ollama_local.sh" in start_ollama
 
 
 def test_release_docs_and_status_match_current_truth() -> None:
@@ -93,7 +100,7 @@ def test_release_docs_and_status_match_current_truth() -> None:
     assert "immutable bundle" in release_doc
     assert "promotion evidence" in release_doc
     assert "exercise_release_rollback_drill" in rollback_doc
-    assert "python -m tools.run_pr_latency_gate" in operations_doc
+    assert "python -m tools.quality.run_pr_latency_gate" in operations_doc
     assert "`ops/deploy/deploy.sh`" in operations_doc
     assert "`ops/systemd/goat-ai.service`" in operations_doc
     assert "<app_log_dir>/desktop-shell.log" in operations_doc

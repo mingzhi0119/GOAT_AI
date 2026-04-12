@@ -240,7 +240,16 @@ function Resolve-OllamaBaseUrl {
     }
 
     Assert-CommandAvailable -Name ollama
-    $logsDir = Join-Path $ProjectRoot "logs"
+    $runtimeRoot = if ($env:GOAT_RUNTIME_ROOT) {
+        $env:GOAT_RUNTIME_ROOT
+    } else {
+        Join-Path $ProjectRoot "var"
+    }
+    $logsDir = if ($env:GOAT_LOG_DIR) {
+        $env:GOAT_LOG_DIR
+    } else {
+        Join-Path $runtimeRoot "logs"
+    }
     New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
     $ollamaOutLog = Join-Path $logsDir "ollama.local.out.log"
     $ollamaErrLog = Join-Path $logsDir "ollama.local.err.log"
@@ -328,7 +337,26 @@ $ProjectDir = [System.IO.Path]::GetFullPath($ProjectDir)
 $VenvDir = Join-Path $ProjectDir ".venv"
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
 $FrontendDir = Join-Path $ProjectDir "frontend"
-$LogsDir = Join-Path $ProjectDir "logs"
+$RuntimeRoot = if ($env:GOAT_RUNTIME_ROOT) {
+    $env:GOAT_RUNTIME_ROOT
+} else {
+    Join-Path $ProjectDir "var"
+}
+$LogsDir = if ($env:GOAT_LOG_DIR) {
+    $env:GOAT_LOG_DIR
+} else {
+    Join-Path $RuntimeRoot "logs"
+}
+$LogDbPath = if ($env:GOAT_LOG_PATH) {
+    $env:GOAT_LOG_PATH
+} else {
+    Join-Path $RuntimeRoot "chat_logs.db"
+}
+$DataDir = if ($env:GOAT_DATA_DIR) {
+    $env:GOAT_DATA_DIR
+} else {
+    Join-Path $RuntimeRoot "data"
+}
 $ApiLog = Join-Path $LogsDir "fastapi.log"
 $ApiErrLog = Join-Path $LogsDir "fastapi.err.log"
 $ApiPid = Join-Path $LogsDir "fastapi.pid"
@@ -358,7 +386,7 @@ if ($BundleDeploy) {
         Copy-Item -LiteralPath $currentManifestPath -Destination $previousManifestTemp -Force
     }
 
-    & $PythonBin (Join-Path $Script:RepoRoot "tools\install_release_bundle.py") `
+    & $PythonBin (Join-Path $Script:RepoRoot "tools\release\install_release_bundle.py") `
         --bundle $ReleaseBundle `
         --manifest $ReleaseManifest `
         --project-dir $ProjectDir `
@@ -383,7 +411,9 @@ if ($BundleDeploy) {
 }
 
 Set-Location -LiteralPath $ProjectDir
+New-Item -ItemType Directory -Path $RuntimeRoot -Force | Out-Null
 New-Item -ItemType Directory -Path $LogsDir -Force | Out-Null
+New-Item -ItemType Directory -Path $DataDir -Force | Out-Null
 
 if (-not $BundleDeploy) {
     if ($SyncGit.IsPresent) {
@@ -472,15 +502,27 @@ $startInfo = @{
 
 $previousGoatServerPort = $env:GOAT_SERVER_PORT
 $previousGoatLocalPort = $env:GOAT_LOCAL_PORT
+$previousGoatRuntimeRoot = $env:GOAT_RUNTIME_ROOT
+$previousGoatLogDir = $env:GOAT_LOG_DIR
+$previousGoatLogPath = $env:GOAT_LOG_PATH
+$previousGoatDataDir = $env:GOAT_DATA_DIR
 $previousOllamaBaseUrl = $env:OLLAMA_BASE_URL
 try {
     $env:GOAT_SERVER_PORT = $ServerPort.ToString()
     $env:GOAT_LOCAL_PORT = $ServerPort.ToString()
+    $env:GOAT_RUNTIME_ROOT = $RuntimeRoot
+    $env:GOAT_LOG_DIR = $LogsDir
+    $env:GOAT_LOG_PATH = $LogDbPath
+    $env:GOAT_DATA_DIR = $DataDir
     $env:OLLAMA_BASE_URL = $ResolvedOllamaBaseUrl
     $process = Start-Process @startInfo
 } finally {
     $env:GOAT_SERVER_PORT = $previousGoatServerPort
     $env:GOAT_LOCAL_PORT = $previousGoatLocalPort
+    $env:GOAT_RUNTIME_ROOT = $previousGoatRuntimeRoot
+    $env:GOAT_LOG_DIR = $previousGoatLogDir
+    $env:GOAT_LOG_PATH = $previousGoatLogPath
+    $env:GOAT_DATA_DIR = $previousGoatDataDir
     $env:OLLAMA_BASE_URL = $previousOllamaBaseUrl
 }
 
@@ -492,7 +534,20 @@ if (-not (Test-DeploymentContract -Port $ServerPort)) {
 }
 
 Write-Step "Running post-deploy contract checks"
-& $VenvPython (Join-Path $ProjectDir "scripts\post_deploy_check.py") --base-url "http://127.0.0.1:$ServerPort"
+Push-Location -LiteralPath $ProjectDir
+try {
+    $env:GOAT_RUNTIME_ROOT = $RuntimeRoot
+    $env:GOAT_LOG_DIR = $LogsDir
+    $env:GOAT_LOG_PATH = $LogDbPath
+    $env:GOAT_DATA_DIR = $DataDir
+    & $VenvPython -m tools.ops.post_deploy_check --base-url "http://127.0.0.1:$ServerPort"
+} finally {
+    Pop-Location
+    $env:GOAT_RUNTIME_ROOT = $previousGoatRuntimeRoot
+    $env:GOAT_LOG_DIR = $previousGoatLogDir
+    $env:GOAT_LOG_PATH = $previousGoatLogPath
+    $env:GOAT_DATA_DIR = $previousGoatDataDir
+}
 if ($LASTEXITCODE -ne 0) {
     Stop-PidFileProcess -PidFile $ApiPid
     throw "Post-deploy contract checks failed on port $ServerPort."

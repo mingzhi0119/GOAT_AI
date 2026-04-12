@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # GOAT AI Phase 0 verification script
-# Run on the target host: bash phase0_check.sh
+# Run on the target host: bash ops/verification/phase0_check.sh
 set -euo pipefail
 
 GREEN='\033[0;32m'
@@ -104,6 +104,6 @@ echo ""
 ok "Phase 0 complete; all checks passed"
 echo ""
 echo "Next:"
-echo "  mkdir -p logs"
-echo "  nohup python3 -m uvicorn server:create_app --factory --host 0.0.0.0 --port $PORT > logs/fastapi.log 2>&1 &"
-echo "  echo \$! > logs/fastapi.pid"
+echo "  mkdir -p var/logs"
+echo "  GOAT_RUNTIME_ROOT=\$PWD/var GOAT_LOG_DIR=\$PWD/var/logs nohup python3 -m uvicorn server:create_app --factory --host 0.0.0.0 --port $PORT > var/logs/fastapi.log 2>&1 &"
+echo "  echo \$! > var/logs/fastapi.pid"

@@ -1,4 +1,4 @@
-"""Tests for scripts/backup_chat_db.py."""
+"""Tests for tools/ops/backup_chat_db.py."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.backup_chat_db import backup_chat_db, prune_old_backups
+from tools.ops.backup_chat_db import backup_chat_db, prune_old_backups
 
 
 class BackupChatDbTests(unittest.TestCase):

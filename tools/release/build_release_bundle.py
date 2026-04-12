@@ -17,6 +17,7 @@ EXCLUDED_TOP_LEVEL_NAMES = {
     "backups",
     "data",
     "logs",
+    "var",
     "node_modules",
 }
 EXCLUDED_RELATIVE_PREFIXES = (

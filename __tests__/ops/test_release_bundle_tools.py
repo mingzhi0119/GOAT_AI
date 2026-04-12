@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from tools.build_release_bundle import build_release_bundle
-from tools.install_release_bundle import install_release_bundle
+from tools.release.build_release_bundle import build_release_bundle
+from tools.release.install_release_bundle import install_release_bundle
 
 
 def _write(path: Path, content: str) -> None:
@@ -19,13 +19,13 @@ def test_build_release_bundle_packages_dist_and_excludes_runtime_state(
     tmp_path: Path,
 ) -> None:
     repo_root = tmp_path / "repo"
-    _write(repo_root / "deploy.sh", "#!/usr/bin/env bash\n")
+    _write(repo_root / "ops" / "deploy" / "deploy.sh", "#!/usr/bin/env bash\n")
     _write(repo_root / "backend" / "main.py", "print('ok')\n")
     _write(repo_root / "frontend" / "dist" / "index.html", "<!doctype html>\n")
     _write(repo_root / "frontend" / "node_modules" / "left-pad.js", "ignored\n")
-    _write(repo_root / "data" / "runtime.txt", "ignored\n")
-    _write(repo_root / "logs" / "fastapi.log", "ignored\n")
-    _write(repo_root / "chat_logs.db", "ignored\n")
+    _write(repo_root / "var" / "data" / "runtime.txt", "ignored\n")
+    _write(repo_root / "var" / "logs" / "fastapi.log", "ignored\n")
+    _write(repo_root / "var" / "chat_logs.db", "ignored\n")
     _write(repo_root / ".git" / "config", "[core]\n")
 
     bundle_path = tmp_path / "artifacts" / "release-bundle.tar.gz"
@@ -43,13 +43,13 @@ def test_build_release_bundle_packages_dist_and_excludes_runtime_state(
     with tarfile.open(bundle_path, "r:gz") as archive:
         names = set(archive.getnames())
 
-    assert "deploy.sh" in names
+    assert "ops/deploy/deploy.sh" in names
     assert "backend/main.py" in names
     assert "frontend/dist/index.html" in names
     assert "frontend/node_modules/left-pad.js" not in names
-    assert "data/runtime.txt" not in names
-    assert "logs/fastapi.log" not in names
-    assert "chat_logs.db" not in names
+    assert "var/data/runtime.txt" not in names
+    assert "var/logs/fastapi.log" not in names
+    assert "var/chat_logs.db" not in names
     assert ".git/config" not in names
 
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -64,7 +64,9 @@ def test_install_release_bundle_replaces_source_tree_but_preserves_runtime_paths
     tmp_path: Path,
 ) -> None:
     repo_root = tmp_path / "repo"
-    _write(repo_root / "deploy.sh", "#!/usr/bin/env bash\necho deploy\n")
+    _write(
+        repo_root / "ops" / "deploy" / "deploy.sh", "#!/usr/bin/env bash\necho deploy\n"
+    )
     _write(repo_root / "backend" / "main.py", "print('new bundle')\n")
     _write(repo_root / "frontend" / "dist" / "index.html", "<!doctype html>\n")
 
@@ -81,8 +83,8 @@ def test_install_release_bundle_replaces_source_tree_but_preserves_runtime_paths
 
     project_dir = tmp_path / "project"
     _write(project_dir / ".env", "GOAT_SERVER_PORT=62606\n")
-    _write(project_dir / "logs" / "fastapi.log", "keep\n")
-    _write(project_dir / "data" / "upload.txt", "keep\n")
+    _write(project_dir / "var" / "logs" / "fastapi.log", "keep\n")
+    _write(project_dir / "var" / "data" / "upload.txt", "keep\n")
     _write(project_dir / ".git" / "config", "[core]\n")
     _write(project_dir / "obsolete.txt", "remove me\n")
 
@@ -93,7 +95,7 @@ def test_install_release_bundle_replaces_source_tree_but_preserves_runtime_paths
         expected_sha="feedface",
     )
 
-    assert (project_dir / "deploy.sh").is_file()
+    assert (project_dir / "ops" / "deploy" / "deploy.sh").is_file()
     assert (project_dir / "backend" / "main.py").read_text(
         encoding="utf-8"
     ) == "print('new bundle')\n"
@@ -101,17 +103,19 @@ def test_install_release_bundle_replaces_source_tree_but_preserves_runtime_paths
     assert (project_dir / ".env").read_text(
         encoding="utf-8"
     ) == "GOAT_SERVER_PORT=62606\n"
-    assert (project_dir / "logs" / "fastapi.log").read_text(
+    assert (project_dir / "var" / "logs" / "fastapi.log").read_text(
         encoding="utf-8"
     ) == "keep\n"
-    assert (project_dir / "data" / "upload.txt").read_text(encoding="utf-8") == "keep\n"
+    assert (project_dir / "var" / "data" / "upload.txt").read_text(
+        encoding="utf-8"
+    ) == "keep\n"
     assert (project_dir / ".git" / "config").is_file()
     assert not (project_dir / "obsolete.txt").exists()
 
 
 def test_install_release_bundle_rejects_sha_mismatch(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
-    _write(repo_root / "deploy.sh", "#!/usr/bin/env bash\n")
+    _write(repo_root / "ops" / "deploy" / "deploy.sh", "#!/usr/bin/env bash\n")
     _write(repo_root / "frontend" / "dist" / "index.html", "<!doctype html>\n")
 
     bundle_path = tmp_path / "artifacts" / "release-bundle.tar.gz"

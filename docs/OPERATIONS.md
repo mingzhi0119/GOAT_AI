@@ -38,7 +38,7 @@ python3 -m uvicorn server:create_app --factory --host 0.0.0.0 --port 62606 --rel
 
 `lint-imports` enforces backend package layering (`pyproject.toml`); run it after dependency or router/service refactors.
 
-**Repository tools:** run CLI modules from the **repository root** with `python -m tools.<module>` (for example `python -m tools.run_rag_eval`, `python -m tools.check_api_contract_sync`). This avoids setting `PYTHONPATH` manually; `.env` is for app runtime, not your shell. For **`python -m tools.check_api_contract_sync`**, use the **same Python minor as CI (3.14)** so `docs/openapi.json` matches `app.openapi()`. On Windows hosts, use WSL when a tool or dependency path needs Linux parity. `bash scripts/wsl_api_contract_refresh.sh` remains the preferred artifact-refresh path when Windows packaging availability differs from CI.
+**Repository tools:** run CLI modules from the **repository root** with `python -m tools.<module>` (for example `python -m tools.quality.run_rag_eval`, `python -m tools.contracts.check_api_contract_sync`). This avoids setting `PYTHONPATH` manually; `.env` is for app runtime, not your shell. For **`python -m tools.contracts.check_api_contract_sync`**, use the **same Python minor as CI (3.14)** so `docs/openapi.json` matches `app.openapi()`. On Windows hosts, use WSL when a tool or dependency path needs Linux parity. `bash scripts/wsl/wsl_api_contract_refresh.sh` remains the preferred artifact-refresh path when Windows packaging availability differs from CI.
 
 ### SQLite schema migrations (Phase 13 Section 13.0)
 
@@ -72,8 +72,8 @@ with `npm run contract:generate` whenever the backend contract changes.
 This remains a normal Windows-native flow for the Tauri-based desktop shell and future packaged Windows app path. Use the bootstrap script instead of manually clicking through installers:
 
 ```powershell
-.\scripts\install_desktop_prereqs.ps1 -Profile Runtime
-.\scripts\install_desktop_prereqs.ps1 -Profile Dev
+.\scripts\desktop\install_desktop_prereqs.ps1 -Profile Runtime
+.\scripts\desktop\install_desktop_prereqs.ps1 -Profile Dev
 ```
 
 Profiles:
@@ -103,17 +103,17 @@ Build flow:
 
 ```bash
 pip install -r requirements-desktop-build.txt
-python -m tools.build_desktop_sidecar
+python -m tools.desktop.build_desktop_sidecar
 cd frontend
 npm run desktop:build
 ```
 
 Important notes:
 
-- `python -m tools.build_desktop_sidecar` builds a per-platform executable with **PyInstaller**
+- `python -m tools.desktop.build_desktop_sidecar` builds a per-platform executable with **PyInstaller**
 - the output is copied to `frontend/src-tauri/binaries/goat-backend-$TARGET_TRIPLE[.exe]`
 - `npm run desktop:build` triggers the same sidecar build automatically through Tauri's `beforeBuildCommand`
-- merge-blocking CI now also builds real Windows packaged desktop installers and records provenance through `python -m tools.write_desktop_release_provenance`
+- merge-blocking CI now also builds real Windows packaged desktop installers and records provenance through `python -m tools.desktop.write_desktop_release_provenance`
 - PyInstaller is **not** a cross-compiler; build each platform's sidecar on that platform (or an equivalent CI runner / VM)
 - on Windows developer machines, Linux-targeted desktop validation should still run from WSL when you need Linux parity; Windows-native packaging remains a Windows flow
 - packaged desktop builds move app-owned writable state out of the repository and into the platform app-local-data directory
@@ -135,7 +135,7 @@ Packaged desktop runtime config:
 Desktop smoke command:
 
 ```bash
-python -m scripts.desktop_smoke --host 127.0.0.1 --port 62606
+python -m tools.desktop.desktop_smoke --host 127.0.0.1 --port 62606
 ```
 
 When API protection is enabled, pass `--api-key "$GOAT_API_KEY"`.
@@ -149,26 +149,26 @@ Public Windows desktop release path:
 ## Deploy
 
 Canonical checked-in operator assets now live under `ops/deploy/`, `ops/systemd/`, and `ops/verification/`.
-Use the repository-root `deploy.sh`, `deploy.ps1`, and `phase0_check.sh` entrypoints when you want the stable operator commands; those root files are compatibility wrappers that delegate to the canonical `ops/` implementations.
+Use the canonical `ops/` entrypoints directly; repository-root deploy wrappers are no longer supported.
 The checked-in user-service unit now lives at `ops/systemd/goat-ai.service`.
 
 Linux:
 
 ```bash
-bash deploy.sh
-QUICK=1 bash deploy.sh
-SKIP_BUILD=1 bash deploy.sh
-SYNC_GIT=1 bash deploy.sh
-RELEASE_BUNDLE=/tmp/release-bundle.tar.gz RELEASE_MANIFEST=/tmp/release-manifest.json bash deploy.sh
+bash ops/deploy/deploy.sh
+QUICK=1 bash ops/deploy/deploy.sh
+SKIP_BUILD=1 bash ops/deploy/deploy.sh
+SYNC_GIT=1 bash ops/deploy/deploy.sh
+RELEASE_BUNDLE=/tmp/release-bundle.tar.gz RELEASE_MANIFEST=/tmp/release-manifest.json bash ops/deploy/deploy.sh
 ```
 
 Windows PowerShell:
 
 ```powershell
-.\deploy.ps1
-.\deploy.ps1 -Quick
-.\deploy.ps1 -SkipBuild
-.\deploy.ps1 -SyncGit
+.\ops\deploy\deploy.ps1
+.\ops\deploy\deploy.ps1 -Quick
+.\ops\deploy\deploy.ps1 -SkipBuild
+.\ops\deploy\deploy.ps1 -SyncGit
 ```
 
 Important behavior:
@@ -178,11 +178,11 @@ Important behavior:
 - `GIT_REF` is authoritative: branch refs sync to `origin/$GIT_REF`, while tag/commit refs deploy in detached mode without drifting back to `main`
 - `EXPECTED_GIT_SHA` may be supplied by release automation to hard-fail if the host resolves any SHA other than the requested release commit
 - `RELEASE_BUNDLE` + `RELEASE_MANIFEST` switch deploy into artifact-first mode: the shipped bundle is installed before process restart, and the host no longer rebuilds the frontend from source
-- `deploy.sh` keeps the `nohup` + `logs/fastapi.pid` fallback path
-- `deploy.sh` and `deploy.ps1` now stop the current FastAPI process gracefully first, then force cleanup only if the drain window expires
+- `deploy.sh` keeps the `nohup` + `var/logs/fastapi.pid` fallback path
+- `ops/deploy/deploy.sh` and `ops/deploy/deploy.ps1` now stop the current FastAPI process gracefully first, then force cleanup only if the drain window expires
 - Artifact-first rollback is the preferred path; ref-based rollback remains available for manual recovery. See [ROLLBACK.md](ROLLBACK.md)
 - Windows deploy reuses Ollama on `127.0.0.1:11434` when available unless `OLLAMA_BASE_URL` is explicitly set
-- Deploy now includes a post-deploy contract check (`scripts/post_deploy_check.py`) before success is reported: it exercises `GET /api/health`, `GET /api/ready`, `GET /api/system/runtime-target`, and a short `POST /api/chat` stream. The chat step passes when the SSE body includes **at least one** `token` or **`thinking`** frame (so thinking-first models still validate), and fails on HTTP errors, empty SSE, or a first-frame `error`
+- Deploy now includes a post-deploy contract check (`tools/ops/post_deploy_check.py`) before success is reported: it exercises `GET /api/health`, `GET /api/ready`, `GET /api/system/runtime-target`, and a short `POST /api/chat` stream. The chat step passes when the SSE body includes **at least one** `token` or **`thinking`** frame (so thinking-first models still validate), and fails on HTTP errors, empty SSE, or a first-frame `error`
 
 Windows PowerShell deploy remains fully supported. Use WSL only when you specifically need Linux-targeted deploy-script parity or shell semantics.
 
@@ -216,8 +216,8 @@ Self-managed VMs, Docker Compose, Kubernetes, or developer laptops use the same 
 | `GOAT_MAX_DATAFRAME_ROWS` | Max parsed rows | `50000` |
 | `GOAT_SYSTEM_PROMPT` | Override system prompt | built-in default |
 | `GOAT_SYSTEM_PROMPT_FILE` | Path to UTF-8 prompt file | empty |
-| `GOAT_LOG_PATH` | SQLite path | `<project>/chat_logs.db` |
-| `GOAT_DATA_DIR` | Root directory for persisted uploads, normalized knowledge text, vector indexes, and vision attachments | `<project>/data` (gitignored by default; do not commit) |
+| `GOAT_LOG_PATH` | SQLite path | `<project>/var/chat_logs.db` |
+| `GOAT_DATA_DIR` | Root directory for persisted uploads, normalized knowledge text, vector indexes, and vision attachments | `<project>/var/data` (gitignored by default; do not commit) |
 | `GOAT_API_KEY` | Protect non-health APIs via `X-GOAT-API-Key` | empty |
 | `GOAT_API_KEY_WRITE` | Optional second key: `GET`/`HEAD`/`OPTIONS` may use read key (`GOAT_API_KEY`); other methods require this write key when set | empty |
 | `GOAT_API_CREDENTIALS_JSON` | Optional JSON credential registry; each entry may provide `secret` or `secret_sha256`, and when empty the app derives default read/write credentials from `GOAT_API_KEY` and `GOAT_API_KEY_WRITE` | empty |
@@ -417,7 +417,7 @@ Setting `GOAT_SAFEGUARD_ENABLED=false` and `GOAT_SAFEGUARD_MODE=off` are equival
 
 ### RAG retrieval quality (Phase 14.7)
 
-**Regression:** run `python -m tools.run_rag_eval` (from the repository root) before merge when changing `backend/services/retrieval_quality/`, `tools/run_rag_eval.py`, or `evaldata/`. CI enforces this on every backend job.
+**Regression:** run `python -m tools.quality.run_rag_eval` (from the repository root) before merge when changing `backend/services/retrieval_quality/`, `tools/run_rag_eval.py`, or `evaldata/`. CI enforces this on every backend job.
 
 **Knobs (environment + request):**
 
@@ -456,14 +456,14 @@ SLO starter table:
 |----------|--------|--------|
 | First-token latency p95 | <= 2000 ms | `GET /api/system/inference` (`first_token_p95_ms`) |
 | Full chat latency p95 | <= 12000 ms | `GET /api/system/inference` (`chat_p95_ms`) |
-| Max concurrent SSE streams (single process) | 20 | Runbook load validation (`python -m tools.load_chat_smoke`) |
+| Max concurrent SSE streams (single process) | 20 | Runbook load validation (`python -m tools.quality.load_chat_smoke`) |
 | Upload analyze JSON budget | <= 5 s for <= 20 MB supported knowledge file (`csv/xlsx/txt/md/pdf/docx`) | `POST /api/upload/analyze` smoke run |
 | Session append guardrails | hard-stop at configured maxes | `GOAT_MAX_CHAT_MESSAGES`, `GOAT_MAX_CHAT_PAYLOAD_BYTES` |
 
 Load smoke command:
 
 ```bash
-python -m tools.load_chat_smoke --base-url http://127.0.0.1:62606 --model gemma4:26b --runs 20 --show-system-inference
+python -m tools.quality.load_chat_smoke --base-url http://127.0.0.1:62606 --model gemma4:26b --runs 20 --show-system-inference
 ```
 
 When API protection is enabled, pass `--api-key "$GOAT_API_KEY"`.
@@ -471,7 +471,7 @@ When API protection is enabled, pass `--api-key "$GOAT_API_KEY"`.
 Performance governance:
 
 - `.github/workflows/performance-nightly.yml` runs the same smoke command on a schedule or manual dispatch.
-- `.github/workflows/ci.yml` now also runs `python -m tools.run_pr_latency_gate` with in-process fake-LLM traffic so the highest-risk chat latency regressions fail before merge.
+- `.github/workflows/ci.yml` now also runs `python -m tools.quality.run_pr_latency_gate` with in-process fake-LLM traffic so the highest-risk chat latency regressions fail before merge.
 - The performance gate currently fails when:
   - full chat p95 exceeds `12000 ms`
   - first-token p95 exceeds `2000 ms`
@@ -487,24 +487,24 @@ Performance governance:
   - staging deployment of the exact retained bundle
   - production promotion of the same bundle behind GitHub Environment approval
   - per-environment promotion evidence with artifact digest and rollback target capture
-- `python -m scripts.exercise_release_rollback_drill` is the repo-level artifact rollback drill for scratch-project validation of bundle promotion + rollback semantics.
+- `python -m tools.release.exercise_release_rollback_drill` is the repo-level artifact rollback drill for scratch-project validation of bundle promotion + rollback semantics.
 - Release policy and required environment secrets are documented in [RELEASE_GOVERNANCE.md](RELEASE_GOVERNANCE.md).
 
 ## Process and health
 
 - Liveness: `GET /api/health`
 - Readiness: `GET /api/ready` (SQLite + optional Ollama probe; use `GOAT_READY_SKIP_OLLAMA_PROBE=1` when Ollama is intentionally absent)
-- Logs: `logs/fastapi.log`
-- PID file in nohup mode: `logs/fastapi.pid`
+- Logs: `var/logs/fastapi.log`
+- PID file in nohup mode: `var/logs/fastapi.pid`
 
 Stop commands:
 
 ```bash
-kill "$(cat logs/fastapi.pid)"
+kill "$(cat var/logs/fastapi.pid)"
 ```
 
 ```powershell
-Stop-Process -Id (Get-Content .\logs\fastapi.pid)
+Stop-Process -Id (Get-Content .\var\logs\fastapi.pid)
 ```
 
 Graceful shutdown note:
@@ -524,13 +524,13 @@ Graceful shutdown note:
 - One-command backup:
 
 ```bash
-python scripts/backup_chat_db.py
+python -m tools.ops.backup_chat_db
 ```
 
 - Recovery drill:
 
 ```bash
-python -m scripts.exercise_recovery_drill --src "$GOAT_LOG_PATH" --backup-dir ./backups --required-table sessions --required-table session_messages
+python -m tools.ops.exercise_recovery_drill --src "$GOAT_LOG_PATH" --backup-dir ./backups --required-table sessions --required-table session_messages
 ```
 
 - The recovery drill is now covered by automated tests; keep it passing whenever backup, restore, rollback, or SQLite persistence behavior changes.
@@ -550,7 +550,7 @@ Treat the following as operational stop signs during Phase 13 rollout work:
 
 | Trigger | Response |
 |---------|----------|
-| Repeated SSE failure or timeout in post-deploy contract checks | Pause Wave B work, inspect `logs/fastapi.log` and Ollama logs, and do not advance the rollout until `/api/chat` emits SSE again. |
+| Repeated SSE failure or timeout in post-deploy contract checks | Pause Wave B work, inspect `var/logs/fastapi.log` and Ollama logs, and do not advance the rollout until `/api/chat` emits SSE again. |
 | `/api/ready` flapping or sustained non-200 responses | Block Phase 15 structural refactors until readiness and deploy checks are stable across a full deploy cycle. |
 | `sqlite_log_write_failures_total` rising over a sustained window | Prioritize backup/restore drill and recovery work before any new persistence feature lands. |
 

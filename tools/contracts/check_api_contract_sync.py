@@ -2,7 +2,7 @@
 
 Run from the repository root::
 
-    python -m tools.check_api_contract_sync
+    python -m tools.contracts.check_api_contract_sync
 """
 
 from __future__ import annotations
@@ -12,9 +12,9 @@ import tempfile
 from pathlib import Path
 
 from backend.main import create_contract_app
-from tools import generate_llm_api_yaml
+from tools.contracts import generate_llm_api_yaml
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 OPENAPI_PATH = REPO_ROOT / "docs" / "openapi.json"
 LLM_API_PATH = REPO_ROOT / "docs" / "api.llm.yaml"
 
@@ -26,8 +26,8 @@ def main() -> int:
     # Deep equality: avoids false failures when Python versions emit different dict key order in dumps.
     if generated_openapi != committed_openapi:
         print("Contract check failed: docs/openapi.json is out of sync.")
-        print("Run: python -m tools.regenerate_openapi_json")
-        print("Then: python -m tools.generate_llm_api_yaml")
+        print("Run: python -m tools.contracts.regenerate_openapi_json")
+        print("Then: python -m tools.contracts.generate_llm_api_yaml")
         return 1
 
     openapi_obj = committed_openapi
@@ -39,7 +39,7 @@ def main() -> int:
     committed_llm = LLM_API_PATH.read_text(encoding="utf-8")
     if generated_llm != committed_llm:
         print("Contract check failed: docs/api.llm.yaml is out of sync.")
-        print("Run: python -m tools.generate_llm_api_yaml")
+        print("Run: python -m tools.contracts.generate_llm_api_yaml")
         return 1
 
     print("API contract artifacts are in sync.")
