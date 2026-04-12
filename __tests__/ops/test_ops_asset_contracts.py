@@ -91,6 +91,8 @@ def test_watchdog_phase0_and_school_ollama_assets_align_with_supported_ops_contr
     assert "read_first_dotenv_value() {" in deploy_sh
     assert "school_ollama_local_enabled() {" in deploy_sh
     assert "School Ubuntu Ollama profile enabled" in deploy_sh
+    assert '[ ! -f "${PROJECT_DIR}/scripts/ollama/start_ollama_local.sh" ]' in deploy_sh
+    assert 'bash "${PROJECT_DIR}/scripts/ollama/start_ollama_local.sh"' in deploy_sh
     assert (
         '_dotenv_school_switch="$(read_first_dotenv_value "GOAT_USE_SCHOOL_OLLAMA_LOCAL" "${SCHOOL_DOTENV_PATH}" "${PRIMARY_DOTENV_PATH}")"'
         in deploy_sh
@@ -109,7 +111,8 @@ def test_watchdog_phase0_and_school_ollama_assets_align_with_supported_ops_contr
     assert '[ "${EFFECTIVE_OLLAMA_URL}" = "${LOCAL_OLLAMA_URL}" ]' not in deploy_sh
 
     assert (
-        "ExecStartPre=%h/GOAT_AI/scripts/ollama/start_ollama_local.sh" in school_service
+        "ExecStartPre=/usr/bin/bash %h/GOAT_AI/scripts/ollama/start_ollama_local.sh"
+        in school_service
     )
     assert "Environment=GOAT_USE_SCHOOL_OLLAMA_LOCAL=1" in school_service
     assert "EnvironmentFile=-%h/GOAT_AI/.env.school-ubuntu" in school_service

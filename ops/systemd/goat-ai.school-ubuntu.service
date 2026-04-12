@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 WorkingDirectory=%h/GOAT_AI
 ExecStartPre=/usr/bin/mkdir -p %h/GOAT_AI/var/logs %h/GOAT_AI/var/data
-ExecStartPre=%h/GOAT_AI/scripts/ollama/start_ollama_local.sh
+ExecStartPre=/usr/bin/bash %h/GOAT_AI/scripts/ollama/start_ollama_local.sh
 ExecStart=%h/GOAT_AI/.venv/bin/python -m uvicorn server:create_app \
     --factory \
     --host 0.0.0.0 --port 62606 --workers 2

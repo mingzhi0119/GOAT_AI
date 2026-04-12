@@ -289,14 +289,14 @@ API_LOG="${LOGS_DIR}/fastapi.log"
 API_PID="${LOGS_DIR}/fastapi.pid"
 
 if school_ollama_local_enabled; then
-  if [ ! -x "${PROJECT_DIR}/scripts/ollama/start_ollama_local.sh" ]; then
+  if [ ! -f "${PROJECT_DIR}/scripts/ollama/start_ollama_local.sh" ]; then
     echo "School Ubuntu Ollama profile is enabled but scripts/ollama/start_ollama_local.sh is missing."
     exit 1
   fi
   echo "School Ubuntu Ollama profile enabled; ensuring local Ollama is running at ${EFFECTIVE_OLLAMA_URL}"
   OLLAMA_BASE_URL="${EFFECTIVE_OLLAMA_URL}" \
   OLLAMA_HOST="${EFFECTIVE_OLLAMA_URL}" \
-  "${PROJECT_DIR}/scripts/ollama/start_ollama_local.sh"
+  bash "${PROJECT_DIR}/scripts/ollama/start_ollama_local.sh"
 fi
 
 _goat_systemd_restart() {
