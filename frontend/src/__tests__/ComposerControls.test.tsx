@@ -40,8 +40,8 @@ describe('ComposerControls', () => {
     )
 
     fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
-    fireEvent.click(screen.getByRole('button', { name: /open model menu/i }))
-    fireEvent.click(screen.getByRole('button', { name: /open reasoning menu/i }))
+    fireEvent.click(screen.getByRole('button', { name: /open model menu\. current model: gemma4:26b/i }))
+    fireEvent.click(screen.getByRole('button', { name: /open reasoning menu\. current level: medium/i }))
     fireEvent.click(screen.getByRole('button', { name: /plan enabled/i }))
     fireEvent.click(screen.getByRole('button', { name: /thinking mode enabled/i }))
     fireEvent.click(screen.getByRole('button', { name: /send message/i }))
@@ -52,6 +52,42 @@ describe('ComposerControls', () => {
     expect(onPlanModeChange).toHaveBeenCalledWith(false)
     expect(onThinkingEnabledChange).toHaveBeenCalledWith(false)
     expect(onSubmit).toHaveBeenCalled()
+  })
+
+  it('exposes the current model and reasoning level in control labels', () => {
+    render(
+      <ComposerControls
+        layoutDecisions={getChatLayoutDecisions('wide')}
+        selectedModel="gemma4:26b"
+        reasoningLevel="high"
+        supportsThinking={false}
+        thinkingEnabled={false}
+        planModeEnabled={false}
+        onPlanModeChange={vi.fn()}
+        plusMenuOpen={false}
+        modelMenuOpen={false}
+        reasoningMenuOpen={false}
+        isStreaming={false}
+        attachmentUploading={false}
+        canSend={false}
+        gpuStatus={null}
+        gpuError={null}
+        inferenceLatency={null}
+        onTogglePlusMenu={vi.fn()}
+        onToggleModelMenu={vi.fn()}
+        onToggleReasoningMenu={vi.fn()}
+        onThinkingEnabledChange={vi.fn()}
+        onStop={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    )
+
+    expect(
+      screen.getByRole('button', { name: /open model menu\. current model: gemma4:26b/i }),
+    ).toHaveAttribute('aria-haspopup', 'menu')
+    expect(
+      screen.getByRole('button', { name: /open reasoning menu\. current level: high/i }),
+    ).toHaveAttribute('aria-haspopup', 'menu')
   })
 
   it('uses hover highlight for the thinking indicator without rendering a tooltip by default', () => {

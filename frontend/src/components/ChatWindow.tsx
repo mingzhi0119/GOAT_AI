@@ -2,40 +2,29 @@ import {
   Suspense,
   lazy,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
   type FC,
   type KeyboardEvent,
 } from 'react'
-import { uploadMediaImage } from '../api/media'
-import {
-  executeCodeSandbox,
-  fetchCodeSandboxExecution,
-  openCodeSandboxLogStream,
-} from '../api/codeSandbox'
-import { streamUpload, type UploadStreamEvent } from '../api/upload'
+import type { UploadStreamEvent } from '../api/upload'
 import type { GPUStatus, InferenceLatency } from '../api/system'
 import type {
   ChartSpec,
-  CodeSandboxExecutionMode,
-  CodeSandboxExecutionResponse,
   CodeSandboxFeature,
   Message,
 } from '../api/types'
 import type { FileBindingMode, FileContextItem } from '../hooks/useFileContext'
+import { useCodeSandboxController } from '../hooks/useCodeSandboxController'
+import { useComposerAttachments } from '../hooks/useComposerAttachments'
 import ComposerControls from './ComposerControls'
-import CodeSandboxPanel from './CodeSandboxPanel'
 import EmptyChatState, { type EmptyChatPrompt } from './EmptyChatState'
-import ManageUploadsPanel from './ManageUploadsPanel'
 import ModelMenu from './ModelMenu'
 import PlusMenu from './PlusMenu'
 import ReasoningMenu from './ReasoningMenu'
-import {
-  getFileExtension,
-  getSuffixPrompt,
-  getTemplateFallbackPrompt,
-} from '../utils/uploadPrompts'
+import { getSuffixPrompt, getTemplateFallbackPrompt } from '../utils/uploadPrompts'
 import { pickRandomPromptTexts, STARTER_PROMPT_POOL } from '../utils/starterPrompts'
 import type { ChatLayoutDecisions } from '../utils/chatLayout'
 import MessageBubble from './MessageBubble'
@@ -49,18 +38,15 @@ import {
 import { brandingConfig } from '../config/branding'
 
 const LazyChartCard = lazy(() => import('./ChartCard'))
+const LazyCodeSandboxPanel = lazy(() => import('./CodeSandboxPanel'))
+const LazyManageUploadsPanel = lazy(() => import('./ManageUploadsPanel'))
+const LazyMessageBubble = lazy(() => import('./MessageBubble'))
 
-const KNOWLEDGE_FILE_EXTENSIONS = new Set(['csv', 'xlsx', 'pdf', 'docx', 'md', 'txt'])
-const IMAGE_FILE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp'])
 const TEXTAREA_MAX_HEIGHT_PX = 144
 const TEXTAREA_MIN_HEIGHT_PX = 28
 
-interface PendingImageAttachment {
-  id: string
-  filename: string
-}
-
 type ComposerPanel = 'plus' | 'manage-uploads' | 'model' | 'reasoning' | 'code-sandbox' | null
+type MenuFocusStrategy = 'selected' | 'first' | 'last'
 
 interface Props {
   messages: Message[]
@@ -89,28 +75,6 @@ interface Props {
   onReasoningLevelChange: (level: ReasoningLevel) => void
   thinkingEnabled: boolean
   onThinkingEnabledChange: (enabled: boolean) => void
-}
-
-function getAttachmentKind(file: File, supportsVision: boolean): 'image' | 'knowledge' | 'unsupported' {
-  const ext = getFileExtension(file.name)
-  if (KNOWLEDGE_FILE_EXTENSIONS.has(ext)) return 'knowledge'
-  if (supportsVision && IMAGE_FILE_EXTENSIONS.has(ext)) return 'image'
-  return 'unsupported'
-}
-
-function supportedAttachmentLabel(supportsVision: boolean): string {
-  return supportsVision
-    ? 'PNG, JPG, WEBP, CSV, XLSX, PDF, DOCX, MD, or TXT'
-    : 'CSV, XLSX, PDF, DOCX, MD, or TXT'
-}
-
-function formatAttachmentErrorMessage(error: unknown, supportsVision: boolean): string {
-  const fallback = 'Attachment upload failed'
-  const message = error instanceof Error ? error.message : fallback
-  if (message.startsWith('Unsupported file type:')) {
-    return `Unsupported file type. Please upload a ${supportedAttachmentLabel(supportsVision)} file.`
-  }
-  return message
 }
 
 function handleComposerTextAreaPointerDown(
@@ -154,33 +118,60 @@ const ChatWindow: FC<Props> = ({
   onThinkingEnabledChange,
 }) => {
   const [input, setInput] = useState('')
-  const [pendingImages, setPendingImages] = useState<PendingImageAttachment[]>([])
-  const [attachmentUploadError, setAttachmentUploadError] = useState<string | null>(null)
-  const [attachmentUploading, setAttachmentUploading] = useState(false)
   const [activePanel, setActivePanel] = useState<ComposerPanel>(null)
-  const [sandboxExecutionMode, setSandboxExecutionMode] = useState<CodeSandboxExecutionMode>('sync')
-  const [sandboxCode, setSandboxCode] = useState('')
-  const [sandboxCommand, setSandboxCommand] = useState('')
-  const [sandboxStdin, setSandboxStdin] = useState('')
-  const [sandboxPending, setSandboxPending] = useState(false)
-  const [sandboxError, setSandboxError] = useState<string | null>(null)
-  const [sandboxResult, setSandboxResult] = useState<CodeSandboxExecutionResponse | null>(null)
-  const [sandboxLiveLogs, setSandboxLiveLogs] = useState<string[]>([])
-  const [sandboxStreamDisconnected, setSandboxStreamDisconnected] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const composerRef = useRef<HTMLDivElement>(null)
   const panelBoundaryRef = useRef<HTMLDivElement>(null)
   const plusButtonRef = useRef<HTMLButtonElement | null>(null)
-  const sandboxLogCloseRef = useRef<(() => void) | null>(null)
-  const sandboxPollRef = useRef<number | null>(null)
-  const sandboxLogCursorRef = useRef(0)
+  const modelButtonRef = useRef<HTMLButtonElement | null>(null)
+  const reasoningButtonRef = useRef<HTMLButtonElement | null>(null)
   const previousCodeSandboxOpenRef = useRef(false)
+  const previousCodeSandboxPanelRef = useRef(false)
+  const modelMenuId = useId()
+  const modelTriggerId = useId()
+  const reasoningMenuId = useId()
+  const reasoningTriggerId = useId()
+  const [modelMenuFocusStrategy, setModelMenuFocusStrategy] =
+    useState<MenuFocusStrategy>('selected')
+  const [reasoningMenuFocusStrategy, setReasoningMenuFocusStrategy] =
+    useState<MenuFocusStrategy>('selected')
   const hasActiveFileContext = activeFileContext !== null
   const activeFileContextFilename = activeFileContext?.filename ?? null
   const activeFileContextSuffixPrompt = activeFileContext?.suffixPrompt ?? null
   const activeFileContextTemplatePrompt = activeFileContext?.templatePrompt ?? null
+  const {
+    attachmentAccept,
+    attachmentUploadError,
+    attachmentUploading,
+    pendingImages,
+    clearPendingImages,
+    handleAttachmentPick,
+    removePendingImage,
+  } = useComposerAttachments({
+    supportsVision,
+    onUploadEvent,
+  })
+  const {
+    codeSandboxEnabled,
+    sandboxCode,
+    sandboxCommand,
+    sandboxError,
+    sandboxExecutionMode,
+    sandboxLiveLogs,
+    sandboxPending,
+    sandboxResult,
+    sandboxStdin,
+    sandboxStreamDisconnected,
+    clearSandboxError,
+    runCodeSandbox,
+    setSandboxCode,
+    setSandboxCommand,
+    setSandboxExecutionMode,
+    setSandboxStdin,
+    stopCodeSandboxMonitoring,
+  } = useCodeSandboxController(codeSandboxFeature)
 
   const starterPrompts = useMemo<EmptyChatPrompt[]>(() => {
     const basePrompts = pickRandomPromptTexts(
@@ -216,10 +207,6 @@ const ChatWindow: FC<Props> = ({
     () => fileContexts.filter(item => item.documentId || item.status === 'processing'),
     [fileContexts],
   )
-  const attachmentAccept = supportsVision
-    ? 'image/png,image/jpeg,image/jpg,image/webp,.csv,.xlsx,.pdf,.docx,.md,.txt'
-    : '.csv,.xlsx,.pdf,.docx,.md,.txt'
-
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -235,17 +222,6 @@ const ChatWindow: FC<Props> = ({
     document.addEventListener('pointerdown', handlePointerDown)
     return () => document.removeEventListener('pointerdown', handlePointerDown)
   }, [activePanel])
-
-  useEffect(() => {
-    return () => {
-      sandboxLogCloseRef.current?.()
-      sandboxLogCloseRef.current = null
-      if (sandboxPollRef.current !== null) {
-        window.clearInterval(sandboxPollRef.current)
-        sandboxPollRef.current = null
-      }
-    }
-  }, [])
 
   useEffect(() => {
     const textarea = textareaRef.current
@@ -266,59 +242,8 @@ const ChatWindow: FC<Props> = ({
     const text = trimmed || (pendingImageIds.length > 0 ? 'What do you see in this image?' : '')
     onSendMessage(text, pendingImageIds.length > 0 ? pendingImageIds : undefined)
     setInput('')
-    setPendingImages([])
-    setAttachmentUploadError(null)
+    clearPendingImages()
     setActivePanel(null)
-  }
-
-  const uploadKnowledgeFile = async (file: File) => {
-    for await (const event of streamUpload(file)) {
-      if (event.type === 'file_prompt' || event.type === 'knowledge_ready') {
-        onUploadEvent(event)
-      } else if (event.type === 'error') {
-        throw new Error(event.message)
-      }
-    }
-  }
-
-  const handleAttachmentPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files ? Array.from(e.target.files) : []
-    e.target.value = ''
-    if (files.length === 0) return
-
-    setAttachmentUploadError(null)
-    setAttachmentUploading(true)
-    setActivePanel(null)
-    try {
-      const knowledgeFiles = files.filter(
-        file => getAttachmentKind(file, supportsVision) === 'knowledge',
-      )
-      const imageFiles = files.filter(file => getAttachmentKind(file, supportsVision) === 'image')
-      const unsupportedFiles = files.filter(
-        file => getAttachmentKind(file, supportsVision) === 'unsupported',
-      )
-
-      if (unsupportedFiles.length > 0) {
-        throw new Error(`Unsupported file type: ${unsupportedFiles[0]!.name}`)
-      }
-      if (knowledgeFiles.length > 1) {
-        throw new Error('Please upload one knowledge file at a time.')
-      }
-
-      for (const imageFile of imageFiles) {
-        const result = await uploadMediaImage(imageFile)
-        setPendingImages(prev => [...prev, { id: result.attachment_id, filename: imageFile.name }])
-      }
-
-      const knowledgeFile = knowledgeFiles[0]
-      if (knowledgeFile) {
-        await uploadKnowledgeFile(knowledgeFile)
-      }
-    } catch (err) {
-      setAttachmentUploadError(formatAttachmentErrorMessage(err, supportsVision))
-    } finally {
-      setAttachmentUploading(false)
-    }
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -337,126 +262,38 @@ const ChatWindow: FC<Props> = ({
   const reasoningMenuOpen = activePanel === 'reasoning'
   const codeSandboxOpen = activePanel === 'code-sandbox'
   const isNarrow = layoutDecisions.layoutMode === 'narrow'
-  const codeSandboxEnabled =
-    !!codeSandboxFeature?.policy_allowed && !!codeSandboxFeature?.effective_enabled
+
+  const toggleComposerPanel = (panel: Exclude<ComposerPanel, null>) => {
+    setActivePanel(prev => (prev === panel ? null : panel))
+  }
+
+  const handleMenuTriggerKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    panel: 'model' | 'reasoning',
+    setFocusStrategy: (strategy: MenuFocusStrategy) => void,
+  ) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+    event.preventDefault()
+    setFocusStrategy(event.key === 'ArrowUp' ? 'last' : 'first')
+    setActivePanel(panel)
+  }
 
   useEffect(() => {
-    if (!codeSandboxOpen && previousCodeSandboxOpenRef.current) {
+    if (
+      (!codeSandboxOpen && previousCodeSandboxOpenRef.current) ||
+      (!manageUploadsOpen && previousCodeSandboxOpenRef.current)
+    ) {
       plusButtonRef.current?.focus()
     }
-    previousCodeSandboxOpenRef.current = codeSandboxOpen
-  }, [codeSandboxOpen])
+    previousCodeSandboxOpenRef.current = codeSandboxOpen || manageUploadsOpen
+  }, [codeSandboxOpen, manageUploadsOpen])
 
-  const stopSandboxPolling = () => {
-    if (sandboxPollRef.current !== null) {
-      window.clearInterval(sandboxPollRef.current)
-      sandboxPollRef.current = null
+  useEffect(() => {
+    if (!codeSandboxOpen && previousCodeSandboxPanelRef.current) {
+      stopCodeSandboxMonitoring()
     }
-  }
-
-  const stopSandboxLogStream = () => {
-    sandboxLogCloseRef.current?.()
-    sandboxLogCloseRef.current = null
-  }
-
-  const refreshSandboxExecution = async (executionId: string) => {
-    const execution = await fetchCodeSandboxExecution(executionId)
-    setSandboxResult(current => {
-      if (!current || current.execution_id !== executionId) return execution
-      return execution
-    })
-    if (
-      execution.status === 'completed' ||
-      execution.status === 'failed' ||
-      execution.status === 'denied'
-    ) {
-      stopSandboxPolling()
-      stopSandboxLogStream()
-    }
-  }
-
-  const startSandboxPolling = (executionId: string) => {
-    stopSandboxPolling()
-    sandboxPollRef.current = window.setInterval(() => {
-      void refreshSandboxExecution(executionId).catch(() => {
-        // Keep polling; the inline status copy is enough here.
-      })
-    }, 1000)
-  }
-
-  const startSandboxLogStream = (executionId: string) => {
-    stopSandboxLogStream()
-    setSandboxStreamDisconnected(false)
-    sandboxLogCloseRef.current = openCodeSandboxLogStream(executionId, {
-      afterSequence: sandboxLogCursorRef.current,
-      onEvent: event => {
-        if (event.type === 'stdout' || event.type === 'stderr') {
-          if (typeof event.sequence === 'number') {
-            sandboxLogCursorRef.current = Math.max(sandboxLogCursorRef.current, event.sequence)
-          }
-          const chunk = event.chunk
-          if (typeof chunk === 'string' && chunk.length > 0) {
-            setSandboxLiveLogs(prev => [...prev, chunk])
-          }
-          return
-        }
-        if (event.type === 'status') {
-          setSandboxResult(current => {
-            if (!current || current.execution_id !== executionId) return current
-            return {
-              ...current,
-              status: event.status ?? current.status,
-              provider_name: event.provider_name ?? current.provider_name,
-              updated_at: event.updated_at ?? current.updated_at,
-              timed_out: event.timed_out ?? current.timed_out,
-            }
-          })
-          return
-        }
-        if (event.type === 'done') {
-          stopSandboxLogStream()
-          void refreshSandboxExecution(executionId).catch(() => {
-            startSandboxPolling(executionId)
-          })
-        }
-      },
-      onError: () => {
-        setSandboxStreamDisconnected(true)
-        startSandboxPolling(executionId)
-      },
-    })
-  }
-
-  const handleRunCodeSandbox = async () => {
-    if ((!sandboxCode.trim() && !sandboxCommand.trim()) || sandboxPending || !codeSandboxEnabled) {
-      return
-    }
-    setSandboxPending(true)
-    setSandboxError(null)
-    setSandboxLiveLogs([])
-    setSandboxStreamDisconnected(false)
-    sandboxLogCursorRef.current = 0
-    stopSandboxPolling()
-    stopSandboxLogStream()
-    try {
-      const result = await executeCodeSandbox({
-        execution_mode: sandboxExecutionMode,
-        runtime_preset: 'shell',
-        ...(sandboxCode.trim() ? { code: sandboxCode } : {}),
-        ...(sandboxCommand.trim() ? { command: sandboxCommand.trim() } : {}),
-        ...(sandboxStdin ? { stdin: sandboxStdin } : {}),
-      })
-      setSandboxResult(result)
-      if (result.execution_mode === 'async' && (result.status === 'queued' || result.status === 'running')) {
-        startSandboxLogStream(result.execution_id)
-      }
-    } catch (err) {
-      setSandboxError(err instanceof Error ? err.message : 'Code sandbox execution failed')
-      setSandboxResult(null)
-    } finally {
-      setSandboxPending(false)
-    }
-  }
+    previousCodeSandboxPanelRef.current = codeSandboxOpen
+  }, [codeSandboxOpen, stopCodeSandboxMonitoring])
 
   return (
     <div
@@ -500,14 +337,29 @@ const ChatWindow: FC<Props> = ({
             onSendMessage={text => onSendMessage(text, undefined)}
           />
         ) : (
-          visibleMessages.map(message => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              hasFileContext={sessionHasFileContext}
-              layoutMode={layoutDecisions.layoutMode}
-            />
-          ))
+          <Suspense
+            fallback={
+              <div
+                className="rounded-2xl border px-4 py-3 text-sm"
+                style={{
+                  borderColor: 'var(--border-color)',
+                  background: 'var(--bg-asst-bubble)',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                Loading responses...
+              </div>
+            }
+          >
+            {visibleMessages.map(message => (
+              <LazyMessageBubble
+                key={message.id}
+                message={message}
+                hasFileContext={sessionHasFileContext}
+                layoutMode={layoutDecisions.layoutMode}
+              />
+            ))}
+          </Suspense>
         )}
         <div ref={bottomRef} />
       </div>
@@ -536,7 +388,7 @@ const ChatWindow: FC<Props> = ({
                 thinkingEnabled={thinkingEnabled}
                 onOpenCodeSandbox={() => {
                   if (!codeSandboxEnabled) return
-                  setSandboxError(null)
+                  clearSandboxError()
                   setActivePanel('code-sandbox')
                 }}
                 onUploadFiles={() => fileInputRef.current?.click()}
@@ -547,8 +399,12 @@ const ChatWindow: FC<Props> = ({
               <ModelMenu
                 isOpen={modelMenuOpen}
                 isNarrow={isNarrow}
+                menuId={modelMenuId}
+                triggerRef={modelButtonRef}
+                focusStrategy={modelMenuFocusStrategy}
                 models={models}
                 selectedModel={selectedModel}
+                onClose={() => setActivePanel(null)}
                 onSelectModel={model => {
                   onModelChange(model)
                   setActivePanel(null)
@@ -557,45 +413,55 @@ const ChatWindow: FC<Props> = ({
               <ReasoningMenu
                 isOpen={reasoningMenuOpen}
                 isNarrow={isNarrow}
+                menuId={reasoningMenuId}
+                triggerRef={reasoningButtonRef}
+                focusStrategy={reasoningMenuFocusStrategy}
                 reasoningLevel={reasoningLevel}
+                onClose={() => setActivePanel(null)}
                 onSelectReasoningLevel={level => {
                   onReasoningLevelChange(level)
                   setActivePanel(null)
                 }}
               />
-              <ManageUploadsPanel
-                isOpen={manageUploadsOpen}
-                uploadedKnowledgeFiles={uploadedKnowledgeFiles}
-                pendingImages={pendingImages}
-                onClose={() => setActivePanel(null)}
-                onRemoveFileContext={onRemoveFileContext}
-                onSetFileContextMode={onSetFileContextMode}
-                onRemovePendingImage={id =>
-                  setPendingImages(prev => prev.filter(item => item.id !== id))
-                }
-              />
-              <CodeSandboxPanel
-                isOpen={codeSandboxOpen}
-                feature={codeSandboxFeature}
-                runtimeEnabled={codeSandboxEnabled}
-                runPending={sandboxPending}
-                executionMode={sandboxExecutionMode}
-                code={sandboxCode}
-                command={sandboxCommand}
-                stdin={sandboxStdin}
-                error={sandboxError}
-                result={sandboxResult}
-                liveLogs={sandboxLiveLogs}
-                streamDisconnected={sandboxStreamDisconnected}
-                onClose={() => setActivePanel(null)}
-                onExecutionModeChange={setSandboxExecutionMode}
-                onCodeChange={setSandboxCode}
-                onCommandChange={setSandboxCommand}
-                onStdinChange={setSandboxStdin}
-                onRun={() => {
-                  void handleRunCodeSandbox()
-                }}
-              />
+              {manageUploadsOpen && (
+                <Suspense fallback={null}>
+                  <LazyManageUploadsPanel
+                    isOpen={manageUploadsOpen}
+                    uploadedKnowledgeFiles={uploadedKnowledgeFiles}
+                    pendingImages={pendingImages}
+                    onClose={() => setActivePanel(null)}
+                    onRemoveFileContext={onRemoveFileContext}
+                    onSetFileContextMode={onSetFileContextMode}
+                    onRemovePendingImage={id => removePendingImage(id)}
+                  />
+                </Suspense>
+              )}
+              {codeSandboxOpen && (
+                <Suspense fallback={null}>
+                  <LazyCodeSandboxPanel
+                    isOpen={codeSandboxOpen}
+                    feature={codeSandboxFeature}
+                    runtimeEnabled={codeSandboxEnabled}
+                    runPending={sandboxPending}
+                    executionMode={sandboxExecutionMode}
+                    code={sandboxCode}
+                    command={sandboxCommand}
+                    stdin={sandboxStdin}
+                    error={sandboxError}
+                    result={sandboxResult}
+                    liveLogs={sandboxLiveLogs}
+                    streamDisconnected={sandboxStreamDisconnected}
+                    onClose={() => setActivePanel(null)}
+                    onExecutionModeChange={setSandboxExecutionMode}
+                    onCodeChange={setSandboxCode}
+                    onCommandChange={setSandboxCommand}
+                    onStdinChange={setSandboxStdin}
+                    onRun={() => {
+                      void runCodeSandbox()
+                    }}
+                  />
+                </Suspense>
+              )}
               <div className="flex flex-col gap-2">
               <input
                 ref={fileInputRef}
@@ -657,6 +523,7 @@ const ChatWindow: FC<Props> = ({
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
+                  aria-label={`Message ${brandingConfig.displayName}`}
                   placeholder={`Message ${brandingConfig.displayName}`}
                   rows={1}
                   disabled={isStreaming}
@@ -691,14 +558,28 @@ const ChatWindow: FC<Props> = ({
                 gpuError={gpuError}
                 inferenceLatency={inferenceLatency}
                 plusButtonRef={plusButtonRef}
+                modelButtonRef={modelButtonRef}
+                reasoningButtonRef={reasoningButtonRef}
+                modelButtonId={modelTriggerId}
+                reasoningButtonId={reasoningTriggerId}
+                modelMenuId={modelMenuOpen ? modelMenuId : undefined}
+                reasoningMenuId={reasoningMenuOpen ? reasoningMenuId : undefined}
                 onTogglePlusMenu={() => {
-                  setActivePanel(prev => (prev === 'plus' ? null : 'plus'))
+                  toggleComposerPanel('plus')
                 }}
                 onToggleModelMenu={() => {
-                  setActivePanel(prev => (prev === 'model' ? null : 'model'))
+                  setModelMenuFocusStrategy('selected')
+                  toggleComposerPanel('model')
                 }}
                 onToggleReasoningMenu={() => {
-                  setActivePanel(prev => (prev === 'reasoning' ? null : 'reasoning'))
+                  setReasoningMenuFocusStrategy('selected')
+                  toggleComposerPanel('reasoning')
+                }}
+                onModelMenuTriggerKeyDown={event => {
+                  handleMenuTriggerKeyDown(event, 'model', setModelMenuFocusStrategy)
+                }}
+                onReasoningMenuTriggerKeyDown={event => {
+                  handleMenuTriggerKeyDown(event, 'reasoning', setReasoningMenuFocusStrategy)
                 }}
                 onThinkingEnabledChange={onThinkingEnabledChange}
                 thinkingTooltipEnabled={false}

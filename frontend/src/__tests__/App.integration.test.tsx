@@ -250,6 +250,8 @@ describe('App protected access integration', () => {
         'X-GOAT-Owner-Id': 'owner-99',
       },
     })
-    expect(await screen.findByText('Hello back')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getAllByText(/^Hello back$/i).length).toBeGreaterThan(0)
+    })
   })
 })

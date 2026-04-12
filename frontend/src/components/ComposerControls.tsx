@@ -1,4 +1,4 @@
-import { type RefObject, useState, type CSSProperties } from 'react'
+import { type CSSProperties, type KeyboardEvent, type RefObject, useState } from 'react'
 import type { GPUStatus, InferenceLatency } from '../api/system'
 import type { ChatLayoutDecisions } from '../utils/chatLayout'
 import GpuStatusDot from './GpuStatusDot'
@@ -30,9 +30,17 @@ interface ComposerControlsProps {
   gpuError: string | null
   inferenceLatency: InferenceLatency | null
   plusButtonRef?: RefObject<HTMLButtonElement | null>
+  modelButtonRef?: RefObject<HTMLButtonElement | null>
+  reasoningButtonRef?: RefObject<HTMLButtonElement | null>
+  modelButtonId?: string
+  reasoningButtonId?: string
+  modelMenuId?: string
+  reasoningMenuId?: string
   onTogglePlusMenu: () => void
   onToggleModelMenu: () => void
   onToggleReasoningMenu: () => void
+  onModelMenuTriggerKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void
+  onReasoningMenuTriggerKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void
   onThinkingEnabledChange: (enabled: boolean) => void
   thinkingTooltipEnabled?: boolean
   onStop: () => void
@@ -65,9 +73,17 @@ export default function ComposerControls({
   gpuError,
   inferenceLatency,
   plusButtonRef,
+  modelButtonRef,
+  reasoningButtonRef,
+  modelButtonId,
+  reasoningButtonId,
+  modelMenuId,
+  reasoningMenuId,
   onTogglePlusMenu,
   onToggleModelMenu,
   onToggleReasoningMenu,
+  onModelMenuTriggerKeyDown,
+  onReasoningMenuTriggerKeyDown,
   onThinkingEnabledChange,
   thinkingTooltipEnabled = false,
   onStop,
@@ -94,6 +110,7 @@ export default function ComposerControls({
           disabled={isStreaming || attachmentUploading}
           onClick={onTogglePlusMenu}
           aria-label={plusMenuOpen ? 'Close upload and planning actions' : 'Open upload and planning actions'}
+          aria-haspopup="dialog"
           className={`${layoutDecisions.compactComposer ? 'h-9 w-9' : 'h-10 w-10'} flex shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40 ${plusMenuOpen ? '' : 'hover:bg-[var(--composer-control-hover-bg)]'}`}
           style={{ border: 'none', ...controlPillStyle(plusMenuOpen), color: 'var(--composer-control-icon)' }}
           title={plusMenuOpen ? 'Close actions' : 'Open upload and planning actions'}
@@ -105,11 +122,16 @@ export default function ComposerControls({
           className={`flex min-w-0 flex-1 items-center ${layoutDecisions.compactComposer ? 'gap-1' : 'gap-1.5'}`}
         >
           <button
+            id={modelButtonId}
+            ref={modelButtonRef}
             type="button"
-            aria-label="Open model menu"
+            aria-label={`Open model menu. Current model: ${selectedModel}`}
             aria-expanded={modelMenuOpen}
+            aria-haspopup="menu"
+            aria-controls={modelMenuId}
             title={selectedModel}
             onClick={onToggleModelMenu}
+            onKeyDown={onModelMenuTriggerKeyDown}
             className={`inline-flex min-w-0 shrink items-center gap-1 overflow-hidden rounded-full px-2 py-1 text-[13px] font-medium transition-all ${layoutDecisions.compactComposer ? 'max-w-[min(5.5rem,28vw)]' : 'max-w-[min(9.5rem,36vw)]'}`}
             style={controlPillStyle(modelMenuOpen)}
           >
@@ -120,10 +142,15 @@ export default function ComposerControls({
           </button>
 
           <button
+            id={reasoningButtonId}
+            ref={reasoningButtonRef}
             type="button"
-            aria-label="Open reasoning menu"
+            aria-label={`Open reasoning menu. Current level: ${reasoningLevel === 'low' ? 'Low' : reasoningLevel === 'high' ? 'High' : 'Medium'}`}
             aria-expanded={reasoningMenuOpen}
+            aria-haspopup="menu"
+            aria-controls={reasoningMenuId}
             onClick={onToggleReasoningMenu}
+            onKeyDown={onReasoningMenuTriggerKeyDown}
             className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[13px] font-medium transition-all ${layoutDecisions.compactComposer ? 'max-w-[4.5rem]' : ''}`}
             style={controlPillStyle(reasoningMenuOpen)}
           >

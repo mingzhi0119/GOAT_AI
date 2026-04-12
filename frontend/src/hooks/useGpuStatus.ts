@@ -5,6 +5,10 @@ import { fetchGpuStatus, fetchInferenceLatency, type GPUStatus, type InferenceLa
 const POLL_STREAMING_MS = 1000
 const POLL_IDLE_MS = 3000
 
+function pageVisible(): boolean {
+  return document.visibilityState !== 'hidden'
+}
+
 export interface UseGpuStatusReturn {
   status: GPUStatus | null
   inference: InferenceLatency | null
@@ -43,10 +47,22 @@ export function useGpuStatus(isStreaming: boolean): UseGpuStatusReturn {
     }
     void load()
     const pollMs = isStreaming ? POLL_STREAMING_MS : POLL_IDLE_MS
-    const timer = window.setInterval(() => void load(), pollMs)
+    const timer = pageVisible() ? window.setInterval(() => void load(), pollMs) : null
+
+    const handleVisibilityRefresh = () => {
+      if (!pageVisible()) return
+      void load()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityRefresh)
+    window.addEventListener('focus', handleVisibilityRefresh)
     return () => {
       cancelled = true
-      window.clearInterval(timer)
+      if (timer !== null) {
+        window.clearInterval(timer)
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityRefresh)
+      window.removeEventListener('focus', handleVisibilityRefresh)
     }
   }, [isStreaming, refreshTick])
 

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { useBranding } from './config/branding'
 import { useAdvancedSettings } from './hooks/useAdvancedSettings'
 import { useAppearance } from './hooks/useAppearance'
 import { useApiKey } from './hooks/useApiKey'
 import { useChatLayoutMode } from './hooks/useChatLayoutMode'
 import { useChatSession } from './hooks/useChatSession'
+import { useChatShellActions } from './hooks/useChatShellActions'
 import { useGpuStatus } from './hooks/useGpuStatus'
 import { useModels } from './hooks/useModels'
 import { useOwnerId } from './hooks/useOwnerId'
@@ -13,12 +14,12 @@ import { useSystemFeatures } from './hooks/useSystemFeatures'
 import { useUserName } from './hooks/useUserName'
 import { getChatLayoutDecisions } from './utils/chatLayout'
 import { downloadChatAsMarkdown } from './utils/exportChatMarkdown'
-import AppearancePanel from './components/AppearancePanel'
 import ChatWindow from './components/ChatWindow'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
-import type { UploadStreamEvent } from './api/upload'
+
+const LazyAppearancePanel = lazy(() => import('./components/AppearancePanel'))
 
 /** Root application: compose stateful controllers and render the shell UI. */
 export default function App() {
@@ -53,8 +54,13 @@ export default function App() {
   })
   const gpu = useGpuStatus(session.isStreaming)
   const systemFeatures = useSystemFeatures()
-  const { refreshNow } = gpu
-  const wasStreamingRef = useRef(session.isStreaming)
+  const {
+    handleDeleteAllHistory,
+    handleDeleteConversation,
+    handleRefreshHistory,
+    handleRenameConversation,
+    handleUploadEvent,
+  } = useChatShellActions(session)
 
   useEffect(() => {
     document.title = branding.appTitle
@@ -63,72 +69,6 @@ export default function App() {
   useEffect(() => {
     setSidebarOpen(chatLayout.sidebarBehavior === 'docked')
   }, [chatLayout.sidebarBehavior])
-
-  useEffect(() => {
-    const wasStreaming = wasStreamingRef.current
-    wasStreamingRef.current = session.isStreaming
-    if (!wasStreaming || session.isStreaming) return
-
-    const timer = window.setTimeout(() => {
-      void refreshNow()
-    }, 1000)
-    return () => window.clearTimeout(timer)
-  }, [refreshNow, session.isStreaming])
-
-  const handleDeleteConversation = () => {
-    if (!session.sessionId) return
-    if (!window.confirm('Delete this saved conversation? This cannot be undone.')) {
-      return
-    }
-    void session.deleteHistorySession(session.sessionId).then(() => {
-      session.clearChatSession()
-    })
-  }
-
-  const handleRefreshHistory = () => {
-    void session.refreshHistory()
-  }
-
-  const handleDeleteAllHistory = () => {
-    if (!window.confirm('Delete all saved conversations? This cannot be undone.')) {
-      return
-    }
-    void session.deleteAllHistory().then(() => {
-      session.clearChatSession()
-    })
-  }
-
-  const handleRenameConversation = () => {
-    if (!session.sessionId) return
-    const currentTitle = session.sessionTitle ?? 'New conversation'
-    const nextTitle = window.prompt('Rename this conversation', currentTitle)
-    if (nextTitle == null) return
-    const normalizedTitle = nextTitle.trim()
-    if (!normalizedTitle || normalizedTitle === currentTitle) return
-    void session.renameHistorySession(session.sessionId, normalizedTitle)
-  }
-
-  const handleUploadEvent = (event: UploadStreamEvent) => {
-    if (event.type === 'file_prompt') {
-      session.upsertFileContext({
-        filename: event.filename,
-        suffixPrompt: event.suffix_prompt,
-        status: 'processing',
-      })
-      return
-    }
-    if (event.type === 'knowledge_ready') {
-      session.upsertFileContext({
-        filename: event.filename,
-        documentId: event.document_id,
-        ingestionId: event.ingestion_id,
-        retrievalMode: event.retrieval_mode,
-        suffixPrompt: event.suffix_prompt,
-        templatePrompt: event.template_prompt,
-        status: 'ready',
-      })
-    }
-  }
 
   return (
     <div className="relative flex h-screen overflow-hidden" style={{ background: 'var(--bg-main)' }}>
@@ -228,14 +168,18 @@ export default function App() {
           />
         </ErrorBoundary>
       </div>
-      <AppearancePanel
-        open={appearanceOpen}
-        appearance={appearance}
-        effectiveMode={effectiveMode}
-        onClose={() => setAppearanceOpen(false)}
-        onChange={updateAppearance}
-        onReset={resetAppearance}
-      />
+      {appearanceOpen && (
+        <Suspense fallback={null}>
+          <LazyAppearancePanel
+            open={appearanceOpen}
+            appearance={appearance}
+            effectiveMode={effectiveMode}
+            onClose={() => setAppearanceOpen(false)}
+            onChange={updateAppearance}
+            onReset={resetAppearance}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }

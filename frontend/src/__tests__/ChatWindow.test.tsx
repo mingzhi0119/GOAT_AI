@@ -114,6 +114,7 @@ describe('ChatWindow composer', () => {
 
     expect(screen.queryByText(/Attach PNG/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/Enter to Send/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: /message goat/i })).toBeInTheDocument()
 
     const sendButton = screen.getByRole('button', { name: /send message/i })
     expect(sendButton).toBeDisabled()
@@ -147,16 +148,49 @@ describe('ChatWindow composer', () => {
     expect(screen.queryByText('Thinking Mode')).not.toBeInTheDocument()
   })
 
-  it('opens model and reasoning menus and applies the selected options', () => {
+  it('opens model and reasoning menus and applies the selected options', async () => {
     const { onModelChange, onReasoningLevelChange } = renderChatWindow()
 
     fireEvent.click(screen.getByRole('button', { name: /open model menu/i }))
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'backup-model' }))
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'backup-model' }))
     expect(onModelChange).toHaveBeenCalledWith('backup-model')
 
     fireEvent.click(screen.getByRole('button', { name: /open reasoning menu/i }))
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'High' }))
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'High' }))
     expect(onReasoningLevelChange).toHaveBeenCalledWith('high')
+  })
+
+  it('supports keyboard opening, navigation, and Escape focus return for the composer menus', async () => {
+    renderChatWindow()
+
+    const modelTrigger = screen.getByRole('button', { name: /open model menu/i })
+    modelTrigger.focus()
+    fireEvent.keyDown(modelTrigger, { key: 'ArrowDown' })
+
+    await waitFor(() => {
+      expect(screen.getByRole('menuitemradio', { name: 'test-model' })).toHaveFocus()
+    })
+
+    fireEvent.keyDown(screen.getByRole('menu', { name: /model menu/i }), { key: 'ArrowDown' })
+    expect(screen.getByRole('menuitemradio', { name: 'backup-model' })).toHaveFocus()
+
+    fireEvent.keyDown(screen.getByRole('menu', { name: /model menu/i }), { key: 'Escape' })
+    await waitFor(() => {
+      expect(modelTrigger).toHaveFocus()
+    })
+
+    const reasoningTrigger = screen.getByRole('button', { name: /open reasoning menu/i })
+    reasoningTrigger.focus()
+    fireEvent.keyDown(reasoningTrigger, { key: 'ArrowUp' })
+
+    await waitFor(() => {
+      expect(screen.getByRole('menuitemradio', { name: 'High' })).toHaveFocus()
+    })
+
+    fireEvent.keyDown(screen.getByRole('menu', { name: /reasoning menu/i }), { key: 'Escape' })
+    await waitFor(() => {
+      expect(reasoningTrigger).toHaveFocus()
+    })
   })
 
   it('keeps upload, manage uploads, plan mode, and thinking mode inside the plus popover', () => {
@@ -192,7 +226,7 @@ describe('ChatWindow composer', () => {
     expect(indicatorLabels[0]).toBeInTheDocument()
   })
 
-  it('keeps composer popovers mutually exclusive', () => {
+  it('keeps composer popovers mutually exclusive', async () => {
     renderChatWindow()
 
     fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
@@ -209,7 +243,7 @@ describe('ChatWindow composer', () => {
     fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
     fireEvent.click(screen.getByText('Manage Uploads'))
     expect(screen.queryByText('Upload Files')).not.toBeInTheDocument()
-    expect(screen.getByText('No uploaded files yet.')).toBeInTheDocument()
+    expect(await screen.findByText('No uploaded files yet.')).toBeInTheDocument()
   })
 
   it('keeps the narrow composer footer on one row', () => {
@@ -304,25 +338,25 @@ describe('ChatWindow composer', () => {
     })
   })
 
-  it('opens the code sandbox panel from the plus menu', () => {
+  it('opens the code sandbox panel from the plus menu', async () => {
     renderChatWindow()
 
     fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
     fireEvent.click(screen.getByRole('button', { name: /open code sandbox/i }))
 
-    expect(screen.getByRole('dialog', { name: /code sandbox/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Run' })).toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: /code sandbox/i })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Run' })).toBeInTheDocument()
   })
 
-  it('keeps code sandbox inputs usable after opening the panel', () => {
+  it('keeps code sandbox inputs usable after opening the panel', async () => {
     renderChatWindow()
 
     fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
     fireEvent.click(screen.getByRole('button', { name: /open code sandbox/i }))
 
-    const commandInput = screen.getByPlaceholderText(/optional: sh/i)
-    const codeArea = screen.getByPlaceholderText("echo 'hello from the sandbox'")
-    const stdinArea = screen.getByPlaceholderText(/optional stdin content/i)
+    const commandInput = await screen.findByPlaceholderText(/optional: sh/i)
+    const codeArea = await screen.findByPlaceholderText("echo 'hello from the sandbox'")
+    const stdinArea = await screen.findByPlaceholderText(/optional stdin content/i)
 
     fireEvent.change(commandInput, { target: { value: 'python demo.py' } })
     fireEvent.change(codeArea, { target: { value: 'print(42)' } })
@@ -378,10 +412,10 @@ describe('ChatWindow composer', () => {
 
     fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
     fireEvent.click(screen.getByRole('button', { name: /open code sandbox/i }))
-    fireEvent.change(screen.getByPlaceholderText("echo 'hello from the sandbox'"), {
+    fireEvent.change(await screen.findByPlaceholderText("echo 'hello from the sandbox'"), {
       target: { value: "echo 'hello from sandbox'" },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Run' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Run' }))
 
     await waitFor(() => {
       expect(screen.getByText('hello from sandbox')).toBeInTheDocument()
@@ -441,13 +475,13 @@ describe('ChatWindow composer', () => {
 
     fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
     fireEvent.click(screen.getByRole('button', { name: /open code sandbox/i }))
-    fireEvent.change(screen.getByRole('combobox', { name: /execution mode/i }), {
+    fireEvent.change(await screen.findByRole('combobox', { name: /execution mode/i }), {
       target: { value: 'async' },
     })
-    fireEvent.change(screen.getByPlaceholderText("echo 'hello from the sandbox'"), {
+    fireEvent.change(await screen.findByPlaceholderText("echo 'hello from the sandbox'"), {
       target: { value: "echo 'hello from sandbox'" },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Run' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Run' }))
 
     await waitFor(() => {
       expect(screen.getAllByText('async log line').length).toBeGreaterThan(0)
@@ -490,13 +524,13 @@ describe('ChatWindow composer', () => {
 
     fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
     fireEvent.click(screen.getByRole('button', { name: /open code sandbox/i }))
-    fireEvent.change(screen.getByRole('combobox', { name: /execution mode/i }), {
+    fireEvent.change(await screen.findByRole('combobox', { name: /execution mode/i }), {
       target: { value: 'async' },
     })
-    fireEvent.change(screen.getByPlaceholderText("echo 'hello from the sandbox'"), {
+    fireEvent.change(await screen.findByPlaceholderText("echo 'hello from the sandbox'"), {
       target: { value: "echo 'hello from sandbox'" },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Run' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Run' }))
 
     await waitFor(() => {
       expect(openCodeSandboxLogStream).toHaveBeenCalled()
@@ -510,7 +544,7 @@ describe('ChatWindow composer', () => {
     expect(setIntervalSpy.mock.calls.length).toBeGreaterThan(intervalCallsBeforeError)
   })
 
-  it('describes localhost execution as a trusted local fallback instead of an isolated sandbox', () => {
+  it('describes localhost execution as a trusted local fallback instead of an isolated sandbox', async () => {
     renderChatWindow({
       codeSandboxFeature: {
         policy_allowed: true,
@@ -528,7 +562,9 @@ describe('ChatWindow composer', () => {
     expect(screen.getByText(/trusted-dev fallback/i)).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /open code sandbox/i }))
-    expect(screen.getByText(/does not provide full sandbox isolation/i)).toBeInTheDocument()
+    expect(
+      await screen.findByText(/does not provide full sandbox isolation/i),
+    ).toBeInTheDocument()
   })
 
   it('adds modal semantics and Escape close for the code sandbox panel', async () => {
@@ -537,10 +573,68 @@ describe('ChatWindow composer', () => {
     fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
     fireEvent.click(screen.getByRole('button', { name: /open code sandbox/i }))
 
-    const dialog = screen.getByRole('dialog', { name: /code sandbox/i })
+    const dialog = await screen.findByRole('dialog', { name: /code sandbox/i })
     expect(dialog).toHaveAttribute('aria-modal', 'true')
 
     fireEvent.keyDown(dialog, { key: 'Escape' })
     expect(screen.queryByRole('dialog', { name: /code sandbox/i })).not.toBeInTheDocument()
+  })
+
+  it('stops sandbox log monitoring when the code sandbox panel closes', async () => {
+    const stop = vi.fn()
+    vi.mocked(executeCodeSandbox).mockResolvedValue({
+      execution_id: 'cs-close',
+      status: 'queued',
+      execution_mode: 'async',
+      runtime_preset: 'shell',
+      network_policy: 'disabled',
+      created_at: '2026-04-10T00:00:00Z',
+      updated_at: '2026-04-10T00:00:00Z',
+      started_at: null,
+      finished_at: null,
+      provider_name: 'docker',
+      isolation_level: 'container',
+      network_policy_enforced: true,
+      exit_code: null,
+      stdout: '',
+      stderr: '',
+      timed_out: false,
+      error_detail: null,
+      output_files: [],
+    })
+    vi.mocked(openCodeSandboxLogStream).mockImplementation(() => stop)
+
+    renderChatWindow()
+
+    fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
+    fireEvent.click(screen.getByRole('button', { name: /open code sandbox/i }))
+    fireEvent.change(await screen.findByRole('combobox', { name: /execution mode/i }), {
+      target: { value: 'async' },
+    })
+    fireEvent.change(await screen.findByPlaceholderText("echo 'hello from the sandbox'"), {
+      target: { value: "echo 'hello from sandbox'" },
+    })
+    fireEvent.click(await screen.findByRole('button', { name: 'Run' }))
+
+    await waitFor(() => {
+      expect(openCodeSandboxLogStream).toHaveBeenCalled()
+    })
+
+    fireEvent.keyDown(await screen.findByRole('dialog', { name: /code sandbox/i }), { key: 'Escape' })
+    expect(stop).toHaveBeenCalled()
+  })
+
+  it('adds modal semantics and Escape close for the manage uploads panel', async () => {
+    renderChatWindow()
+
+    fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
+    fireEvent.click(screen.getByText('Manage Uploads'))
+
+    const dialog = await screen.findByRole('dialog', { name: /manage uploads/i })
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: /manage uploads/i })).not.toBeInTheDocument()
+    expect(screen.getByTitle(/open upload and planning actions/i)).toHaveFocus()
   })
 })
