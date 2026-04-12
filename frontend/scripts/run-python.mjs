@@ -21,16 +21,26 @@ export function pythonCandidates({
   if (explicit) {
     candidates.push(explicit);
   }
+  const pushCandidate = candidate => {
+    const normalized = candidate?.trim();
+    if (normalized && !candidates.includes(normalized)) {
+      candidates.push(normalized);
+    }
+  };
   if (platform === "win32") {
     const localAppData = env.LOCALAPPDATA || joinForPlatform(platform, homeDir, "AppData", "Local");
-    candidates.push(
+    [
+      env.pythonLocation && joinForPlatform(platform, env.pythonLocation, "python.exe"),
+      env.Python3_ROOT_DIR && joinForPlatform(platform, env.Python3_ROOT_DIR, "python.exe"),
+      env.Python_ROOT_DIR && joinForPlatform(platform, env.Python_ROOT_DIR, "python.exe"),
       joinForPlatform(platform, localAppData, "Python", "pythoncore-3.14-64", "python.exe"),
       joinForPlatform(platform, localAppData, "Programs", "Python", "Python314", "python.exe"),
+      "python.exe",
       "python",
       "py",
-    );
+    ].forEach(pushCandidate);
   } else {
-    candidates.push("python3", "python");
+    ["python3", "python"].forEach(pushCandidate);
   }
   return candidates;
 }
@@ -65,6 +75,7 @@ export function findPython({
     }
     const result = spawn(candidate, buildPythonVersionArgs({ candidate, platform }), {
       cwd,
+      env,
       stdio: "ignore",
       shell: false,
     });
@@ -101,6 +112,7 @@ export function runPythonCli({
 
   const result = spawn(python, buildPythonArgs({ python, rawArgs, platform }), {
     cwd,
+    env,
     stdio: "inherit",
     shell: false,
   });
