@@ -95,6 +95,7 @@ def build_fault_smoke_environment(
     restart_limit: int,
     backoff_ms: int,
     hang_sec: float,
+    app_identifier: str = DEFAULT_WINDOWS_APP_IDENTIFIER,
 ) -> dict[str, str]:
     runtime_root = base_dir / "runtime-env"
     local_appdata = runtime_root / "LocalAppData"
@@ -107,6 +108,14 @@ def build_fault_smoke_environment(
     env["APPDATA"] = str(roaming_appdata)
     env["GOAT_DESKTOP_BACKEND_HOST"] = "127.0.0.1"
     env["GOAT_DESKTOP_BACKEND_PORT"] = str(_reserve_local_port())
+    env["GOAT_DESKTOP_APP_DATA_DIR"] = str(local_appdata / app_identifier)
+    env["GOAT_RUNTIME_ROOT"] = env["GOAT_DESKTOP_APP_DATA_DIR"]
+    env["GOAT_LOG_DIR"] = str(local_appdata / app_identifier / "logs")
+    env["GOAT_LOG_PATH"] = str(local_appdata / app_identifier / "chat_logs.db")
+    env["GOAT_DATA_DIR"] = str(local_appdata / app_identifier / "data")
+    env["GOAT_DESKTOP_SHELL_LOG_PATH"] = str(
+        local_appdata / app_identifier / "logs" / "desktop-shell.log"
+    )
     env[INTERNAL_TEST_FLAG] = "1"
     env[INTERNAL_TEST_SCENARIO] = "" if scenario == "missing_sidecar" else scenario
     env[INTERNAL_TEST_HEALTH_TIMEOUT_SEC] = str(health_timeout_sec)
@@ -278,6 +287,7 @@ def run_fault_scenario(
         restart_limit=restart_limit,
         backoff_ms=backoff_ms,
         hang_sec=hang_sec,
+        app_identifier=app_identifier,
     )
     fallback_log = fallback_desktop_log_path(
         app_identifier,

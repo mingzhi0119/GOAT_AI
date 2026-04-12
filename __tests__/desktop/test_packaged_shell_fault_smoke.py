@@ -18,11 +18,14 @@ def test_build_fault_smoke_environment_isolates_appdata_and_enables_hooks(
         restart_limit=1,
         backoff_ms=100,
         hang_sec=5.0,
+        app_identifier=subject.DEFAULT_WINDOWS_APP_IDENTIFIER,
     )
 
     assert env["LOCALAPPDATA"].startswith(str(tmp_path))
     assert env["APPDATA"].startswith(str(tmp_path))
     assert env["GOAT_DESKTOP_BACKEND_HOST"] == "127.0.0.1"
+    assert env["GOAT_DESKTOP_APP_DATA_DIR"].endswith("com.simonbb.goatai")
+    assert env["GOAT_DESKTOP_SHELL_LOG_PATH"].endswith("desktop-shell.log")
     assert env[subject.INTERNAL_TEST_FLAG] == "1"
     assert env[subject.INTERNAL_TEST_SCENARIO] == "exit_before_ready"
     assert env[subject.INTERNAL_TEST_HEALTH_TIMEOUT_SEC] == "2"

@@ -132,6 +132,8 @@ Important notes:
 - `.github/workflows/desktop-provenance.yml` now runs `python -m tools.desktop.installed_windows_desktop_fault_smoke` against both the built `.msi` and NSIS installers before release assets are uploaded
 - `.github/workflows/fault-injection.yml` reruns the same installed Windows drill on a schedule so installer regressions do not hide behind release-only evidence
 - installed Windows evidence now writes `summary.json` even on install or scenario failure, including installer kind/path/digest, install root, log paths, partial scenario results, uninstall outcome, and workflow metadata such as release ref, resolved SHA, and distribution channel
+- installed Windows evidence now follows a fixed order: `install -> healthy launch -> fault scenarios -> uninstall`; the retained `healthy_launch` payload is the positive proof that the installed desktop reached `/api/health` and `/api/ready` before the pre-ready fault scenarios begin
+- the healthy installed-launch probe uses isolated appdata, a reserved localhost backend port, preserved shell logs, and `GOAT_READY_SKIP_OLLAMA_PROBE=1` so the evidence proves installed desktop startup baseline, not local Ollama availability
 - installed Windows evidence upload should use `if: always()` in both release and scheduled workflows so `desktop-installed-smoke/*/summary.json` survives the exact failures it is meant to diagnose
 - PyInstaller is **not** a cross-compiler; build each platform's sidecar on that platform (or an equivalent CI runner / VM)
 - on Windows developer machines, Linux-targeted desktop validation should still run from WSL when you need Linux parity; Windows-native packaging remains a Windows flow
@@ -165,8 +167,8 @@ Public Windows desktop release path:
 
 - `.github/workflows/desktop-provenance.yml` is the public signed installer workflow
 - `desktop-package-windows` proves fail-closed startup for packaged CI binaries before merge; it is not installer-installed evidence
-- `.github/workflows/desktop-provenance.yml` is the installed Windows evidence gate for signed MSI and NSIS artifacts
-- `.github/workflows/fault-injection.yml` is the recurring installed Windows drill; it is neither a PR gate nor a signing workflow
+- `.github/workflows/desktop-provenance.yml` is the installed Windows evidence gate for signed MSI and NSIS artifacts, including healthy launch proof plus pre-ready fault scenarios
+- `.github/workflows/fault-injection.yml` is the recurring installed Windows drill; it is neither a PR gate nor a signing workflow, and its job is drift detection rather than release signing
 - local `npm run desktop:build` output remains internal/test-only unless it is rebuilt and signed through the workflow
 - signed public Windows installers require `GOAT_DESKTOP_SIGNING_CERT_BASE64` and `GOAT_DESKTOP_SIGNING_CERT_PASSWORD`
 

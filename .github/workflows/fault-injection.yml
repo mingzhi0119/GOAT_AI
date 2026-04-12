@@ -88,6 +88,24 @@ jobs:
             --release-ref "${{ github.ref_name }}" `
             --resolved-sha "${{ github.sha }}" `
             --distribution-channel internal_test
+      - name: Summarize installed Windows drill evidence
+        if: ${{ always() }}
+        shell: pwsh
+        run: |
+          Add-Content $env:GITHUB_STEP_SUMMARY "## Installed Windows drill evidence"
+          $summaries = Get-ChildItem -Path "desktop-installed-smoke/*/summary.json" -File -ErrorAction SilentlyContinue
+          if ($null -eq $summaries -or $summaries.Count -eq 0) {
+            Add-Content $env:GITHUB_STEP_SUMMARY ""
+            Add-Content $env:GITHUB_STEP_SUMMARY "No installed Windows summary.json artifact was produced."
+            exit 0
+          }
+          foreach ($summaryPath in $summaries) {
+            $payload = Get-Content $summaryPath.FullName -Raw | ConvertFrom-Json
+            $healthyLaunch = $payload.healthy_launch
+            $readyStatus = if ($null -eq $healthyLaunch) { "<none>" } else { $healthyLaunch.ready_status }
+            $healthyStatus = if ($null -eq $healthyLaunch) { "<none>" } else { $healthyLaunch.status }
+            Add-Content $env:GITHUB_STEP_SUMMARY ""
+            Add-Content $env:GITHUB_STEP_SUMMARY "* $($payload.installer_kind): status=$($payload.status), phase=$($payload.phase), healthy_launch=$healthyStatus, ready_status=$readyStatus, summary=$($summaryPath.FullName)"
       - name: Upload installed Windows drill evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@v4

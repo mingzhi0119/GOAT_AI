@@ -97,6 +97,8 @@ def main() -> None:
         str(spec_dir),
         "--add-data",
         _add_data_arg(REPO_ROOT / "backend" / "migrations", "backend/migrations"),
+        "--hidden-import",
+        "backend.main",
         str(ENTRYPOINT),
     ]
 

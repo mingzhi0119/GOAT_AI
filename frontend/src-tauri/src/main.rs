@@ -36,6 +36,13 @@ const INTERNAL_TEST_PRE_READY_RESTART_LIMIT_ENV: &str =
     "GOAT_DESKTOP_INTERNAL_TEST_PRE_READY_RESTART_LIMIT";
 const INTERNAL_TEST_PRE_READY_BACKOFF_MS_ENV: &str =
     "GOAT_DESKTOP_INTERNAL_TEST_PRE_READY_BACKOFF_MS";
+#[cfg_attr(debug_assertions, allow(dead_code))]
+const DESKTOP_APP_DATA_DIR_ENV: &str = "GOAT_DESKTOP_APP_DATA_DIR";
+const DESKTOP_SHELL_LOG_PATH_ENV: &str = "GOAT_DESKTOP_SHELL_LOG_PATH";
+#[cfg_attr(debug_assertions, allow(dead_code))]
+const LOG_DIR_ENV: &str = "GOAT_LOG_DIR";
+const LOG_PATH_ENV: &str = "GOAT_LOG_PATH";
+const DATA_DIR_ENV: &str = "GOAT_DATA_DIR";
 
 #[derive(Clone, Default)]
 struct BackendProcessState(Arc<Mutex<Option<BackendProcessHandle>>>);
@@ -219,9 +226,33 @@ fn next_retry_detail(current_attempt_index: usize, total_attempts: usize) -> Opt
     ))
 }
 
+fn configured_path_override(name: &str) -> Option<PathBuf> {
+    std::env::var(name).ok().and_then(|value| {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(PathBuf::from(trimmed))
+        }
+    })
+}
+
+fn configured_log_db_path(data_root: &Path) -> PathBuf {
+    configured_path_override(LOG_PATH_ENV).unwrap_or_else(|| data_root.join("chat_logs.db"))
+}
+
+fn configured_data_dir(data_root: &Path) -> PathBuf {
+    configured_path_override(DATA_DIR_ENV).unwrap_or_else(|| data_root.join("data"))
+}
+
 #[cfg(not(debug_assertions))]
 fn desktop_log_path(logs_dir: &Path) -> PathBuf {
     logs_dir.join("desktop-shell.log")
+}
+
+fn configured_desktop_log_path(default_log_path: &Path) -> PathBuf {
+    configured_path_override(DESKTOP_SHELL_LOG_PATH_ENV)
+        .unwrap_or_else(|| default_log_path.to_path_buf())
 }
 
 #[cfg(not(debug_assertions))]
@@ -238,16 +269,44 @@ fn append_desktop_log(log_path: &Path, message: &str) {
 fn append_desktop_log(_log_path: &Path, _message: &str) {}
 
 #[cfg(not(debug_assertions))]
+fn resolve_release_data_root<R: tauri::Runtime>(
+    app_handle: &tauri::AppHandle<R>,
+) -> Result<PathBuf, String> {
+    let data_root = configured_path_override(DESKTOP_APP_DATA_DIR_ENV)
+        .or_else(|| app_handle.path().app_local_data_dir().ok())
+        .ok_or_else(|| "could not resolve app data dir".to_string())?;
+    fs::create_dir_all(&data_root).map_err(|err| {
+        format!(
+            "could not create app data dir {}: {err}",
+            data_root.display()
+        )
+    })?;
+    Ok(data_root)
+}
+
+#[cfg(not(debug_assertions))]
+fn resolve_release_log_dir<R: tauri::Runtime>(
+    app_handle: &tauri::AppHandle<R>,
+) -> Result<PathBuf, String> {
+    let logs_dir = configured_path_override(LOG_DIR_ENV)
+        .or_else(|| app_handle.path().app_log_dir().ok())
+        .ok_or_else(|| "could not resolve app log dir".to_string())?;
+    fs::create_dir_all(&logs_dir)
+        .map_err(|err| format!("could not create app log dir {}: {err}", logs_dir.display()))?;
+    Ok(logs_dir)
+}
+
+#[cfg(not(debug_assertions))]
 fn resolve_desktop_log_path<R: tauri::Runtime>(
     app_handle: &tauri::AppHandle<R>,
 ) -> Result<PathBuf, String> {
-    let logs_dir = app_handle
-        .path()
-        .app_log_dir()
-        .map_err(|err| format!("could not resolve app log dir: {err}"))?;
-    fs::create_dir_all(&logs_dir)
-        .map_err(|err| format!("could not create app log dir {}: {err}", logs_dir.display()))?;
-    Ok(desktop_log_path(&logs_dir))
+    let logs_dir = resolve_release_log_dir(app_handle)?;
+    let log_path = configured_desktop_log_path(&desktop_log_path(&logs_dir));
+    if let Some(parent) = log_path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|err| format!("could not create app log dir {}: {err}", parent.display()))?;
+    }
+    Ok(log_path)
 }
 
 fn main() {
@@ -561,12 +620,14 @@ fn _path_exists(path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        backend_health_url, backend_termination_diagnostic, normalize_configured_value,
-        parse_positive_u64_override, pre_ready_restart_backoff, startup_failure_diagnostic,
-        wait_for_backend_startup_with_probes, wait_for_backend_with_probe,
-        BackendStartupWaitOutcome,
+        backend_health_url, backend_termination_diagnostic, configured_data_dir,
+        configured_desktop_log_path, configured_log_db_path, configured_path_override,
+        normalize_configured_value, parse_positive_u64_override, pre_ready_restart_backoff,
+        startup_failure_diagnostic, wait_for_backend_startup_with_probes,
+        wait_for_backend_with_probe, BackendStartupWaitOutcome, DATA_DIR_ENV,
+        DESKTOP_SHELL_LOG_PATH_ENV, LOG_PATH_ENV,
     };
-    use std::time::Duration;
+    use std::{path::PathBuf, time::Duration};
 
     #[test]
     fn normalize_configured_value_trims_and_falls_back() {
@@ -626,6 +687,55 @@ mod tests {
         assert!(message.contains("health_wait_timeout"));
         assert!(message.contains("http://127.0.0.1:62606/api/health"));
         assert!(message.contains("Timed out"));
+    }
+
+    #[test]
+    fn configured_path_override_trims_and_rejects_blank_values() {
+        unsafe {
+            std::env::set_var(DESKTOP_SHELL_LOG_PATH_ENV, " C:/GOAT/logs/desktop-shell.log ");
+        }
+        assert_eq!(
+            configured_path_override(DESKTOP_SHELL_LOG_PATH_ENV),
+            Some(PathBuf::from("C:/GOAT/logs/desktop-shell.log"))
+        );
+
+        unsafe {
+            std::env::set_var(DESKTOP_SHELL_LOG_PATH_ENV, "   ");
+        }
+        assert_eq!(configured_path_override(DESKTOP_SHELL_LOG_PATH_ENV), None);
+
+        unsafe {
+            std::env::remove_var(DESKTOP_SHELL_LOG_PATH_ENV);
+        }
+    }
+
+    #[test]
+    fn configured_release_paths_prefer_explicit_runtime_overrides() {
+        unsafe {
+            std::env::set_var(LOG_PATH_ENV, "C:/GOAT/runtime/chat_logs.db");
+            std::env::set_var(DATA_DIR_ENV, "C:/GOAT/runtime/data");
+            std::env::set_var(DESKTOP_SHELL_LOG_PATH_ENV, "C:/GOAT/runtime/logs/desktop-shell.log");
+        }
+        let data_root = PathBuf::from("C:/fallback");
+
+        assert_eq!(
+            configured_log_db_path(&data_root),
+            PathBuf::from("C:/GOAT/runtime/chat_logs.db")
+        );
+        assert_eq!(
+            configured_data_dir(&data_root),
+            PathBuf::from("C:/GOAT/runtime/data")
+        );
+        assert_eq!(
+            configured_desktop_log_path(&data_root.join("desktop-shell.log")),
+            PathBuf::from("C:/GOAT/runtime/logs/desktop-shell.log")
+        );
+
+        unsafe {
+            std::env::remove_var(LOG_PATH_ENV);
+            std::env::remove_var(DATA_DIR_ENV);
+            std::env::remove_var(DESKTOP_SHELL_LOG_PATH_ENV);
+        }
     }
 
     #[test]
@@ -703,24 +813,12 @@ fn spawn_release_backend<R: tauri::Runtime>(
 ) -> Result<CommandChild, String> {
     let backend_host = backend_host();
     let backend_port = backend_port();
-    let data_root = app_handle
-        .path()
-        .app_local_data_dir()
-        .map_err(|err| format!("could not resolve app data dir: {err}"))?;
-    let logs_dir = app_handle
-        .path()
-        .app_log_dir()
-        .map_err(|err| format!("could not resolve app log dir: {err}"))?;
-    fs::create_dir_all(&data_root).map_err(|err| {
-        format!(
-            "could not create app data dir {}: {err}",
-            data_root.display()
-        )
-    })?;
-    fs::create_dir_all(&logs_dir)
-        .map_err(|err| format!("could not create app log dir {}: {err}", logs_dir.display()))?;
-    let desktop_log = desktop_log_path(&logs_dir);
+    let data_root = resolve_release_data_root(app_handle)?;
+    let logs_dir = resolve_release_log_dir(app_handle)?;
+    let desktop_log = resolve_desktop_log_path(app_handle)?;
     let data_root_arg = data_root.to_string_lossy().to_string();
+    let log_db_path = configured_log_db_path(&data_root);
+    let data_dir = configured_data_dir(&data_root);
     append_desktop_log(&desktop_log, "Starting bundled backend sidecar.");
 
     let mut sidecar = app_handle
@@ -737,12 +835,12 @@ fn spawn_release_backend<R: tauri::Runtime>(
             "--data-root",
             &data_root_arg,
         ])
-        .env("GOAT_DESKTOP_APP_DATA_DIR", data_root.as_os_str())
+        .env(DESKTOP_APP_DATA_DIR_ENV, data_root.as_os_str())
         .env("GOAT_RUNTIME_ROOT", data_root.as_os_str())
-        .env("GOAT_LOG_DIR", logs_dir.as_os_str())
-        .env("GOAT_LOG_PATH", data_root.join("chat_logs.db").as_os_str())
-        .env("GOAT_DATA_DIR", data_root.join("data").as_os_str())
-        .env("GOAT_DESKTOP_SHELL_LOG_PATH", desktop_log.as_os_str())
+        .env(LOG_DIR_ENV, logs_dir.as_os_str())
+        .env(LOG_PATH_ENV, log_db_path.as_os_str())
+        .env(DATA_DIR_ENV, data_dir.as_os_str())
+        .env(DESKTOP_SHELL_LOG_PATH_ENV, desktop_log.as_os_str())
         .env("GOAT_SERVER_PORT", &backend_port)
         .env("GOAT_LOCAL_PORT", &backend_port)
         .env("GOAT_DEPLOY_TARGET", "local");

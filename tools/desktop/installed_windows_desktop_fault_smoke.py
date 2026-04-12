@@ -5,12 +5,14 @@ import json
 import os
 import re
 import shutil
+import socket
 import subprocess
 import time
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from tools.desktop import desktop_smoke as desktop_probe
 from tools.desktop import packaged_shell_fault_smoke as packaged_smoke
 from tools.desktop.write_desktop_release_provenance import sha256_for_path
 
@@ -27,7 +29,10 @@ SIDECAR_EXE_NAME = "goat-backend.exe"
 NSIS_UNINSTALLER_NAME = "uninstall.exe"
 DEFAULT_INSTALL_TIMEOUT_SEC = 120.0
 DEFAULT_UNINSTALL_TIMEOUT_SEC = 90.0
+DEFAULT_HEALTHY_STARTUP_TIMEOUT_SEC = 45.0
+DEFAULT_HEALTHY_SHUTDOWN_TIMEOUT_SEC = 20.0
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+READY_SKIP_OLLAMA_PROBE_ENV = "GOAT_READY_SKIP_OLLAMA_PROBE"
 
 UNINSTALL_ROOTS = (
     (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE) if winreg is not None else ()
@@ -60,6 +65,38 @@ class UninstallResult:
     error: str | None = None
 
 
+@dataclass(frozen=True)
+class HealthyLaunchResult:
+    stdout_path: str
+    stderr_path: str
+    shutdown_stdout_path: str
+    shutdown_stderr_path: str
+    runtime_root: str
+    app_local_data_dir: str
+    app_roaming_data_dir: str
+    backend_host: str
+    backend_port: int
+    health_url: str
+    ready_url: str
+    runtime_target_url: str
+    expected_shell_log_path: str
+    health_ready: bool = False
+    ready_status: int | None = None
+    ready_payload: object | None = None
+    runtime_target_status: int | None = None
+    runtime_target: object | None = None
+    shell_log_path: str | None = None
+    shell_log_source_path: str | None = None
+    shutdown_method: str | None = None
+    shutdown_exit_code: int | None = None
+    status: str = "passed"
+    phase: str = "completed"
+    error: str | None = None
+    started_at_utc: str | None = None
+    completed_at_utc: str | None = None
+    ready_skip_ollama_probe: bool = True
+
+
 class InstalledWindowsFaultSmokeError(SystemExit):
     def __init__(
         self,
@@ -73,12 +110,26 @@ class InstalledWindowsFaultSmokeError(SystemExit):
         self.results = results
 
 
+class InstalledWindowsHealthyLaunchError(SystemExit):
+    def __init__(
+        self,
+        message: str,
+        *,
+        phase: str,
+        result: HealthyLaunchResult,
+    ) -> None:
+        super().__init__(message)
+        self.phase = phase
+        self.result = result
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="installed-windows-desktop-fault-smoke",
         description=(
-            "Silently install a packaged Windows desktop artifact, run fault-injected "
-            "startup scenarios against the installed app, then uninstall and clean up."
+            "Silently install a packaged Windows desktop artifact, prove the "
+            "installed app can reach health/ready once, run fault-injected startup "
+            "scenarios against the installed app, then uninstall and clean up."
         ),
     )
     parser.add_argument("--installer", type=Path, required=True)
@@ -95,6 +146,16 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--restart-limit", type=int, default=1)
     parser.add_argument("--backoff-ms", type=int, default=100)
     parser.add_argument("--hang-sec", type=float, default=5.0)
+    parser.add_argument(
+        "--healthy-startup-timeout-sec",
+        type=float,
+        default=DEFAULT_HEALTHY_STARTUP_TIMEOUT_SEC,
+    )
+    parser.add_argument(
+        "--healthy-shutdown-timeout-sec",
+        type=float,
+        default=DEFAULT_HEALTHY_SHUTDOWN_TIMEOUT_SEC,
+    )
     parser.add_argument(
         "--install-timeout-sec",
         type=float,
@@ -129,6 +190,12 @@ def _write_json(path: Path, payload: dict[str, object]) -> None:
         json.dumps(payload, indent=2) + "\n",
         encoding="utf-8",
     )
+
+
+def _reserve_local_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
 
 
 def _normalize_path(value: Path | str) -> str:
@@ -509,6 +576,384 @@ def _build_failed_uninstall_result(
     )
 
 
+def _build_healthy_launch_environment(
+    *,
+    base_dir: Path,
+    app_identifier: str,
+) -> tuple[dict[str, str], dict[str, object]]:
+    runtime_root = base_dir / "runtime-env"
+    local_appdata = runtime_root / "LocalAppData"
+    roaming_appdata = runtime_root / "RoamingAppData"
+    local_appdata.mkdir(parents=True, exist_ok=True)
+    roaming_appdata.mkdir(parents=True, exist_ok=True)
+    backend_host = "127.0.0.1"
+    backend_port = _reserve_local_port()
+
+    env = os.environ.copy()
+    env["LOCALAPPDATA"] = str(local_appdata)
+    env["APPDATA"] = str(roaming_appdata)
+    env["GOAT_DESKTOP_BACKEND_HOST"] = backend_host
+    env["GOAT_DESKTOP_BACKEND_PORT"] = str(backend_port)
+    env["GOAT_DESKTOP_APP_DATA_DIR"] = str(local_appdata / app_identifier)
+    env["GOAT_RUNTIME_ROOT"] = env["GOAT_DESKTOP_APP_DATA_DIR"]
+    env["GOAT_LOG_DIR"] = str(local_appdata / app_identifier / "logs")
+    env["GOAT_LOG_PATH"] = str(local_appdata / app_identifier / "chat_logs.db")
+    env["GOAT_DATA_DIR"] = str(local_appdata / app_identifier / "data")
+    env[READY_SKIP_OLLAMA_PROBE_ENV] = "1"
+    for name in (
+        packaged_smoke.INTERNAL_TEST_FLAG,
+        packaged_smoke.INTERNAL_TEST_SCENARIO,
+        packaged_smoke.INTERNAL_TEST_HEALTH_TIMEOUT_SEC,
+        packaged_smoke.INTERNAL_TEST_RESTART_LIMIT,
+        packaged_smoke.INTERNAL_TEST_BACKOFF_MS,
+        packaged_smoke.INTERNAL_TEST_HANG_SEC,
+    ):
+        env.pop(name, None)
+
+    expected_shell_log_path = packaged_smoke.fallback_desktop_log_path(
+        app_identifier,
+        local_appdata=local_appdata,
+    )
+    metadata = {
+        "runtime_root": str(runtime_root),
+        "app_local_data_dir": env["GOAT_DESKTOP_APP_DATA_DIR"],
+        "app_roaming_data_dir": str(roaming_appdata),
+        "backend_host": backend_host,
+        "backend_port": backend_port,
+        "health_url": f"http://{backend_host}:{backend_port}/api/health",
+        "ready_url": f"http://{backend_host}:{backend_port}/api/ready",
+        "runtime_target_url": (
+            f"http://{backend_host}:{backend_port}/api/system/runtime-target"
+        ),
+        "expected_shell_log_path": str(expected_shell_log_path),
+    }
+    return env, metadata
+
+
+def _copy_shell_log(
+    *,
+    source_log_path: Path,
+    copied_log_path: Path,
+    wait_timeout_sec: float = 5.0,
+) -> tuple[str, str]:
+    deadline = time.monotonic() + wait_timeout_sec
+    while time.monotonic() < deadline:
+        if source_log_path.is_file():
+            copied_log_path.parent.mkdir(parents=True, exist_ok=True)
+            copied_log_path.write_bytes(source_log_path.read_bytes())
+            return str(copied_log_path), str(source_log_path)
+        time.sleep(0.25)
+    raise SystemExit(
+        f"Could not find desktop-shell.log at expected path {source_log_path}."
+    )
+
+
+def _healthy_launch_result_from_context(
+    *,
+    context: dict[str, object],
+    healthy_dir: Path,
+    started_at_utc: str,
+    status: str,
+    phase: str,
+    error: str | None,
+    health_ready: bool = False,
+    ready_status: int | None = None,
+    ready_payload: object | None = None,
+    runtime_target_status: int | None = None,
+    runtime_target: object | None = None,
+    shell_log_path: str | None = None,
+    shell_log_source_path: str | None = None,
+    shutdown_method: str | None = None,
+    shutdown_exit_code: int | None = None,
+) -> HealthyLaunchResult:
+    return HealthyLaunchResult(
+        stdout_path=str(healthy_dir / "desktop.stdout.log"),
+        stderr_path=str(healthy_dir / "desktop.stderr.log"),
+        shutdown_stdout_path=str(healthy_dir / "shutdown.stdout.log"),
+        shutdown_stderr_path=str(healthy_dir / "shutdown.stderr.log"),
+        runtime_root=str(context["runtime_root"]),
+        app_local_data_dir=str(context["app_local_data_dir"]),
+        app_roaming_data_dir=str(context["app_roaming_data_dir"]),
+        backend_host=str(context["backend_host"]),
+        backend_port=int(context["backend_port"]),
+        health_url=str(context["health_url"]),
+        ready_url=str(context["ready_url"]),
+        runtime_target_url=str(context["runtime_target_url"]),
+        expected_shell_log_path=str(context["expected_shell_log_path"]),
+        health_ready=health_ready,
+        ready_status=ready_status,
+        ready_payload=ready_payload,
+        runtime_target_status=runtime_target_status,
+        runtime_target=runtime_target,
+        shell_log_path=shell_log_path,
+        shell_log_source_path=shell_log_source_path,
+        shutdown_method=shutdown_method,
+        shutdown_exit_code=shutdown_exit_code,
+        status=status,
+        phase=phase,
+        error=error,
+        started_at_utc=started_at_utc,
+        completed_at_utc=utc_now(),
+    )
+
+
+def _best_effort_kill_process_tree(process: subprocess.Popen[object]) -> None:
+    if process.poll() is not None:
+        return
+    try:
+        subprocess.run(  # noqa: S603
+            ["taskkill.exe", "/PID", str(process.pid), "/T", "/F"],
+            check=False,
+            timeout=5,
+            creationflags=CREATE_NO_WINDOW,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except (subprocess.SubprocessError, OSError):
+        process.kill()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            pass
+
+
+def run_installed_healthy_launch(
+    *,
+    installation: DesktopInstallation,
+    artifact_dir: Path,
+    app_identifier: str,
+    startup_timeout_sec: float,
+    shutdown_timeout_sec: float,
+) -> HealthyLaunchResult:
+    healthy_dir = artifact_dir / "healthy-launch"
+    healthy_dir.mkdir(parents=True, exist_ok=True)
+    started_at_utc = utc_now()
+    env, context = _build_healthy_launch_environment(
+        base_dir=healthy_dir,
+        app_identifier=app_identifier,
+    )
+    headers = desktop_probe.build_request_headers()
+    expected_shell_log_path = Path(str(context["expected_shell_log_path"]))
+    copied_shell_log_path = healthy_dir / "desktop-shell.log"
+    process: subprocess.Popen[object] | None = None
+    health_ready = False
+    ready_status: int | None = None
+    ready_payload: object | None = None
+    runtime_target_status: int | None = None
+    runtime_target: object | None = None
+    shutdown_method: str | None = None
+    shutdown_exit_code: int | None = None
+
+    try:
+        with (
+            (healthy_dir / "desktop.stdout.log").open(
+                "w", encoding="utf-8"
+            ) as stdout_file,
+            (healthy_dir / "desktop.stderr.log").open(
+                "w", encoding="utf-8"
+            ) as stderr_file,
+        ):
+            process = subprocess.Popen(  # noqa: S603
+                [installation.desktop_exe],
+                cwd=str(Path(installation.desktop_exe).parent),
+                env=env,
+                stdout=stdout_file,
+                stderr=stderr_file,
+                creationflags=CREATE_NO_WINDOW,
+            )
+
+            health_ready = desktop_probe.wait_for_health(
+                base_url=f"http://{context['backend_host']}:{context['backend_port']}",
+                headers=headers,
+                timeout_sec=startup_timeout_sec,
+            )
+            if not health_ready:
+                raise InstalledWindowsHealthyLaunchError(
+                    (
+                        "Installed desktop never reached /api/health during the "
+                        "healthy launch proof."
+                    ),
+                    phase="healthy_launch:health",
+                    result=_healthy_launch_result_from_context(
+                        context=context,
+                        healthy_dir=healthy_dir,
+                        started_at_utc=started_at_utc,
+                        status="failed",
+                        phase="health",
+                        error=(
+                            "Installed desktop never reached /api/health during the "
+                            "healthy launch proof."
+                        ),
+                    ),
+                )
+
+            ready_status, ready_payload = desktop_probe._request_json(
+                str(context["ready_url"]),
+                headers=headers,
+            )
+            runtime_target_status, runtime_target = desktop_probe._request_json(
+                str(context["runtime_target_url"]),
+                headers=headers,
+            )
+            ready_ok = ready_status == 200 and bool(
+                isinstance(ready_payload, dict) and ready_payload.get("ready")
+            )
+            if not ready_ok:
+                raise InstalledWindowsHealthyLaunchError(
+                    (
+                        "Installed desktop reached /api/health but did not report a "
+                        "ready baseline under GOAT_READY_SKIP_OLLAMA_PROBE=1."
+                    ),
+                    phase="healthy_launch:ready",
+                    result=_healthy_launch_result_from_context(
+                        context=context,
+                        healthy_dir=healthy_dir,
+                        started_at_utc=started_at_utc,
+                        status="failed",
+                        phase="ready",
+                        error=(
+                            "Installed desktop reached /api/health but did not report "
+                            "a ready baseline under GOAT_READY_SKIP_OLLAMA_PROBE=1."
+                        ),
+                        health_ready=health_ready,
+                        ready_status=ready_status,
+                        ready_payload=ready_payload,
+                        runtime_target_status=runtime_target_status,
+                        runtime_target=runtime_target,
+                    ),
+                )
+
+            if process.poll() is not None:
+                raise InstalledWindowsHealthyLaunchError(
+                    (
+                        "Installed desktop exited before the healthy launch proof "
+                        "could perform controlled shutdown."
+                    ),
+                    phase="healthy_launch:process_exit",
+                    result=_healthy_launch_result_from_context(
+                        context=context,
+                        healthy_dir=healthy_dir,
+                        started_at_utc=started_at_utc,
+                        status="failed",
+                        phase="process_exit",
+                        error=(
+                            "Installed desktop exited before the healthy launch proof "
+                            "could perform controlled shutdown."
+                        ),
+                        health_ready=health_ready,
+                        ready_status=ready_status,
+                        ready_payload=ready_payload,
+                        runtime_target_status=runtime_target_status,
+                        runtime_target=runtime_target,
+                    ),
+                )
+
+            shutdown_exit_code = _run_process(
+                args=["taskkill.exe", "/PID", str(process.pid), "/T", "/F"],
+                cwd=None,
+                env=None,
+                stdout_path=healthy_dir / "shutdown.stdout.log",
+                stderr_path=healthy_dir / "shutdown.stderr.log",
+                timeout_sec=shutdown_timeout_sec,
+            )
+            shutdown_method = "taskkill_tree_force"
+            if shutdown_exit_code != 0:
+                raise InstalledWindowsHealthyLaunchError(
+                    "Controlled shutdown of the healthy installed desktop failed.",
+                    phase="healthy_launch:shutdown",
+                    result=_healthy_launch_result_from_context(
+                        context=context,
+                        healthy_dir=healthy_dir,
+                        started_at_utc=started_at_utc,
+                        status="failed",
+                        phase="shutdown",
+                        error="Controlled shutdown of the healthy installed desktop failed.",
+                        health_ready=health_ready,
+                        ready_status=ready_status,
+                        ready_payload=ready_payload,
+                        runtime_target_status=runtime_target_status,
+                        runtime_target=runtime_target,
+                        shutdown_method=shutdown_method,
+                        shutdown_exit_code=shutdown_exit_code,
+                    ),
+                )
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired as exc:
+                raise InstalledWindowsHealthyLaunchError(
+                    (
+                        "Installed desktop remained alive after the healthy launch "
+                        "controlled shutdown request."
+                    ),
+                    phase="healthy_launch:shutdown",
+                    result=_healthy_launch_result_from_context(
+                        context=context,
+                        healthy_dir=healthy_dir,
+                        started_at_utc=started_at_utc,
+                        status="failed",
+                        phase="shutdown",
+                        error=(
+                            "Installed desktop remained alive after the healthy "
+                            "launch controlled shutdown request."
+                        ),
+                        health_ready=health_ready,
+                        ready_status=ready_status,
+                        ready_payload=ready_payload,
+                        runtime_target_status=runtime_target_status,
+                        runtime_target=runtime_target,
+                        shutdown_method=shutdown_method,
+                        shutdown_exit_code=shutdown_exit_code,
+                    ),
+                ) from exc
+
+        shell_log_path, shell_log_source_path = _copy_shell_log(
+            source_log_path=expected_shell_log_path,
+            copied_log_path=copied_shell_log_path,
+        )
+        return _healthy_launch_result_from_context(
+            context=context,
+            healthy_dir=healthy_dir,
+            started_at_utc=started_at_utc,
+            status="passed",
+            phase="completed",
+            error=None,
+            health_ready=health_ready,
+            ready_status=ready_status,
+            ready_payload=ready_payload,
+            runtime_target_status=runtime_target_status,
+            runtime_target=runtime_target,
+            shell_log_path=shell_log_path,
+            shell_log_source_path=shell_log_source_path,
+            shutdown_method=shutdown_method,
+            shutdown_exit_code=shutdown_exit_code,
+        )
+    except InstalledWindowsHealthyLaunchError:
+        raise
+    except SystemExit as exc:
+        raise InstalledWindowsHealthyLaunchError(
+            str(exc),
+            phase="healthy_launch:log_capture",
+            result=_healthy_launch_result_from_context(
+                context=context,
+                healthy_dir=healthy_dir,
+                started_at_utc=started_at_utc,
+                status="failed",
+                phase="log_capture",
+                error=str(exc),
+                health_ready=health_ready,
+                ready_status=ready_status,
+                ready_payload=ready_payload,
+                runtime_target_status=runtime_target_status,
+                runtime_target=runtime_target,
+                shutdown_method=shutdown_method,
+                shutdown_exit_code=shutdown_exit_code,
+            ),
+        ) from exc
+    finally:
+        if process is not None:
+            _best_effort_kill_process_tree(process)
+
+
 def _build_summary_payload(
     *,
     installer_path: Path,
@@ -521,7 +966,16 @@ def _build_summary_payload(
     status: str,
     phase: str,
     error: str | None,
+    scenarios: list[str],
+    startup_timeout_sec: float,
+    health_timeout_sec: int,
+    restart_limit: int,
+    backoff_ms: int,
+    hang_sec: float,
+    healthy_startup_timeout_sec: float,
+    healthy_shutdown_timeout_sec: float,
     installation: DesktopInstallation | None,
+    healthy_launch_result: HealthyLaunchResult | None,
     results: list[packaged_smoke.PackagedShellFaultResult],
     uninstall_result: UninstallResult | None,
     started_at_utc: str,
@@ -541,6 +995,16 @@ def _build_summary_payload(
         "installer_kind": installer_kind,
         "installer_path": str(installer_path),
         "installer_sha256": sha256_for_path(installer_path),
+        "config": {
+            "scenarios": scenarios,
+            "startup_timeout_sec": startup_timeout_sec,
+            "health_timeout_sec": health_timeout_sec,
+            "restart_limit": restart_limit,
+            "backoff_ms": backoff_ms,
+            "hang_sec": hang_sec,
+            "healthy_startup_timeout_sec": healthy_startup_timeout_sec,
+            "healthy_shutdown_timeout_sec": healthy_shutdown_timeout_sec,
+        },
         "install_root": installation.install_root if installation else None,
         "desktop_exe": installation.desktop_exe if installation else None,
         "sidecar_path": installation.sidecar_path if installation else None,
@@ -563,6 +1027,9 @@ def _build_summary_payload(
             )
         ),
         "installation": asdict(installation) if installation else None,
+        "healthy_launch": (
+            asdict(healthy_launch_result) if healthy_launch_result else None
+        ),
         "results": [asdict(result) for result in results],
         "uninstall": asdict(uninstall_result) if uninstall_result else None,
     }
@@ -581,6 +1048,7 @@ def main() -> None:
     scenarios = args.scenarios or list(packaged_smoke.SCENARIO_EXPECTED_STAGE)
     started_at_utc = utc_now()
     installation: DesktopInstallation | None = None
+    healthy_launch_result: HealthyLaunchResult | None = None
     uninstall_result: UninstallResult | None = None
     results: list[packaged_smoke.PackagedShellFaultResult] = []
     status = "passed"
@@ -593,6 +1061,13 @@ def main() -> None:
             artifact_dir=artifact_dir,
             install_timeout_sec=args.install_timeout_sec,
         )
+        healthy_launch_result = run_installed_healthy_launch(
+            installation=installation,
+            artifact_dir=artifact_dir,
+            app_identifier=args.app_identifier,
+            startup_timeout_sec=args.healthy_startup_timeout_sec,
+            shutdown_timeout_sec=args.healthy_shutdown_timeout_sec,
+        )
         results = run_installed_fault_smoke(
             installation=installation,
             artifact_dir=artifact_dir,
@@ -604,6 +1079,11 @@ def main() -> None:
             hang_sec=args.hang_sec,
             app_identifier=args.app_identifier,
         )
+    except InstalledWindowsHealthyLaunchError as exc:
+        status = "failed"
+        phase = exc.phase
+        error = str(exc)
+        healthy_launch_result = exc.result
     except InstalledWindowsFaultSmokeError as exc:
         status = "failed"
         phase = exc.phase
@@ -642,7 +1122,16 @@ def main() -> None:
         status=status,
         phase=phase,
         error=error,
+        scenarios=scenarios,
+        startup_timeout_sec=args.startup_timeout_sec,
+        health_timeout_sec=args.health_timeout_sec,
+        restart_limit=args.restart_limit,
+        backoff_ms=args.backoff_ms,
+        hang_sec=args.hang_sec,
+        healthy_startup_timeout_sec=args.healthy_startup_timeout_sec,
+        healthy_shutdown_timeout_sec=args.healthy_shutdown_timeout_sec,
         installation=installation,
+        healthy_launch_result=healthy_launch_result,
         results=results,
         uninstall_result=uninstall_result,
         started_at_utc=started_at_utc,

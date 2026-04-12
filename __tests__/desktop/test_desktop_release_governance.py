@@ -184,6 +184,8 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     assert "--distribution-channel" in desktop_provenance
     assert "desktop-windows-installed-smoke" in desktop_provenance
     assert "if: ${{ always() }}" in desktop_provenance
+    assert "GITHUB_STEP_SUMMARY" in desktop_provenance
+    assert "healthy_launch" in desktop_provenance
     assert desktop_provenance.count("actions/attest@v4") >= 4
     assert "windows-installed-desktop-drill" in fault_injection
     assert (
@@ -195,6 +197,8 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     assert "--workflow-role fault_injection_drill" in fault_injection
     assert "desktop-installed-drill" in fault_injection
     assert "if: ${{ always() }}" in fault_injection
+    assert "GITHUB_STEP_SUMMARY" in fault_injection
+    assert "healthy_launch" in fault_injection
     assert "python -m tools.desktop.packaged_shell_fault_smoke" not in fault_injection
 
     assert "signed Windows desktop release path" in release_doc
@@ -217,11 +221,14 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     assert "build.log" in operations_doc
     assert "summary.json" in operations_doc
     assert "installed Windows evidence now writes" in operations_doc
+    assert "install -> healthy launch -> fault scenarios -> uninstall" in operations_doc
+    assert "GOAT_READY_SKIP_OLLAMA_PROBE=1" in operations_doc
     assert "desktop-installed-smoke/*/summary.json" in operations_doc
     assert "frontend build inputs" in incident_triage
     assert "non-desktop-only backend or documentation changes" in incident_triage
     assert "desktop-fault-smoke/summary.json" in incident_triage
     assert "desktop-fault-smoke/build.log" in incident_triage
+    assert "healthy_launch" in incident_triage
     assert "desktop-installed-smoke/*/summary.json" in incident_triage
 
 
