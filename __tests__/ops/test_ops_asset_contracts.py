@@ -98,6 +98,9 @@ def test_release_docs_and_status_match_current_truth() -> None:
     incident_triage = (
         REPO_ROOT / "docs" / "operations" / "INCIDENT_TRIAGE.md"
     ).read_text(encoding="utf-8")
+    observability_readme = (
+        REPO_ROOT / "ops" / "observability" / "README.md"
+    ).read_text(encoding="utf-8")
     project_status = (
         REPO_ROOT / "docs" / "governance" / "PROJECT_STATUS.md"
     ).read_text(encoding="utf-8")
@@ -113,13 +116,19 @@ def test_release_docs_and_status_match_current_truth() -> None:
     assert "python -m tools.quality.run_pr_latency_gate" in operations_doc
     assert "`backend-fast`" in operations_doc
     assert "`backend-heavy`" in operations_doc
+    assert "OTel enabled-path tests" in operations_doc
+    assert "observability asset contract" in operations_doc
     assert "python -m tools.desktop.packaged_shell_fault_smoke" in operations_doc
     assert "Linux sidecar/provenance/cargo-audit gate" in operations_doc
     assert "does not own the Windows pre-ready retry semantics" in operations_doc
     assert "`desktop-package-windows`" in incident_triage
     assert "`desktop-supply-chain`" in incident_triage
     assert "`backend-fast`" in incident_triage
+    assert "OTel enabled-path tests" in incident_triage
+    assert "observability asset contract" in incident_triage
     assert "hang_before_ready" in incident_triage
+    assert "EXPORTED_METRIC_FAMILIES" in observability_readme
+    assert "mechanically verified" in observability_readme
     assert "`desktop-package-windows`" in security_doc
     assert "`desktop-supply-chain`" in security_doc
     assert "`ops/deploy/deploy.sh`" in operations_doc

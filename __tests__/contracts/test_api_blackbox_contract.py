@@ -2138,11 +2138,14 @@ class ApiProtectedBlackboxContractTests(unittest.TestCase):
         response = self.client.get("/api/system/metrics", headers=headers)
         self.assertEqual(200, response.status_code)
         text = response.text
+        self.assertIn("# HELP http_requests_total", text)
         self.assertIn("http_requests_total", text)
+        self.assertIn("# TYPE http_request_duration_seconds histogram", text)
         self.assertIn("http_request_duration_seconds_bucket", text)
         self.assertIn("chat_stream_completed_total", text)
         self.assertIn("ollama_errors_total", text)
         self.assertIn("sqlite_log_write_failures_total", text)
+        self.assertIn("feature_gate_denials_total", text)
         self.assertIn("knowledge_retrieval_requests_total", text)
         self.assertIn("knowledge_query_rewrite_applied_total", text)
 

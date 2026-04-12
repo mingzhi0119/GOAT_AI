@@ -45,7 +45,7 @@ python3 -m uvicorn server:create_app --factory --host 0.0.0.0 --port 62606 --rel
 When merge-blocking CI is red, clear the gates in this order instead of mixing backend and desktop failures together:
 
 - `backend-fast`: treat changed-files `ruff format --check` and repo-wide `ruff check` as the first blocker; when this job is red, deeper backend results are still hidden
-- `backend-heavy`: after `backend-fast` is green, inspect dependency audit, import-layer lint, RAG regression, API contract sync, full `pytest`, and the PR latency gate
+- `backend-heavy`: after `backend-fast` is green, inspect dependency audit, import-layer lint, RAG regression, API contract sync, OTel enabled-path tests, the observability asset contract, full `pytest`, and the PR latency gate
 - desktop gates: only after backend is green should triage move to `desktop-package-windows` and `desktop-supply-chain`
 
 ### SQLite schema migrations (Phase 13 Section 13.0)
@@ -301,6 +301,7 @@ Self-managed VMs, Docker Compose, Kubernetes, or developer laptops use the same 
 - Default **`GOAT_OTEL_ENABLED=0`** - tracing is off; the app does not eagerly import the OpenTelemetry SDK.
 - Set **`GOAT_OTEL_ENABLED=1`** to enable a `TracerProvider`, W3C **`traceparent`** / **`tracestate`** extraction on incoming HTTP requests (`backend/platform/otel_middleware.py`), and spans around Ollama HTTP calls in `goat_ai/llm/ollama_client.py`.
 - **`GOAT_OTEL_EXPORTER`:** `console` (default) prints spans to stderr; `otlp` sends to **`OTEL_EXPORTER_OTLP_ENDPOINT`** (OTLP/HTTP traces URL, e.g. `http://127.0.0.1:4318/v1/traces`).
+- `backend-heavy` now runs explicit OTel enabled-path tests so provider init, `traceparent` propagation, OTLP fallback, and middleware registration stay proven instead of default-off-only.
 - Standard OpenTelemetry env vars apply alongside the above (see OpenTelemetry Python docs for OTLP tuning).
 
 ### Structured logging (Phase 13 Wave A)
@@ -381,10 +382,12 @@ curl -sS -H "X-GOAT-API-Key: $GOAT_API_KEY" http://127.0.0.1:62606/api/system/me
   - `http_request_duration_seconds_sum`
   - `http_request_duration_seconds_count`
 - Counter semantics: `chat_stream_completed_total` counts only successful assistant completions, not safeguard-blocked refusal flows
+- `backend/platform/prometheus_metrics.py::EXPORTED_METRIC_FAMILIES` is the single source of truth for operator-facing metric families.
 - Versioned observability assets live under [`ops/observability/`](../../ops/observability/README.md):
   - Prometheus scrape example: [`ops/observability/prometheus/goat-api-scrape.yml`](../../ops/observability/prometheus/goat-api-scrape.yml)
   - Alert rules: [`ops/observability/alerts/goat-api-alerts.yml`](../../ops/observability/alerts/goat-api-alerts.yml)
   - Grafana dashboard: [`ops/observability/grafana/goat-api-dashboard.json`](../../ops/observability/grafana/goat-api-dashboard.json)
+- `backend-heavy` also runs an observability asset contract so alerts, dashboards, and runbooks cannot reference metric families that the API no longer exports.
 - Checked-in deploy and verification assets live under:
   - `ops/deploy/deploy.sh`
   - `ops/deploy/deploy.ps1`

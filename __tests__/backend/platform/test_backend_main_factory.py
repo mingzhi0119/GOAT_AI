@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from backend import main
+from backend.platform.otel_middleware import OtelTraceContextMiddleware
 from goat_ai.config.settings import Settings
 
 
@@ -63,3 +65,29 @@ class BackendMainFactoryTests(unittest.TestCase):
         )
         init_otel_if_enabled.assert_called_once_with()
         self.assertIn("/api/health", app.openapi()["paths"])
+
+    def test_create_app_adds_otel_middleware_when_enabled(self) -> None:
+        with (
+            patch.dict(
+                os.environ,
+                {"GOAT_OTEL_ENABLED": "1", "GOAT_OTEL_EXPORTER": "console"},
+                clear=True,
+            ),
+            patch.object(main, "get_settings", return_value=self.settings),
+            patch.object(main, "configure_logging") as configure_logging,
+            patch.object(main.log_service, "init_db") as init_db,
+            patch.object(main, "init_latency_metrics") as init_latency_metrics,
+            patch.object(main, "init_otel_if_enabled") as init_otel_if_enabled,
+        ):
+            app = main.create_app()
+
+        configure_logging.assert_called_once_with()
+        init_db.assert_called_once_with(self.settings.log_db_path)
+        init_latency_metrics.assert_called_once_with(
+            self.settings.latency_rolling_max_samples
+        )
+        init_otel_if_enabled.assert_called_once_with()
+        self.assertIn(
+            OtelTraceContextMiddleware,
+            [entry.cls for entry in app.user_middleware],
+        )
