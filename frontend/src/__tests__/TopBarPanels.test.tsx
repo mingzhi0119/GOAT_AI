@@ -83,4 +83,49 @@ describe('TopBarPanels', () => {
     expect(onOpenAppearance).toHaveBeenCalled()
     expect(onClose).toHaveBeenCalled()
   })
+
+  it('renders desktop diagnostics details when available', () => {
+    render(
+      <SettingsPanel
+        appearanceSummary="Classic System"
+        advancedOpen={false}
+        desktopDiagnostics={{
+          desktop_mode: true,
+          backend_base_url: 'http://127.0.0.1:62606',
+          readiness_ok: false,
+          failing_checks: ['ollama'],
+          skipped_checks: [],
+          code_sandbox_effective_enabled: true,
+          workbench_effective_enabled: false,
+          app_data_dir: 'C:/GOAT/Desktop',
+          runtime_root: 'C:/GOAT/Desktop',
+          data_dir: 'C:/GOAT/Desktop/data',
+          log_dir: 'C:/GOAT/Desktop/logs',
+          log_db_path: 'C:/GOAT/Desktop/chat_logs.db',
+          packaged_shell_log_path: 'C:/GOAT/Desktop/logs/desktop-shell.log',
+        }}
+        apiKey=""
+        ownerId=""
+        systemInstruction=""
+        temperature={0.7}
+        maxTokens={1024}
+        topP={0.9}
+        onApiKeyChange={vi.fn()}
+        onOwnerIdChange={vi.fn()}
+        onSystemInstructionChange={vi.fn()}
+        onAdvancedOpenChange={vi.fn()}
+        onTemperatureChange={vi.fn()}
+        onMaxTokensChange={vi.fn()}
+        onTopPChange={vi.fn()}
+        onResetAdvanced={vi.fn()}
+        onOpenAppearance={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Desktop runtime')).toBeInTheDocument()
+    expect(screen.getByText('http://127.0.0.1:62606')).toBeInTheDocument()
+    expect(screen.getByText(/failing: ollama/i)).toBeInTheDocument()
+    expect(screen.getByText('C:/GOAT/Desktop/logs/desktop-shell.log')).toBeInTheDocument()
+  })
 })

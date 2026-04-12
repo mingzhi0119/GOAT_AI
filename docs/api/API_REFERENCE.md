@@ -49,6 +49,7 @@ Base path: `/api`
 | `GET` | `/api/system/inference` | Rolling chat latency |
 | `GET` | `/api/system/runtime-target` | Runtime target resolution |
 | `GET` | `/api/system/features` | Capability-gated feature flags (config + host probe) |
+| `GET` | `/api/system/desktop` | Desktop runtime diagnostics for packaged installs |
 | `POST` | `/api/code-sandbox/exec` | Execute one sandbox run in `sync` or `async` mode |
 | `GET` | `/api/code-sandbox/executions/{execution_id}` | Read one persisted sandbox execution |
 | `POST` | `/api/code-sandbox/executions/{execution_id}/cancel` | Cancel one queued sandbox execution |
@@ -893,6 +894,30 @@ Returns machine-readable flags for optional high-risk features (see `docs/standa
 ```
 
 `policy_allowed` is evaluated per caller from the current request's authorization context; for `code_sandbox`, the scope is `sandbox:execute`. `deny_reason` when the **runtime** gate is closed is one of: `disabled_by_operator`, `docker_unavailable`, or `localhost_unavailable` (controlled enum; not raw exception text).
+
+## `GET /api/system/desktop`
+
+Returns desktop-only diagnostics used by the packaged shell settings panel. Non-desktop or server deployments return `desktop_mode: false` and leave the desktop-specific fields empty instead of pretending desktop capabilities are available.
+
+Example:
+
+```json
+{
+  "desktop_mode": true,
+  "backend_base_url": "http://127.0.0.1:62606",
+  "readiness_ok": false,
+  "failing_checks": ["ollama"],
+  "skipped_checks": [],
+  "code_sandbox_effective_enabled": true,
+  "workbench_effective_enabled": false,
+  "app_data_dir": "C:/Users/alice/AppData/Local/GOAT AI",
+  "runtime_root": "C:/Users/alice/AppData/Local/GOAT AI",
+  "data_dir": "C:/Users/alice/AppData/Local/GOAT AI/data",
+  "log_dir": "C:/Users/alice/AppData/Local/GOAT AI/logs",
+  "log_db_path": "C:/Users/alice/AppData/Local/GOAT AI/chat_logs.db",
+  "packaged_shell_log_path": "C:/Users/alice/AppData/Local/GOAT AI/logs/desktop-shell.log"
+}
+```
 
 ## `POST /api/code-sandbox/exec`
 

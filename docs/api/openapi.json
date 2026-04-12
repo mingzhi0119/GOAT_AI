@@ -1460,6 +1460,48 @@
         }
       }
     },
+    "/api/system/desktop": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Read desktop runtime diagnostics",
+        "description": "Return desktop-only diagnostics used by the settings panel and packaged runtime triage.",
+        "operationId": "get_desktop_diagnostics_route_api_system_desktop_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesktopDiagnosticsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/system/runtime-target": {
       "get": {
         "tags": [
@@ -3653,6 +3695,144 @@
         ],
         "title": "CodeSandboxOutputFilePayload",
         "description": "Metadata for one output file created under the sandbox outputs directory."
+      },
+      "DesktopDiagnosticsResponse": {
+        "properties": {
+          "desktop_mode": {
+            "type": "boolean",
+            "title": "Desktop Mode"
+          },
+          "backend_base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend Base Url"
+          },
+          "readiness_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Readiness Ok"
+          },
+          "failing_checks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failing Checks"
+          },
+          "skipped_checks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skipped Checks"
+          },
+          "code_sandbox_effective_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code Sandbox Effective Enabled"
+          },
+          "workbench_effective_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workbench Effective Enabled"
+          },
+          "app_data_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Data Dir"
+          },
+          "runtime_root": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runtime Root"
+          },
+          "data_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Dir"
+          },
+          "log_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Log Dir"
+          },
+          "log_db_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Log Db Path"
+          },
+          "packaged_shell_log_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Packaged Shell Log Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "desktop_mode"
+        ],
+        "title": "DesktopDiagnosticsResponse",
+        "description": "Desktop-only runtime diagnostics used by the settings panel."
       },
       "ErrorResponse": {
         "properties": {

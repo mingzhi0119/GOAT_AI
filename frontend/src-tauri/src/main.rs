@@ -468,6 +468,7 @@ fn spawn_release_backend<R: tauri::Runtime>(
     fs::create_dir_all(&logs_dir)
         .map_err(|err| format!("could not create app log dir {}: {err}", logs_dir.display()))?;
     let desktop_log = desktop_log_path(&logs_dir);
+    let data_root_arg = data_root.to_string_lossy().to_string();
     append_desktop_log(&desktop_log, "Starting bundled backend sidecar.");
 
     let mut sidecar = app_handle
@@ -476,10 +477,20 @@ fn spawn_release_backend<R: tauri::Runtime>(
         .map_err(|err| format!("could not resolve bundled backend sidecar: {err}"))?;
 
     sidecar = sidecar
-        .args(["--host", &backend_host, "--port", &backend_port])
+        .args([
+            "--host",
+            &backend_host,
+            "--port",
+            &backend_port,
+            "--data-root",
+            &data_root_arg,
+        ])
         .env("GOAT_DESKTOP_APP_DATA_DIR", data_root.as_os_str())
+        .env("GOAT_RUNTIME_ROOT", data_root.as_os_str())
+        .env("GOAT_LOG_DIR", logs_dir.as_os_str())
         .env("GOAT_LOG_PATH", data_root.join("chat_logs.db").as_os_str())
         .env("GOAT_DATA_DIR", data_root.join("data").as_os_str())
+        .env("GOAT_DESKTOP_SHELL_LOG_PATH", desktop_log.as_os_str())
         .env("GOAT_SERVER_PORT", &backend_port)
         .env("GOAT_LOCAL_PORT", &backend_port)
         .env("GOAT_DEPLOY_TARGET", "local");

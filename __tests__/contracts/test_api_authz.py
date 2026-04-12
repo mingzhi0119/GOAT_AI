@@ -371,6 +371,13 @@ class ApiAuthzTests(unittest.TestCase):
         self.assertTrue(workbench["deep_research"]["effective_enabled"])
         self.assertFalse(workbench["connectors"]["effective_enabled"])
 
+        desktop = self.client.get(
+            "/api/system/desktop",
+            headers={"X-GOAT-API-Key": "limited-workbench"},
+        )
+        self.assertEqual(200, desktop.status_code)
+        self.assertFalse(desktop.json()["desktop_mode"])
+
     @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
     def test_system_features_resolve_policy_gate_per_credential(
         self, _mock: object

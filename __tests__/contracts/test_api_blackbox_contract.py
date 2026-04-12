@@ -1177,6 +1177,13 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertFalse(feat_body["workbench"]["plan_mode"]["effective_enabled"])
         self.assertFalse(feat_body["workbench"]["browse"]["effective_enabled"])
 
+        desktop = self.client.get("/api/system/desktop")
+        self.assertEqual(200, desktop.status_code)
+        desktop_body = desktop.json()
+        self.assertFalse(desktop_body["desktop_mode"])
+        self.assertEqual([], desktop_body["failing_checks"])
+        self.assertIsNone(desktop_body["backend_base_url"])
+
         exec_stub = self.client.post("/api/code-sandbox/exec", json={})
         self.assertEqual(503, exec_stub.status_code)
         ej = exec_stub.json()
@@ -2092,6 +2099,7 @@ class ApiProtectedBlackboxContractTests(unittest.TestCase):
             ("GET", "/api/system/inference", {}),
             ("GET", "/api/system/runtime-target", {}),
             ("GET", "/api/system/features", {}),
+            ("GET", "/api/system/desktop", {}),
             ("POST", "/api/code-sandbox/exec", {}),
             ("POST", "/api/code-sandbox/executions/cs-1/cancel", {}),
             ("POST", "/api/code-sandbox/executions/cs-1/retry", {}),

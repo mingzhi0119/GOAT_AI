@@ -381,6 +381,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/system/desktop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read desktop runtime diagnostics
+         * @description Return desktop-only diagnostics used by the settings panel and packaged runtime triage.
+         */
+        get: operations["get_desktop_diagnostics_route_api_system_desktop_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/system/runtime-target": {
         parameters: {
             query?: never;
@@ -1119,6 +1139,38 @@ export interface components {
              * @description Output file size in bytes.
              */
             byte_size: number;
+        };
+        /**
+         * DesktopDiagnosticsResponse
+         * @description Desktop-only runtime diagnostics used by the settings panel.
+         */
+        DesktopDiagnosticsResponse: {
+            /** Desktop Mode */
+            desktop_mode: boolean;
+            /** Backend Base Url */
+            backend_base_url?: string | null;
+            /** Readiness Ok */
+            readiness_ok?: boolean | null;
+            /** Failing Checks */
+            failing_checks?: string[];
+            /** Skipped Checks */
+            skipped_checks?: string[];
+            /** Code Sandbox Effective Enabled */
+            code_sandbox_effective_enabled?: boolean | null;
+            /** Workbench Effective Enabled */
+            workbench_effective_enabled?: boolean | null;
+            /** App Data Dir */
+            app_data_dir?: string | null;
+            /** Runtime Root */
+            runtime_root?: string | null;
+            /** Data Dir */
+            data_dir?: string | null;
+            /** Log Dir */
+            log_dir?: string | null;
+            /** Log Db Path */
+            log_db_path?: string | null;
+            /** Packaged Shell Log Path */
+            packaged_shell_log_path?: string | null;
         };
         /**
          * ErrorResponse
@@ -3297,6 +3349,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SystemFeaturesResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_desktop_diagnostics_route_api_system_desktop_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesktopDiagnosticsResponse"];
                 };
             };
             /** @description Unauthorized */

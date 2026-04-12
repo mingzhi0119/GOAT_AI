@@ -130,6 +130,7 @@ Packaged desktop runtime config:
 
 - The packaged desktop app inherits runtime configuration from the parent OS environment rather than a repo-local `.env`.
 - Common runtime knobs for packaged installs are `OLLAMA_BASE_URL`, `GOAT_FEATURE_CODE_SANDBOX`, `GOAT_CODE_SANDBOX_PROVIDER`, and `GOAT_DESKTOP_BACKEND_PORT`.
+- The desktop settings panel reads `/api/system/desktop` for backend URL, readiness summary, feature summary, writable paths, and the packaged shell log path when `GOAT_DESKTOP_SHELL_LOG_PATH` is present.
 - Docker is the default sandbox backend for strong isolation. `localhost` is a trusted-dev fallback only and does not enforce the same network guarantees.
 
 Desktop smoke command:

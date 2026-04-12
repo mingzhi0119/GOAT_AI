@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import os
+
 from backend.platform.config import BACKEND_HOST, BACKEND_PORT
 from backend.domain.authz_types import AuthorizationContext
 from backend.models.system import (
     CodeSandboxFeaturePayload,
+    DesktopDiagnosticsResponse,
     InferenceLatencyResponse,
     RuntimeFeaturePayload,
     RuntimeOperationalContractResponse,
@@ -14,6 +17,7 @@ from backend.models.system import (
     SystemFeaturesResponse,
     WorkbenchFeaturePayload,
 )
+from backend.platform.readiness_service import evaluate_readiness
 from backend.services.feature_gate_service import code_sandbox_policy_allowed
 from backend.services.workbench_source_registry import list_workbench_sources
 from backend.types import Settings
@@ -28,6 +32,9 @@ from goat_ai.runtime.runtime_target import (
     current_runtime_target,
     ordered_runtime_targets,
 )
+
+_DESKTOP_APP_DATA_ENV = "GOAT_DESKTOP_APP_DATA_DIR"
+_DESKTOP_SHELL_LOG_ENV = "GOAT_DESKTOP_SHELL_LOG_PATH"
 
 
 def build_inference_latency_response() -> InferenceLatencyResponse:
@@ -115,6 +122,48 @@ def build_system_features_response(
                 )
             ),
         ),
+    )
+
+
+def build_desktop_diagnostics_response(
+    settings: Settings,
+    auth_context: AuthorizationContext,
+) -> DesktopDiagnosticsResponse:
+    """Return a desktop-scoped diagnostics snapshot for the settings surface."""
+    app_data_dir = os.environ.get(_DESKTOP_APP_DATA_ENV, "").strip()
+    if not app_data_dir:
+        return DesktopDiagnosticsResponse(desktop_mode=False)
+
+    runtime = build_runtime_target_response(settings)
+    readiness_body, _status = evaluate_readiness(settings)
+    features = build_system_features_response(settings, auth_context)
+    checks = readiness_body.get("checks", {})
+    failing_checks = [
+        name
+        for name, payload in checks.items()
+        if isinstance(payload, dict) and payload.get("ok") is False
+    ]
+    skipped_checks = [
+        name
+        for name, payload in checks.items()
+        if isinstance(payload, dict) and payload.get("skipped") is True
+    ]
+
+    return DesktopDiagnosticsResponse(
+        desktop_mode=True,
+        backend_base_url=runtime.current.base_url,
+        readiness_ok=bool(readiness_body.get("ready")),
+        failing_checks=failing_checks,
+        skipped_checks=skipped_checks,
+        code_sandbox_effective_enabled=features.code_sandbox.effective_enabled,
+        workbench_effective_enabled=features.workbench.agent_tasks.effective_enabled,
+        app_data_dir=app_data_dir,
+        runtime_root=str(settings.runtime_root),
+        data_dir=str(settings.data_dir),
+        log_dir=str(settings.log_dir),
+        log_db_path=str(settings.log_db_path),
+        packaged_shell_log_path=os.environ.get(_DESKTOP_SHELL_LOG_ENV, "").strip()
+        or None,
     )
 
 

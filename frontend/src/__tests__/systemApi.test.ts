@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { API_KEY_STORAGE_KEY, OWNER_ID_STORAGE_KEY } from '../api/auth'
 import {
+  fetchDesktopDiagnostics,
   fetchGpuStatus,
   fetchInferenceLatency,
   fetchSystemFeatures,
@@ -129,6 +130,39 @@ describe('system api', () => {
     expect(payload.code_sandbox.policy_allowed).toBe(false)
     expect(payload.workbench.agent_tasks.effective_enabled).toBe(true)
     expect(mockedFetch).toHaveBeenCalledWith('./api/system/features', {
+      headers: {
+        'X-GOAT-API-Key': 'secret-123',
+        'X-GOAT-Owner-Id': 'alice',
+      },
+    })
+  })
+
+  it('fetches desktop diagnostics payload', async () => {
+    localStorage.setItem(API_KEY_STORAGE_KEY, 'secret-123')
+    localStorage.setItem(OWNER_ID_STORAGE_KEY, 'alice')
+    const mockedFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        desktop_mode: true,
+        backend_base_url: 'http://127.0.0.1:62606',
+        readiness_ok: true,
+        failing_checks: [],
+        skipped_checks: [],
+        code_sandbox_effective_enabled: true,
+        workbench_effective_enabled: false,
+        app_data_dir: 'C:/GOAT/Desktop',
+        runtime_root: 'C:/GOAT/Desktop',
+        data_dir: 'C:/GOAT/Desktop/data',
+        log_dir: 'C:/GOAT/Desktop/logs',
+        log_db_path: 'C:/GOAT/Desktop/chat_logs.db',
+        packaged_shell_log_path: 'C:/GOAT/Desktop/logs/desktop-shell.log',
+      }),
+    })
+    vi.stubGlobal('fetch', mockedFetch)
+    const payload = await fetchDesktopDiagnostics()
+    expect(payload.desktop_mode).toBe(true)
+    expect(payload.packaged_shell_log_path).toContain('desktop-shell.log')
+    expect(mockedFetch).toHaveBeenCalledWith('./api/system/desktop', {
       headers: {
         'X-GOAT-API-Key': 'secret-123',
         'X-GOAT-Owner-Id': 'alice',
