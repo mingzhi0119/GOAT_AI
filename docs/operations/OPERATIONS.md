@@ -282,7 +282,7 @@ Self-managed VMs, Docker Compose, Kubernetes, or developer laptops use the same 
 ### OpenTelemetry (optional, Phase 15.6)
 
 - Default **`GOAT_OTEL_ENABLED=0`** - tracing is off; the app does not eagerly import the OpenTelemetry SDK.
-- Set **`GOAT_OTEL_ENABLED=1`** to enable a `TracerProvider`, W3C **`traceparent`** / **`tracestate`** extraction on incoming HTTP requests (`backend/otel_middleware.py`), and spans around Ollama HTTP calls in `goat_ai/ollama_client.py`.
+- Set **`GOAT_OTEL_ENABLED=1`** to enable a `TracerProvider`, W3C **`traceparent`** / **`tracestate`** extraction on incoming HTTP requests (`backend/platform/otel_middleware.py`), and spans around Ollama HTTP calls in `goat_ai/llm/ollama_client.py`.
 - **`GOAT_OTEL_EXPORTER`:** `console` (default) prints spans to stderr; `otlp` sends to **`OTEL_EXPORTER_OTLP_ENDPOINT`** (OTLP/HTTP traces URL, e.g. `http://127.0.0.1:4318/v1/traces`).
 - Standard OpenTelemetry env vars apply alongside the above (see OpenTelemetry Python docs for OTLP tuning).
 
@@ -364,10 +364,10 @@ curl -sS -H "X-GOAT-API-Key: $GOAT_API_KEY" http://127.0.0.1:62606/api/system/me
   - `http_request_duration_seconds_sum`
   - `http_request_duration_seconds_count`
 - Counter semantics: `chat_stream_completed_total` counts only successful assistant completions, not safeguard-blocked refusal flows
-- Versioned observability assets live under [`../ops/observability/`](../ops/observability/README.md):
-  - Prometheus scrape example: [`../ops/observability/prometheus/goat-api-scrape.yml`](../ops/observability/prometheus/goat-api-scrape.yml)
-  - Alert rules: [`../ops/observability/alerts/goat-api-alerts.yml`](../ops/observability/alerts/goat-api-alerts.yml)
-  - Grafana dashboard: [`../ops/observability/grafana/goat-api-dashboard.json`](../ops/observability/grafana/goat-api-dashboard.json)
+- Versioned observability assets live under [`ops/observability/`](../../ops/observability/README.md):
+  - Prometheus scrape example: [`ops/observability/prometheus/goat-api-scrape.yml`](../../ops/observability/prometheus/goat-api-scrape.yml)
+  - Alert rules: [`ops/observability/alerts/goat-api-alerts.yml`](../../ops/observability/alerts/goat-api-alerts.yml)
+  - Grafana dashboard: [`ops/observability/grafana/goat-api-dashboard.json`](../../ops/observability/grafana/goat-api-dashboard.json)
 - Checked-in deploy and verification assets live under:
   - `ops/deploy/deploy.sh`
   - `ops/deploy/deploy.ps1`
@@ -423,7 +423,7 @@ Setting `GOAT_SAFEGUARD_ENABLED=false` and `GOAT_SAFEGUARD_MODE=off` are equival
 
 | Control | Where | Behavior |
 |---------|--------|----------|
-| `GOAT_RAG_RERANK_MODE` | `passthrough` or `lexical` | For `retrieval_profile=default` only, selects vector order vs lexical overlap rerank after the vector stage (`goat_ai/config.py`). |
+| `GOAT_RAG_RERANK_MODE` | `passthrough` or `lexical` | For `retrieval_profile=default` only, selects vector order vs lexical overlap rerank after the vector stage (`goat_ai/config/settings.py`). |
 | `retrieval_profile` | `POST /api/knowledge/search` body | `default` - uses `GOAT_RAG_RERANK_MODE`; `rag3_lexical` / `rag3_quality` - always lexical rerank; `rag3_quality` also enables conservative whitespace query rewrite before search. |
 | Vector similarity | Implementation | Scores are backend-specific; there is **no** global numeric score threshold in config-triage uses **hit vs miss** (see metrics) and eval cases. |
 
@@ -438,7 +438,7 @@ Setting `GOAT_SAFEGUARD_ENABLED=false` and `GOAT_SAFEGUARD_MODE=off` are equival
 
 ### Multi-instance stance (honest limits)
 
-- Rate limiting in `backend/http_security.py` is still in-memory and per-process by default, but it now executes behind a replaceable `RateLimiter` boundary so a shared store can replace the current adapter without changing middleware semantics
+- Rate limiting in `backend/platform/http_security.py` is still in-memory and per-process by default, but it now executes behind a replaceable `RateLimiter` boundary so a shared store can replace the current adapter without changing middleware semantics
 - Rolling latency samples (`/api/system/inference`) are process-local
 - Idempotency cache is SQLite-backed in this release; concurrent multi-writer behavior across many app instances is not treated as a cluster-wide guarantee
 - Durable background execution now also uses a replaceable runner boundary, and workbench startup recovery explicitly replays queued tasks while marking previously running tasks as interrupted

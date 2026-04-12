@@ -69,7 +69,7 @@ If you use the Codex app on Windows and want to run a Linux-targeted workflow th
 
 - `\\wsl$\Ubuntu\home\<your-user>\dev\GOAT_AI`
 
-Use the repo-local skills under [`.agents/skills`](../.agents/skills) when you want WSL-backed validation for Linux-targeted work.
+Use the repo-local skills under [`.agents/skills`](../../.agents/skills) when you want WSL-backed validation for Linux-targeted work.
 
 ## Windows-native stays primary
 
@@ -78,7 +78,7 @@ The following remain normal Windows-native flows:
 - ordinary day-to-day editing and local development
 - Windows installer generation and verification
 - `scripts/desktop/install_desktop_prereqs.ps1`
-- `deploy.ps1`
+- `ops/deploy/deploy.ps1`
 - WebView2 validation
 - MSVC / Visual Studio Build Tools flows
 - Windows shell integration and packaged-installer behavior checks
@@ -93,7 +93,7 @@ From a Windows machine:
 
 ## Related docs
 
-- [README.md](../README.md)
+- [README.md](../../README.md)
 - [OPERATIONS.md](OPERATIONS.md)
 - [ENGINEERING_STANDARDS.md](../standards/ENGINEERING_STANDARDS.md)
-- [AGENTS.md](../AGENTS.md)
+- [AGENTS.md](../../AGENTS.md)

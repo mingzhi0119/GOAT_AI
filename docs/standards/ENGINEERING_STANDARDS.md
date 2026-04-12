@@ -1,6 +1,6 @@
 # GOAT AI - Engineering Standards
 
-Single source of truth for repo-wide engineering rules. Keep [`AGENTS.md`](../AGENTS.md) aligned with this file.
+Single source of truth for repo-wide engineering rules. Keep [`AGENTS.md`](../../AGENTS.md) aligned with this file.
 
 ## 0. Core Principles
 
@@ -44,8 +44,8 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 ### Backend layout
 
 - `backend/main.py`: app factory and router wiring
-- `backend/config.py`: validated settings
-- `backend/dependencies.py`: dependency factories
+- `backend/platform/config.py`: validated settings
+- `backend/platform/dependencies.py`: dependency factories
 - `backend/routers/`: HTTP layer only
 - `backend/services/`: orchestration and integrations
 - `backend/models/`: Pydantic schemas only

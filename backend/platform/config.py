@@ -1,4 +1,4 @@
-"""Backend configuration 鈥?wraps goat_ai Settings and adds HTTP server options.
+"""Backend configuration - wraps goat_ai Settings and adds HTTP server options.
 
 Delegates to `goat_ai.config.settings.Settings` for shared env vars.
 `get_settings()` is LRU-cached so env vars are read exactly once at startup.
@@ -11,7 +11,7 @@ from functools import lru_cache
 
 from goat_ai.config.settings import Settings, load_settings
 
-# 鈹€鈹€ Server-only config (not part of goat_ai shared layer) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+# Server-only config (not part of the goat_ai shared layer).
 _legacy_backend_port = os.environ.get("GOAT_PORT", "").strip()
 BACKEND_PORT: int = int(
     os.environ.get("GOAT_SERVER_PORT", _legacy_backend_port or "62606")

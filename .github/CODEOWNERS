@@ -21,9 +21,21 @@
 * @mingzhi0119
 .github/** @mingzhi0119
 scripts/** @mingzhi0119
-tools/** @mingzhi0119
-goat_ai/** @mingzhi0119
 ops/** @mingzhi0119
+tools/contracts/** @mingzhi0119
+tools/desktop/** @mingzhi0119
+tools/ops/** @mingzhi0119
+tools/quality/** @mingzhi0119
+tools/release/** @mingzhi0119
+goat_ai/charts/** @mingzhi0119
+goat_ai/chat/** @mingzhi0119
+goat_ai/config/** @mingzhi0119
+goat_ai/llm/** @mingzhi0119
+goat_ai/runtime/** @mingzhi0119
+goat_ai/sandbox/** @mingzhi0119
+goat_ai/shared/** @mingzhi0119
+goat_ai/telemetry/** @mingzhi0119
+goat_ai/uploads/** @mingzhi0119
 
 # Frontend
 frontend/src/** @mingzhi0119
@@ -35,22 +47,39 @@ frontend/tsconfig*.json @mingzhi0119
 frontend/vite.config.ts @mingzhi0119
 
 # Backend
-backend/** @mingzhi0119
+backend/application/** @mingzhi0119
+backend/domain/** @mingzhi0119
+backend/models/** @mingzhi0119
+backend/platform/** @mingzhi0119
+backend/routers/** @mingzhi0119
+backend/services/** @mingzhi0119
 requirements*.txt @mingzhi0119
 pyproject.toml @mingzhi0119
 pytest.ini @mingzhi0119
-__tests__/** @mingzhi0119
+__tests__/backend/** @mingzhi0119
+__tests__/contracts/** @mingzhi0119
+__tests__/desktop/** @mingzhi0119
+__tests__/governance/** @mingzhi0119
+__tests__/helpers/** @mingzhi0119
+__tests__/integration/** @mingzhi0119
+__tests__/ops/** @mingzhi0119
 
 # Docs / Assets
-docs/** @mingzhi0119
+docs/api/** @mingzhi0119
+docs/architecture/** @mingzhi0119
+docs/governance/** @mingzhi0119
+docs/operations/** @mingzhi0119
+docs/standards/** @mingzhi0119
 .cursor/rules/** @mingzhi0119
 AGENTS.md @mingzhi0119
+CLAUDE.md @mingzhi0119
 README.md @mingzhi0119
 CONTRIBUTING.md @mingzhi0119
 
 # Shared boundaries
 docs/api/openapi.json @mingzhi0119
 docs/api/api.llm.yaml @mingzhi0119
+frontend/src/api/generated/openapi.ts @mingzhi0119
 frontend/src/api/types.ts @mingzhi0119
 backend/application/ports.py @mingzhi0119
 .github/CODEOWNERS @mingzhi0119

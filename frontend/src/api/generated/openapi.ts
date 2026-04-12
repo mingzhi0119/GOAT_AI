@@ -724,7 +724,7 @@ export interface components {
         };
         /**
          * ChatMessage
-         * @description A single turn in the conversation (mirrors goat_ai.types.ChatTurn).
+         * @description A single turn in the conversation (mirrors goat_ai.shared.types.ChatTurn).
          */
         ChatMessage: {
             /** Role */

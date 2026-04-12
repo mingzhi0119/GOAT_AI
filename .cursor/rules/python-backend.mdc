@@ -23,7 +23,7 @@ def list_models(self):
 ## Pydantic and config
 
 - FastAPI bodies: always `BaseModel` subclasses.
-- Config: `pydantic_settings.BaseSettings` or the existing `goat_ai/config.py` `@dataclass` + `load_settings()`. Both must validate at startup.
+- Config: `pydantic_settings.BaseSettings` or the existing `goat_ai/config/settings.py` `@dataclass` + `load_settings()`. Both must validate at startup.
 - Never read `os.environ` inside request handlers.
 - Never parse raw `request.json()` dicts in a handler.
 
@@ -56,12 +56,13 @@ Do not move business logic into route handlers.
 ```
 backend/
   main.py          # create_app(); startup wiring
-  config.py        # server-only; delegates to goat_ai/config.py
-  dependencies.py  # Depends() factories
+  platform/
+    config.py        # server-only; delegates to goat_ai/config/settings.py
+    dependencies.py  # Depends() factories
   routers/
   services/
   models/
 goat_ai/           # shared: clients, config, tools; no FastAPI
-  config.py
-  exceptions.py
+  config/settings.py
+  shared/exceptions.py
 ```

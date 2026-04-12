@@ -9,10 +9,10 @@
 | `SessionRepository` | `backend/services/chat_runtime.py` | Load, list, upsert, and delete persisted chat sessions. |
 | `ConversationLogger` | `backend/services/chat_runtime.py` | Append-only audit log of completed turns. |
 | `TitleGenerator` | `backend/services/chat_runtime.py` | Optional LLM-backed session title generation. |
-| `LLMClient` | `goat_ai/ollama_client.py` | Model listing, streaming, and tool-calling boundary for tests and adapters. |
+| `LLMClient` | `goat_ai/llm/ollama_client.py` | Model listing, streaming, and tool-calling boundary for tests and adapters. |
 | `SafeguardService` | `backend/services/safeguard_service.py` | Chat safeguard boundary used by orchestration and streaming. |
 | `TabularContextExtractor` | `backend/services/tabular_context.py` | Shared table extraction boundary for chat and upload flows. |
-| `Settings` | `goat_ai/config.py` | Typed app settings for dependency injection and use-case signatures. |
+| `Settings` | `goat_ai/config/settings.py` | Typed app settings for dependency injection and use-case signatures. |
 | `ChatCapacityError` | `backend/services/chat_capacity_service.py` | Chat request capacity guardrail. |
 | `FeatureNotAvailable` | `backend/services/exceptions.py` | Feature-gate denial semantics. |
 | `InferenceBackendUnavailable` | `backend/services/exceptions.py` | Inference backend reachability semantics. |

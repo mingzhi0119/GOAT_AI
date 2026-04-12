@@ -1,0 +1,70 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from __tests__.helpers.repo_root import repo_root
+
+
+REPO_ROOT = repo_root(Path(__file__))
+
+TARGETS = [
+    REPO_ROOT / "README.md",
+    REPO_ROOT / "AGENTS.md",
+    REPO_ROOT / "CLAUDE.md",
+    REPO_ROOT / ".github" / "CODEOWNERS",
+    *sorted((REPO_ROOT / "docs").rglob("*.md")),
+    *sorted((REPO_ROOT / "docs").rglob("*.json")),
+    *sorted((REPO_ROOT / "docs").rglob("*.yaml")),
+    *sorted((REPO_ROOT / "docs").rglob("*.yml")),
+    *sorted((REPO_ROOT / ".cursor" / "rules").glob("*.mdc")),
+]
+
+FORBIDDEN_SNIPPETS = [
+    "docs/ENGINEERING_STANDARDS.md",
+    "docs/DOMAIN.md",
+    "docs/APPEARANCE.md",
+    "docs/PROJECT_STATUS.md",
+    "docs/ROADMAP.md",
+    "docs/QUALITY_TRENDS.md",
+    "docs/SECURITY.md",
+    "docs/SECURITY_RESPONSE.md",
+    "docs/OPERATIONS.md",
+    "docs/BACKUP_RESTORE.md",
+    "docs/ROLLBACK.md",
+    "docs/RELEASE_GOVERNANCE.md",
+    "docs/INCIDENT_TRIAGE.md",
+    "docs/WSL_DEVELOPMENT.md",
+    "docs/DESKTOP_CARGO_AUDIT_EXCEPTIONS.md",
+    "docs/openapi.json",
+    "docs/api.llm.yaml",
+    "backend/config.py",
+    "backend/dependencies.py",
+    "backend/exception_handlers.py",
+    "backend/http_security.py",
+    "backend/otel_middleware.py",
+    "backend/prometheus_metrics.py",
+    "backend/readiness_service.py",
+    "goat_ai/config.py",
+    "goat_ai/ollama_client.py",
+    "goat_ai/runtime_target.py",
+    "goat_ai/clocks.py",
+    "goat_ai/desktop_sidecar.py",
+    "](../AGENTS.md)",
+    "](../README.md)",
+    "](../ops/observability/",
+]
+
+
+def test_structure_docs_and_rules_reference_canonical_paths() -> None:
+    violations: list[str] = []
+    for path in TARGETS:
+        text = path.read_text(encoding="utf-8")
+        for snippet in FORBIDDEN_SNIPPETS:
+            if snippet in text:
+                violations.append(
+                    f"{path.relative_to(REPO_ROOT)} contains stale path `{snippet}`"
+                )
+
+    assert violations == [], (
+        "Repo docs/rules should reference canonical industrial structure paths"
+    )

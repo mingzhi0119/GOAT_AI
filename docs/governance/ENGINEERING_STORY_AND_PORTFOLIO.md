@@ -103,7 +103,7 @@ If a claim has **no** anchor in the repo or docs, do not put it on the homepage.
 
 Wave B evidence anchors in this repo:
 
-- `goat_ai/ollama_client.py` + `__tests__/backend/services/test_ollama_client_cache.py`
+- `goat_ai/llm/ollama_client.py` + `__tests__/backend/services/test_ollama_client_cache.py`
 - `backend/services/idempotency_service.py` + `backend/migrations/005_add_idempotency_keys.sql`
 - `backend/routers/upload.py` + `backend/routers/chat.py`
 - `__tests__/backend/routers/test_upload_router.py` + `__tests__/contracts/test_api_blackbox_contract.py`
@@ -157,7 +157,7 @@ The differentiator is not the stack list; it is **the documented path from demo-
 - [ROADMAP.md](ROADMAP.md) -Phase 13 (Section 13.0, Wave A/B), Phase 14 RAG-first sequencing, and Phase 15 structural semantics.
 - [OPERATIONS.md](../operations/OPERATIONS.md) -deploy, env, host constraints (keep aligned with claims on your homepage).
 - [ENGINEERING_STANDARDS.md](../standards/ENGINEERING_STANDARDS.md) - canonical engineering contract.
-- [AGENTS.md](../AGENTS.md) - agent memory and collaboration guide; canonical engineering rules stay in ENGINEERING_STANDARDS.
+- [AGENTS.md](../../AGENTS.md) - agent memory and collaboration guide; canonical engineering rules stay in ENGINEERING_STANDARDS.
 
 ---
 

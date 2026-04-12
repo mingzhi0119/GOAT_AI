@@ -1,4 +1,4 @@
-"""Safeguard moderation boundary for chat — re-exports domain policy + adapter."""
+"""Safeguard moderation boundary for chat - re-exports domain policy and adapter."""
 
 from __future__ import annotations
 
@@ -53,11 +53,11 @@ _ALLOWED_OUTPUT = SafeguardAssessment(allowed=True, stage="output")
 class ModeScopedSafeguardService:
     """Wraps RuleBasedSafeguardService and suppresses one check direction based on mode.
 
-    mode="input_only"  — review_output always returns allowed (only input is moderated)
-    mode="output_only" — review_input always returns allowed (only output is moderated)
-    mode="full"        — both checks active; identical to RuleBasedSafeguardService
+    mode="input_only"  - review_output always returns allowed (only input is moderated)
+    mode="output_only" - review_input always returns allowed (only output is moderated)
+    mode="full"        - both checks active; identical to RuleBasedSafeguardService
 
-    The factory in backend/dependencies.py returns None for mode="off", so this
+    The factory in backend/platform/dependencies.py returns None for mode="off", so this
     class never needs to handle that case.
     """
 

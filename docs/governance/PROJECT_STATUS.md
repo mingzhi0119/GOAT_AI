@@ -93,4 +93,4 @@ Last updated: 2026-04-11
 - [BACKUP_RESTORE.md](../operations/BACKUP_RESTORE.md)
 - [ROLLBACK.md](../operations/ROLLBACK.md)
 - [RELEASE_GOVERNANCE.md](../operations/RELEASE_GOVERNANCE.md)
-- [AGENTS.md](../AGENTS.md)
+- [AGENTS.md](../../AGENTS.md)
