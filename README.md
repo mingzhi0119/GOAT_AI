@@ -195,6 +195,8 @@ Windows PowerShell:
 .\deploy.ps1
 ```
 
+Canonical checked-in operator assets now live under `ops/deploy/`, `ops/systemd/`, and `ops/verification/`. The repository-root `deploy.sh`, `deploy.ps1`, and `phase0_check.sh` files remain supported compatibility entrypoints so existing operator commands keep working during the cleanup.
+
 ## Testing
 
 Backend (canonical - matches CI):

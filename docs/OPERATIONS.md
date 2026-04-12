@@ -148,6 +148,10 @@ Public Windows desktop release path:
 
 ## Deploy
 
+Canonical checked-in operator assets now live under `ops/deploy/`, `ops/systemd/`, and `ops/verification/`.
+Use the repository-root `deploy.sh`, `deploy.ps1`, and `phase0_check.sh` entrypoints when you want the stable operator commands; those root files are compatibility wrappers that delegate to the canonical `ops/` implementations.
+The checked-in user-service unit now lives at `ops/systemd/goat-ai.service`.
+
 Linux:
 
 ```bash
@@ -364,6 +368,11 @@ curl -sS -H "X-GOAT-API-Key: $GOAT_API_KEY" http://127.0.0.1:62606/api/system/me
   - Prometheus scrape example: [`../ops/observability/prometheus/goat-api-scrape.yml`](../ops/observability/prometheus/goat-api-scrape.yml)
   - Alert rules: [`../ops/observability/alerts/goat-api-alerts.yml`](../ops/observability/alerts/goat-api-alerts.yml)
   - Grafana dashboard: [`../ops/observability/grafana/goat-api-dashboard.json`](../ops/observability/grafana/goat-api-dashboard.json)
+- Checked-in deploy and verification assets live under:
+  - `ops/deploy/deploy.sh`
+  - `ops/deploy/deploy.ps1`
+  - `ops/systemd/goat-ai.service`
+  - `ops/verification/phase0_check.sh`
 - First-response runbook for failures is tracked in [INCIDENT_TRIAGE.md](INCIDENT_TRIAGE.md).
 
 ### Ollama client resilience policy (Phase 13 Wave B)

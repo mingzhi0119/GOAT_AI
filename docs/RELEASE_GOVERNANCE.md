@@ -51,6 +51,9 @@ The deploy scripts preserve the latest deployed `release-manifest.json` under th
 
 The workflow is the default release path, but the same deploy scripts support manual artifact promotion when required:
 
+- canonical checked-in deploy assets live under `ops/deploy/`
+- repository-root `deploy.sh` and `deploy.ps1` remain supported compatibility entrypoints for operators and release bundles
+
 Linux:
 
 ```bash

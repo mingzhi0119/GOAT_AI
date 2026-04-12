@@ -3,12 +3,34 @@ from __future__ import annotations
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+def _repo_root() -> Path:
+    current = Path(__file__).resolve()
+    for candidate in (current.parent, *current.parents):
+        if (candidate / "pyproject.toml").is_file():
+            return candidate
+    raise RuntimeError("Could not locate repository root from test path.")
 
 
-def test_deploy_scripts_use_factory_entrypoint() -> None:
-    deploy_sh = (REPO_ROOT / "deploy.sh").read_text(encoding="utf-8")
-    deploy_ps1 = (REPO_ROOT / "deploy.ps1").read_text(encoding="utf-8")
+REPO_ROOT = _repo_root()
+
+
+def test_root_entrypoints_delegate_to_canonical_ops_assets() -> None:
+    deploy_sh_wrapper = (REPO_ROOT / "deploy.sh").read_text(encoding="utf-8")
+    deploy_ps1_wrapper = (REPO_ROOT / "deploy.ps1").read_text(encoding="utf-8")
+    phase0_wrapper = (REPO_ROOT / "phase0_check.sh").read_text(encoding="utf-8")
+
+    assert 'exec bash "${SCRIPT_DIR}/ops/deploy/deploy.sh" "$@"' in deploy_sh_wrapper
+    assert 'Join-Path $PSScriptRoot "ops\\deploy\\deploy.ps1"' in deploy_ps1_wrapper
+    assert 'exec bash "${SCRIPT_DIR}/ops/verification/phase0_check.sh" "$@"' in (
+        phase0_wrapper
+    )
+
+
+def test_canonical_deploy_scripts_use_factory_entrypoint() -> None:
+    deploy_sh = (REPO_ROOT / "ops" / "deploy" / "deploy.sh").read_text(encoding="utf-8")
+    deploy_ps1 = (REPO_ROOT / "ops" / "deploy" / "deploy.ps1").read_text(
+        encoding="utf-8"
+    )
 
     assert "server:create_app" in deploy_sh
     assert "--factory" in deploy_sh
@@ -17,7 +39,9 @@ def test_deploy_scripts_use_factory_entrypoint() -> None:
 
 
 def test_goat_service_uses_supported_logs_and_factory_entrypoint() -> None:
-    service = (REPO_ROOT / "goat-ai.service").read_text(encoding="utf-8")
+    service = (REPO_ROOT / "ops" / "systemd" / "goat-ai.service").read_text(
+        encoding="utf-8"
+    )
 
     assert "ExecStartPre=/usr/bin/mkdir -p %h/GOAT_AI/logs" in service
     assert "server:create_app" in service
@@ -30,7 +54,9 @@ def test_watchdog_phase0_and_local_ollama_scripts_align_with_supported_ops_contr
 ):
     healthcheck = (REPO_ROOT / "scripts" / "healthcheck.sh").read_text(encoding="utf-8")
     watchdog = (REPO_ROOT / "scripts" / "watchdog.sh").read_text(encoding="utf-8")
-    phase0 = (REPO_ROOT / "phase0_check.sh").read_text(encoding="utf-8")
+    phase0 = (REPO_ROOT / "ops" / "verification" / "phase0_check.sh").read_text(
+        encoding="utf-8"
+    )
     start_ollama = (REPO_ROOT / "scripts" / "start_ollama_local.sh").read_text(
         encoding="utf-8"
     )
@@ -68,6 +94,8 @@ def test_release_docs_and_status_match_current_truth() -> None:
     assert "promotion evidence" in release_doc
     assert "exercise_release_rollback_drill" in rollback_doc
     assert "python -m tools.run_pr_latency_gate" in operations_doc
+    assert "`ops/deploy/deploy.sh`" in operations_doc
+    assert "`ops/systemd/goat-ai.service`" in operations_doc
     assert "<app_log_dir>/desktop-shell.log" in operations_doc
     assert "P0, P1, and P2 are complete" not in project_status
     assert "artifact-first staged release governance workflow" in project_status

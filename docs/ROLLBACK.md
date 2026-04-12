@@ -6,7 +6,7 @@ This runbook covers rollback on the shared-host deployment path.
 
 - Preferred rollback target: previous known-good release bundle + manifest
 - Fallback rollback target: previous known-good ref when an artifact is unavailable
-- Deploy scripts: `deploy.sh` and `deploy.ps1`
+- Deploy scripts: canonical files under `ops/deploy/`, with supported repository-root wrappers `deploy.sh` and `deploy.ps1`
 - Database rollback companion: [BACKUP_RESTORE.md](BACKUP_RESTORE.md)
 
 ## 1) Pick a known-good rollback target

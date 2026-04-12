@@ -1,6 +1,6 @@
 ---
 description: Project snapshot, production host constraints, and deploy rules aligned with docs/ENGINEERING_STANDARDS.md
-globs: deploy.sh,docs/OPERATIONS.md,docs/PROJECT_STATUS.md,goat-ai.service,scripts/rotate_fastapi_log.py,scripts/backup_chat_db.py,scripts/healthcheck.sh,scripts/watchdog.sh
+globs: deploy.sh,ops/deploy/deploy.sh,deploy.ps1,ops/deploy/deploy.ps1,phase0_check.sh,ops/verification/phase0_check.sh,docs/OPERATIONS.md,docs/PROJECT_STATUS.md,ops/systemd/goat-ai.service,scripts/rotate_fastapi_log.py,scripts/backup_chat_db.py,scripts/healthcheck.sh,scripts/watchdog.sh
 alwaysApply: false
 ---
 

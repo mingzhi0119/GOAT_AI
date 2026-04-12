@@ -19,6 +19,9 @@
 
 # Lead / Platform
 * @mingzhi0119
+/deploy.sh @mingzhi0119
+/deploy.ps1 @mingzhi0119
+/phase0_check.sh @mingzhi0119
 .github/** @mingzhi0119
 scripts/** @mingzhi0119
 tools/** @mingzhi0119
