@@ -23,6 +23,17 @@ def _workflow_job_block(workflow_text: str, job_name: str) -> str:
     return "\n".join(block_lines)
 
 
+def _workflow_filter_block(workflow_text: str, filter_name: str) -> str:
+    lines = workflow_text.splitlines()
+    start_index = lines.index(f"            {filter_name}:")
+    block_lines: list[str] = []
+    for line in lines[start_index + 1 :]:
+        if line.startswith("            ") and not line.startswith("              "):
+            break
+        block_lines.append(line)
+    return "\n".join(block_lines)
+
+
 def test_build_provenance_payload_records_expected_artifacts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -101,19 +112,45 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     roadmap = (REPO_ROOT / "docs" / "governance" / "ROADMAP.md").read_text(
         encoding="utf-8"
     )
+    operations_doc = (REPO_ROOT / "docs" / "operations" / "OPERATIONS.md").read_text(
+        encoding="utf-8"
+    )
+    incident_triage = (
+        REPO_ROOT / "docs" / "operations" / "INCIDENT_TRIAGE.md"
+    ).read_text(encoding="utf-8")
+    changes_filter = _workflow_filter_block(ci_workflow, "desktop")
     desktop_windows_job = _workflow_job_block(ci_workflow, "desktop-package-windows")
     desktop_supply_chain_job = _workflow_job_block(ci_workflow, "desktop-supply-chain")
 
     assert "desktop-package-windows" in ci_workflow
     assert "runs-on: windows-latest" in ci_workflow
     assert "npm run desktop:build" in ci_workflow
+    assert "'frontend/src/**'" in changes_filter
+    assert "'frontend/public/**'" in changes_filter
+    assert "'frontend/index.html'" in changes_filter
+    assert "'frontend/vite.config.ts'" in changes_filter
+    assert "'frontend/tsconfig*.json'" in changes_filter
+    assert "'frontend/postcss.config.cjs'" in changes_filter
+    assert "'frontend/tailwind.config.cjs'" in changes_filter
+    assert "'__tests__/desktop/**'" in changes_filter
+    assert "'__tests__/ops/test_ops_asset_contracts.py'" in changes_filter
+    assert "needs.changes.outputs.desktop_changed == 'true'" in ci_workflow
     assert "python -m tools.desktop.packaged_shell_fault_smoke" in desktop_windows_job
     assert "desktop-windows-fault-smoke" in desktop_windows_job
+    assert "if: ${{ always() }}" in desktop_windows_job
     assert ci_workflow.count("python -m tools.desktop.packaged_shell_fault_smoke") == 1
     assert (
         "python -m tools.desktop.packaged_shell_fault_smoke"
         not in desktop_supply_chain_job
     )
+    assert "--scenario missing_sidecar" in desktop_windows_job
+    assert "--scenario exit_before_ready" in desktop_windows_job
+    assert "--scenario hang_before_ready" in desktop_windows_job
+    assert "--startup-timeout-sec 20" in desktop_windows_job
+    assert "--health-timeout-sec 2" in desktop_windows_job
+    assert "--restart-limit 1" in desktop_windows_job
+    assert "--backoff-ms 100" in desktop_windows_job
+    assert "--hang-sec 5" in desktop_windows_job
     assert "Build Linux desktop sidecar" in desktop_supply_chain_job
     assert "Rust dependency audit" in desktop_supply_chain_job
     assert "python -m tools.desktop.write_desktop_release_provenance" in ci_workflow
@@ -157,6 +194,10 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     assert "merge-blocking packaged-shell fault smoke" in roadmap
     assert "desktop-package-windows" in roadmap
     assert "merge-blocking packaged-shell fault smoke" in roadmap
+    assert "packaged-build truth set" in operations_doc
+    assert "non-desktop-only backend or documentation changes" in operations_doc
+    assert "frontend build inputs" in incident_triage
+    assert "non-desktop-only backend or documentation changes" in incident_triage
 
 
 def test_main_writes_json_output(

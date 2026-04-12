@@ -124,6 +124,8 @@ Important notes:
 - merge-blocking CI now also builds real Windows packaged desktop installers and records provenance through `python -m tools.desktop.write_desktop_release_provenance`
 - `desktop-package-windows` also runs `python -m tools.desktop.packaged_shell_fault_smoke` so packaged startup stays fail-closed for missing-sidecar, early-exit-before-ready, and health-timeout paths
 - `desktop-package-windows` is still the PR packaged-binary gate only; it does not install MSI/NSIS artifacts
+- `desktop-package-windows` should trigger for desktop build inputs, not just Rust shell files: `frontend/src/**`, `frontend/public/**`, `frontend/index.html`, Vite/Tailwind/PostCSS/TS config, desktop scripts, desktop tooling, and desktop governance tests/workflows are part of the packaged-build truth set
+- non-desktop-only backend or documentation changes should not burn the Windows packaged PR gate when they do not affect the packaged desktop build surface
 - `desktop-supply-chain` remains the Linux sidecar/provenance/cargo-audit gate; it does not own the Windows pre-ready retry semantics
 - `.github/workflows/desktop-provenance.yml` now runs `python -m tools.desktop.installed_windows_desktop_fault_smoke` against both the built `.msi` and NSIS installers before release assets are uploaded
 - `.github/workflows/fault-injection.yml` reruns the same installed Windows drill on a schedule so installer regressions do not hide behind release-only evidence

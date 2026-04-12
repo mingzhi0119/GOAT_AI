@@ -14,7 +14,9 @@ Use this runbook when staging or production health regresses and you need a fast
 2. After `backend-fast` is green, inspect `backend-heavy` for `python -m tools.contracts.check_api_contract_sync`, OTel enabled-path tests, the observability asset contract, `pytest`, `pip-audit`, `python -m tools.quality.run_rag_eval`, `lint-imports`, and the PR latency gate.
 3. Only after backend is green should triage move to `desktop-package-windows` and `desktop-supply-chain`.
 4. Treat `desktop-package-windows` as the source of truth for packaged pre-ready startup resilience because it now carries the packaged-shell fault smoke for missing-sidecar, early-exit, and health-timeout paths.
-5. Treat `.github/workflows/desktop-provenance.yml` as the source of truth for installed Windows release evidence and `.github/workflows/fault-injection.yml` as the recurring installed-desktop drill; do not mix those failures into the PR packaged gate.
+5. Expect `desktop-package-windows` for desktop build inputs, not just `frontend/src-tauri/**`: frontend build inputs such as `frontend/src/**`, `frontend/public/**`, `frontend/index.html`, Vite/Tailwind/PostCSS/TS config, desktop scripts, desktop tools, and desktop governance tests/workflows are in scope for that PR gate.
+6. Do not expect `desktop-package-windows` for non-desktop-only backend or documentation changes when the packaged Windows build surface is untouched.
+7. Treat `.github/workflows/desktop-provenance.yml` as the source of truth for installed Windows release evidence and `.github/workflows/fault-injection.yml` as the recurring installed-desktop drill; do not mix those failures into the PR packaged gate.
 
 ## What to look at first
 

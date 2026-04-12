@@ -27,17 +27,27 @@ jobs:
         with:
           filters: |
             desktop:
+              - 'frontend/index.html'
+              - 'frontend/postcss.config.cjs'
+              - 'frontend/public/**'
+              - 'frontend/src/**'
               - 'frontend/src-tauri/**'
               - 'frontend/scripts/run-tauri.mjs'
               - 'frontend/scripts/run-python.mjs'
               - 'frontend/package.json'
               - 'frontend/package-lock.json'
+              - 'frontend/tailwind.config.cjs'
+              - 'frontend/tsconfig*.json'
+              - 'frontend/vite.config.ts'
               - 'tools/desktop/**'
+              - '__tests__/desktop/**'
+              - '__tests__/ops/test_ops_asset_contracts.py'
               - 'goat_ai/runtime/desktop_sidecar.py'
               - 'requirements-desktop-build.txt'
               - 'scripts/desktop/**'
               - '.github/workflows/ci.yml'
               - '.github/workflows/desktop-provenance.yml'
+              - '.github/workflows/fault-injection.yml'
 
   backend-fast:
     runs-on: ubuntu-latest
