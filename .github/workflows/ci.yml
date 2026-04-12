@@ -250,6 +250,27 @@ jobs:
       - name: Build Windows desktop package
         working-directory: frontend
         run: npm run desktop:build
+      - name: Packaged-shell fault smoke
+        shell: pwsh
+        run: |
+          python -m tools.desktop.packaged_shell_fault_smoke `
+            --desktop-exe frontend/src-tauri/target/release/goat-ai-desktop.exe `
+            --sidecar frontend/src-tauri/target/release/goat-backend.exe `
+            --artifact-dir desktop-fault-smoke `
+            --scenario missing_sidecar `
+            --scenario exit_before_ready `
+            --scenario hang_before_ready `
+            --startup-timeout-sec 20 `
+            --health-timeout-sec 2 `
+            --restart-limit 1 `
+            --backoff-ms 100 `
+            --hang-sec 5
+      - name: Upload packaged-shell fault smoke artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows-fault-smoke
+          path: desktop-fault-smoke
       - name: Write packaged desktop provenance
         shell: pwsh
         run: |

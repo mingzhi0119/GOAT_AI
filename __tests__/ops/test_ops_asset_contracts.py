@@ -95,6 +95,9 @@ def test_release_docs_and_status_match_current_truth() -> None:
     operations_doc = (REPO_ROOT / "docs" / "operations" / "OPERATIONS.md").read_text(
         encoding="utf-8"
     )
+    incident_triage = (
+        REPO_ROOT / "docs" / "operations" / "INCIDENT_TRIAGE.md"
+    ).read_text(encoding="utf-8")
     project_status = (
         REPO_ROOT / "docs" / "governance" / "PROJECT_STATUS.md"
     ).read_text(encoding="utf-8")
@@ -105,8 +108,19 @@ def test_release_docs_and_status_match_current_truth() -> None:
     assert "promotion evidence" in release_doc
     assert "exercise_release_rollback_drill" in rollback_doc
     assert "python -m tools.quality.run_pr_latency_gate" in operations_doc
+    assert "`backend-fast`" in operations_doc
+    assert "`backend-heavy`" in operations_doc
+    assert "python -m tools.desktop.packaged_shell_fault_smoke" in operations_doc
+    assert "Linux sidecar/provenance/cargo-audit gate" in operations_doc
+    assert "does not own the Windows pre-ready retry semantics" in operations_doc
+    assert "`desktop-package-windows`" in incident_triage
+    assert "`desktop-supply-chain`" in incident_triage
+    assert "`backend-fast`" in incident_triage
+    assert "hang_before_ready" in incident_triage
     assert "`ops/deploy/deploy.sh`" in operations_doc
     assert "`ops/systemd/goat-ai.service`" in operations_doc
     assert "<app_log_dir>/desktop-shell.log" in operations_doc
     assert "P0, P1, and P2 are complete" not in project_status
     assert "artifact-first staged release governance workflow" in project_status
+    assert "backend-fast -> backend-heavy -> backend" in project_status
+    assert "desktop-package-windows" in project_status

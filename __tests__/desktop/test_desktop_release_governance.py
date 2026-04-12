@@ -12,6 +12,17 @@ import tools.desktop.write_desktop_release_provenance as subject
 REPO_ROOT = repo_root(Path(__file__))
 
 
+def _workflow_job_block(workflow_text: str, job_name: str) -> str:
+    lines = workflow_text.splitlines()
+    start_index = lines.index(f"  {job_name}:")
+    block_lines: list[str] = []
+    for line in lines[start_index + 1 :]:
+        if line.startswith("  ") and not line.startswith("    "):
+            break
+        block_lines.append(line)
+    return "\n".join(block_lines)
+
+
 def test_build_provenance_payload_records_expected_artifacts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -87,10 +98,21 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     roadmap = (REPO_ROOT / "docs" / "governance" / "ROADMAP.md").read_text(
         encoding="utf-8"
     )
+    desktop_windows_job = _workflow_job_block(ci_workflow, "desktop-package-windows")
+    desktop_supply_chain_job = _workflow_job_block(ci_workflow, "desktop-supply-chain")
 
     assert "desktop-package-windows" in ci_workflow
     assert "runs-on: windows-latest" in ci_workflow
     assert "npm run desktop:build" in ci_workflow
+    assert "python -m tools.desktop.packaged_shell_fault_smoke" in desktop_windows_job
+    assert "desktop-windows-fault-smoke" in desktop_windows_job
+    assert ci_workflow.count("python -m tools.desktop.packaged_shell_fault_smoke") == 1
+    assert (
+        "python -m tools.desktop.packaged_shell_fault_smoke"
+        not in desktop_supply_chain_job
+    )
+    assert "Build Linux desktop sidecar" in desktop_supply_chain_job
+    assert "Rust dependency audit" in desktop_supply_chain_job
     assert "python -m tools.desktop.write_desktop_release_provenance" in ci_workflow
 
     assert (
@@ -105,9 +127,14 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
 
     assert "signed Windows desktop release path" in release_doc
     assert "Linux desktop sidecar provenance record" in release_doc
+    assert "packaged-shell fault smoke" in release_doc
     assert "desktop-provenance.yml" in release_doc
     assert "Publicly distributed Windows desktop installers" in security_doc
     assert "No open P1 audit items remain" in roadmap
+    assert "backend-fast" in roadmap
+    assert "merge-blocking packaged-shell fault smoke" in roadmap
+    assert "desktop-package-windows" in roadmap
+    assert "merge-blocking packaged-shell fault smoke" in roadmap
 
 
 def test_main_writes_json_output(

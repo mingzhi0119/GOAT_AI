@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 import goat_ai.runtime.desktop_sidecar as subject
 
 
@@ -121,6 +123,53 @@ def test_main_wires_desktop_environment_and_uvicorn(
             "access_log": True,
         }
     ]
+
+
+def test_run_internal_test_scenario_ignores_disabled_or_blank_requests(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(subject.INTERNAL_TEST_FLAG, raising=False)
+    monkeypatch.delenv(subject.INTERNAL_TEST_SCENARIO, raising=False)
+
+    subject.run_internal_test_scenario_if_requested()
+
+    monkeypatch.setenv(subject.INTERNAL_TEST_FLAG, "1")
+    subject.run_internal_test_scenario_if_requested()
+
+
+def test_run_internal_test_scenario_exit_before_ready_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(subject.INTERNAL_TEST_FLAG, "1")
+    monkeypatch.setenv(subject.INTERNAL_TEST_SCENARIO, "exit_before_ready")
+
+    with pytest.raises(SystemExit, match="exit_before_ready"):
+        subject.run_internal_test_scenario_if_requested()
+
+
+def test_run_internal_test_scenario_hang_before_ready_sleeps_and_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sleeps: list[float] = []
+    monkeypatch.setenv(subject.INTERNAL_TEST_FLAG, "1")
+    monkeypatch.setenv(subject.INTERNAL_TEST_SCENARIO, "hang_before_ready")
+    monkeypatch.setenv(subject.INTERNAL_TEST_HANG_SEC, "1.5")
+    monkeypatch.setattr(subject.time, "sleep", lambda seconds: sleeps.append(seconds))
+
+    with pytest.raises(SystemExit, match="hang_before_ready"):
+        subject.run_internal_test_scenario_if_requested()
+
+    assert sleeps == [1.5]
+
+
+def test_run_internal_test_scenario_rejects_unknown_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(subject.INTERNAL_TEST_FLAG, "1")
+    monkeypatch.setenv(subject.INTERNAL_TEST_SCENARIO, "unknown")
+
+    with pytest.raises(SystemExit, match="Unsupported"):
+        subject.run_internal_test_scenario_if_requested()
 
 
 def _parser_with_namespace(namespace: SimpleNamespace):
