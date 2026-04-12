@@ -41,12 +41,12 @@ pip3 install fastapi==0.135.2 python-multipart --quiet && ok "FastAPI installed"
 python3 -c "import fastapi; print('version:', fastapi.__version__)" && ok "FastAPI importable" || fail "FastAPI import failed"
 
 info "Step 3: Node.js runtime"
-node --version | grep -q "v18\." && ok "Node 18 found ($(node --version))" || fail "Need Node 18.x; got $(node --version 2>/dev/null || echo 'not found')"
+node --version | grep -q "v24\." && ok "Node 24 found ($(node --version))" || fail "Need Node 24.x; got $(node --version 2>/dev/null || echo 'not found')"
 npm --version >/dev/null 2>&1 && ok "npm $(npm --version) found" || fail "npm not found"
 
-info "Step 4: npm install"
+info "Step 4: npm ci"
 cd "$SCRIPT_DIR/frontend"
-npm install --silent && ok "npm install succeeded" || fail "npm install failed"
+npm ci --silent && ok "npm ci succeeded" || fail "npm ci failed"
 cd "$SCRIPT_DIR"
 
 info "Step 5: npm run build"
@@ -63,7 +63,7 @@ else
 fi
 
 info "Step 7: Start FastAPI on port $PORT and hit /api/health"
-python3 -m uvicorn server:app --host 0.0.0.0 --port "$PORT" --log-level warning &
+python3 -m uvicorn server:create_app --factory --host 0.0.0.0 --port "$PORT" --log-level warning &
 SERVER_PID=$!
 sleep 2
 
@@ -103,5 +103,6 @@ echo ""
 ok "Phase 0 complete; all checks passed"
 echo ""
 echo "Next:"
-echo "  nohup python3 -m uvicorn server:app --host 0.0.0.0 --port $PORT > fastapi.log 2>&1 &"
-echo "  echo \$! > fastapi.pid"
+echo "  mkdir -p logs"
+echo "  nohup python3 -m uvicorn server:create_app --factory --host 0.0.0.0 --port $PORT > logs/fastapi.log 2>&1 &"
+echo "  echo \$! > logs/fastapi.pid"

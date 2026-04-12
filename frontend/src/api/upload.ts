@@ -1,4 +1,5 @@
 import { buildApiHeaders } from './auth'
+import { buildApiErrorMessage } from './errors'
 /** Stream file-ingestion events from the RAG knowledge upload pipeline. */
 
 export interface UploadFilePromptEvent {
@@ -75,7 +76,7 @@ export async function* streamUpload(file: File): AsyncGenerator<UploadStreamEven
     headers: buildApiHeaders(),
     body: form,
   })
-  if (!resp.ok) throw new Error(`Upload API: HTTP ${resp.status}`)
+  if (!resp.ok) throw new Error(await buildApiErrorMessage(resp, 'Upload API'))
   if (!resp.body) throw new Error('Upload API: no response body')
 
   const reader = resp.body.getReader()

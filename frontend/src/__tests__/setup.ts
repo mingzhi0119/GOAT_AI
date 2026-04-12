@@ -36,3 +36,10 @@ Object.defineProperty(globalThis, 'matchMedia', {
     dispatchEvent: () => true,
   }),
 })
+
+if (typeof globalThis.Element !== 'undefined') {
+  Object.defineProperty(globalThis.Element.prototype, 'scrollIntoView', {
+    writable: true,
+    value: () => undefined,
+  })
+}

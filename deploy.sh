@@ -211,7 +211,8 @@ if [ "${SYSTEMD_USED}" != "1" ]; then
   echo "Freeing port ${SERVER_PORT}"
   free_port "${SERVER_PORT}"
   echo "Starting FastAPI on 0.0.0.0:${SERVER_PORT} (log: ${API_LOG})"
-  GOAT_SERVER_PORT="${SERVER_PORT}" GOAT_LOCAL_PORT="${SERVER_PORT}" nohup "${VENV_DIR}/bin/python" -m uvicorn server:app \
+  GOAT_SERVER_PORT="${SERVER_PORT}" GOAT_LOCAL_PORT="${SERVER_PORT}" nohup "${VENV_DIR}/bin/python" -m uvicorn server:create_app \
+    --factory \
     --host 0.0.0.0 \
     --port "${SERVER_PORT}" \
     --workers 2 \

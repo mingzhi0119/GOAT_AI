@@ -11,7 +11,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from backend.main import app
+from backend.main import create_contract_app
 from tools import generate_llm_api_yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -20,7 +20,7 @@ LLM_API_PATH = REPO_ROOT / "docs" / "api.llm.yaml"
 
 
 def main() -> int:
-    generated_openapi = app.openapi()
+    generated_openapi = create_contract_app().openapi()
     committed_text = OPENAPI_PATH.read_text(encoding="utf-8")
     committed_openapi = json.loads(committed_text)
     # Deep equality: avoids false failures when Python versions emit different dict key order in dumps.

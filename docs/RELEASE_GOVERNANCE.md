@@ -20,11 +20,11 @@ This document defines the minimum P1 release process for staging and production.
 ## Required GitHub environment setup
 
 - `staging`
-  - secrets: `STAGING_SSH_HOST`, `STAGING_SSH_USER`, `STAGING_SSH_KEY`, `STAGING_APP_DIR`
-  - optional secrets: `STAGING_BASE_URL`, `STAGING_API_KEY`, `STAGING_OWNER_ID`
+  - secrets: `STAGING_SSH_HOST`, `STAGING_SSH_USER`, `STAGING_SSH_KEY`, `STAGING_APP_DIR`, `STAGING_BASE_URL`
+  - optional secrets: `STAGING_API_KEY`, `STAGING_OWNER_ID`
 - `production`
-  - secrets: `PRODUCTION_SSH_HOST`, `PRODUCTION_SSH_USER`, `PRODUCTION_SSH_KEY`, `PRODUCTION_APP_DIR`
-  - optional secrets: `PRODUCTION_BASE_URL`, `PRODUCTION_API_KEY`, `PRODUCTION_OWNER_ID`
+  - secrets: `PRODUCTION_SSH_HOST`, `PRODUCTION_SSH_USER`, `PRODUCTION_SSH_KEY`, `PRODUCTION_APP_DIR`, `PRODUCTION_BASE_URL`
+  - optional secrets: `PRODUCTION_API_KEY`, `PRODUCTION_OWNER_ID`
 
 ## Approval policy
 
@@ -42,7 +42,9 @@ Each release workflow run should retain:
 - UTC timestamp
 - deploy jobs must verify the resolved commit SHA before reporting success
 
-This is enough to answer "what exactly was deployed?" during rollback or incident review.
+This is enough to answer "which ref and SHA did we ask the host to deploy?" during
+rollback or incident review. It is not yet full artifact-first provenance; richer
+artifact digest and promotion evidence remain tracked in [ROADMAP.md](ROADMAP.md).
 
 ## Supply-chain provenance follow-on
 

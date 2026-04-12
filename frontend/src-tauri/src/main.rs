@@ -188,7 +188,8 @@ fn spawn_dev_backend() -> Result<Child, String> {
             .args([
                 "-m",
                 "uvicorn",
-                "server:app",
+                "server:create_app",
+                "--factory",
                 "--host",
                 &backend_host,
                 "--port",

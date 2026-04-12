@@ -6,7 +6,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="${PROJECT_DIR:-$HOME/GOAT_AI}"
 FAIL_THRESHOLD="${GOAT_WATCHDOG_FAIL_THRESHOLD:-3}"
 SLEEP_SEC="${GOAT_WATCHDOG_SLEEP_SEC:-60}"
-LOG="${GOAT_WATCHDOG_LOG:-$PROJECT_DIR/watchdog.log}"
+LOG="${GOAT_WATCHDOG_LOG:-$PROJECT_DIR/logs/watchdog.log}"
+mkdir -p "$(dirname "$LOG")"
 fail_count=0
 while true; do
   if bash "$SCRIPT_DIR/healthcheck.sh"; then

@@ -1,4 +1,8 @@
-/** API types - mirror the backend Pydantic models exactly. */
+/** Frontend API and UI types.
+ * Backend-derived contract types are generated under `src/api/generated/openapi.ts`.
+ * Keep this file for UI-only unions and frontend-facing adapters where the OpenAPI
+ * contract needs narrower or more ergonomic typing.
+ */
 
 export type ReasoningLevel = 'low' | 'medium' | 'high'
 export type ThemeStyle = 'classic' | 'urochester' | 'thu'

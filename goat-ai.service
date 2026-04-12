@@ -5,13 +5,15 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=%h/GOAT_AI
+ExecStartPre=/usr/bin/mkdir -p %h/GOAT_AI/logs
 ExecStartPre=%h/GOAT_AI/scripts/start_ollama_local.sh
-ExecStart=%h/GOAT_AI/.venv/bin/python -m uvicorn server:app \
+ExecStart=%h/GOAT_AI/.venv/bin/python -m uvicorn server:create_app \
+    --factory \
     --host 0.0.0.0 --port 62606 --workers 2
 Restart=always
 RestartSec=5
-StandardOutput=append:%h/GOAT_AI/fastapi.log
-StandardError=append:%h/GOAT_AI/fastapi.log
+StandardOutput=append:%h/GOAT_AI/logs/fastapi.log
+StandardError=append:%h/GOAT_AI/logs/fastapi.log
 EnvironmentFile=-%h/GOAT_AI/.env
 
 [Install]

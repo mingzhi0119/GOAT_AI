@@ -10,14 +10,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from backend.main import create_contract_app
+
 
 def main() -> None:
-    from backend.main import app
-
     root = Path(__file__).resolve().parent.parent
     out = root / "docs" / "openapi.json"
     out.write_text(
-        json.dumps(app.openapi(), ensure_ascii=False, indent=2) + "\n",
+        json.dumps(create_contract_app().openapi(), ensure_ascii=False, indent=2)
+        + "\n",
         encoding="utf-8",
     )
 

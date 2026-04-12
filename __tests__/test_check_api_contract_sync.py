@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from tools import check_api_contract_sync
@@ -23,7 +24,9 @@ class CheckApiContractSyncTests(unittest.TestCase):
                 patch.object(check_api_contract_sync, "OPENAPI_PATH", openapi_path),
                 patch.object(check_api_contract_sync, "LLM_API_PATH", llm_path),
                 patch.object(
-                    check_api_contract_sync.app, "openapi", return_value=openapi_obj
+                    check_api_contract_sync,
+                    "create_contract_app",
+                    return_value=SimpleNamespace(openapi=lambda: openapi_obj),
                 ),
                 patch.object(
                     check_api_contract_sync.generate_llm_api_yaml,
@@ -57,9 +60,11 @@ class CheckApiContractSyncTests(unittest.TestCase):
                 patch.object(check_api_contract_sync, "OPENAPI_PATH", openapi_path),
                 patch.object(check_api_contract_sync, "LLM_API_PATH", llm_path),
                 patch.object(
-                    check_api_contract_sync.app,
-                    "openapi",
-                    return_value={"openapi": "3.1.0", "paths": {"/api/chat": {}}},
+                    check_api_contract_sync,
+                    "create_contract_app",
+                    return_value=SimpleNamespace(
+                        openapi=lambda: {"openapi": "3.1.0", "paths": {"/api/chat": {}}}
+                    ),
                 ),
             ):
                 status = check_api_contract_sync.main()

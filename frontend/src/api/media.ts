@@ -1,4 +1,5 @@
 import { buildApiHeaders } from './auth'
+import { buildApiErrorMessage } from './errors'
 
 /** POST /api/media/uploads - vision image attachments. */
 export interface MediaUploadResponse {
@@ -19,7 +20,7 @@ export async function uploadMediaImage(file: File): Promise<MediaUploadResponse>
     body,
   })
   if (!resp.ok) {
-    throw new Error(`Media upload API: HTTP ${resp.status}`)
+    throw new Error(await buildApiErrorMessage(resp, 'Media upload API'))
   }
   return (await resp.json()) as MediaUploadResponse
 }

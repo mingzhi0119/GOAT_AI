@@ -1,4 +1,5 @@
 import { buildApiHeaders } from './auth'
+import { buildApiErrorMessage } from './errors'
 import type { ChatRequest, ChatStreamEvent, ChartSpec } from './types'
 
 export interface StreamChatOptions {
@@ -79,7 +80,7 @@ export async function* streamChat(
     throw err
   }
 
-  if (!resp.ok) throw new Error(`Chat API: HTTP ${resp.status}`)
+  if (!resp.ok) throw new Error(await buildApiErrorMessage(resp, 'Chat API'))
   if (!resp.body) throw new Error('Chat API: no response body')
 
   const reader = resp.body.getReader()

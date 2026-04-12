@@ -134,35 +134,38 @@ describe('code sandbox api', () => {
     })
   })
 
-  it('opens an EventSource log stream with cursor replay support', () => {
-    const close = vi.fn()
-    class FakeEventSource {
-      static instances: FakeEventSource[] = []
-      url: string
-      onmessage: ((event: MessageEvent<string>) => void) | null = null
-      onerror: (() => void) | null = null
-      constructor(url: string) {
-        this.url = url
-        FakeEventSource.instances.push(this)
-      }
-      close() {
-        close()
-      }
-    }
-    vi.stubGlobal('EventSource', FakeEventSource as unknown as typeof EventSource)
-
+  it('opens an authenticated fetch log stream with cursor replay support', async () => {
+    localStorage.setItem(API_KEY_STORAGE_KEY, 'secret-123')
+    localStorage.setItem(OWNER_ID_STORAGE_KEY, 'alice')
+    const encoder = new TextEncoder()
+    const mockedFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      body: new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode('data: {"type":"stdout","sequence":4,"chunk":"hello"}\n\n'),
+          )
+          controller.close()
+        },
+      }),
+    })
+    vi.stubGlobal('fetch', mockedFetch)
     const onEvent = vi.fn()
     const stop = openCodeSandboxLogStream('cs-1', { afterSequence: 3, onEvent })
-    const source = FakeEventSource.instances[0]
-    expect(source?.url).toContain('/api/code-sandbox/executions/cs-1/logs')
-    expect(source?.url).toContain('after_seq=3')
 
-    source?.onmessage?.({
-      data: JSON.stringify({ type: 'stdout', sequence: 4, chunk: 'hello' }),
-    } as MessageEvent<string>)
+    await new Promise(resolve => setTimeout(resolve, 0))
 
     expect(onEvent).toHaveBeenCalledWith({ type: 'stdout', sequence: 4, chunk: 'hello' })
+    expect(mockedFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/code-sandbox/executions/cs-1/logs?after_seq=3'),
+      expect.objectContaining({
+        headers: {
+          'X-GOAT-API-Key': 'secret-123',
+          'X-GOAT-Owner-Id': 'alice',
+        },
+        signal: expect.any(AbortSignal),
+      }),
+    )
     stop()
-    expect(close).toHaveBeenCalled()
   })
 })

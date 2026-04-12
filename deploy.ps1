@@ -413,7 +413,8 @@ Stop-PidFileProcess -PidFile $ApiPid
 
 $startupArgs = @(
     "-m", "uvicorn",
-    "server:app",
+    "server:create_app",
+    "--factory",
     "--host", "0.0.0.0",
     "--port", $ServerPort.ToString(),
     "--workers", "1"

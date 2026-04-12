@@ -77,7 +77,7 @@ Last updated: 2026-04-11
 - **17 runtime platform:** partial workbench runtime is landed; canvas, typed workspace outputs, session restoration, direct output reopen, and output-to-artifact export linkage are now in place, while web retrieval, project memory, and connectors remain open
 - **18 sandbox follow-ons:** MVP is landed; richer async control, egress policy, and Rust supervisor work remain open
 - **19 desktop maturity:** Windows packaging is landed; cross-platform packaged validation, signing, updater readiness, and deeper native runtime operations remain open
-- **engineering quality uplift:** P0, P1, and P2 are complete; recurring quality/security evidence, fault-injection coverage, and provenance baselines are now part of the shipped operating model
+- **engineering quality uplift:** P0 audit remediation is complete; recurring quality/security evidence, fault-injection coverage, and provenance baselines are shipped, while several lifecycle P1 items remain open in [ROADMAP.md](ROADMAP.md)
 
 ## Recommended live references
 

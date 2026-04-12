@@ -33,7 +33,7 @@ source .venv/bin/activate
 pip install -r requirements-ci.txt
 cp .env.example .env
 lint-imports
-python3 -m uvicorn server:app --host 0.0.0.0 --port 62606 --reload
+python3 -m uvicorn server:create_app --factory --host 0.0.0.0 --port 62606 --reload
 ```
 
 `lint-imports` enforces backend package layering (`pyproject.toml`); run it after dependency or router/service refactors.
@@ -51,6 +51,7 @@ Frontend:
 ```bash
 cd frontend
 npm ci
+npm run contract:check
 npm run dev
 ```
 
@@ -58,6 +59,8 @@ If the backend is protected with `GOAT_API_KEY` or `GOAT_REQUIRE_SESSION_OWNER=1
 open the browser UI settings menu and populate `Protected access` with the shared
 API key and, when required, the owner ID. The SPA stores those values locally in
 the browser and attaches `X-GOAT-API-Key` / `X-GOAT-Owner-Id` to runtime API calls.
+Frontend API contract types are generated from `docs/openapi.json`; refresh them
+with `npm run contract:generate` whenever the backend contract changes.
 
 ### Windows desktop prerequisites
 

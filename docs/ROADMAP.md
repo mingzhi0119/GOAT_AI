@@ -27,6 +27,11 @@ No open P0 audit items remain after the 2026-04-11 remediation pass. Active
 follow-on work now starts at P1 and focuses on broader contract, release,
 desktop, and observability maturity.
 
+The 2026-04-11 P1 pass also closed the deploy/ops asset-governance slice
+(direct tests now cover deploy/service/health/watchdog/phase0 contracts) and
+closed the contract-tooling startup-side-effect slice (API contract tooling no
+longer needs runtime DB/telemetry initialization just to inspect OpenAPI).
+
 #### P1: immutable artifact promotion and richer release evidence
 
 - Problem:
@@ -41,18 +46,17 @@ desktop, and observability maturity.
   - release evidence captures artifact digest, environment promotion, and rollback target
   - rollback drills validate artifact-first recovery
 
-#### P1: frontend contract governance and end-to-end confidence
+#### P1: frontend browser-level coverage and broader UI quality gates
 
 - Problem:
-  - frontend API types are still maintained by hand against backend schemas
-  - frontend CI lacks a contract-sync gate and browser-level end-to-end coverage
-  - complex user paths are still validated mostly through component and hook tests
+  - frontend contract generation/checking is now automated, but browser-level end-to-end coverage is still missing
+  - complex protected flows are now covered in jsdom/App integration tests, not in a real browser runner
+  - lint and accessibility/performance checks are still not part of the standard frontend gate
 - Solution:
-  - add an explicit frontend contract generation or verification step against `docs/openapi.json`
   - add browser-level integration coverage for chat, history, uploads, auth-enabled flows, and feature-gated UI
   - add lint and accessibility/performance checks to the frontend gate
+  - keep protected code-sandbox async log flows inside the same browser regression suite so auth/header regressions do not slip past unit tests
 - Exit criteria:
-  - frontend CI fails on contract drift before runtime breakage reaches users
   - protected-path browser tests exist for the highest-risk flows
   - lint and basic accessibility checks are part of the standard frontend gate
 
@@ -73,31 +77,15 @@ desktop, and observability maturity.
   - signed release artifacts are the default public distribution path
   - packaged-app failures are diagnosable without manual stdout/stderr scraping
 
-#### P1: deploy/ops asset test coverage and stale artifact cleanup
+#### P1: backend provider drift and runtime seam hardening
 
 - Problem:
-  - several operational assets have drifted outside the tested governance boundary
-  - legacy scripts and service files still reflect obsolete Node, port, or log-path assumptions
-- Solution:
-  - add direct tests for deploy scripts, service/unit files, health checks, and watchdog paths where practical
-  - explicitly deprecate or remove stale assets that no longer match the supported runtime
-  - reconcile service/log locations with current operations docs and deploy behavior
-- Exit criteria:
-  - supported ops artifacts are either tested or intentionally retired
-  - stale operational guidance no longer competes with the real deploy/recovery path
-
-#### P1: backend startup side effects, provider drift, and runtime seam hardening
-
-- Problem:
-  - importing `backend.main` still performs real startup work such as DB initialization
   - some provider/config paths, such as the OpenAI client seam, remain partially landed and undocumented
   - critical runtime seams still rely on process-local assumptions
 - Solution:
-  - separate app construction from import-time side effects so tooling can inspect contracts without mutating runtime state
   - either wire unfinished provider paths all the way through settings/docs/tests or remove them until needed
   - clarify which runtime seams remain intentionally single-process and add stronger guards/tests around those assumptions
 - Exit criteria:
-  - tooling can read API contracts without touching real runtime state
   - provider/config surfaces are either fully supported or removed from the active code path
   - the repo is explicit about which seams are single-instance by design
 

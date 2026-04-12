@@ -45,7 +45,7 @@ Details: [`docs/DEPENDENCY_GRAPH.md`](docs/DEPENDENCY_GRAPH.md) · [`docs/PORTS.
 python3.14 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-ci.txt
 cp .env.example .env
-python3 -m uvicorn server:app --host 0.0.0.0 --port 62606 --reload
+python3 -m uvicorn server:create_app --factory --host 0.0.0.0 --port 62606 --reload
 
 # Frontend (development)
 cd frontend && npm ci && npm run dev

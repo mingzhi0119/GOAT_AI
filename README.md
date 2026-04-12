@@ -122,7 +122,7 @@ python3.14 -m venv .venv   # or any `python3` that matches CI (see `.github/work
 source .venv/bin/activate
 pip install -r requirements-ci.txt
 cp .env.example .env
-python3 -m uvicorn server:app --host 0.0.0.0 --port 62606 --reload
+python3 -m uvicorn server:create_app --factory --host 0.0.0.0 --port 62606 --reload
 ```
 
 Use **Python 3.14** for the venv when you can so `python -m tools.check_api_contract_sync` matches the CI backend job.

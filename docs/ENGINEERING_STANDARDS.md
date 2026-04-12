@@ -66,7 +66,9 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 
 - Keep TypeScript strict.
 - Do not use `any` or `@ts-ignore`.
-- Define API types in `src/api/types.ts` and keep network calls inside `src/api/`.
+- Keep generated contract types under `src/api/generated/` and regenerate them from `docs/openapi.json`.
+- Use `src/api/types.ts` only for frontend-specific adapters or UI-only unions that cannot come straight from OpenAPI.
+- Keep network calls inside `src/api/`.
 - Keep components focused and hooks typed.
 - Avoid business logic in JSX.
 - Keep frontend accessibility at WCAG 2.2 AA by default.
@@ -93,7 +95,7 @@ Engineering work must not silently lower the repo's correctness, testability, ma
 - When fixing a bug, add or update the test that would have caught it before the fix.
 - Prefer direct tests for decision-heavy modules; do not rely only on end-to-end or black-box coverage when the internal branch logic is complex.
 - Run the relevant CI-equivalent checks for the layer you changed.
-- For frontend changes, run `cd frontend && npm ci && npm test -- --run`.
+- For frontend changes, run `cd frontend && npm ci && npm run contract:check && npm test -- --run`.
 - CI also runs `cd frontend && npm run build`; run that locally for frontend changes that touch types, build inputs, packaging, test utilities, or any path that may compile differently from `vitest`.
 - Desktop shell changes must keep `cargo test --manifest-path frontend/src-tauri/Cargo.toml` green.
 - Delivery and desktop wrapper changes must keep the scripted smoke coverage green (`python -m pytest __tests__/test_desktop_smoke.py` and any affected script tests).

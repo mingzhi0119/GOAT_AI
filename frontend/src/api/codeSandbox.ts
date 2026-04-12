@@ -1,4 +1,5 @@
 import { buildApiHeaders } from './auth'
+import { buildApiErrorMessage } from './errors'
 import type {
   CodeSandboxExecRequest,
   CodeSandboxExecutionEventsResponse,
@@ -6,20 +7,12 @@ import type {
   CodeSandboxExecutionResponse,
 } from './types'
 
-function extractErrorDetail(payload: unknown): string | null {
-  if (typeof payload !== 'object' || payload === null) return null
-  const detail = (payload as { detail?: unknown }).detail
-  if (typeof detail === 'string') return detail
-  if (Array.isArray(detail)) return 'Request validation failed.'
-  return null
-}
-
-async function parseErrorResponse(resp: Response): Promise<string> {
+function emitParsedEvent(line: string, onEvent: (event: CodeSandboxLogStreamEvent) => void): void {
+  if (!line.startsWith('data: ')) return
   try {
-    const payload = (await resp.json()) as unknown
-    return extractErrorDetail(payload) ?? `Code sandbox API: HTTP ${resp.status}`
+    onEvent(JSON.parse(line.slice(6).trim()) as CodeSandboxLogStreamEvent)
   } catch {
-    return `Code sandbox API: HTTP ${resp.status}`
+    // Ignore malformed SSE frames and keep the stream alive.
   }
 }
 
@@ -31,7 +24,7 @@ export async function executeCodeSandbox(
     headers: buildApiHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(request),
   })
-  if (!resp.ok) throw new Error(await parseErrorResponse(resp))
+  if (!resp.ok) throw new Error(await buildApiErrorMessage(resp, 'Code sandbox API'))
   return (await resp.json()) as CodeSandboxExecutionResponse
 }
 
@@ -41,7 +34,7 @@ export async function fetchCodeSandboxExecution(
   const resp = await fetch(`./api/code-sandbox/executions/${executionId}`, {
     headers: buildApiHeaders(),
   })
-  if (!resp.ok) throw new Error(await parseErrorResponse(resp))
+  if (!resp.ok) throw new Error(await buildApiErrorMessage(resp, 'Code sandbox API'))
   return (await resp.json()) as CodeSandboxExecutionResponse
 }
 
@@ -51,7 +44,7 @@ export async function fetchCodeSandboxExecutionEvents(
   const resp = await fetch(`./api/code-sandbox/executions/${executionId}/events`, {
     headers: buildApiHeaders(),
   })
-  if (!resp.ok) throw new Error(await parseErrorResponse(resp))
+  if (!resp.ok) throw new Error(await buildApiErrorMessage(resp, 'Code sandbox API'))
   return (await resp.json()) as CodeSandboxExecutionEventsResponse
 }
 
@@ -65,21 +58,52 @@ export function openCodeSandboxLogStream(
   executionId: string,
   options: CodeSandboxLogStreamOptions,
 ): () => void {
+  const controller = new AbortController()
   const url = new URL(`./api/code-sandbox/executions/${executionId}/logs`, window.location.href)
   if (options.afterSequence && options.afterSequence > 0) {
     url.searchParams.set('after_seq', String(options.afterSequence))
   }
-  const source = new EventSource(url.toString())
-  source.onmessage = event => {
+
+  void (async () => {
     try {
-      options.onEvent(JSON.parse(event.data) as CodeSandboxLogStreamEvent)
+      const resp = await fetch(url.toString(), {
+        headers: buildApiHeaders(),
+        signal: controller.signal,
+      })
+      if (!resp.ok) {
+        throw new Error(await buildApiErrorMessage(resp, 'Code sandbox log stream'))
+      }
+      if (!resp.body) {
+        throw new Error('Code sandbox log stream: no response body')
+      }
+
+      const reader = resp.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const parts = buffer.split('\n')
+          buffer = parts[parts.length - 1] ?? ''
+          for (const line of parts.slice(0, -1)) {
+            emitParsedEvent(line, options.onEvent)
+          }
+        }
+        if (buffer.trim()) {
+          emitParsedEvent(buffer, options.onEvent)
+        }
+      } finally {
+        reader.cancel().catch(() => {})
+      }
     } catch {
-      // Ignore malformed SSE frames and keep the stream alive.
+      if (!controller.signal.aborted) {
+        options.onError?.()
+      }
     }
-  }
-  source.onerror = () => {
-    source.close()
-    options.onError?.()
-  }
-  return () => source.close()
+  })()
+
+  return () => controller.abort()
 }
