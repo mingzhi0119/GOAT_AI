@@ -58,7 +58,7 @@ closure. The final desktop slice now has:
 - explicit packaged-app failure handling in the Tauri shell so startup timeout
   and sidecar exit paths do not silently reveal a broken UI
 
-No open P2 audit items remain after the 2026-04-12 closeout. That pass:
+The 2026-04-12 P2 closeout completed the original lifecycle-audit backlog. That pass:
 
 - extracted remaining composer-panel and attachment-strip responsibilities out of
   the largest frontend hotspot so `ChatWindow` no longer owns the full popover
@@ -71,7 +71,34 @@ No open P2 audit items remain after the 2026-04-12 closeout. That pass:
   merge-blocking governance tests so docs drift and stale paths are less likely
   to re-enter the repo unnoticed
 
-Any remaining work is now capability roadmap scope, not audit-remediation debt.
+The same-day engineering-score follow-on pass also closed the last open `P2`
+gaps:
+
+- backend runtime persistence and stream hotspots are now split into smaller
+  modules instead of concentrating state transitions, storage mapping, and
+  orchestration in a few oversized files
+- workbench now has dedicated `workbench:read`, `workbench:write`, and
+  `workbench:export` scopes, with route/authz semantics proven through contract
+  and application tests
+- OTel enabled-path behavior and observability assets are now mechanically
+  verified in `backend-heavy`
+- top-bar settings/actions now use real keyboard/focus semantics, and chat
+  composer state has been extracted out of the largest frontend hotspot
+- Windows desktop evidence now covers installed MSI/NSIS startup behavior in the
+  release workflow plus a recurring installed-desktop drill
+
+No open `P2` engineering-score items remain after the 2026-04-12 closeout. The
+current quality watchpoints are `P3` governance-maintenance items, not blockers
+ahead of feature expansion:
+
+- keep `desktop-package-windows` packaged-binary smoke green for desktop-related
+  changes, because the merge-blocking packaged-shell fault smoke is still the
+  first guardrail for desktop PRs
+- keep `.github/workflows/desktop-provenance.yml` installed Windows evidence and
+  `.github/workflows/fault-injection.yml` installed-desktop drills green as the
+  desktop distribution surface expands
+- preserve the new workbench/authz and observability contracts when future
+  runtime features widen the supported surface
 
 ### Active priorities
 
@@ -88,7 +115,7 @@ Any remaining work is now capability roadmap scope, not audit-remediation debt.
    - signed Windows release and packaged CI validation are landed
    - macOS/Linux public packaging, updater readiness, and deeper native runtime operations are still open
    - current governance order is: clear `backend-fast` first, then inspect `backend-heavy`, and only then move to `desktop-package-windows` / `desktop-supply-chain`
-   - pre-ready restart/backoff is shipped, and the current residual risk is keeping the merge-blocking packaged-shell fault smoke in `desktop-package-windows` green for missing-sidecar, early-exit, and pre-ready-timeout paths
+   - pre-ready restart/backoff is shipped, and current residual governance work is keeping both the PR packaged-binary smoke and the installed-desktop release/scheduled evidence green as platform scope expands
 
 ### Runtime platform
 
@@ -96,8 +123,8 @@ Any remaining work is now capability roadmap scope, not audit-remediation debt.
 
 - Goal: finish the shared task/runtime primitives that Browse, Deep Research, Canvas, project memory, and connectors should all build on.
 - Remaining work:
-  - clearer task cancellation and retry semantics
   - source registry extensions for real web and future connector-backed retrieval
+  - broader runtime composition for project memory/connectors on top of the now-landed queued-only cancel/retry control plane
 - Sequencing rule:
   - finish shared runtime foundations before widening frontend promises
 
@@ -105,8 +132,7 @@ Any remaining work is now capability roadmap scope, not audit-remediation debt.
 
 - Goal: move beyond the current minimal `task_kind = plan` runner.
 - Remaining work:
-  - safe cancellation
-  - retry semantics
+  - running-state interruption beyond the current queued-only control plane
   - richer execution beyond a minimal inline markdown result
 
 #### Phase 17C: browse and deep-research runtime
@@ -132,7 +158,7 @@ Any remaining work is now capability roadmap scope, not audit-remediation debt.
 
 - Goal: extend the landed Docker-first sandbox without weakening the current operator/safety posture.
 - Remaining work:
-  - cancel / retry semantics for async runs
+  - running-state cancellation / retry behavior beyond the current queued-only control plane
   - multi-file workspace ergonomics beyond inline text seeding
   - allowlisted egress modes instead of all-or-nothing disablement
   - alternate providers behind the same sandbox boundary
@@ -191,7 +217,7 @@ Desktop shell scaffolding and packaged backend sidecar are already landed and ar
   - restart/backoff and clearer first-run failure reporting
   - desktop-safe local data and path handling
 - Current governance focus:
-  - the runtime behavior is landed, but merge-blocking packaged-shell fault smoke still needs to remain green on desktop-related changes because Rust unit tests and local builds alone are not enough evidence for pre-ready retry behavior
+  - the runtime behavior is landed; the remaining governance work is to keep the PR packaged-binary smoke plus the release/scheduled installed-desktop evidence green on desktop-related changes because Rust unit tests and local builds alone are not enough proof for pre-ready retry behavior
 - Non-goals:
   - no SPA rewrite into Rust
   - no backend business-logic rewrite solely for desktop packaging
