@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { streamChat } from '../api/chat'
 import type { HistorySessionDetail } from '../api/history'
 import type {
-  ChatMessage,
   ChatStreamEvent,
   ChartSpec,
   Message,
@@ -10,25 +9,25 @@ import type {
   ThemeStyle,
 } from '../api/types'
 import { hydrateHistorySession } from '../utils/sessionHistory'
-
-const MESSAGES_KEY = 'goat-ai-messages'
-const SESSION_KEY = 'goat-ai-session-id'
-const MAX_STORED = 100
+import {
+  clearStoredChatState,
+  loadStoredMessages,
+  loadStoredSessionId,
+  persistMessages,
+  persistSessionId,
+} from './chatLocalPersistence'
+import {
+  applyStreamEvent,
+  buildHistoryMessages,
+  buildUserMessage,
+  buildUserText,
+  createAssistantStreamingMessage,
+  finalizeStreamingMessage,
+  markStreamError,
+} from './chatStreamState'
 
 function shouldShowThinking(think: OllamaOptionsPayload['think'] | undefined): boolean {
   return think === true || typeof think === 'string'
-}
-
-function loadMessages(): Message[] {
-  try {
-    const raw = localStorage.getItem(MESSAGES_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw) as unknown
-    if (!Array.isArray(parsed)) return []
-    return (parsed as Message[]).filter(m => !m.isStreaming)
-  } catch {
-    return []
-  }
 }
 
 export interface UseChatReturn {
@@ -56,127 +55,68 @@ export interface UseChatReturn {
 
 /** Stream a mixed token/chart-spec generator into an existing assistant message slot. */
 function useStreamIntoMessage() {
-  const run = useCallback(
+  return useCallback(
     async (
       gen: AsyncGenerator<ChatStreamEvent>,
       msgId: string,
-      setMsgs: React.Dispatch<React.SetStateAction<Message[]>>,
-      setStreaming: React.Dispatch<React.SetStateAction<boolean>>,
+      setMessages: Dispatch<SetStateAction<Message[]>>,
+      setStreaming: Dispatch<SetStateAction<boolean>>,
       onChartSpec?: (spec: ChartSpec) => void,
     ) => {
       try {
         for await (const event of gen) {
-          if (event.type === 'token') {
-            setMsgs(prev =>
-              prev.map(m => (m.id === msgId ? { ...m, content: m.content + event.token } : m)),
-            )
-          } else if (event.type === 'thinking') {
-            setMsgs(prev =>
-              prev.map(m =>
-                m.id === msgId
-                  ? {
-                      ...m,
-                      thinkingContent: (m.thinkingContent ?? '') + event.token,
-                    }
-                  : m,
-              ),
-            )
-          } else if (event.type === 'artifact') {
-            const { type: _type, ...artifact } = event
-            setMsgs(prev =>
-              prev.map(m =>
-                m.id === msgId
-                  ? { ...m, artifacts: [...(m.artifacts ?? []), artifact] }
-                  : m,
-              ),
-            )
-          } else if (event.type === 'chart_spec') {
-            onChartSpec?.(event.chart)
-          } else if (event.type === 'error') {
-            setMsgs(prev =>
-              prev.map(m =>
-                m.id === msgId ? { ...m, content: event.message, isError: true } : m,
-              ),
-            )
-          }
+          setMessages(previous => applyStreamEvent(previous, msgId, event, onChartSpec))
         }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Streaming error'
-        setMsgs(prev =>
-          prev.map(m =>
-            m.id === msgId ? { ...m, content: msg, isError: true } : m,
-          ),
-        )
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Streaming error'
+        setMessages(previous => markStreamError(previous, msgId, message))
       } finally {
-        setMsgs(prev =>
-          prev.map(m => (m.id === msgId ? { ...m, isStreaming: false } : m)),
-        )
+        setMessages(previous => finalizeStreamingMessage(previous, msgId))
         setStreaming(false)
       }
     },
     [],
   )
-  return run
 }
 
 /**
  * Manages conversation state, SSE streaming, abort control, and local persistence.
  *
- * Session persistence: messages are saved to localStorage on every change (up to
- * MAX_STORED non-streaming messages) and restored on page load.
- *
- * Abort: call stopStreaming() to cancel a live stream; the partial response is kept.
+ * Session persistence: messages are saved to localStorage on every change and restored on page
+ * load. Abort: call stopStreaming() to cancel a live stream; the partial response is kept.
  */
 export function useChat(): UseChatReturn {
-  const [messages, setMessages] = useState<Message[]>(loadMessages)
-  const [sessionId, setSessionId] = useState<string | null>(() => localStorage.getItem(SESSION_KEY))
+  const [messages, setMessages] = useState<Message[]>(loadStoredMessages)
+  const [sessionId, setSessionId] = useState<string | null>(loadStoredSessionId)
   const [isStreaming, setIsStreaming] = useState(false)
 
   const messagesRef = useRef<Message[]>([])
   messagesRef.current = messages
 
   const abortControllerRef = useRef<AbortController | null>(null)
-  const _runStream = useStreamIntoMessage()
+  const runStreamIntoMessage = useStreamIntoMessage()
 
-  // Persist completed messages to localStorage on every change
   useEffect(() => {
-    try {
-      const toStore = messages.filter(m => !m.isStreaming).slice(-MAX_STORED)
-      localStorage.setItem(MESSAGES_KEY, JSON.stringify(toStore))
-    } catch {
-      // localStorage might be full or unavailable
-    }
+    persistMessages(messages)
   }, [messages])
 
   useEffect(() => {
-    if (sessionId) localStorage.setItem(SESSION_KEY, sessionId)
-    else localStorage.removeItem(SESSION_KEY)
+    persistSessionId(sessionId)
   }, [sessionId])
 
-  const _startStream = useCallback(
+  const startStream = useCallback(
     async (
       gen: AsyncGenerator<ChatStreamEvent>,
       prependMessages?: Message[],
       onChartSpec?: (spec: ChartSpec) => void,
       showThinking?: boolean,
     ) => {
-      const asstId = crypto.randomUUID()
-      setMessages(prev => [
-        ...(prependMessages ?? prev),
-        {
-          id: asstId,
-          role: 'assistant',
-          content: '',
-          createdAt: new Date().toISOString(),
-          isStreaming: true,
-          artifacts: [],
-          showThinking,
-        },
-      ])
+      const assistantMessage = createAssistantStreamingMessage(showThinking)
+      setMessages(previous => [...(prependMessages ?? previous), assistantMessage])
       setIsStreaming(true)
-      await _runStream(gen, asstId, setMessages, setIsStreaming, onChartSpec)
+      await runStreamIntoMessage(gen, assistantMessage.id, setMessages, setIsStreaming, onChartSpec)
     },
-    [_runStream],
+    [runStreamIntoMessage],
   )
 
   const sendMessage = useCallback(
@@ -198,38 +138,17 @@ export function useChat(): UseChatReturn {
       const activeSessionId = sessionIdOverride ?? sessionId ?? crypto.randomUUID()
       if (!sessionId) setSessionId(activeSessionId)
 
-      const userText =
-        content.trim() ||
-        (imageAttachmentIds && imageAttachmentIds.length > 0
-          ? 'What do you see in this image?'
-          : '')
-
-      let baseHistory: ChatMessage[] = messagesRef.current.map(m => ({
-        role: m.role,
-        content: m.content,
-        ...(m.file_context ? { file_context: true as const } : {}),
-        ...(m.image_attachment_ids && m.image_attachment_ids.length > 0
-          ? { image_attachment_ids: m.image_attachment_ids }
-          : {}),
-      }))
-      const history: ChatMessage[] = [
-        ...baseHistory,
+      const userText = buildUserText(content, imageAttachmentIds)
+      const userMessage = buildUserMessage(userText, imageAttachmentIds)
+      const history = [
+        ...buildHistoryMessages(messagesRef.current),
         { role: 'user' as const, content: userText },
       ]
-      const userMsg: Message = {
-        id: crypto.randomUUID(),
-        role: 'user',
-        content: userText,
-        createdAt: new Date().toISOString(),
-        ...(imageAttachmentIds && imageAttachmentIds.length > 0
-          ? { image_attachment_ids: imageAttachmentIds }
-          : {}),
-      }
 
-      const ctrl = new AbortController()
-      abortControllerRef.current = ctrl
+      const controller = new AbortController()
+      abortControllerRef.current = controller
       try {
-        await _startStream(
+        await startStream(
           streamChat(
             {
               model,
@@ -258,9 +177,9 @@ export function useChat(): UseChatReturn {
                   }
                 : {}),
             },
-            { signal: ctrl.signal, userName },
+            { signal: controller.signal, userName },
           ),
-          [...messagesRef.current, userMsg],
+          [...messagesRef.current, userMessage],
           onChartSpec,
           shouldShowThinking(ollamaOptions?.think),
         )
@@ -269,21 +188,21 @@ export function useChat(): UseChatReturn {
       }
       return activeSessionId
     },
-    [isStreaming, sessionId, _startStream],
+    [isStreaming, sessionId, startStream],
   )
 
   const streamToChat = useCallback(
     async (gen: AsyncGenerator<ChatStreamEvent>) => {
       if (isStreaming) return
-      await _startStream(gen, undefined, undefined, false)
+      await startStream(gen, undefined, undefined, false)
     },
-    [isStreaming, _startStream],
+    [isStreaming, startStream],
   )
 
   const clearMessages = useCallback(() => {
     setMessages([])
     setSessionId(null)
-    localStorage.removeItem(MESSAGES_KEY)
+    clearStoredChatState()
   }, [])
 
   const loadSession = useCallback((session: HistorySessionDetail) => {

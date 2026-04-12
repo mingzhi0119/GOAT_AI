@@ -1,20 +1,34 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { createRef } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { ConversationActionsMenu, SettingsPanel } from '../components/TopBarPanels'
 
 describe('TopBarPanels', () => {
-  it('disables rename and delete when there is no saved session', () => {
+  it('disables rename and delete when there is no saved session', async () => {
+    const triggerRef = createRef<HTMLButtonElement>()
     render(
-      <ConversationActionsMenu
-        hasSession={false}
-        onRenameConversation={vi.fn()}
-        onExportMarkdown={vi.fn()}
-        onDeleteConversation={vi.fn()}
-        onClose={vi.fn()}
-        isNarrow={false}
-      />,
+      <>
+        <button ref={triggerRef} id="conversation-actions-trigger" type="button">
+          Actions
+        </button>
+        <ConversationActionsMenu
+          menuId="conversation-actions-menu"
+          triggerId="conversation-actions-trigger"
+          triggerRef={triggerRef}
+          focusStrategy="first"
+          hasSession={false}
+          onRenameConversation={vi.fn()}
+          onExportMarkdown={vi.fn()}
+          onDeleteConversation={vi.fn()}
+          onClose={vi.fn()}
+          isNarrow={false}
+        />
+      </>,
     )
 
+    await waitFor(() => {
+      expect(screen.getByRole('menuitem', { name: /export to markdown/i })).toHaveFocus()
+    })
     expect(screen.getByRole('menuitem', { name: /rename/i })).toBeDisabled()
     expect(screen.getByRole('menuitem', { name: /delete/i })).toBeDisabled()
     expect(screen.getByRole('menuitem', { name: /export to markdown/i })).toBeEnabled()
@@ -34,6 +48,8 @@ describe('TopBarPanels', () => {
 
     render(
       <SettingsPanel
+        panelId="settings-panel"
+        triggerId="settings-trigger"
         appearanceSummary="Classic System"
         advancedOpen={true}
         apiKey="secret-123"
@@ -87,6 +103,8 @@ describe('TopBarPanels', () => {
   it('renders desktop diagnostics details when available', () => {
     render(
       <SettingsPanel
+        panelId="settings-panel"
+        triggerId="settings-trigger"
         appearanceSummary="Classic System"
         advancedOpen={false}
         desktopDiagnostics={{
@@ -127,5 +145,47 @@ describe('TopBarPanels', () => {
     expect(screen.getByText('http://127.0.0.1:62606')).toBeInTheDocument()
     expect(screen.getByText(/failing: ollama/i)).toBeInTheDocument()
     expect(screen.getByText('C:/GOAT/Desktop/logs/desktop-shell.log')).toBeInTheDocument()
+  })
+
+  it('supports Escape close and focus cycling inside settings', async () => {
+    const onClose = vi.fn()
+
+    render(
+      <SettingsPanel
+        panelId="settings-panel"
+        triggerId="settings-trigger"
+        appearanceSummary="Classic System"
+        advancedOpen={false}
+        apiKey=""
+        ownerId=""
+        systemInstruction=""
+        temperature={0.7}
+        maxTokens={1024}
+        topP={0.9}
+        onApiKeyChange={vi.fn()}
+        onOwnerIdChange={vi.fn()}
+        onSystemInstructionChange={vi.fn()}
+        onAdvancedOpenChange={vi.fn()}
+        onTemperatureChange={vi.fn()}
+        onMaxTokensChange={vi.fn()}
+        onTopPChange={vi.fn()}
+        onResetAdvanced={vi.fn()}
+        onOpenAppearance={vi.fn()}
+        onClose={onClose}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /close settings/i })).toHaveFocus()
+    })
+
+    fireEvent.keyDown(screen.getByRole('dialog', { name: /settings/i }), {
+      key: 'Tab',
+      shiftKey: true,
+    })
+    expect(screen.getByText('Classic System').closest('button')).toHaveFocus()
+
+    fireEvent.keyDown(screen.getByRole('dialog', { name: /settings/i }), { key: 'Escape' })
+    expect(onClose).toHaveBeenCalled()
   })
 })

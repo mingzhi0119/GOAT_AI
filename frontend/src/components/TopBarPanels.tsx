@@ -1,12 +1,24 @@
-import type { ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+} from 'react'
 import type { DesktopDiagnostics } from '../api/types'
+import type { TopBarMenuFocusStrategy } from '../hooks/useTopBarPanels'
 import {
   AppearanceIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  CloseIcon,
 } from './uiIcons'
 
 export interface SettingsPanelProps {
+  panelId: string
+  triggerId: string
+  panelRef?: RefObject<HTMLDivElement | null>
   appearanceSummary: string
   advancedOpen: boolean
   desktopDiagnostics?: DesktopDiagnostics | null
@@ -26,15 +38,20 @@ export interface SettingsPanelProps {
   onTopPChange: (value: number) => void
   onResetAdvanced: () => void
   onOpenAppearance: () => void
-  onClose: () => void
+  onClose: (options?: { restoreFocus?: boolean }) => void
 }
 
 export interface ConversationActionsMenuProps {
+  menuId: string
+  triggerId: string
+  triggerRef?: RefObject<HTMLButtonElement | null>
+  menuRef?: RefObject<HTMLDivElement | null>
+  focusStrategy: TopBarMenuFocusStrategy
   hasSession: boolean
   onRenameConversation: () => void
   onExportMarkdown: () => void
   onDeleteConversation: () => void
-  onClose: () => void
+  onClose: (options?: { restoreFocus?: boolean }) => void
   isNarrow: boolean
 }
 
@@ -48,9 +65,18 @@ const fieldCls =
   'w-full cursor-text select-text rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/35'
 const actionButtonCls =
   'flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-slate-900/[0.04]'
+const focusableSelector =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 function clampGenerationValue(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value))
+}
+
+function getFocusableElements(root: HTMLElement | null): HTMLElement[] {
+  if (!root) return []
+  return Array.from(root.querySelectorAll<HTMLElement>(focusableSelector)).filter(
+    element => !element.hasAttribute('disabled') && element.getAttribute('aria-hidden') !== 'true',
+  )
 }
 
 function InstructionsSection({
@@ -360,7 +386,7 @@ function AppearanceSection({
         style={{ color: 'var(--text-main)' }}
         onClick={() => {
           onOpenAppearance()
-          onClose()
+          onClose({ restoreFocus: false })
         }}
       >
         <span className="inline-flex items-center gap-2">
@@ -455,30 +481,18 @@ function DesktopDiagnosticsSection({
         </p>
       ) : (
         <dl className="grid grid-cols-1 gap-2">
-          <DiagnosticsField
-            label="Summary"
-            value={renderDesktopSummary(diagnostics)}
-          />
+          <DiagnosticsField label="Summary" value={renderDesktopSummary(diagnostics)} />
           <DiagnosticsField
             label="Backend base URL"
             value={diagnostics.backend_base_url ?? 'Not available'}
           />
-          <DiagnosticsField
-            label="App data"
-            value={diagnostics.app_data_dir ?? 'Not available'}
-          />
+          <DiagnosticsField label="App data" value={diagnostics.app_data_dir ?? 'Not available'} />
           <DiagnosticsField
             label="Runtime root"
             value={diagnostics.runtime_root ?? 'Not available'}
           />
-          <DiagnosticsField
-            label="Data dir"
-            value={diagnostics.data_dir ?? 'Not available'}
-          />
-          <DiagnosticsField
-            label="Log dir"
-            value={diagnostics.log_dir ?? 'Not available'}
-          />
+          <DiagnosticsField label="Data dir" value={diagnostics.data_dir ?? 'Not available'} />
+          <DiagnosticsField label="Log dir" value={diagnostics.log_dir ?? 'Not available'} />
           <DiagnosticsField
             label="Log database"
             value={diagnostics.log_db_path ?? 'Not available'}
@@ -493,7 +507,16 @@ function DesktopDiagnosticsSection({
   )
 }
 
+function enabledItemIndices(items: Array<HTMLButtonElement | null>): number[] {
+  return items.flatMap((item, index) => (item && !item.disabled ? [index] : []))
+}
+
 export function ConversationActionsMenu({
+  menuId,
+  triggerId,
+  triggerRef,
+  menuRef,
+  focusStrategy,
   hasSession,
   onRenameConversation,
   onExportMarkdown,
@@ -501,8 +524,87 @@ export function ConversationActionsMenu({
   onClose,
   isNarrow,
 }: ConversationActionsMenuProps) {
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([])
+
+  const restoreTriggerFocus = useCallback(() => {
+    window.setTimeout(() => triggerRef?.current?.focus(), 0)
+  }, [triggerRef])
+
+  const focusByEnabledIndex = useCallback((index: number) => {
+    const enabledIndices = enabledItemIndices(itemRefs.current)
+    if (enabledIndices.length === 0) return
+    const clampedIndex = Math.min(enabledIndices.length - 1, Math.max(index, 0))
+    itemRefs.current[enabledIndices[clampedIndex] ?? 0]?.focus()
+  }, [])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const enabledIndices = enabledItemIndices(itemRefs.current)
+      if (enabledIndices.length === 0) return
+      const targetIndex = focusStrategy === 'last' ? enabledIndices.length - 1 : 0
+      itemRefs.current[enabledIndices[targetIndex] ?? 0]?.focus()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [focusStrategy])
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const enabledIndices = enabledItemIndices(itemRefs.current)
+    if (enabledIndices.length === 0) return
+
+    const activeIndex = enabledIndices.findIndex(
+      index => itemRefs.current[index] === document.activeElement,
+    )
+
+    switch (event.key) {
+      case 'ArrowDown': {
+        event.preventDefault()
+        focusByEnabledIndex(activeIndex >= 0 ? (activeIndex + 1) % enabledIndices.length : 0)
+        break
+      }
+      case 'ArrowUp': {
+        event.preventDefault()
+        focusByEnabledIndex(
+          activeIndex >= 0
+            ? (activeIndex - 1 + enabledIndices.length) % enabledIndices.length
+            : enabledIndices.length - 1,
+        )
+        break
+      }
+      case 'Home': {
+        event.preventDefault()
+        focusByEnabledIndex(0)
+        break
+      }
+      case 'End': {
+        event.preventDefault()
+        focusByEnabledIndex(enabledIndices.length - 1)
+        break
+      }
+      case 'Escape': {
+        event.preventDefault()
+        onClose({ restoreFocus: false })
+        restoreTriggerFocus()
+        break
+      }
+      case 'Tab': {
+        onClose({ restoreFocus: false })
+        break
+      }
+      default:
+        break
+    }
+  }
+
+  const handleSelect = (callback: () => void) => {
+    callback()
+    onClose({ restoreFocus: false })
+    restoreTriggerFocus()
+  }
+
   return (
     <div
+      id={menuId}
+      ref={menuRef}
       className={`absolute right-0 top-full z-50 mt-2 rounded-2xl border p-1.5 shadow-[0_10px_20px_rgba(15,23,42,0.08)] ${isNarrow ? 'w-[min(92vw,20rem)]' : 'w-[332px]'}`}
       style={{
         borderColor: 'var(--input-border)',
@@ -511,10 +613,14 @@ export function ConversationActionsMenu({
         boxShadow: '0 10px 20px rgba(15,23,42,0.08)',
       }}
       role="menu"
+      aria-labelledby={triggerId}
       aria-label="Conversation actions"
-      onClick={event => event.stopPropagation()}
+      onKeyDown={handleKeyDown}
     >
       <button
+        ref={node => {
+          itemRefs.current[0] = node
+        }}
         type="button"
         role="menuitem"
         disabled={!hasSession}
@@ -522,8 +628,7 @@ export function ConversationActionsMenu({
         style={{ color: hasSession ? 'var(--text-main)' : 'var(--text-muted)' }}
         onClick={() => {
           if (!hasSession) return
-          onRenameConversation()
-          onClose()
+          handleSelect(onRenameConversation)
         }}
       >
         <span>
@@ -534,14 +639,14 @@ export function ConversationActionsMenu({
         </span>
       </button>
       <button
+        ref={node => {
+          itemRefs.current[1] = node
+        }}
         type="button"
         role="menuitem"
         className={actionButtonCls}
         style={{ color: 'var(--text-main)' }}
-        onClick={() => {
-          onExportMarkdown()
-          onClose()
-        }}
+        onClick={() => handleSelect(onExportMarkdown)}
       >
         <span>
           <span className="block font-medium leading-none">Export to Markdown</span>
@@ -551,6 +656,9 @@ export function ConversationActionsMenu({
         </span>
       </button>
       <button
+        ref={node => {
+          itemRefs.current[2] = node
+        }}
         type="button"
         role="menuitem"
         disabled={!hasSession}
@@ -558,8 +666,7 @@ export function ConversationActionsMenu({
         style={{ color: hasSession ? 'var(--text-main)' : 'var(--text-muted)' }}
         onClick={() => {
           if (!hasSession) return
-          onDeleteConversation()
-          onClose()
+          handleSelect(onDeleteConversation)
         }}
       >
         <span>
@@ -574,6 +681,9 @@ export function ConversationActionsMenu({
 }
 
 export function SettingsPanel({
+  panelId,
+  triggerId,
+  panelRef,
   appearanceSummary,
   advancedOpen,
   desktopDiagnostics,
@@ -595,9 +705,48 @@ export function SettingsPanel({
   onOpenAppearance,
   onClose,
 }: SettingsPanelProps) {
+  const fallbackPanelRef = useRef<HTMLDivElement | null>(null)
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const dialogRef = panelRef ?? fallbackPanelRef
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      closeButtonRef.current?.focus()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [])
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      onClose()
+      return
+    }
+
+    if (event.key !== 'Tab') return
+    const focusable = getFocusableElements(dialogRef.current)
+    if (focusable.length === 0) return
+
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last?.focus()
+      return
+    }
+
+    if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first?.focus()
+    }
+  }
+
   return (
     <div
-      className="absolute right-0 z-50 mt-2 max-h-[min(85vh,38rem)] overflow-y-auto rounded-[24px] border px-4 py-3 shadow-[0_16px_36px_var(--panel-shadow-color)] w-[min(92vw,26rem)]"
+      id={panelId}
+      ref={dialogRef}
+      className="absolute right-0 z-50 mt-2 max-h-[min(85vh,38rem)] w-[min(92vw,26rem)] overflow-y-auto rounded-[24px] border px-4 py-3 shadow-[0_16px_36px_var(--panel-shadow-color)]"
       style={{
         background: 'var(--composer-menu-bg-strong)',
         borderColor: 'var(--input-border)',
@@ -605,9 +754,34 @@ export function SettingsPanel({
         backdropFilter: 'blur(18px)',
       }}
       role="dialog"
+      aria-modal="true"
+      aria-labelledby={triggerId}
       aria-label="Settings"
-      onClick={event => event.stopPropagation()}
+      onKeyDown={handleKeyDown}
     >
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+            Settings
+          </p>
+          <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+            Tune instructions, protected access, and generation defaults.
+          </p>
+        </div>
+        <button
+          ref={closeButtonRef}
+          type="button"
+          aria-label="Close settings"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-slate-900/[0.04]"
+          style={{
+            color: 'var(--text-main)',
+            background: 'var(--composer-muted-surface)',
+          }}
+          onClick={() => onClose()}
+        >
+          <CloseIcon />
+        </button>
+      </div>
       <div className="space-y-3">
         <InstructionsSection
           systemInstruction={systemInstruction}

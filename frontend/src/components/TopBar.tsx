@@ -1,12 +1,9 @@
-import { useEffect, useRef, useState, type FC } from 'react'
+import { useId, useRef, type FC } from 'react'
 import type { DesktopDiagnostics } from '../api/types'
+import { useTopBarPanels } from '../hooks/useTopBarPanels'
 import type { ChatLayoutMode } from '../utils/chatLayout'
 import { ConversationActionsMenu, SettingsPanel } from './TopBarPanels'
-import {
-  MoreIcon,
-  SettingsIcon,
-  SidebarToggleIcon,
-} from './uiIcons'
+import { MoreIcon, SettingsIcon, SidebarToggleIcon } from './uiIcons'
 
 interface Props {
   sessionTitle: string | null
@@ -88,10 +85,6 @@ function buildCapabilityItems(
     }))
 }
 
-function clampGenerationValue(value: number, minimum: number, maximum: number): number {
-  return Math.min(maximum, Math.max(minimum, value))
-}
-
 function CapabilityBadge({
   item,
   includeTestId = true,
@@ -130,7 +123,7 @@ function CapabilityBadges({
 
   return (
     <div
-      className="group/caps relative flex min-w-0 items-start gap-1.5 select-none"
+      className="flex min-w-0 items-center gap-1.5 select-none"
       aria-label={`Model capabilities: ${capabilitySummary}`}
     >
       <div
@@ -139,28 +132,24 @@ function CapabilityBadges({
         {visibleCapabilities.map(item => (
           <CapabilityBadge key={item.key} item={item} />
         ))}
-      </div>
-      {isNarrow && hiddenCapabilities.length > 0 && (
-        <div
-          role="tooltip"
-          className="pointer-events-none absolute left-0 top-full z-50 mt-2 hidden min-w-[12rem] rounded-2xl border p-2 text-left shadow-[0_12px_24px_rgba(15,23,42,0.14)] group-hover/caps:block group-focus-within/caps:block"
-          style={{
-            borderColor: 'var(--input-border)',
-            background: 'var(--composer-menu-bg-strong)',
-          }}
-        >
-          <p
-            className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em]"
-            style={{ color: 'var(--text-muted)' }}
+        {isNarrow && hiddenCapabilities.length > 0 && (
+          <span
+            aria-hidden="true"
+            className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium"
+            style={{
+              borderColor: 'var(--border-color)',
+              color: 'var(--text-muted)',
+              background: 'var(--composer-muted-surface)',
+            }}
           >
-            More capabilities
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {capabilityItems.map(item => (
-              <CapabilityBadge key={item.key} item={item} includeTestId={false} />
-            ))}
-          </div>
-        </div>
+            +{hiddenCapabilities.length}
+          </span>
+        )}
+      </div>
+      {hiddenCapabilities.length > 0 && (
+        <span className="sr-only">
+          Additional capabilities: {hiddenCapabilities.map(item => item.label).join(', ')}
+        </span>
       )}
     </div>
   )
@@ -196,22 +185,30 @@ const TopBar: FC<Props> = ({
   onTopPChange,
   onResetAdvanced,
 }) => {
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [actionsOpen, setActionsOpen] = useState(false)
-  const wrapRef = useRef<HTMLDivElement>(null)
+  const panelBoundaryRef = useRef<HTMLDivElement>(null)
+  const actionsTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const settingsTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const actionsMenuRef = useRef<HTMLDivElement | null>(null)
+  const settingsPanelRef = useRef<HTMLDivElement | null>(null)
+  const actionsMenuId = useId()
+  const settingsPanelId = useId()
+  const actionsTriggerId = useId()
+  const settingsTriggerId = useId()
   const isNarrow = layoutMode === 'narrow'
   const capabilityItems = buildCapabilityItems(modelCapabilities, thinkingEnabled)
-
-  useEffect(() => {
-    const closeMenus = (event: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) {
-        setSettingsOpen(false)
-        setActionsOpen(false)
-      }
-    }
-    document.addEventListener('click', closeMenus)
-    return () => document.removeEventListener('click', closeMenus)
-  }, [])
+  const {
+    actionsOpen,
+    settingsOpen,
+    actionsFocusStrategy,
+    togglePanel,
+    closeActivePanel,
+    handleActionsTriggerKeyDown,
+    handleSettingsTriggerKeyDown,
+  } = useTopBarPanels({
+    panelBoundaryRef,
+    actionsTriggerRef,
+    settingsTriggerRef,
+  })
 
   return (
     <header
@@ -246,53 +243,61 @@ const TopBar: FC<Props> = ({
         <CapabilityBadges capabilityItems={capabilityItems} isNarrow={isNarrow} />
       </div>
 
-      <div className="flex min-w-0 flex-shrink-0 justify-end" ref={wrapRef}>
+      <div ref={panelBoundaryRef} className="flex min-w-0 flex-shrink-0 justify-end">
         <div className="relative flex items-center gap-2">
           <button
+            id={actionsTriggerId}
+            ref={actionsTriggerRef}
             type="button"
             className="inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-[var(--composer-muted-surface)]"
             style={{ color: 'var(--text-main)' }}
             aria-label="Conversation actions"
             aria-expanded={actionsOpen}
             aria-haspopup="menu"
-            onClick={event => {
-              event.stopPropagation()
-              setActionsOpen(open => !open)
-              setSettingsOpen(false)
-            }}
+            aria-controls={actionsMenuId}
+            onClick={() => togglePanel('actions')}
+            onKeyDown={handleActionsTriggerKeyDown}
           >
             <MoreIcon />
           </button>
           {actionsOpen && (
             <ConversationActionsMenu
+              menuId={actionsMenuId}
+              triggerId={actionsTriggerId}
+              triggerRef={actionsTriggerRef}
+              menuRef={actionsMenuRef}
+              focusStrategy={actionsFocusStrategy}
               hasSession={hasSession}
               onRenameConversation={onRenameConversation}
               onExportMarkdown={onExportMarkdown}
               onDeleteConversation={onDeleteConversation}
-              onClose={() => setActionsOpen(false)}
+              onClose={closeActivePanel}
               isNarrow={isNarrow}
             />
           )}
 
           <div className="relative">
             <button
+              id={settingsTriggerId}
+              ref={settingsTriggerRef}
               type="button"
               className="inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-[var(--composer-muted-surface)]"
               style={{ color: 'var(--text-main)' }}
               aria-label="Settings"
               aria-expanded={settingsOpen}
               aria-haspopup="dialog"
-              onClick={event => {
-                event.stopPropagation()
-                setSettingsOpen(open => !open)
-                setActionsOpen(false)
-              }}
+              aria-controls={settingsPanelId}
+              onClick={() => togglePanel('settings')}
+              onKeyDown={handleSettingsTriggerKeyDown}
             >
               <SettingsIcon />
             </button>
 
             {settingsOpen && (
               <SettingsPanel
+                panelId={settingsPanelId}
+                triggerId={settingsTriggerId}
+                panelRef={settingsPanelRef}
                 appearanceSummary={appearanceSummary}
                 advancedOpen={advancedOpen}
                 desktopDiagnostics={desktopDiagnostics}
@@ -312,7 +317,7 @@ const TopBar: FC<Props> = ({
                 onTopPChange={onTopPChange}
                 onResetAdvanced={onResetAdvanced}
                 onOpenAppearance={onOpenAppearance}
-                onClose={() => setSettingsOpen(false)}
+                onClose={closeActivePanel}
               />
             )}
           </div>
