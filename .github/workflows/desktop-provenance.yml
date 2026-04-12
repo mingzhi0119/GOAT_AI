@@ -41,20 +41,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Build Linux desktop sidecar
         run: python -m tools.desktop.build_desktop_sidecar --target-triple x86_64-unknown-linux-gnu --clean
-      - name: Write sidecar digest manifest
-        shell: bash
-        run: |
-          set -euo pipefail
-          artifact="frontend/src-tauri/binaries/goat-backend-x86_64-unknown-linux-gnu"
-          sha="$(sha256sum "${artifact}" | awk '{print $1}')"
-          cat > desktop-provenance.json <<EOF
-          {
-            "release_ref": "${{ inputs.release_ref || github.ref_name }}",
-            "resolved_sha": "${GITHUB_SHA}",
-            "artifact_path": "${artifact}",
-            "sha256": "${sha}"
-          }
-          EOF
       - name: Generate desktop sidecar SBOM
         uses: anchore/sbom-action@v0
         with:
@@ -62,6 +48,16 @@ jobs:
           artifact-name: goat-backend-x86_64-unknown-linux-gnu.spdx.json
           output-file: desktop-sidecar.spdx.json
           upload-release-assets: false
+      - name: Write Linux sidecar provenance
+        run: |
+          python -m tools.desktop.write_linux_sidecar_provenance \
+            --artifact frontend/src-tauri/binaries/goat-backend-x86_64-unknown-linux-gnu \
+            --sbom desktop-sidecar.spdx.json \
+            --output desktop-provenance.json \
+            --release-ref "${{ inputs.release_ref || github.ref_name }}" \
+            --resolved-sha "${{ github.sha }}" \
+            --platform linux-x64 \
+            --target-triple x86_64-unknown-linux-gnu
       - name: Upload provenance assets
         uses: actions/upload-artifact@v4
         with:

@@ -93,12 +93,18 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     assert "npm run desktop:build" in ci_workflow
     assert "python -m tools.desktop.write_desktop_release_provenance" in ci_workflow
 
+    assert (
+        "python -m tools.desktop.write_linux_sidecar_provenance" in desktop_provenance
+    )
+    assert "desktop-sidecar.spdx.json" in desktop_provenance
+    assert "x86_64-unknown-linux-gnu" in desktop_provenance
     assert "GOAT_DESKTOP_SIGNING_CERT_BASE64" in desktop_provenance
     assert "sign_windows_desktop_artifacts.ps1" in desktop_provenance
     assert "desktop-windows-provenance.json" in desktop_provenance
     assert desktop_provenance.count("actions/attest@v4") >= 4
 
     assert "signed Windows desktop release path" in release_doc
+    assert "Linux desktop sidecar provenance record" in release_doc
     assert "desktop-provenance.yml" in release_doc
     assert "Publicly distributed Windows desktop installers" in security_doc
     assert "No open P1 audit items remain" in roadmap
