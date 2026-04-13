@@ -9,21 +9,23 @@ from datetime import datetime, timezone
 from typing import Any, Callable, TypedDict
 
 from backend.domain.authz_types import AuthorizationContext
-from backend.models.knowledge import KnowledgeCitation, KnowledgeSearchRequest
+from backend.models.knowledge import KnowledgeCitation
 from backend.services.exceptions import KnowledgeDocumentNotFound
 from backend.services.knowledge_service import search_knowledge
+from backend.services.workbench_research_source_executors import (
+    WorkbenchResearchSourceExecutionContext,
+    resolve_workbench_research_source_executor,
+)
 from backend.services.workbench_runtime import (
     WorkbenchTaskRecord,
     WorkbenchTaskRepository,
 )
 from backend.services.workbench_source_registry import resolve_requested_sources
 from backend.services.workbench_web_search import (
-    WorkbenchWebSearchError,
     WorkbenchWebSearchHit,
     search_public_web,
 )
 from backend.services.workbench_readonly_retrieval import (
-    WorkbenchConnectorBindingNotFound,
     search_connector_binding,
     search_project_memory,
 )
@@ -259,312 +261,88 @@ def _compile_research_graph(
         completed_sources: list[str] = []
         source_failures: list[dict[str, str]] = []
         step_successful_source_runs = 0
+        execution_context = WorkbenchResearchSourceExecutionContext(
+            task=task,
+            repository=repository,
+            settings=settings,
+            auth_context=auth_context,
+            request_id=request_id,
+            query=query,
+            knowledge_search=knowledge_search,
+            web_search=web_search,
+            project_memory_search=project_memory_search,
+            connector_search=connector_search,
+        )
 
         for source_id in state["runnable_source_ids"]:
-            if source_id == "knowledge":
-                try:
-                    response = knowledge_search(
-                        request=KnowledgeSearchRequest(
-                            query=query,
-                            document_ids=task.knowledge_document_ids,
-                            top_k=8 if task.task_kind == "deep_research" else 5,
-                            retrieval_profile=(
-                                "rag3_quality"
-                                if task.task_kind == "deep_research"
-                                else "default"
-                            ),
-                        ),
-                        settings=settings,
-                        auth_context=auth_context,
-                        request_id=request_id,
-                    )
-                except KnowledgeDocumentNotFound:
-                    raise
-                except Exception as exc:
-                    logger.warning(
-                        "Workbench knowledge research step failed",
-                        extra={
-                            "task_id": task.id,
-                            "step_index": step_number,
-                            "query": query,
-                        },
-                        exc_info=exc,
-                    )
-                    failure = {
-                        "source_id": "knowledge",
-                        "deny_reason": "provider_error",
-                    }
-                    source_failures.append(failure)
-                    _append_task_event(
-                        repository=repository,
-                        task_id=task.id,
-                        event_type="retrieval.step.skipped",
-                        status="running",
-                        message="Source knowledge failed to return results.",
-                        metadata={
-                            **failure,
-                            "runtime": "langgraph",
-                            "step_index": step_number,
-                            "query": query,
-                        },
-                    )
-                    continue
-
-                all_step_citations.extend(response.hits)
-                completed_sources.append("knowledge")
-                step_successful_source_runs += 1
+            executor = resolve_workbench_research_source_executor(source_id)
+            if executor is None:
+                failure = {"source_id": source_id, "deny_reason": "no_executor"}
+                source_failures.append(failure)
                 _append_task_event(
                     repository=repository,
                     task_id=task.id,
-                    event_type="retrieval.step.completed",
+                    event_type="retrieval.step.skipped",
                     status="running",
-                    message=(
-                        f"Step {step_number} source knowledge returned "
-                        f"{len(response.hits)} citations."
-                    ),
+                    message=f"Source {source_id} is registered but has no executor yet.",
                     metadata={
+                        **failure,
                         "runtime": "langgraph",
                         "step_index": step_number,
                         "query": query,
-                        "source_id": "knowledge",
-                        "citation_count": len(response.hits),
-                        "effective_query": response.effective_query or query,
                     },
                 )
                 continue
 
-            if source_id == "web":
-                try:
-                    web_hits = web_search(
-                        query=query,
-                        settings=settings,
-                        max_results=_resolve_web_result_limit(
-                            task_kind=task.task_kind,
-                            settings=settings,
-                        ),
-                    )
-                except WorkbenchWebSearchError:
-                    failure = {"source_id": "web", "deny_reason": "provider_error"}
-                    source_failures.append(failure)
-                    _append_task_event(
-                        repository=repository,
-                        task_id=task.id,
-                        event_type="retrieval.step.skipped",
-                        status="running",
-                        message="Source web failed to return results.",
-                        metadata={
-                            **failure,
-                            "runtime": "langgraph",
-                            "step_index": step_number,
-                            "query": query,
-                            "provider": settings.workbench_web_provider,
-                        },
-                    )
-                    continue
+            try:
+                execution_result = executor(execution_context)
+            except KnowledgeDocumentNotFound:
+                raise
 
-                all_step_citations.extend(_web_hit_to_citation(hit) for hit in web_hits)
-                completed_sources.append("web")
-                step_successful_source_runs += 1
+            if execution_result.failure_reason is not None:
+                failure = {
+                    "source_id": source_id,
+                    "deny_reason": execution_result.failure_reason,
+                }
+                source_failures.append(failure)
                 _append_task_event(
                     repository=repository,
                     task_id=task.id,
-                    event_type="retrieval.step.completed",
+                    event_type="retrieval.step.skipped",
                     status="running",
-                    message=(
-                        f"Step {step_number} source web returned {len(web_hits)} citations."
-                    ),
-                    metadata={
-                        "runtime": "langgraph",
-                        "step_index": step_number,
-                        "query": query,
-                        "source_id": "web",
-                        "citation_count": len(web_hits),
-                        "provider": settings.workbench_web_provider,
-                        "max_results": _resolve_web_result_limit(
-                            task_kind=task.task_kind,
-                            settings=settings,
-                        ),
-                        "urls": [hit.url for hit in web_hits[:5]],
-                    },
-                )
-                continue
-
-            if source_id == "project_memory":
-                if not task.project_id:
-                    failure = {
-                        "source_id": "project_memory",
-                        "deny_reason": "project_scope_missing",
-                    }
-                    source_failures.append(failure)
-                    _append_task_event(
-                        repository=repository,
-                        task_id=task.id,
-                        event_type="retrieval.step.skipped",
-                        status="running",
-                        message="Project memory requires an explicit project scope.",
-                        metadata={
-                            **failure,
-                            "runtime": "langgraph",
-                            "step_index": step_number,
-                            "query": query,
-                        },
-                    )
-                    continue
-                try:
-                    project_hits = project_memory_search(
-                        task=task,
-                        repository=repository,
-                        settings=settings,
-                        auth_context=auth_context,
-                        query=query,
-                    )
-                except Exception as exc:
-                    logger.warning(
-                        "Workbench project-memory research step failed",
-                        extra={
-                            "task_id": task.id,
-                            "step_index": step_number,
-                            "query": query,
-                        },
-                        exc_info=exc,
-                    )
-                    failure = {
-                        "source_id": "project_memory",
-                        "deny_reason": "provider_error",
-                    }
-                    source_failures.append(failure)
-                    _append_task_event(
-                        repository=repository,
-                        task_id=task.id,
-                        event_type="retrieval.step.skipped",
-                        status="running",
-                        message="Source project_memory failed to return results.",
-                        metadata={
-                            **failure,
-                            "runtime": "langgraph",
-                            "step_index": step_number,
-                            "query": query,
-                        },
-                    )
-                    continue
-
-                all_step_citations.extend(project_hits)
-                completed_sources.append("project_memory")
-                step_successful_source_runs += 1
-                _append_task_event(
-                    repository=repository,
-                    task_id=task.id,
-                    event_type="retrieval.step.completed",
-                    status="running",
-                    message=(
-                        f"Step {step_number} source project_memory returned "
-                        f"{len(project_hits)} citations."
-                    ),
-                    metadata={
-                        "runtime": "langgraph",
-                        "step_index": step_number,
-                        "query": query,
-                        "source_id": "project_memory",
-                        "citation_count": len(project_hits),
-                        "project_id": task.project_id,
-                    },
-                )
-                continue
-
-            if source_id.startswith("connector:"):
-                try:
-                    connector_hits = connector_search(
+                    message=_build_skipped_source_message(
                         source_id=source_id,
-                        task_kind=task.task_kind,
-                        settings=settings,
-                        query=query,
-                    )
-                except WorkbenchConnectorBindingNotFound:
-                    failure = {
-                        "source_id": source_id,
-                        "deny_reason": "binding_unavailable",
-                    }
-                    source_failures.append(failure)
-                    _append_task_event(
-                        repository=repository,
-                        task_id=task.id,
-                        event_type="retrieval.step.skipped",
-                        status="running",
-                        message=f"Source {source_id} is no longer available.",
-                        metadata={
-                            **failure,
-                            "runtime": "langgraph",
-                            "step_index": step_number,
-                            "query": query,
-                        },
-                    )
-                    continue
-                except Exception as exc:
-                    logger.warning(
-                        "Workbench connector research step failed",
-                        extra={
-                            "task_id": task.id,
-                            "step_index": step_number,
-                            "query": query,
-                            "source_id": source_id,
-                        },
-                        exc_info=exc,
-                    )
-                    failure = {
-                        "source_id": source_id,
-                        "deny_reason": "provider_error",
-                    }
-                    source_failures.append(failure)
-                    _append_task_event(
-                        repository=repository,
-                        task_id=task.id,
-                        event_type="retrieval.step.skipped",
-                        status="running",
-                        message=f"Source {source_id} failed to return results.",
-                        metadata={
-                            **failure,
-                            "runtime": "langgraph",
-                            "step_index": step_number,
-                            "query": query,
-                        },
-                    )
-                    continue
-
-                all_step_citations.extend(connector_hits)
-                completed_sources.append(source_id)
-                step_successful_source_runs += 1
-                _append_task_event(
-                    repository=repository,
-                    task_id=task.id,
-                    event_type="retrieval.step.completed",
-                    status="running",
-                    message=(
-                        f"Step {step_number} source {source_id} returned "
-                        f"{len(connector_hits)} citations."
+                        deny_reason=execution_result.failure_reason,
                     ),
                     metadata={
+                        **failure,
                         "runtime": "langgraph",
                         "step_index": step_number,
                         "query": query,
-                        "source_id": source_id,
-                        "citation_count": len(connector_hits),
+                        **execution_result.metadata,
                     },
                 )
                 continue
 
-            failure = {"source_id": source_id, "deny_reason": "no_executor"}
-            source_failures.append(failure)
+            all_step_citations.extend(execution_result.citations)
+            completed_sources.append(source_id)
+            step_successful_source_runs += 1
             _append_task_event(
                 repository=repository,
                 task_id=task.id,
-                event_type="retrieval.step.skipped",
+                event_type="retrieval.step.completed",
                 status="running",
-                message=f"Source {source_id} is registered but has no executor yet.",
+                message=(
+                    f"Step {step_number} source {source_id} returned "
+                    f"{len(execution_result.citations)} citations."
+                ),
                 metadata={
-                    **failure,
                     "runtime": "langgraph",
                     "step_index": step_number,
                     "query": query,
+                    "source_id": source_id,
+                    "citation_count": len(execution_result.citations),
+                    **execution_result.metadata,
                 },
             )
 
@@ -993,19 +771,12 @@ def _resolve_max_steps(task_kind: str, settings: Settings) -> int:
     return settings.workbench_browse_max_steps
 
 
-def _resolve_web_result_limit(*, task_kind: str, settings: Settings) -> int:
-    default_limit = 8 if task_kind == "deep_research" else 5
-    return min(default_limit, settings.workbench_web_max_results)
-
-
-def _web_hit_to_citation(hit: WorkbenchWebSearchHit) -> KnowledgeCitation:
-    return KnowledgeCitation(
-        document_id=hit.url,
-        chunk_id=hit.url,
-        filename=hit.title,
-        snippet=hit.snippet,
-        score=max(0.0, 1.0 - ((hit.rank - 1) * 0.01)),
-    )
+def _build_skipped_source_message(*, source_id: str, deny_reason: str) -> str:
+    if source_id == "project_memory" and deny_reason == "project_scope_missing":
+        return "Project memory requires an explicit project scope."
+    if deny_reason == "binding_unavailable":
+        return f"Source {source_id} is no longer available."
+    return f"Source {source_id} failed to return results."
 
 
 def _dedupe_citations(citations: list[KnowledgeCitation]) -> list[KnowledgeCitation]:

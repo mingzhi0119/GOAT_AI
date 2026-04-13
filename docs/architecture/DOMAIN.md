@@ -63,6 +63,7 @@ Concrete modules: `backend.domain.authz_types` (`AuthorizationContext`), `backen
 | Term | Meaning |
 |------|---------|
 | **Workbench source descriptor** | One caller-scoped retrieval entry returned by `GET /api/workbench/sources`, including `source_id`, `kind`, `scope_kind`, task support, runtime readiness, and operator-facing description. |
+| **Visible source facts** | The caller-visible runnable-source predicates derived from the shared source catalog and reused by capability discovery as well as runtime orchestration. |
 | **Project memory** | Read-only retrieval over caller-visible durable workspace outputs for a specific `project_id`. It does not create a new storage plane; it reuses the shipped workspace-output boundary plus existing workbench authz. |
 | **Connector binding** | Operator-provisioned read-only external source descriptor loaded from `GOAT_WORKBENCH_CONNECTOR_BINDINGS_JSON`, with optional tenant, principal, and owner visibility constraints. Hidden bindings are concealed rather than advertised as denied. |
 

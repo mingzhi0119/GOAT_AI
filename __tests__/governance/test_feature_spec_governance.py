@@ -19,6 +19,7 @@ def test_feature_specs_pilot_uses_a_narrow_allowed_file_set() -> None:
         "desktop-distribution-maturity",
         "governance-tooling-follow-ons",
         "project-memory-connectors-foundation",
+        "runtime-platform-shared-foundations",
         "workbench-multi-step-research",
     ]
 
@@ -48,6 +49,9 @@ def test_feature_specs_docs_remain_explicitly_non_canonical() -> None:
     task_four_spec = (
         SPECS_ROOT / "code-sandbox-runtime-follow-ons" / "spec.md"
     ).read_text(encoding="utf-8")
+    task_six_spec = (
+        SPECS_ROOT / "runtime-platform-shared-foundations" / "spec.md"
+    ).read_text(encoding="utf-8")
 
     assert "not a second governance system" in readme
     assert "ROADMAP.md" in readme
@@ -60,3 +64,4 @@ def test_feature_specs_docs_remain_explicitly_non_canonical() -> None:
     assert "non-canonical working artifact" in task_one_spec
     assert "non-canonical working artifact" in task_three_spec
     assert "non-canonical working artifact" in task_four_spec
+    assert "non-canonical working artifact" in task_six_spec

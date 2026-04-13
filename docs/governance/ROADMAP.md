@@ -54,16 +54,6 @@ Completed phases, landed slices, and historical closeout notes live in:
 
 ### Runtime platform
 
-#### Phase 17 shared runtime foundations
-
-- Goal: finish the shared task/runtime primitives that Browse, Deep Research, Canvas, project memory, and connectors should all build on.
-- Remaining work:
-  - lift the now-landed workbench source descriptors, bounded research runtime, project-memory reads, and read-only connector bindings into a broader shared runtime control plane
-  - broader runtime composition for project memory/connectors on top of the
-    current durable control-plane seams
-- Sequencing rule:
-  - finish shared runtime foundations before widening frontend promises
-
 #### Phase 17B: plan-mode follow-ons
 
 - Goal: move beyond the current minimal `task_kind = plan` runner.
@@ -73,7 +63,7 @@ Completed phases, landed slices, and historical closeout notes live in:
 
 #### Phase 17C: browse and deep-research runtime
 
-- Goal: continue hardening the landed browse/deep-research runtime around safety boundaries, richer sources, and shared-runtime composition.
+- Goal: continue hardening the landed browse/deep-research runtime around safety boundaries, richer sources, and the now-landed shared runtime control plane.
 - Remaining work:
   - staged safety boundaries for public web vs private retrieval
   - remote connector adapters behind the shared source registry
@@ -169,7 +159,7 @@ These items should remain roadmap-only in the frontend until the corresponding b
 ## Dependencies and constraints
 
 - Planning for future workbench, connector, project-memory, and other frontier surfaces should follow the canonical policy in [ENGINEERING_STANDARDS.md](../standards/ENGINEERING_STANDARDS.md), especially the admission-gate and capability-gate rules.
-- Shared runtime foundations still need to land before project-memory, connector, or broader frontend promises widen.
+- Future project-memory, connector, and frontend widening should build on the landed shared source catalog, capability assembly, and source-executor seams before promising broader runtime behavior.
 - Shared runtime foundations now build on the shipped object-store boundary plus the hosted/server Postgres runtime metadata posture in [POSTGRES_RUNTIME_PERSISTENCE_DECISION_PACKAGE.md](../architecture/POSTGRES_RUNTIME_PERSISTENCE_DECISION_PACKAGE.md), while local and desktop continue to default to SQLite.
 
 ---

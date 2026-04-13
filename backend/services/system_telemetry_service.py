@@ -10,12 +10,10 @@ from backend.models.system import (
     CodeSandboxFeaturePayload,
     DesktopDiagnosticsResponse,
     InferenceLatencyResponse,
-    RuntimeFeaturePayload,
     RuntimeOperationalContractResponse,
     RuntimeTargetItemResponse,
     RuntimeTargetResponse,
     SystemFeaturesResponse,
-    WorkbenchFeaturePayload,
 )
 from backend.platform.readiness_service import evaluate_readiness
 from backend.services.feature_gate_service import code_sandbox_policy_allowed
@@ -25,11 +23,12 @@ from backend.services.authorizer import (
     workbench_write_policy_allowed,
 )
 from backend.services.runtime_persistence import runtime_storage_model_label
+from backend.services.workbench_capability_surface import (
+    build_workbench_feature_payload,
+)
 from backend.services.workbench_source_registry import list_workbench_sources
 from backend.types import Settings
-from goat_ai.config.feature_gate_reasons import RUNTIME_NOT_IMPLEMENTED
 from goat_ai.config.feature_gates import (
-    RuntimeFeatureSnapshot,
     compute_agent_workbench_snapshot,
     compute_code_sandbox_snapshot,
 )
@@ -78,53 +77,6 @@ def build_system_features_response(
         and "artifact:write" in auth_context.scopes
     )
 
-    def _runtime_payload(snapshot: RuntimeFeatureSnapshot) -> RuntimeFeaturePayload:
-        return RuntimeFeaturePayload(
-            allowed_by_config=snapshot.allowed_by_config and workbench_write_allowed,
-            available_on_host=snapshot.available_on_host,
-            effective_enabled=snapshot.effective_enabled and workbench_write_allowed,
-            deny_reason=(
-                snapshot.deny_reason
-                if not snapshot.effective_enabled
-                else (None if workbench_write_allowed else "permission_denied")
-            ),
-        )
-
-    def _workbench_capability(
-        *,
-        policy_allowed: bool,
-        runtime_ready: bool,
-        deny_reason: str | None = None,
-    ) -> RuntimeFeaturePayload:
-        if not workbench.allowed_by_config:
-            return _runtime_payload(workbench)
-        return RuntimeFeaturePayload(
-            allowed_by_config=policy_allowed,
-            available_on_host=runtime_ready,
-            effective_enabled=workbench.effective_enabled
-            and policy_allowed
-            and runtime_ready,
-            deny_reason=(
-                "permission_denied"
-                if not policy_allowed
-                else (
-                    None if runtime_ready else (deny_reason or RUNTIME_NOT_IMPLEMENTED)
-                )
-            ),
-        )
-
-    def _has_runnable_source(task_kind: str) -> bool:
-        return any(
-            source.runtime_ready and task_kind in source.task_kinds
-            for source in visible_sources
-        )
-
-    def _has_visible_source(source_id: str) -> bool:
-        return any(
-            source.runtime_ready and source.source_id == source_id
-            for source in visible_sources
-        )
-
     return SystemFeaturesResponse(
         code_sandbox=CodeSandboxFeaturePayload(
             policy_allowed=code_sandbox_policy_allowed(auth_context),
@@ -136,36 +88,12 @@ def build_system_features_response(
             network_policy_enforced=snap.network_policy_enforced,
             deny_reason=snap.deny_reason,
         ),
-        workbench=WorkbenchFeaturePayload(
-            agent_tasks=_runtime_payload(workbench),
-            plan_mode=_runtime_payload(workbench),
-            browse=_workbench_capability(
-                policy_allowed=workbench_write_allowed,
-                runtime_ready=_has_runnable_source("browse"),
-            ),
-            deep_research=_workbench_capability(
-                policy_allowed=workbench_write_allowed,
-                runtime_ready=_has_runnable_source("deep_research"),
-            ),
-            artifact_workspace=_workbench_capability(
-                policy_allowed=workbench_read_allowed,
-                runtime_ready=True,
-            ),
-            artifact_exports=_workbench_capability(
-                policy_allowed=artifact_export_allowed,
-                runtime_ready=True,
-            ),
-            project_memory=_workbench_capability(
-                policy_allowed=workbench_read_allowed,
-                runtime_ready=_has_visible_source("project_memory"),
-            ),
-            connectors=_workbench_capability(
-                policy_allowed=workbench_write_allowed,
-                runtime_ready=any(
-                    source.runtime_ready and source.kind == "connector"
-                    for source in visible_sources
-                ),
-            ),
+        workbench=build_workbench_feature_payload(
+            snapshot=workbench,
+            workbench_read_allowed=workbench_read_allowed,
+            workbench_write_allowed=workbench_write_allowed,
+            artifact_export_allowed=artifact_export_allowed,
+            visible_sources=visible_sources,
         ),
     )
 

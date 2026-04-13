@@ -167,6 +167,7 @@ Notes:
 - `workbench.artifact_exports` reflects the shipped export-to-artifact linkage and stays denied unless the caller also has `workbench:export` plus `artifact:write`
 - `workbench.project_memory` now reflects the landed read-only project-memory foundation and becomes runtime-ready when the caller can see the bounded `project_memory` source
 - `workbench.connectors` remains write-scoped even though `/api/workbench/sources` may expose read-only connector bindings to `workbench:read` callers; connector task execution still requires `workbench:write`
+- `/api/system/features` and `/api/workbench/sources` now derive from the same caller-visible source facts, so hidden connector bindings stay concealed instead of leaking through capability discovery
 - frontend UI should use this endpoint to hide or disable unavailable surfaces instead of assuming that a visible button implies runtime support
 
 ## `GET /api/models`

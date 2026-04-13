@@ -44,6 +44,7 @@ Last updated: 2026-04-13
 - declarative workbench source registry with `knowledge` ready and experimental DDGS-backed `web` retrieval now runtime-ready
 - bounded LangGraph-backed multi-step research for `browse` and `deep_research`, with durable plan/retrieval/follow-up/synthesis events and a private rollback switch to the legacy single-pass path
 - caller-scoped `project_memory` retrieval plus operator-provisioned read-only connector bindings are now part of the shipped source registry and bounded browse/deep-research runtime foundation
+- shared runtime foundations now include a pure source catalog, caller-visible source facts for capability discovery, and a LangGraph source-executor registry under the existing workbench wrappers
 - durable code sandbox execution with persisted events and replayable logs
 - queued plus running sandbox cancellation now flows through an in-process
   supervisor seam, and startup recovery fails abandoned `running` executions
@@ -124,6 +125,7 @@ Last updated: 2026-04-13
 - **16B/16C storage evolution:** complete; repository ownership boundaries are explicit across sessions, artifacts, knowledge, media, workbench, and sandbox, persisted blobs now use `storage_key` plus the local/S3 object-store boundary
 - **16D Postgres-backed runtime persistence:** complete for the hosted/server opt-in path; Alembic owns the Postgres runtime schema, repository adapters preserve the existing contracts, and SQLite snapshot export/import/parity plus rollback runbooks now anchor cutover proof
 - **17 runtime platform:** the shipped baseline includes durable workbench tasks, canvas/workspace-output persistence, session restoration, direct output reopen, output-to-artifact export linkage, experimental DDGS-backed public-web retrieval, bounded LangGraph-backed multi-step research for browse/deep-research, read-only `project_memory` retrieval, and caller-scoped static connector bindings
+- **17 shared runtime foundations:** the shipped baseline now also includes a shared workbench source catalog, caller-visible capability assembly, and a LangGraph source-executor seam under the existing `/api/workbench/*` and `/api/system/features` contracts
 - **18 sandbox follow-ons:** the shipped baseline includes the Docker-first
   sandbox MVP, queued plus running cancellation through an in-process
   supervisor seam, fail-closed restart recovery for abandoned runs, durable

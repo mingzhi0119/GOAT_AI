@@ -28,13 +28,13 @@ from backend.services.authorizer import (
     authorize_workbench_task_write,
 )
 from backend.services.feature_gate_service import require_agent_workbench_enabled
+from backend.services.workbench_source_catalog import WorkbenchSourceDescriptor
 from backend.services.workbench_runtime import (
     WorkbenchTaskCreatePayload,
     WorkbenchTaskEventRecord,
     WorkbenchTaskRecord,
     WorkbenchWorkspaceOutputRecord,
 )
-from backend.services.workbench_source_registry import WorkbenchSourceDescriptor
 
 
 def ensure_agent_workbench_enabled(settings: Settings) -> None:
