@@ -90,6 +90,23 @@ def test_validate_fault_smoke_log_requires_nonzero_exit_and_expected_stage() -> 
         )
 
 
+def test_validate_fault_smoke_log_accepts_equivalent_exit_before_ready_marker() -> None:
+    log_text = (
+        "GOAT desktop startup issue [health_wait_timeout]\n"
+        "Retrying before window reveal after 100 ms backoff (next attempt 2/2).\n"
+        "GOAT desktop backend sidecar terminated before startup completed (code=Some(1), signal=None).\n"
+    )
+
+    assert (
+        subject.validate_fault_smoke_log(
+            scenario="exit_before_ready",
+            exit_code=1,
+            log_text=log_text,
+        )
+        == "backend_terminated_before_ready"
+    )
+
+
 def test_main_writes_summary_json(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

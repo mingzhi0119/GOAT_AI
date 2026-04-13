@@ -17,6 +17,12 @@ SCENARIO_EXPECTED_STAGE = {
     "hang_before_ready": "health_wait_timeout",
 }
 
+SCENARIO_EQUIVALENT_LOG_MARKERS = {
+    "exit_before_ready": (
+        "GOAT desktop backend sidecar terminated before startup completed",
+    ),
+}
+
 INTERNAL_TEST_FLAG = "GOAT_DESKTOP_INTERNAL_TEST"
 INTERNAL_TEST_SCENARIO = "GOAT_DESKTOP_INTERNAL_TEST_SCENARIO"
 INTERNAL_TEST_HEALTH_TIMEOUT_SEC = "GOAT_DESKTOP_INTERNAL_TEST_HEALTH_TIMEOUT_SEC"
@@ -162,7 +168,10 @@ def validate_fault_smoke_log(*, scenario: str, exit_code: int, log_text: str) ->
             f"Scenario {scenario} unexpectedly exited cleanly; expected fail-closed behavior."
         )
     expected_stage = SCENARIO_EXPECTED_STAGE[scenario]
-    if expected_stage not in log_text:
+    equivalent_markers = SCENARIO_EQUIVALENT_LOG_MARKERS.get(scenario, ())
+    if expected_stage not in log_text and not any(
+        marker in log_text for marker in equivalent_markers
+    ):
         raise SystemExit(
             f"Scenario {scenario} did not record expected failure stage {expected_stage!r}."
         )
