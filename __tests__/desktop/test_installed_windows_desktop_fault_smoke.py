@@ -94,7 +94,9 @@ def test_build_healthy_launch_environment_uses_isolated_runtime_and_ready_skip(
     assert env["GOAT_DESKTOP_BACKEND_HOST"] == "127.0.0.1"
     assert env[subject.READY_SKIP_OLLAMA_PROBE_ENV] == "1"
     assert env["GOAT_DESKTOP_APP_DATA_DIR"].endswith("com.simonbb.goatai")
-    assert env["GOAT_LOG_DIR"].endswith("com.simonbb.goatai\\logs")
+    log_dir = Path(env["GOAT_LOG_DIR"])
+    assert log_dir.name == "logs"
+    assert log_dir.parent.name == "com.simonbb.goatai"
     assert packaged_smoke.INTERNAL_TEST_FLAG not in env
     assert packaged_smoke.INTERNAL_TEST_SCENARIO not in env
     assert Path(env["LOCALAPPDATA"]).is_dir()
