@@ -1322,7 +1322,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
                 "prompt": "Draft a plan",
                 "session_id": "chat-1",
                 "project_id": "project-1",
-                "source_ids": ["web"],
+                "source_ids": ["knowledge"],
             },
         )
 
@@ -1361,7 +1361,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
         )
         self.assertEqual("queued", events_body["events"][0]["status"])
         self.assertEqual("completed", events_body["events"][-1]["status"])
-        self.assertEqual(["web"], events_body["events"][0]["metadata"]["source_ids"])
+        self.assertEqual(
+            ["knowledge"], events_body["events"][0]["metadata"]["source_ids"]
+        )
         self.assertEqual(
             "markdown", events_body["events"][-1]["metadata"]["result_format"]
         )
@@ -1369,6 +1371,24 @@ class ApiBlackboxContractTests(unittest.TestCase):
         missing = self.client.get("/api/workbench/tasks/wb-missing")
         self.assertEqual(404, missing.status_code)
         self.assertEqual("Workbench task not found", missing.json()["detail"])
+
+    def test_workbench_rejects_incompatible_source_for_task_kind(self) -> None:
+        self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        create_response = self.client.post(
+            "/api/workbench/tasks",
+            json={
+                "task_kind": "plan",
+                "prompt": "Draft a plan",
+                "source_ids": ["web"],
+            },
+        )
+
+        self.assertEqual(422, create_response.status_code)
+        body = create_response.json()
+        self.assertEqual(REQUEST_VALIDATION_ERROR, body["code"])
+        self.assertIn("do not support task kind", body["detail"])
 
     def test_workbench_task_cancel_cancels_queued_task(self) -> None:
         self.settings = replace(self.settings, feature_agent_workbench_enabled=True)

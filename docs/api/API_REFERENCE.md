@@ -379,6 +379,7 @@ Notes:
 - legacy `connector_ids` is still accepted as a deprecated alias for `source_ids`
 - when `knowledge_document_ids` are attached, the task implicitly includes the `knowledge` source even if the caller omitted it from `source_ids`
 - when `browse` or `deep_research` omits both `source_ids` and `knowledge_document_ids`, the task defaults to the global `web` source
+- every resolved source must explicitly advertise the requested `task_kind`; mixed source sets that include an incompatible source now fail fast with `422`
 - `browse` and `deep_research` now fail fast with `422` when no runtime-ready retrieval source is available to the caller
 - request shape is intentionally forward-compatible for future task execution and output linkage
 - current task-kind behavior:
@@ -592,6 +593,7 @@ Current behavior:
 
 - queued and running tasks return `result = null`
 - failed and cancelled tasks return `result = null` plus a stable `error_detail`
+- `workspace_outputs` is filtered per output using the same visibility rules as the history/output listing surfaces; a visible task can still return an empty `workspace_outputs` list when some linked outputs are caller-hidden
 - missing workbench read scope returns `403`
 - missing or caller-invisible task ids return `404`
 - the same runtime gate still applies: if workbench is disabled for the deployment, the route returns `503` with `FEATURE_UNAVAILABLE`
@@ -606,6 +608,7 @@ Current behavior:
 - only `queued` tasks can be cancelled
 - success returns `200` with the normal task status payload and `status = cancelled`
 - cancelled tasks return `result = null` and `error_detail = "Task cancelled before execution."`
+- the response applies the same per-output visibility filter as `GET /api/workbench/tasks/{task_id}`
 - missing workbench write scope returns `403`
 - running or terminal tasks return `409` with `code = RESOURCE_CONFLICT`
 - missing or caller-invisible task ids return `404`
@@ -622,6 +625,7 @@ Current behavior:
 - the new task reuses the original `task_kind`, `prompt`, `session_id`, `project_id`, `knowledge_document_ids`, and connector/source request shape, but it re-resolves sources and stores the current caller auth snapshot
 - success returns `202 Accepted` with the same accepted-task payload shape as `POST /api/workbench/tasks`
 - missing workbench write scope or source-read scope returns `403`
+- retry now fails with `422` if the re-resolved source set no longer supports the original task kind, even when the source ids are still visible
 - queued or running tasks return `409` with `code = RESOURCE_CONFLICT`
 - missing or caller-invisible task ids return `404`
 
