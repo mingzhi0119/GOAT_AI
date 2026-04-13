@@ -125,6 +125,12 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     roadmap = (REPO_ROOT / "docs" / "governance" / "ROADMAP.md").read_text(
         encoding="utf-8"
     )
+    roadmap_archive = (
+        REPO_ROOT / "docs" / "governance" / "ROADMAP_ARCHIVE.md"
+    ).read_text(encoding="utf-8")
+    project_status = (
+        REPO_ROOT / "docs" / "governance" / "PROJECT_STATUS.md"
+    ).read_text(encoding="utf-8")
     operations_doc = (REPO_ROOT / "docs" / "operations" / "OPERATIONS.md").read_text(
         encoding="utf-8"
     )
@@ -236,11 +242,10 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     assert "fault-injection.yml" in release_doc
     assert "desktop-provenance.yml" in release_doc
     assert "Publicly distributed Windows desktop installers" in security_doc
-    assert "No open P1 audit items remain" in roadmap
-    assert "backend-fast" in roadmap
-    assert "merge-blocking packaged-shell fault smoke" in roadmap
-    assert "desktop-package-windows" in roadmap
-    assert "merge-blocking packaged-shell fault smoke" in roadmap
+    assert "This file tracks **unfinished work only**." in roadmap
+    assert "engineering quality uplift `P0` and `P1`" in roadmap_archive
+    assert "desktop-package-windows" in project_status
+    assert "merge-blocking packaged-shell fault smoke" in project_status
     assert "packaged-build truth set" in operations_doc
     assert "non-desktop-only backend or documentation changes" in operations_doc
     assert "desktop-windows-fault-smoke" in operations_doc
