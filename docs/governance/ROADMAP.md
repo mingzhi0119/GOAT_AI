@@ -124,6 +124,34 @@ secret availability.
    - current governance order is: clear `backend-fast` first, then inspect `backend-heavy`, and only then move to `desktop-package-windows` / `desktop-supply-chain`
    - pre-ready restart/backoff is shipped, and the PR packaged-binary smoke plus release/scheduled installed-desktop evidence are now fixed governance mechanisms rather than ad hoc watchpoints
 
+### Repository-native Skills and Agent Automation
+
+- Goal: codify GOAT AI's repeatable audit, proof, CI-routing, and governance-sync workflows as repo-local Codex skills instead of relying on thread-by-thread memory.
+- Non-goals:
+  - do not replace [`AGENTS.md`](../../AGENTS.md) or the engineering standards as the permanent policy layer
+  - do not create a plugin marketplace or generic IDE macro bundle
+  - do not collapse all governance work into one broad "万能 skill"
+- Initial skill set:
+  - `goat-engineering-audit`
+  - `goat-api-contract-proof`
+  - `goat-ci-surface-router`
+  - `goat-desktop-release-evidence`
+  - `goat-workbench-authz-proof`
+  - `goat-observability-contract-proof`
+  - `goat-governance-sync`
+- Sequencing:
+  - Phase A: roadmap framing, naming, and shared directory conventions under `.agents/skills/`
+  - Phase B: foundation skills for audit, API contract proof, and CI routing
+  - Phase C: domain proof skills for desktop evidence, workbench/authz, and observability
+  - Phase D: governance sync plus a human-readable skills index after the repo-local skill set becomes large enough to need one
+- Exit criteria:
+  - the seven skills exist with `SKILL.md`, `agents/openai.yaml`, and repo-specific references
+  - the skill set is discoverable from agent guidance without inventing unpublished workflows
+  - a light governance test guards the repo-local skill inventory and catches stale links or missing metadata
+- Relationship to existing skills:
+  - `wsl-linux-build`, `wsl-linux-ops-checks`, and `wsl-linux-rust-desktop` remain the execution-layer helpers for Linux-targeted validation from Windows
+  - the new `goat-*` skills sit above them as governance/proof workflows and may compose with them when Linux parity is required
+
 ### Runtime platform
 
 #### Phase 17 shared runtime foundations
