@@ -280,6 +280,12 @@ def test_targeted_skills_keep_required_truth_sources_and_validation_clues() -> N
             assert snippet in text, f"{path.relative_to(REPO_ROOT)} missing `{snippet}`"
 
 
+def test_wsl_ops_skill_mentions_ci_router_for_linux_parity_decisions() -> None:
+    wsl_ops_skill = SKILLS_ROOT / "wsl-linux-ops-checks" / "SKILL.md"
+    text = wsl_ops_skill.read_text(encoding="utf-8")
+    assert "goat-ci-surface-router" in text
+
+
 def test_authz_truth_sources_include_scope_and_gate_reason_files() -> None:
     authz_truth_sources = (
         SKILLS_ROOT
@@ -324,11 +330,17 @@ def test_shared_forward_test_patterns_capture_live_prompt_and_output_shape() -> 
     for snippet in (
         "## Tasks exercised",
         "## Checks exercised",
+        "## Composed skill chains",
         "## Repeated prompt pattern",
         "## Repeated output pattern",
         "## Script decision",
         "Read-only review of <scope>",
         "No shared script landed in this pass.",
+        "invoke-wsl-command.ps1",
+        "test_desktop_release_governance.py __tests__/ops/test_ops_asset_contracts.py -q",
+        "cd frontend && npm run contract:check",
+        "$goat-ci-surface-router",
+        "$goat-governance-sync",
     ):
         assert snippet in text, (
             f"{shared_patterns.relative_to(REPO_ROOT)} missing `{snippet}`"
