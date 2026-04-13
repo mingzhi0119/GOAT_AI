@@ -25,6 +25,7 @@ from backend.domain.authorization import ResourceRef
 from backend.models.media import MediaUploadResponse
 from backend.services.exceptions import MediaNotFound, MediaValidationError
 from backend.services.authz_audit import emit_authorization_audit
+from backend.services.runtime_persistence import build_media_repository
 from backend.types import Settings
 from goat_ai.uploads import (
     ObjectStore,
@@ -119,7 +120,7 @@ def media_metadata_storage_key(attachment_id: str) -> str:
 def _resolve_repository(
     *, settings: Settings, repository: MediaRepository | None
 ) -> MediaRepository:
-    return repository or SQLiteMediaRepository(settings.log_db_path)
+    return repository or build_media_repository(settings)
 
 
 def _sniff_image_kind(data: bytes) -> str | None:

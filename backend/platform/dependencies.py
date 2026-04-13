@@ -15,17 +15,13 @@ from backend.services.chat_runtime import (
     ConversationLogger,
     OllamaTitleGenerator,
     SessionRepository,
-    SQLiteConversationLogger,
-    SQLiteSessionRepository,
     TitleGenerator,
 )
 from backend.services.workbench_runtime import (
     WorkbenchTaskRepository,
-    SQLiteWorkbenchTaskRepository,
 )
 from backend.services.code_sandbox_runtime import (
     CodeSandboxExecutionRepository,
-    SQLiteCodeSandboxExecutionRepository,
 )
 from backend.services.code_sandbox_provider import (
     DockerSandboxProvider,
@@ -41,6 +37,12 @@ from backend.services.background_jobs import (
     ThreadBackgroundJobRunner,
 )
 from backend.services.workbench_execution_service import execute_workbench_task
+from backend.services.runtime_persistence import (
+    build_code_sandbox_execution_repository,
+    build_conversation_logger,
+    build_session_repository,
+    build_workbench_task_repository,
+)
 from backend.services.tabular_context import (
     EmbeddedCsvTabularExtractor,
     TabularContextExtractor,
@@ -70,28 +72,28 @@ def get_conversation_logger(
     settings: Settings = Depends(get_settings),
 ) -> ConversationLogger:
     """Return the append-only conversation logger bound to current settings."""
-    return SQLiteConversationLogger(settings.log_db_path)
+    return build_conversation_logger(settings)
 
 
 def get_session_repository(
     settings: Settings = Depends(get_settings),
 ) -> SessionRepository:
     """Return the session repository bound to current settings."""
-    return SQLiteSessionRepository(settings.log_db_path)
+    return build_session_repository(settings)
 
 
 def get_workbench_task_repository(
     settings: Settings = Depends(get_settings),
 ) -> WorkbenchTaskRepository:
     """Return the workbench task repository bound to current settings."""
-    return SQLiteWorkbenchTaskRepository(settings.log_db_path)
+    return build_workbench_task_repository(settings)
 
 
 def get_code_sandbox_execution_repository(
     settings: Settings = Depends(get_settings),
 ) -> CodeSandboxExecutionRepository:
     """Return the durable code sandbox execution repository."""
-    return SQLiteCodeSandboxExecutionRepository(settings.log_db_path)
+    return build_code_sandbox_execution_repository(settings)
 
 
 def get_code_sandbox_provider(

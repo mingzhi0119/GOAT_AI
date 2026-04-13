@@ -271,6 +271,8 @@ live in the configured bucket/prefix while SQLite metadata remains local.
 | `GOAT_SYSTEM_PROMPT` | Override system prompt | built-in default |
 | `GOAT_SYSTEM_PROMPT_FILE` | Path to UTF-8 prompt file | empty |
 | `GOAT_LOG_PATH` | SQLite path | `<project>/var/chat_logs.db` |
+| `GOAT_RUNTIME_METADATA_BACKEND` | Runtime metadata backend: `sqlite` or `postgres`; the Postgres path is a server-only Phase 16D preview seam and currently fails fast until repository adapters land | `sqlite` |
+| `GOAT_RUNTIME_POSTGRES_DSN` | Required only when `GOAT_RUNTIME_METADATA_BACKEND=postgres`; reserved for the future hosted/server Postgres adapter path | empty |
 | `GOAT_DATA_DIR` | Local runtime data root; also the default local object-store root when `GOAT_OBJECT_STORE_ROOT` is unset | `<project>/var/data` (gitignored by default; do not commit) |
 | `GOAT_OBJECT_STORE_BACKEND` | Blob/object-store backend for uploads, media, artifacts, normalized knowledge payloads, and workspace export files: `local` or `s3` | `local` |
 | `GOAT_OBJECT_STORE_ROOT` | Local object-store root when backend=`local`; defaults to `GOAT_DATA_DIR` | `<project>/var/data` |
@@ -330,6 +332,8 @@ live in the configured bucket/prefix while SQLite metadata remains local.
 ### Object storage modes (Phase 16C)
 
 - Runtime metadata remains in SQLite at `GOAT_LOG_PATH`; Phase 16C only externalizes binary/object payloads.
+- `GOAT_RUNTIME_METADATA_BACKEND=sqlite` remains the only fully supported runtime metadata mode in the shipped app.
+- `GOAT_RUNTIME_METADATA_BACKEND=postgres` is currently a server-only Phase 16D preview seam. It requires `GOAT_DEPLOY_TARGET=server` plus `GOAT_RUNTIME_POSTGRES_DSN`, and startup fails fast until the Postgres repository adapters and migration tooling land.
 - `GOAT_OBJECT_STORE_BACKEND=local` keeps knowledge uploads, normalized payloads, vector payload JSON, media attachments, generated artifacts, and workspace-export files on the host filesystem under `GOAT_OBJECT_STORE_ROOT`.
 - `GOAT_OBJECT_STORE_BACKEND=s3` moves the same payload families behind an S3-compatible object-store contract. The backend environment must include `boto3` for this mode.
 - Read compatibility is preserved for older local files under `GOAT_DATA_DIR/uploads/*` and `GOAT_DATA_DIR/vector_index/*` while SQLite rows still reference legacy paths.

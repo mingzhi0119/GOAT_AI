@@ -52,8 +52,8 @@ from backend.services.knowledge_repository import (
     KnowledgeDocumentRecord,
     KnowledgeIngestionRecord,
     KnowledgeRepository,
-    SQLiteKnowledgeRepository,
 )
+from backend.services.runtime_persistence import build_knowledge_repository
 from backend.services.knowledge_storage import (
     KnowledgeValidationError as StorageValidationError,
     persist_knowledge_bytes,
@@ -78,7 +78,7 @@ class KnowledgeChatContext:
 def _resolve_repository(
     *, settings: Settings, repository: KnowledgeRepository | None
 ) -> KnowledgeRepository:
-    return repository or SQLiteKnowledgeRepository(settings.log_db_path)
+    return repository or build_knowledge_repository(settings)
 
 
 def create_knowledge_upload(

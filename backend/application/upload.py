@@ -19,8 +19,8 @@ from backend.application.exceptions import (
 from backend.models.upload import UploadAnalysisResponse
 from backend.services.idempotency_service import (
     build_request_hash,
-    SQLiteIdempotencyStore,
 )
+from backend.services.runtime_persistence import build_idempotency_store
 from backend.services.knowledge_storage import SUPPORTED_KNOWLEDGE_EXTENSIONS
 from backend.services.upload_service import (
     ingest_upload as _ingest_upload,
@@ -148,7 +148,4 @@ def analyze_upload_json(
 
 
 def _default_idempotency_store_factory(settings: Settings) -> IdempotencyStore:
-    return SQLiteIdempotencyStore(
-        db_path=settings.log_db_path,
-        ttl_sec=settings.idempotency_ttl_sec,
-    )
+    return build_idempotency_store(settings)

@@ -18,6 +18,7 @@ CodeSandboxProviderId = Literal["docker", "localhost"]
 WorkbenchWebProviderId = Literal["disabled", "duckduckgo"]
 ObjectStoreBackendId = Literal["local", "s3"]
 ObjectStoreS3AddressingStyle = Literal["auto", "path", "virtual"]
+RuntimeMetadataBackendId = Literal["sqlite", "postgres"]
 
 _DEFAULT_SYSTEM_PROMPTS: Final[dict[ThemeStyleId, str]] = {
     "classic": """You are GOAT AI, a helpful general-purpose assistant.
@@ -213,6 +214,8 @@ class Settings:
     log_dir: Path = DEFAULT_RUNTIME_ROOT / "logs"
     system_prompt_overridden: bool = False
     data_dir: Path = DEFAULT_RUNTIME_ROOT / "data"
+    runtime_metadata_backend: RuntimeMetadataBackendId = "sqlite"
+    runtime_postgres_dsn: str = ""
     object_store_backend: ObjectStoreBackendId = "local"
     object_store_root: Path = DEFAULT_RUNTIME_ROOT / "data"
     object_store_bucket: str = ""
@@ -399,6 +402,25 @@ def load_settings() -> Settings:
         )
     if _object_store_backend == "s3" and not _object_store_bucket:
         raise ValueError("GOAT_OBJECT_STORE_BUCKET is required when backend is s3")
+    _runtime_metadata_backend = (
+        os.environ.get("GOAT_RUNTIME_METADATA_BACKEND", "sqlite").strip().lower()
+    )
+    if _runtime_metadata_backend not in {"sqlite", "postgres"}:
+        raise ValueError(
+            "GOAT_RUNTIME_METADATA_BACKEND must be one of: sqlite, postgres"
+        )
+    _runtime_postgres_dsn = os.environ.get("GOAT_RUNTIME_POSTGRES_DSN", "").strip()
+    if _runtime_metadata_backend == "postgres":
+        if not _runtime_postgres_dsn:
+            raise ValueError(
+                "GOAT_RUNTIME_POSTGRES_DSN is required when "
+                "GOAT_RUNTIME_METADATA_BACKEND=postgres"
+            )
+        if _deploy_target != "server":
+            raise ValueError(
+                "GOAT_RUNTIME_METADATA_BACKEND=postgres currently requires "
+                "GOAT_DEPLOY_TARGET=server"
+            )
     _feature_sandbox = _env_bool("GOAT_FEATURE_CODE_SANDBOX", "false")
     _feature_agent_workbench = _env_bool("GOAT_FEATURE_AGENT_WORKBENCH", "false")
     _workbench_web_provider = (
@@ -550,6 +572,10 @@ def load_settings() -> Settings:
         log_dir=log_dir,
         log_db_path=log_db_path,
         data_dir=data_dir,
+        runtime_metadata_backend=cast(
+            RuntimeMetadataBackendId, _runtime_metadata_backend
+        ),
+        runtime_postgres_dsn=_runtime_postgres_dsn,
         object_store_backend=cast(ObjectStoreBackendId, _object_store_backend),
         object_store_root=object_store_root,
         object_store_bucket=_object_store_bucket,

@@ -27,7 +27,6 @@ from backend.routers import (
     upload,
     workbench,
 )
-from backend.services import log_service
 from backend.services.code_sandbox_execution_service import (
     recover_queued_code_sandbox_executions,
 )
@@ -36,11 +35,14 @@ from backend.services.code_sandbox_provider import (
     DockerSandboxProvider,
     LocalHostProvider,
 )
-from backend.services.code_sandbox_runtime import SQLiteCodeSandboxExecutionRepository
 from backend.services.rate_limiter import StoredSlidingWindowRateLimiter
 from backend.services.rate_limit_store import InMemorySlidingWindowRateLimitStore
+from backend.services.runtime_persistence import (
+    build_code_sandbox_execution_repository,
+    build_workbench_task_repository,
+    initialize_runtime_metadata_store,
+)
 from backend.services.workbench_execution_service import recover_workbench_tasks
-from backend.services.workbench_runtime import SQLiteWorkbenchTaskRepository
 from goat_ai.config.settings import Settings
 from goat_ai.telemetry.latency_metrics import init_latency_metrics
 from goat_ai.telemetry.logging_config import configure_logging
@@ -95,7 +97,7 @@ def _build_code_sandbox_provider(
 
 
 def run_workbench_recovery(*, settings: Settings) -> None:
-    repository = SQLiteWorkbenchTaskRepository(settings.log_db_path)
+    repository = build_workbench_task_repository(settings)
     recover_workbench_tasks(
         repository=repository,
         llm=OllamaService(settings),
@@ -109,7 +111,7 @@ def _build_lifespan(settings: Settings):
         recovery_runner = ThreadBackgroundJobRunner()
 
         def run_code_sandbox_recovery() -> None:
-            repository = SQLiteCodeSandboxExecutionRepository(settings.log_db_path)
+            repository = build_code_sandbox_execution_repository(settings)
             provider = _build_code_sandbox_provider(settings)
             recover_queued_code_sandbox_executions(
                 repository=repository,
@@ -133,7 +135,7 @@ def _build_lifespan(settings: Settings):
 
 
 def _configure_runtime_services(settings: Settings) -> None:
-    log_service.init_db(settings.log_db_path)
+    initialize_runtime_metadata_store(settings)
     init_latency_metrics(settings.latency_rolling_max_samples)
     init_otel_if_enabled()
 
