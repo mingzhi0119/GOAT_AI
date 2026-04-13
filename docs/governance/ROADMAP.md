@@ -146,10 +146,10 @@ secret availability.
 - Already landed and tracked in [PROJECT_STATUS.md](PROJECT_STATUS.md):
   - repo-native decision-record templates and PR guidance
   - frontend-only `dependency-cruiser`
-  - `zod` runtime parsing pilot at `/api/system/features` and code sandbox JSON boundaries
+  - shared runtime parsing across the current shipped frontend JSON adapters plus current chat/upload/code-sandbox SSE boundaries
   - lightweight non-canonical `spec/plan/tasks` pilot under `docs/governance/specs/`
 - Remaining work:
-  - decide whether additional high-risk frontend API boundaries justify runtime parsing beyond `/api/system/features` and code sandbox JSON, while keeping the current OpenAPI generation chain as the only contract source
+  - decide whether future workbench, connector, or other newly shipped frontend surfaces should adopt the same runtime parser pattern when a real consumer lands, while keeping the current OpenAPI generation chain as the only contract source
   - decide whether the current frontend `dependency-cruiser` rules should widen after the present structure stabilizes, without expanding the tool to Python imports
   - decide whether feature-spec usage should grow beyond the current single real example, while keeping `AGENTS.md`, repo-local skills, roadmap, and status docs as the canonical governance layer
 - Non-goals:
