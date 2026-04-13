@@ -29,6 +29,13 @@ Short index for coding agents. Canonical rules live in the docs below.
 - For frontend changes, run `cd frontend && npm ci && npm test -- --run`.
 - CI also runs `cd frontend && npm run build`; run the local build for frontend changes that touch types, build inputs, packaging, test utilities, or any build-only failure path.
 - For Linux-targeted validation from Windows, prefer the repo-local skills under [`.agents/skills`](.agents/skills): `$wsl-linux-build`, `$wsl-linux-rust-desktop`, and `$wsl-linux-ops-checks`.
+- Repo-local `goat-*` skills under [`.agents/skills`](.agents/skills) are the governance/proof layer: use them to decide what truth to read, what gates matter, and what counts as landed evidence before editing or closing a slice.
+- Treat the `wsl-*` skills as execution helpers rather than replacements for the `goat-*` workflows.
+- High-frequency entry points:
+  - use `$goat-engineering-audit` for readiness reviews and structured findings
+  - use `$goat-api-contract-proof` for HTTP schema/docs/frontend contract sync
+  - use `$goat-ci-surface-router` to choose the minimum correct validation matrix
+  - use `$goat-desktop-release-evidence` when desktop workflows, tools, or proof docs change
 - Skills are the reusable workflow layer; `AGENTS.md` and [`docs/standards/ENGINEERING_STANDARDS.md`](docs/standards/ENGINEERING_STANDARDS.md) remain the enforcement point for permanent repository policy.
 - Add or update tests for happy path, failure path, and at least one boundary case when you touch core behavior.
 - Do not treat a red local CI-equivalent gate as follow-up work.
