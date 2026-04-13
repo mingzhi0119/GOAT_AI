@@ -19,6 +19,7 @@ from backend.application.exceptions import (
 from backend.application.ports import (
     CodeSandboxExecutionDispatcher,
     CodeSandboxExecutionRepository,
+    CodeSandboxExecutionSupervisor,
     SandboxProvider,
     Settings,
 )
@@ -53,6 +54,7 @@ _SSE_HEADERS = {
     "X-Accel-Buffering": "no",
     "Connection": "keep-alive",
 }
+_RUNNING_CANCEL_WAIT_SEC = 3.0
 
 
 def _utc_now() -> str:
@@ -260,6 +262,7 @@ def execute_code_sandbox_request(
     repository: CodeSandboxExecutionRepository,
     provider: SandboxProvider,
     dispatcher: CodeSandboxExecutionDispatcher,
+    supervisor: CodeSandboxExecutionSupervisor,
     settings: Settings,
     auth_context: AuthorizationContext,
 ) -> CodeSandboxExecutionResponse:
@@ -294,6 +297,7 @@ def execute_code_sandbox_request(
             execution_id=execution_id,
             repository=repository,
             provider=provider,
+            supervisor=supervisor,
             settings=settings,
             raise_errors=True,
         )
@@ -325,10 +329,11 @@ def cancel_code_sandbox_execution(
     *,
     execution_id: str,
     repository: CodeSandboxExecutionRepository,
+    supervisor: CodeSandboxExecutionSupervisor,
     settings: Settings,
     auth_context: AuthorizationContext,
 ) -> CodeSandboxExecutionResponse:
-    """Cancel one visible queued code sandbox execution."""
+    """Cancel one visible queued or running code sandbox execution."""
     ensure_code_sandbox_enabled(settings, auth_context)
     record = _load_visible_execution(
         execution_id=execution_id,
@@ -336,20 +341,46 @@ def cancel_code_sandbox_execution(
         settings=settings,
         auth_context=auth_context,
     )
-    if record.status != "queued":
+    if record.status == "queued":
+        now = _utc_now()
+        repository.mark_execution_cancelled(
+            execution_id,
+            updated_at=now,
+            finished_at=now,
+            error_detail="Execution cancelled before start.",
+        )
+        updated = repository.get_execution(execution_id)
+        if updated is None:
+            raise RuntimeError("Code sandbox execution disappeared after cancellation.")
+        return _to_execution_response(updated)
+    if record.status != "running":
         raise CodeSandboxExecutionConflictError(
-            "Only queued code sandbox executions can be cancelled."
+            "Only queued or running code sandbox executions can be cancelled."
         )
     now = _utc_now()
-    repository.mark_execution_cancelled(
+    repository.append_execution_event(
         execution_id,
-        updated_at=now,
-        finished_at=now,
-        error_detail="Execution cancelled before start.",
+        event_type="execution.cancel_requested",
+        created_at=now,
+        status="running",
+        message="Cancellation requested.",
+        metadata=None,
     )
+    supervisor.request_cancel(execution_id=execution_id)
+
+    deadline = time.monotonic() + _RUNNING_CANCEL_WAIT_SEC
     updated = repository.get_execution(execution_id)
+    while updated is not None and updated.status == "running":
+        if time.monotonic() >= deadline:
+            break
+        time.sleep(0.05)
+        updated = repository.get_execution(execution_id)
     if updated is None:
         raise RuntimeError("Code sandbox execution disappeared after cancellation.")
+    if updated.status == "running":
+        raise CodeSandboxExecutionConflictError(
+            "Execution cancellation did not finish before acknowledgement timeout."
+        )
     return _to_execution_response(updated)
 
 
@@ -359,6 +390,7 @@ def retry_code_sandbox_execution(
     repository: CodeSandboxExecutionRepository,
     provider: SandboxProvider,
     dispatcher: CodeSandboxExecutionDispatcher,
+    supervisor: CodeSandboxExecutionSupervisor,
     settings: Settings,
     auth_context: AuthorizationContext,
 ) -> CodeSandboxExecutionResponse:
@@ -431,6 +463,7 @@ def retry_code_sandbox_execution(
             execution_id=retry_execution_id,
             repository=repository,
             provider=provider,
+            supervisor=supervisor,
             settings=settings,
             raise_errors=True,
         )

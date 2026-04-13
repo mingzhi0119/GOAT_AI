@@ -361,18 +361,29 @@ live in the configured bucket/prefix while SQLite metadata remains local.
   - the selected provider probe succeeds
   - the caller credential includes `sandbox:execute`
 - Phase 18A remains intentionally conservative:
-  - `sync` is the default; `async` uses in-process dispatch plus queued-execution recovery on startup
+  - `sync` is the default; `async` uses in-process dispatch plus startup
+    recovery that replays `queued` executions and fails abandoned `running`
+    executions closed
   - short-lived execution only
   - one shell-capable preset
   - Docker enforces `network_policy=disabled` by default; `localhost` reports a degraded contract and does not enforce the same network boundary
   - `docker`: no privileged mode and no host Docker socket mounted into the sandbox container
   - `localhost`: intended for trusted local development only; it does not provide Docker-grade isolation
+- visible `queued` and `running` executions can be cancelled through the
+  existing cancel route; running cancellation remains cooperative and returns a
+  conflict if the execution does not acknowledge within the bounded API wait
+  window
 - The execution contract persists durable rows, event timelines, and replayable log chunks in SQLite:
   - `GET /api/code-sandbox/executions/{execution_id}`
   - `GET /api/code-sandbox/executions/{execution_id}/events`
   - `GET /api/code-sandbox/executions/{execution_id}/logs`
 - `GET /api/code-sandbox/executions/{execution_id}/logs` is an SSE stream for stdout/stderr replay plus status updates; clients may reconnect with `after_seq=<last_seen_log_sequence>`
 - Files written under `outputs/` are surfaced as metadata in the API response, but they are not yet promoted into the artifact workspace model.
+- Each workspace also gets `.goat/workspace_manifest.json` and the
+  `GOAT_SANDBOX_EXECUTION_ID`, `GOAT_SANDBOX_WORKSPACE`,
+  `GOAT_SANDBOX_OUTPUTS_DIR`, `GOAT_SANDBOX_MANIFEST`, and
+  `GOAT_SANDBOX_NETWORK_POLICY` environment variables so scripts can discover
+  their runtime context without guessing local paths.
 
 ### OpenTelemetry (optional, Phase 15.6)
 

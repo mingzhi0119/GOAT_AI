@@ -45,6 +45,11 @@ Last updated: 2026-04-13
 - bounded LangGraph-backed multi-step research for `browse` and `deep_research`, with durable plan/retrieval/follow-up/synthesis events and a private rollback switch to the legacy single-pass path
 - caller-scoped `project_memory` retrieval plus operator-provisioned read-only connector bindings are now part of the shipped source registry and bounded browse/deep-research runtime foundation
 - durable code sandbox execution with persisted events and replayable logs
+- queued plus running sandbox cancellation now flows through an in-process
+  supervisor seam, and startup recovery fails abandoned `running` executions
+  closed instead of leaving durable rows stranded
+- sandbox workspaces now receive `.goat/workspace_manifest.json` plus
+  `GOAT_SANDBOX_*` environment hints for runtime path discovery
 - Docker-first isolation with `localhost` as an explicit trusted-dev fallback
 
 ### Desktop
@@ -98,6 +103,9 @@ Last updated: 2026-04-13
 - read-only project memory and static connector bindings are shipped, but write-capable connectors, live remote adapters, and any project-memory mutation flow remain future work
 - future workbench, connector, and project-memory widening is now governed by the admission gate in `docs/standards/ENGINEERING_STANDARDS.md` rather than by roadmap notes alone
 - runtime metadata now supports an opt-in hosted/server Postgres backend with Alembic-owned schema truth and deterministic SQLite snapshot import/parity tooling, while local and desktop remain SQLite-first by design
+- sandbox async control now supports queued and running cancellation plus
+  fail-closed restart recovery, but retry remains terminal-only and
+  `network_policy` remains disabled-only until allowlisted egress is proven
 - signed Windows public packaging is shipped, and Linux packaged proof plus
   readiness docs are landed, but public macOS signing/notarization and updater
   activation remain open
@@ -112,7 +120,11 @@ Last updated: 2026-04-13
 - **16B/16C storage evolution:** complete; repository ownership boundaries are explicit across sessions, artifacts, knowledge, media, workbench, and sandbox, persisted blobs now use `storage_key` plus the local/S3 object-store boundary
 - **16D Postgres-backed runtime persistence:** complete for the hosted/server opt-in path; Alembic owns the Postgres runtime schema, repository adapters preserve the existing contracts, and SQLite snapshot export/import/parity plus rollback runbooks now anchor cutover proof
 - **17 runtime platform:** the shipped baseline includes durable workbench tasks, canvas/workspace-output persistence, session restoration, direct output reopen, output-to-artifact export linkage, experimental DDGS-backed public-web retrieval, bounded LangGraph-backed multi-step research for browse/deep-research, read-only `project_memory` retrieval, and caller-scoped static connector bindings
-- **18 sandbox follow-ons:** the shipped baseline includes the Docker-first sandbox MVP, queued-only async control-plane behavior, durable execution/event storage, and replayable sandbox logs
+- **18 sandbox follow-ons:** the shipped baseline includes the Docker-first
+  sandbox MVP, queued plus running cancellation through an in-process
+  supervisor seam, fail-closed restart recovery for abandoned runs, durable
+  execution/event storage, workspace manifest/runtime metadata hints, and
+  replayable sandbox logs
 - **19 desktop maturity:** the shipped baseline includes signed Windows
   packaging, Linux packaged-desktop CI/release scaffolding with retained
   provenance, macOS blocker-report workflow scaffolding, packaged-readiness

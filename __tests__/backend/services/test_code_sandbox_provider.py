@@ -67,10 +67,15 @@ class DockerSandboxProviderTests(unittest.TestCase):
 
             self.assertEqual("docker", result.provider_name)
             self.assertEqual(0, result.exit_code)
+            self.assertFalse(result.cancelled)
             create_kwargs = client.containers.create.call_args.kwargs
             self.assertTrue(create_kwargs["network_disabled"])
             self.assertEqual("256m", create_kwargs["mem_limit"])
             self.assertEqual(500_000_000, create_kwargs["nano_cpus"])
+            self.assertEqual(
+                "/workspace/.goat/workspace_manifest.json",
+                create_kwargs["environment"]["GOAT_SANDBOX_MANIFEST"],
+            )
             container.remove.assert_called_once_with(force=True)
 
     def test_provider_maps_docker_failures_to_feature_unavailable(self) -> None:
@@ -133,6 +138,7 @@ class LocalHostProviderTests(unittest.TestCase):
 
             self.assertEqual("localhost", result.provider_name)
             self.assertEqual(0, result.exit_code)
+            self.assertFalse(result.cancelled)
             stdout = "".join(
                 event.text
                 for event in events[:-1]
@@ -142,6 +148,36 @@ class LocalHostProviderTests(unittest.TestCase):
             self.assertEqual(1, len(result.output_files))
             self.assertEqual("report.txt", result.output_files[0]["path"])
             self.assertEqual(12, result.output_files[0]["byte_size"])
+
+    def test_provider_honors_running_cancellation(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            settings = _settings(Path(tmp))
+            provider = LocalHostProvider(settings)
+            if os.name == "nt":
+                code = "Start-Sleep -Seconds 10\n"
+            else:
+                code = "sleep 10\n"
+
+            events = list(
+                provider.run_stream(
+                    SandboxProviderRequest(
+                        execution_id="cs-local-cancel",
+                        runtime_preset="shell",
+                        code=code,
+                        command=None,
+                        stdin=None,
+                        inline_files=[],
+                        timeout_sec=2,
+                        network_policy="disabled",
+                    ),
+                    cancel_requested=lambda: True,
+                )
+            )
+            result = events[-1]
+
+            self.assertEqual("localhost", result.provider_name)
+            self.assertTrue(result.cancelled)
+            self.assertEqual("Execution cancelled by request.", result.error_detail)
 
     @patch(
         "backend.services.code_sandbox_provider._resolve_localhost_shell",

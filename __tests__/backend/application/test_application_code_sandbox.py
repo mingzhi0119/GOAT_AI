@@ -68,6 +68,44 @@ class _FakeDispatcher:
         self.calls.append(execution_id)
 
 
+class _FakeSupervisor:
+    def __init__(self, repository: _FakeRepository | None = None) -> None:
+        self.repository = repository
+        self.cancelled_ids: set[str] = set()
+
+    def register_execution(self, *, execution_id: str):
+        return lambda: execution_id in self.cancelled_ids
+
+    def request_cancel(self, *, execution_id: str) -> None:
+        self.cancelled_ids.add(execution_id)
+        if self.repository is None:
+            return
+        record = self.repository.records.get(execution_id)
+        if record is None or record.status != "running":
+            return
+        self.repository.records[execution_id] = CodeSandboxExecutionRecord(
+            **{
+                **record.__dict__,
+                "status": "cancelled",
+                "updated_at": "2026-04-10T00:00:03Z",
+                "finished_at": "2026-04-10T00:00:03Z",
+                "error_detail": "Execution cancelled by request.",
+                "output_files": record.output_files or [],
+            }
+        )
+        self.repository.append_execution_event(
+            execution_id,
+            event_type="execution.cancelled",
+            created_at="2026-04-10T00:00:03Z",
+            status="cancelled",
+            message="Execution cancelled by request.",
+            metadata=None,
+        )
+
+    def release_execution(self, *, execution_id: str) -> None:
+        _ = execution_id
+
+
 class _FakeRepository:
     def __init__(self) -> None:
         self.records: dict[str, CodeSandboxExecutionRecord] = {}
@@ -264,6 +302,7 @@ class ApplicationCodeSandboxTests(unittest.TestCase):
     def test_execute_code_sandbox_request_dispatches_async_execution(self) -> None:
         repository = _FakeRepository()
         dispatcher = _FakeDispatcher()
+        supervisor = _FakeSupervisor()
 
         with patch(
             "backend.application.code_sandbox.ensure_code_sandbox_enabled",
@@ -274,6 +313,7 @@ class ApplicationCodeSandboxTests(unittest.TestCase):
                 repository=repository,
                 provider=_FakeProvider(),
                 dispatcher=dispatcher,
+                supervisor=supervisor,
                 settings=_settings(),
                 auth_context=_auth_context(),
             )
@@ -285,6 +325,7 @@ class ApplicationCodeSandboxTests(unittest.TestCase):
     def test_execute_code_sandbox_request_runs_sync_execution_inline(self) -> None:
         repository = _FakeRepository()
         dispatcher = _FakeDispatcher()
+        supervisor = _FakeSupervisor()
 
         def _mark_completed(**kwargs: object) -> None:
             execution_id = str(kwargs["execution_id"])
@@ -308,6 +349,7 @@ class ApplicationCodeSandboxTests(unittest.TestCase):
                 repository=repository,
                 provider=_FakeProvider(),
                 dispatcher=dispatcher,
+                supervisor=supervisor,
                 settings=_settings(),
                 auth_context=_auth_context(),
             )
@@ -321,6 +363,7 @@ class ApplicationCodeSandboxTests(unittest.TestCase):
         self,
     ) -> None:
         repository = _FakeRepository()
+        supervisor = _FakeSupervisor(repository)
         _seed_record(repository, status="queued")
 
         with patch(
@@ -330,6 +373,7 @@ class ApplicationCodeSandboxTests(unittest.TestCase):
             response = cancel_code_sandbox_execution(
                 execution_id="cs-seeded",
                 repository=repository,
+                supervisor=supervisor,
                 settings=_settings(),
                 auth_context=_auth_context(),
             )
@@ -342,9 +386,36 @@ class ApplicationCodeSandboxTests(unittest.TestCase):
             repository.events["cs-seeded"][-1].event_type,
         )
 
-    def test_cancel_code_sandbox_execution_rejects_non_queued_state(self) -> None:
+    def test_cancel_code_sandbox_execution_marks_running_execution_cancelled(
+        self,
+    ) -> None:
         repository = _FakeRepository()
+        supervisor = _FakeSupervisor(repository)
         _seed_record(repository, status="running")
+
+        with patch(
+            "backend.application.code_sandbox.ensure_code_sandbox_enabled",
+            return_value=None,
+        ):
+            response = cancel_code_sandbox_execution(
+                execution_id="cs-seeded",
+                repository=repository,
+                supervisor=supervisor,
+                settings=_settings(),
+                auth_context=_auth_context(),
+            )
+
+        self.assertEqual("cancelled", response.status)
+        self.assertEqual("Execution cancelled by request.", response.error_detail)
+        self.assertEqual(
+            ["execution.cancel_requested", "execution.cancelled"],
+            [event.event_type for event in repository.events["cs-seeded"]],
+        )
+
+    def test_cancel_code_sandbox_execution_rejects_terminal_state(self) -> None:
+        repository = _FakeRepository()
+        supervisor = _FakeSupervisor(repository)
+        _seed_record(repository, status="completed")
 
         with (
             patch(
@@ -356,6 +427,7 @@ class ApplicationCodeSandboxTests(unittest.TestCase):
             cancel_code_sandbox_execution(
                 execution_id="cs-seeded",
                 repository=repository,
+                supervisor=supervisor,
                 settings=_settings(),
                 auth_context=_auth_context(),
             )
@@ -374,6 +446,7 @@ class ApplicationCodeSandboxTests(unittest.TestCase):
             auth_mode="scoped_key",
         )
         dispatcher = _FakeDispatcher()
+        supervisor = _FakeSupervisor()
         current_auth = AuthorizationContext(
             principal_id=PrincipalId("principal-original"),
             tenant_id=TenantId("tenant-original"),
@@ -392,6 +465,7 @@ class ApplicationCodeSandboxTests(unittest.TestCase):
                 repository=repository,
                 provider=_FakeProvider(),
                 dispatcher=dispatcher,
+                supervisor=supervisor,
                 settings=_settings(),
                 auth_context=current_auth,
             )
@@ -421,6 +495,7 @@ class ApplicationCodeSandboxTests(unittest.TestCase):
         repository = _FakeRepository()
         _seed_record(repository, status="failed", execution_mode="sync")
         dispatcher = _FakeDispatcher()
+        supervisor = _FakeSupervisor()
 
         def _complete_retry(**kwargs: object) -> None:
             execution_id = str(kwargs["execution_id"])
@@ -452,6 +527,7 @@ class ApplicationCodeSandboxTests(unittest.TestCase):
                 repository=repository,
                 provider=_FakeProvider(),
                 dispatcher=dispatcher,
+                supervisor=supervisor,
                 settings=_settings(),
                 auth_context=_auth_context(),
             )
@@ -463,6 +539,7 @@ class ApplicationCodeSandboxTests(unittest.TestCase):
 
     def test_retry_code_sandbox_execution_rejects_non_terminal_state(self) -> None:
         repository = _FakeRepository()
+        supervisor = _FakeSupervisor()
         _seed_record(repository, status="running")
 
         with (
@@ -477,6 +554,7 @@ class ApplicationCodeSandboxTests(unittest.TestCase):
                 repository=repository,
                 provider=_FakeProvider(),
                 dispatcher=_FakeDispatcher(),
+                supervisor=supervisor,
                 settings=_settings(),
                 auth_context=_auth_context(),
             )

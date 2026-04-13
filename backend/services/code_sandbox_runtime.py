@@ -188,6 +188,7 @@ class CodeSandboxExecutionRepository(Protocol):
         updated_at: str,
         finished_at: str,
         error_detail: str,
+        output_files: list[dict[str, object]] | None = None,
     ) -> None: ...
 
     def get_execution(self, execution_id: str) -> CodeSandboxExecutionRecord | None: ...
@@ -397,6 +398,7 @@ class SQLiteCodeSandboxExecutionRepository:
         updated_at: str,
         finished_at: str,
         error_detail: str,
+        output_files: list[dict[str, object]] | None = None,
     ) -> None:
         try:
             with sqlite3.connect(self._db_path) as conn:
@@ -407,6 +409,7 @@ class SQLiteCodeSandboxExecutionRepository:
                     updated_at=updated_at,
                     finished_at=finished_at,
                     error_detail=error_detail,
+                    output_files=output_files,
                 )
                 if not updated:
                     conn.rollback()
@@ -815,6 +818,7 @@ class PostgresCodeSandboxExecutionRepository:
         updated_at: str,
         finished_at: str,
         error_detail: str,
+        output_files: list[dict[str, object]] | None = None,
     ) -> None:
         try:
             with postgres_connect(self._dsn) as conn:
@@ -833,10 +837,16 @@ class PostgresCodeSandboxExecutionRepository:
                             finished_at = %s,
                             timed_out = 0,
                             error_detail = %s,
-                            output_files_json = COALESCE(output_files_json, '[]')
-                        WHERE id = %s AND status = 'queued'
+                            output_files_json = %s
+                        WHERE id = %s AND status IN ('queued', 'running')
                         """,
-                        (updated_at, finished_at, error_detail, execution_id),
+                        (
+                            updated_at,
+                            finished_at,
+                            error_detail,
+                            encode_json(output_files or []),
+                            execution_id,
+                        ),
                     )
                     if cursor.rowcount == 0:
                         return

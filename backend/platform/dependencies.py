@@ -31,6 +31,7 @@ from backend.services.code_sandbox_provider import (
 from backend.services.code_sandbox_execution_service import (
     execute_code_sandbox_execution,
 )
+from backend.services.code_sandbox_supervisor import InProcessCodeSandboxSupervisor
 from backend.services.background_jobs import (
     BackgroundJobRunner,
     FastAPIBackgroundJobRunner,
@@ -53,6 +54,7 @@ from backend.services.safeguard_service import (
 )
 from backend.application.ports import (
     CodeSandboxExecutionDispatcher,
+    CodeSandboxExecutionSupervisor,
     WorkbenchTaskDispatcher,
 )
 from backend.types import LLMClient, Settings
@@ -105,6 +107,14 @@ def get_code_sandbox_provider(
     return DockerSandboxProvider(settings)
 
 
+_CODE_SANDBOX_EXECUTION_SUPERVISOR = InProcessCodeSandboxSupervisor()
+
+
+def get_code_sandbox_execution_supervisor() -> CodeSandboxExecutionSupervisor:
+    """Return the shared in-process sandbox execution supervisor."""
+    return _CODE_SANDBOX_EXECUTION_SUPERVISOR
+
+
 class _BackgroundWorkbenchTaskDispatcher:
     def __init__(
         self,
@@ -140,11 +150,13 @@ class _BackgroundCodeSandboxExecutionDispatcher:
         runner: BackgroundJobRunner,
         repository: CodeSandboxExecutionRepository,
         provider: SandboxProvider,
+        supervisor: CodeSandboxExecutionSupervisor,
         settings: Settings,
     ) -> None:
         self._runner = runner
         self._repository = repository
         self._provider = provider
+        self._supervisor = supervisor
         self._settings = settings
 
     def dispatch_execution(self, *, execution_id: str, request_id: str = "") -> None:
@@ -155,6 +167,7 @@ class _BackgroundCodeSandboxExecutionDispatcher:
                 "execution_id": execution_id,
                 "repository": self._repository,
                 "provider": self._provider,
+                "supervisor": self._supervisor,
                 "settings": self._settings,
             },
         )
@@ -180,6 +193,9 @@ def get_code_sandbox_execution_dispatcher(
         get_code_sandbox_execution_repository
     ),
     provider: SandboxProvider = Depends(get_code_sandbox_provider),
+    supervisor: CodeSandboxExecutionSupervisor = Depends(
+        get_code_sandbox_execution_supervisor
+    ),
     settings: Settings = Depends(get_settings),
 ) -> CodeSandboxExecutionDispatcher:
     """Return the scheduler that hands accepted sandbox runs to the runtime."""
@@ -187,6 +203,7 @@ def get_code_sandbox_execution_dispatcher(
         runner=ThreadBackgroundJobRunner(),
         repository=repository,
         provider=provider,
+        supervisor=supervisor,
         settings=settings,
     )
 

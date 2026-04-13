@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import tempfile
+import time
 import unittest
 from dataclasses import replace
 from pathlib import Path
@@ -87,7 +88,7 @@ class FakeTitleGenerator:
 class FakeCodeSandboxProvider:
     provider_name = "fake-docker"
 
-    def run_stream(self, request: SandboxProviderRequest):
+    def run_stream(self, request: SandboxProviderRequest, *, cancel_requested=None):
         output_files: list[dict[str, object]] = []
         if request.command == "touch outputs/report.txt":
             output_files.append({"path": "report.txt", "byte_size": 12})
@@ -97,6 +98,38 @@ class FakeCodeSandboxProvider:
                 created_at="2026-04-10T00:00:00Z",
                 text="async log line\n",
             )
+        if request.command == "hold-cancellable":
+            yield SandboxProviderLogChunk(
+                stream_name="stdout",
+                created_at="2026-04-10T00:00:00Z",
+                text="holding\n",
+            )
+            deadline = time.monotonic() + 1.0
+            while time.monotonic() < deadline:
+                if cancel_requested is not None and cancel_requested():
+                    yield SandboxProviderResult(
+                        provider_name=self.provider_name,
+                        exit_code=None,
+                        stdout="",
+                        stderr="",
+                        timed_out=False,
+                        cancelled=True,
+                        error_detail="Execution cancelled by request.",
+                        output_files=[],
+                    )
+                    return
+                time.sleep(0.02)
+            yield SandboxProviderResult(
+                provider_name=self.provider_name,
+                exit_code=0,
+                stdout="finished after hold",
+                stderr="",
+                timed_out=False,
+                cancelled=False,
+                error_detail=None,
+                output_files=[],
+            )
+            return
         if request.command == "sleep-forever":
             yield SandboxProviderResult(
                 provider_name=self.provider_name,
@@ -104,6 +137,7 @@ class FakeCodeSandboxProvider:
                 stdout="",
                 stderr="",
                 timed_out=True,
+                cancelled=False,
                 error_detail="Execution timed out.",
                 output_files=[],
             )
@@ -115,6 +149,7 @@ class FakeCodeSandboxProvider:
                 stdout="",
                 stderr="bad exit",
                 timed_out=False,
+                cancelled=False,
                 error_detail="Execution exited with a non-zero status.",
                 output_files=[],
             )
@@ -125,6 +160,7 @@ class FakeCodeSandboxProvider:
             stdout="sandbox ok",
             stderr="",
             timed_out=False,
+            cancelled=False,
             error_detail=None,
             output_files=output_files,
         )
@@ -1903,6 +1939,59 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertIn("async log line", final_status.json()["stdout"])
 
     @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
+    def test_code_sandbox_cancel_can_stop_running_execution(
+        self, _mock: object
+    ) -> None:
+        self.settings = replace(self.settings, feature_code_sandbox_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+        self.client.app.dependency_overrides[get_code_sandbox_provider] = lambda: (
+            FakeCodeSandboxProvider()
+        )
+
+        created = self.client.post(
+            "/api/code-sandbox/exec",
+            json={
+                "execution_mode": "async",
+                "code": "echo sandbox ok",
+                "command": "hold-cancellable",
+            },
+        )
+        self.assertEqual(202, created.status_code)
+        execution_id = created.json()["execution_id"]
+
+        status = self.client.get(f"/api/code-sandbox/executions/{execution_id}")
+        deadline = time.monotonic() + 2.0
+        while status.status_code == 200 and status.json()["status"] != "running":
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(0.02)
+            status = self.client.get(f"/api/code-sandbox/executions/{execution_id}")
+
+        self.assertEqual(200, status.status_code)
+        self.assertEqual("running", status.json()["status"])
+
+        cancel = self.client.post(f"/api/code-sandbox/executions/{execution_id}/cancel")
+        self.assertEqual(200, cancel.status_code)
+        self.assertEqual("cancelled", cancel.json()["status"])
+        self.assertEqual(
+            "Execution cancelled by request.",
+            cancel.json()["error_detail"],
+        )
+
+        events = self.client.get(f"/api/code-sandbox/executions/{execution_id}/events")
+        self.assertEqual(200, events.status_code)
+        self.assertEqual(
+            [
+                "execution.queued",
+                "execution.started",
+                "execution.log.stdout",
+                "execution.cancel_requested",
+                "execution.cancelled",
+            ],
+            [event["event_type"] for event in events.json()["events"]],
+        )
+
+    @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
     def test_code_sandbox_cancel_cancels_queued_execution_and_finishes_logs(
         self, _mock: object
     ) -> None:
@@ -1953,6 +2042,40 @@ class ApiBlackboxContractTests(unittest.TestCase):
         )
         self.assertEqual(409, conflict.status_code)
         self.assertEqual(RESOURCE_CONFLICT, conflict.json()["code"])
+
+    @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
+    def test_code_sandbox_retry_rejects_running_execution(self, _mock: object) -> None:
+        self.settings = replace(self.settings, feature_code_sandbox_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+        self.client.app.dependency_overrides[get_code_sandbox_provider] = lambda: (
+            FakeCodeSandboxProvider()
+        )
+
+        created = self.client.post(
+            "/api/code-sandbox/exec",
+            json={
+                "execution_mode": "async",
+                "code": "echo sandbox ok",
+                "command": "hold-cancellable",
+            },
+        )
+        self.assertEqual(202, created.status_code)
+        execution_id = created.json()["execution_id"]
+
+        status = self.client.get(f"/api/code-sandbox/executions/{execution_id}")
+        deadline = time.monotonic() + 2.0
+        while status.status_code == 200 and status.json()["status"] != "running":
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(0.02)
+            status = self.client.get(f"/api/code-sandbox/executions/{execution_id}")
+
+        self.assertEqual(200, status.status_code)
+        self.assertEqual("running", status.json()["status"])
+
+        retry = self.client.post(f"/api/code-sandbox/executions/{execution_id}/retry")
+        self.assertEqual(409, retry.status_code)
+        self.assertEqual(RESOURCE_CONFLICT, retry.json()["code"])
 
     @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
     def test_code_sandbox_retry_creates_new_execution_with_lineage(

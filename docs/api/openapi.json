@@ -1797,8 +1797,8 @@
         "tags": [
           "code_sandbox"
         ],
-        "summary": "Cancel one queued code sandbox execution",
-        "description": "Cancel one visible queued sandbox execution.",
+        "summary": "Cancel one queued or running code sandbox execution",
+        "description": "Cancel one visible queued or running sandbox execution.",
         "operationId": "post_code_sandbox_execution_cancel_route_api_code_sandbox_executions__execution_id__cancel_post",
         "parameters": [
           {
@@ -3425,18 +3425,14 @@
             "anyOf": [
               {
                 "type": "string",
-                "enum": [
-                  "disabled",
-                  "allowlist",
-                  "enabled"
-                ]
+                "const": "disabled"
               },
               {
                 "type": "null"
               }
             ],
             "title": "Network Policy",
-            "description": "Reserved for future policies. Phase 18 only allows `disabled`."
+            "description": "Execution network policy. The shipped runtime only accepts `disabled`."
           },
           "files": {
             "items": {
@@ -3565,11 +3561,7 @@
           },
           "network_policy": {
             "type": "string",
-            "enum": [
-              "disabled",
-              "allowlist",
-              "enabled"
-            ],
+            "const": "disabled",
             "title": "Network Policy"
           },
           "created_at": {

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import json
 import os
 import queue
 import shutil
@@ -15,6 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
+from collections.abc import Callable
 from typing import Any, Generator, Literal, Protocol
 
 try:
@@ -39,6 +41,7 @@ from goat_ai.config.feature_gate_reasons import (
 
 _WORKSPACE_DIR = "/workspace"
 _OUTPUTS_DIR = "outputs"
+_MANIFEST_RELATIVE_PATH = ".goat/workspace_manifest.json"
 _STREAM_DONE = "__done__"
 _STREAM_ERROR = "__error__"
 SandboxIsolationLevel = Literal["container", "host"]
@@ -97,6 +100,7 @@ class SandboxProviderResult:
     stdout: str
     stderr: str
     timed_out: bool
+    cancelled: bool
     error_detail: str | None
     output_files: list[dict[str, object]]
 
@@ -114,6 +118,8 @@ class SandboxProvider(Protocol):
     def run_stream(
         self,
         request: SandboxProviderRequest,
+        *,
+        cancel_requested: Callable[[], bool] | None = None,
     ) -> Generator[SandboxProviderEvent, None, None]: ...
 
 
@@ -140,6 +146,8 @@ class DockerSandboxProvider:
     def run_stream(
         self,
         request: SandboxProviderRequest,
+        *,
+        cancel_requested: Callable[[], bool] | None = None,
     ) -> Generator[SandboxProviderEvent, None, None]:
         try:
             if docker.DockerClient is None:
@@ -173,6 +181,10 @@ class DockerSandboxProvider:
                         volumes={
                             str(workspace): {"bind": _WORKSPACE_DIR, "mode": "rw"}
                         },
+                        environment=self._workspace_environment(
+                            workspace_root=_WORKSPACE_DIR,
+                            request=request,
+                        ),
                         auto_remove=False,
                     )
                     container.start()
@@ -180,6 +192,7 @@ class DockerSandboxProvider:
                         container=container,
                         workspace=workspace,
                         timeout_sec=request.timeout_sec,
+                        cancel_requested=cancel_requested,
                     )
                 finally:
                     with contextlib.suppress(NotFound, DockerException, OSError):
@@ -200,6 +213,7 @@ class DockerSandboxProvider:
         container: Any,
         workspace: Path,
         timeout_sec: int,
+        cancel_requested: Callable[[], bool] | None = None,
     ) -> Generator[SandboxProviderEvent, None, None]:
         log_queue: queue.Queue[tuple[str, bytes | None]] = queue.Queue()
         finished = threading.Event()
@@ -237,6 +251,7 @@ class DockerSandboxProvider:
 
         deadline = time.monotonic() + timeout_sec
         timed_out = False
+        cancelled = False
         exit_code: int | None = None
         provider_error: str | None = None
 
@@ -254,6 +269,12 @@ class DockerSandboxProvider:
                         yield SandboxProviderLogChunk(
                             stream_name=stream_name, created_at=_utc_now(), text=text
                         )
+
+                if cancel_requested is not None and cancel_requested():
+                    cancelled = True
+                    with contextlib.suppress(DockerException):
+                        container.kill()
+                    break
 
                 container.reload()
                 state = container.attrs.get("State", {})
@@ -283,6 +304,18 @@ class DockerSandboxProvider:
                     )
 
             output_files = self._collect_output_files(workspace)
+            if cancelled:
+                yield SandboxProviderResult(
+                    provider_name=self.provider_name,
+                    exit_code=None,
+                    stdout="",
+                    stderr="",
+                    timed_out=False,
+                    cancelled=True,
+                    error_detail="Execution cancelled by request.",
+                    output_files=output_files,
+                )
+                return
             if timed_out:
                 yield SandboxProviderResult(
                     provider_name=self.provider_name,
@@ -290,6 +323,7 @@ class DockerSandboxProvider:
                     stdout="",
                     stderr="",
                     timed_out=True,
+                    cancelled=False,
                     error_detail="Execution timed out.",
                     output_files=output_files,
                 )
@@ -301,6 +335,7 @@ class DockerSandboxProvider:
                     stdout="",
                     stderr="",
                     timed_out=False,
+                    cancelled=False,
                     error_detail="Failed to stream sandbox logs.",
                     output_files=output_files,
                 )
@@ -312,6 +347,7 @@ class DockerSandboxProvider:
                     stdout="",
                     stderr="",
                     timed_out=False,
+                    cancelled=False,
                     error_detail=None,
                     output_files=output_files,
                 )
@@ -322,6 +358,7 @@ class DockerSandboxProvider:
                 stdout="",
                 stderr="",
                 timed_out=False,
+                cancelled=False,
                 error_detail="Execution exited with a non-zero status.",
                 output_files=output_files,
             )
@@ -365,6 +402,37 @@ class DockerSandboxProvider:
             full = workspace / rel
             full.parent.mkdir(parents=True, exist_ok=True)
             full.write_text(item["content"], encoding="utf-8")
+        manifest_path = workspace / _MANIFEST_RELATIVE_PATH
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "execution_id": request.execution_id,
+                    "runtime_preset": request.runtime_preset,
+                    "network_policy": request.network_policy,
+                    "timeout_sec": request.timeout_sec,
+                    "inline_files": [item["filename"] for item in request.inline_files],
+                    "outputs_dir": _OUTPUTS_DIR,
+                },
+                indent=2,
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+
+    def _workspace_environment(
+        self,
+        *,
+        workspace_root: str,
+        request: SandboxProviderRequest,
+    ) -> dict[str, str]:
+        return {
+            "GOAT_SANDBOX_EXECUTION_ID": request.execution_id,
+            "GOAT_SANDBOX_WORKSPACE": workspace_root,
+            "GOAT_SANDBOX_OUTPUTS_DIR": f"{workspace_root}/{_OUTPUTS_DIR}",
+            "GOAT_SANDBOX_MANIFEST": f"{workspace_root}/{_MANIFEST_RELATIVE_PATH}",
+            "GOAT_SANDBOX_NETWORK_POLICY": request.network_policy,
+        }
 
     def _collect_output_files(self, workspace: Path) -> list[dict[str, object]]:
         outputs_root = workspace / _OUTPUTS_DIR
@@ -412,6 +480,8 @@ class LocalHostProvider:
     def run_stream(
         self,
         request: SandboxProviderRequest,
+        *,
+        cancel_requested: Callable[[], bool] | None = None,
     ) -> Generator[SandboxProviderEvent, None, None]:
         shell = _resolve_localhost_shell(self._settings)
         if shell is None:
@@ -432,6 +502,10 @@ class LocalHostProvider:
                 process = subprocess.Popen(
                     command,
                     cwd=workspace,
+                    env=self._build_process_environment(
+                        workspace=workspace,
+                        request=request,
+                    ),
                     stdin=subprocess.PIPE
                     if request.stdin is not None
                     else subprocess.DEVNULL,
@@ -455,6 +529,7 @@ class LocalHostProvider:
                     process=process,
                     workspace=workspace,
                     timeout_sec=request.timeout_sec,
+                    cancel_requested=cancel_requested,
                 )
             finally:
                 with contextlib.suppress(OSError):
@@ -506,6 +581,7 @@ class LocalHostProvider:
         process: subprocess.Popen[bytes],
         workspace: Path,
         timeout_sec: int,
+        cancel_requested: Callable[[], bool] | None = None,
     ) -> Generator[SandboxProviderEvent, None, None]:
         log_queue: queue.Queue[tuple[str, bytes | None]] = queue.Queue()
         finished = threading.Event()
@@ -546,6 +622,7 @@ class LocalHostProvider:
 
         deadline = time.monotonic() + timeout_sec
         timed_out = False
+        cancelled = False
         exit_code: int | None = None
         provider_error: str | None = None
 
@@ -566,6 +643,11 @@ class LocalHostProvider:
 
                 exit_code = process.poll()
                 if exit_code is not None and finished.is_set():
+                    break
+                if cancel_requested is not None and cancel_requested():
+                    cancelled = True
+                    with contextlib.suppress(OSError):
+                        process.kill()
                     break
                 if time.monotonic() >= deadline:
                     timed_out = True
@@ -592,6 +674,18 @@ class LocalHostProvider:
                     )
 
             output_files = self._collect_output_files(workspace)
+            if cancelled:
+                yield SandboxProviderResult(
+                    provider_name=self.provider_name,
+                    exit_code=None,
+                    stdout="",
+                    stderr="",
+                    timed_out=False,
+                    cancelled=True,
+                    error_detail="Execution cancelled by request.",
+                    output_files=output_files,
+                )
+                return
             if timed_out:
                 yield SandboxProviderResult(
                     provider_name=self.provider_name,
@@ -599,6 +693,7 @@ class LocalHostProvider:
                     stdout="",
                     stderr="",
                     timed_out=True,
+                    cancelled=False,
                     error_detail="Execution timed out.",
                     output_files=output_files,
                 )
@@ -610,6 +705,7 @@ class LocalHostProvider:
                     stdout="",
                     stderr="",
                     timed_out=False,
+                    cancelled=False,
                     error_detail="Failed to stream sandbox logs.",
                     output_files=output_files,
                 )
@@ -621,6 +717,7 @@ class LocalHostProvider:
                     stdout="",
                     stderr="",
                     timed_out=False,
+                    cancelled=False,
                     error_detail=None,
                     output_files=output_files,
                 )
@@ -631,6 +728,7 @@ class LocalHostProvider:
                 stdout="",
                 stderr="",
                 timed_out=False,
+                cancelled=False,
                 error_detail="Execution exited with a non-zero status.",
                 output_files=output_files,
             )
@@ -663,6 +761,41 @@ class LocalHostProvider:
             full = workspace / rel
             full.parent.mkdir(parents=True, exist_ok=True)
             full.write_text(item["content"], encoding="utf-8")
+        manifest_path = workspace / _MANIFEST_RELATIVE_PATH
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "execution_id": request.execution_id,
+                    "runtime_preset": request.runtime_preset,
+                    "network_policy": request.network_policy,
+                    "timeout_sec": request.timeout_sec,
+                    "inline_files": [item["filename"] for item in request.inline_files],
+                    "outputs_dir": _OUTPUTS_DIR,
+                },
+                indent=2,
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+
+    def _build_process_environment(
+        self,
+        *,
+        workspace: Path,
+        request: SandboxProviderRequest,
+    ) -> dict[str, str]:
+        env = os.environ.copy()
+        env.update(
+            {
+                "GOAT_SANDBOX_EXECUTION_ID": request.execution_id,
+                "GOAT_SANDBOX_WORKSPACE": str(workspace),
+                "GOAT_SANDBOX_OUTPUTS_DIR": str(workspace / _OUTPUTS_DIR),
+                "GOAT_SANDBOX_MANIFEST": str(workspace / _MANIFEST_RELATIVE_PATH),
+                "GOAT_SANDBOX_NETWORK_POLICY": request.network_policy,
+            }
+        )
+        return env
 
     def _collect_output_files(self, workspace: Path) -> list[dict[str, object]]:
         outputs_root = workspace / _OUTPUTS_DIR

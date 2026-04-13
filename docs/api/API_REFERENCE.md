@@ -52,7 +52,7 @@ Base path: `/api`
 | `GET` | `/api/system/desktop` | Desktop runtime diagnostics for packaged installs |
 | `POST` | `/api/code-sandbox/exec` | Execute one sandbox run in `sync` or `async` mode |
 | `GET` | `/api/code-sandbox/executions/{execution_id}` | Read one persisted sandbox execution |
-| `POST` | `/api/code-sandbox/executions/{execution_id}/cancel` | Cancel one queued sandbox execution |
+| `POST` | `/api/code-sandbox/executions/{execution_id}/cancel` | Cancel one queued or running sandbox execution |
 | `POST` | `/api/code-sandbox/executions/{execution_id}/retry` | Retry one terminal sandbox execution as a new durable run |
 | `GET` | `/api/code-sandbox/executions/{execution_id}/events` | Read one persisted sandbox execution timeline |
 | `GET` | `/api/code-sandbox/executions/{execution_id}/logs` | Stream replayable sandbox logs over SSE |
@@ -976,7 +976,7 @@ Executes one shell run through the configured sandbox provider. Phase 18A uses:
 - an ephemeral workspace
 - Docker isolation with **network disabled by default**, or a localhost dev fallback when `GOAT_CODE_SANDBOX_PROVIDER=localhost`
 - durable execution, event, and log rows in SQLite for later reads
-- `sync` by default, with optional in-process durable `async` dispatch plus queued-execution recovery on startup
+- `sync` by default, with optional in-process durable `async` dispatch plus startup recovery that replays queued executions and fails abandoned running executions closed
 
 Request body:
 
@@ -1004,6 +1004,11 @@ Behavior:
 - when `command` is omitted, the server executes `code` as a shell script
 - inline files must use relative workspace paths only
 - files created under `outputs/` are reported back as metadata in the response
+- each workspace also receives `.goat/workspace_manifest.json` plus
+  `GOAT_SANDBOX_EXECUTION_ID`, `GOAT_SANDBOX_WORKSPACE`,
+  `GOAT_SANDBOX_OUTPUTS_DIR`, `GOAT_SANDBOX_MANIFEST`, and
+  `GOAT_SANDBOX_NETWORK_POLICY` so scripts can discover the current execution
+  boundary without guessing paths
 - `network_policy` currently only allows `disabled`; other values return `422`
 - Docker enforces that policy. The `localhost` provider reports `network_policy_enforced: false` and should be treated as a trusted development fallback rather than a strong-isolation sandbox
 - `execution_mode` defaults to `sync`; `async` returns immediately after durable acceptance and continues in a background dispatcher
@@ -1050,14 +1055,23 @@ Returns the same durable execution shape as `POST /api/code-sandbox/exec` after 
 
 ## `POST /api/code-sandbox/executions/{execution_id}/cancel`
 
-Cancels one visible `queued` sandbox execution.
+Cancels one visible `queued` or `running` sandbox execution.
 
 Current behavior:
 
-- only `queued` executions can be cancelled
-- success returns `200` with the normal durable execution payload and `status = cancelled`
-- cancelled executions set `finished_at` and `error_detail = "Execution cancelled before start."`
-- running or terminal executions return `409` with `code = RESOURCE_CONFLICT`
+- queued cancellations return `200` with the normal durable execution payload
+  and `status = cancelled`
+- running cancellations append `execution.cancel_requested`, ask the current
+  in-process supervisor seam to stop the provider, and return `200` once the
+  durable record reaches `status = cancelled`
+- queued cancellations set `finished_at` and
+  `error_detail = "Execution cancelled before start."`
+- running cancellations set
+  `error_detail = "Execution cancelled by request."` when acknowledgement
+  completes inside the bounded wait window
+- terminal executions return `409` with `code = RESOURCE_CONFLICT`
+- a running execution also returns `409` if cancellation acknowledgement does
+  not complete before the bounded API wait window expires
 - missing or caller-invisible execution ids return `404`
 - cancelled executions are terminal and cause `GET /logs` to emit a final `done` event
 
@@ -1133,7 +1147,11 @@ Returns the durable execution timeline:
 
 Additional lifecycle events include:
 
+- `execution.cancel_requested` when a running execution receives a cooperative
+  cancellation request
 - `execution.cancelled` when a queued execution is cancelled before start
+- `execution.recovered_after_restart` when startup recovery finds an abandoned
+  `running` execution and fails it closed
 - `execution.retry_requested` on the original record, with `metadata.retry_execution_id`
 - `execution.retry_created` on the new record, with `metadata.source_execution_id`
 

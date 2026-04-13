@@ -511,8 +511,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Cancel one queued code sandbox execution
-         * @description Cancel one visible queued sandbox execution.
+         * Cancel one queued or running code sandbox execution
+         * @description Cancel one visible queued or running sandbox execution.
          */
         post: operations["post_code_sandbox_execution_cancel_route_api_code_sandbox_executions__execution_id__cancel_post"];
         delete?: never;
@@ -947,9 +947,9 @@ export interface components {
             timeout_sec?: number | null;
             /**
              * Network Policy
-             * @description Reserved for future policies. Phase 18 only allows `disabled`.
+             * @description Execution network policy. The shipped runtime only accepts `disabled`.
              */
-            network_policy?: ("disabled" | "allowlist" | "enabled") | null;
+            network_policy?: "disabled" | null;
             /**
              * Files
              * @description Optional inline text files seeded into the temporary workspace.
@@ -1010,9 +1010,9 @@ export interface components {
             runtime_preset: "shell";
             /**
              * Network Policy
-             * @enum {string}
+             * @constant
              */
-            network_policy: "disabled" | "allowlist" | "enabled";
+            network_policy: "disabled";
             /** Created At */
             created_at: string;
             /** Updated At */

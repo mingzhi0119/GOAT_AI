@@ -53,14 +53,16 @@ if TestClient is not None:
 class AuthzFakeCodeSandboxProvider:
     provider_name = "fake-docker"
 
-    def run_stream(self, request: SandboxProviderRequest):
+    def run_stream(self, request: SandboxProviderRequest, *, cancel_requested=None):
         _ = request
+        _ = cancel_requested
         yield SandboxProviderResult(
             provider_name=self.provider_name,
             exit_code=0,
             stdout="sandbox ok",
             stderr="",
             timed_out=False,
+            cancelled=False,
             error_detail=None,
             output_files=[],
         )

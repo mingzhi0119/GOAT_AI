@@ -20,7 +20,9 @@ Completed phases, landed slices, and historical closeout notes live in:
 ### Active priorities
 
 1. **Code sandbox follow-ons**
-   - running-state cancellation/retry, allowlisted egress, richer workspace UX, and supervisor parity remain open
+   - running-state cancellation and restart recovery are landed, but
+     running-state retry semantics, allowlisted egress, richer workspace UX,
+     and Rust supervisor parity remain open
 2. **Desktop public release blockers**
    - Linux packaged build/provenance and readiness docs are landed, but public macOS signing/notarization and updater enablement remain open
 3. **`/api/knowledge/answers` semantic alignment**
@@ -69,7 +71,8 @@ Completed phases, landed slices, and historical closeout notes live in:
 - Goal: finish the shared task/runtime primitives that Browse, Deep Research, Canvas, project memory, and connectors should all build on.
 - Remaining work:
   - lift the now-landed workbench source descriptors, bounded research runtime, project-memory reads, and read-only connector bindings into a broader shared runtime control plane
-  - broader runtime composition for project memory/connectors on top of the now-landed queued-only cancel/retry control plane
+  - broader runtime composition for project memory/connectors on top of the
+    current durable control-plane seams
 - Sequencing rule:
   - finish shared runtime foundations before widening frontend promises
 
@@ -102,9 +105,10 @@ Completed phases, landed slices, and historical closeout notes live in:
 
 - Goal: extend the landed Docker-first sandbox without weakening the current operator/safety posture.
 - Remaining work:
-  - running-state cancellation / retry behavior beyond the current queued-only control plane
-  - multi-file workspace ergonomics beyond inline text seeding
-  - allowlisted egress modes instead of all-or-nothing disablement
+  - running-state retry semantics beyond the now-landed cancellation control seam
+  - multi-file workspace ergonomics beyond inline text seeding plus the landed
+    workspace manifest/runtime metadata hints
+  - allowlisted egress modes instead of the current disabled-only contract
   - alternate providers behind the same sandbox boundary
   - richer terminal / PTY UX beyond replayable chunked logs
 

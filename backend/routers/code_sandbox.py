@@ -22,6 +22,7 @@ from backend.application.exceptions import (
 from backend.application.ports import (
     CodeSandboxExecutionDispatcher,
     CodeSandboxExecutionRepository,
+    CodeSandboxExecutionSupervisor,
     SandboxProvider,
     Settings,
 )
@@ -30,6 +31,7 @@ from backend.platform.dependencies import (
     get_authorization_context,
     get_code_sandbox_execution_dispatcher,
     get_code_sandbox_execution_repository,
+    get_code_sandbox_execution_supervisor,
     get_code_sandbox_provider,
 )
 from backend.domain.authz_types import AuthorizationContext
@@ -75,6 +77,9 @@ def post_code_sandbox_exec(
     dispatcher: CodeSandboxExecutionDispatcher = Depends(
         get_code_sandbox_execution_dispatcher
     ),
+    supervisor: CodeSandboxExecutionSupervisor = Depends(
+        get_code_sandbox_execution_supervisor
+    ),
     settings: Settings = Depends(get_settings),
     auth_context: AuthorizationContext = Depends(get_authorization_context),
 ) -> CodeSandboxExecutionResponse:
@@ -85,6 +90,7 @@ def post_code_sandbox_exec(
             repository=repository,
             provider=provider,
             dispatcher=dispatcher,
+            supervisor=supervisor,
             settings=settings,
             auth_context=auth_context,
         )
@@ -142,7 +148,7 @@ def get_code_sandbox_execution_route(
 @router.post(
     "/code-sandbox/executions/{execution_id}/cancel",
     response_model=CodeSandboxExecutionResponse,
-    summary="Cancel one queued code sandbox execution",
+    summary="Cancel one queued or running code sandbox execution",
     responses={
         401: {"model": ErrorResponse},
         403: {"model": ErrorResponse},
@@ -160,14 +166,18 @@ def post_code_sandbox_execution_cancel_route(
     repository: CodeSandboxExecutionRepository = Depends(
         get_code_sandbox_execution_repository
     ),
+    supervisor: CodeSandboxExecutionSupervisor = Depends(
+        get_code_sandbox_execution_supervisor
+    ),
     settings: Settings = Depends(get_settings),
     auth_context: AuthorizationContext = Depends(get_authorization_context),
 ) -> CodeSandboxExecutionResponse:
-    """Cancel one visible queued sandbox execution."""
+    """Cancel one visible queued or running sandbox execution."""
     try:
         return cancel_code_sandbox_execution(
             execution_id=execution_id,
             repository=repository,
+            supervisor=supervisor,
             settings=settings,
             auth_context=auth_context,
         )
@@ -213,6 +223,9 @@ def post_code_sandbox_execution_retry_route(
     dispatcher: CodeSandboxExecutionDispatcher = Depends(
         get_code_sandbox_execution_dispatcher
     ),
+    supervisor: CodeSandboxExecutionSupervisor = Depends(
+        get_code_sandbox_execution_supervisor
+    ),
     settings: Settings = Depends(get_settings),
     auth_context: AuthorizationContext = Depends(get_authorization_context),
 ) -> CodeSandboxExecutionResponse:
@@ -223,6 +236,7 @@ def post_code_sandbox_execution_retry_route(
             repository=repository,
             provider=provider,
             dispatcher=dispatcher,
+            supervisor=supervisor,
             settings=settings,
             auth_context=auth_context,
         )
