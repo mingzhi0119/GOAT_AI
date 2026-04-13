@@ -20,6 +20,7 @@ Last updated: 2026-04-13
 ### Knowledge and media
 
 - persisted upload and ingestion pipeline for `csv`, `xlsx`, `txt`, `md`, `pdf`, and `docx`
+- knowledge source files, normalized text/metadata, and vector-index payloads now persist through a storage-key/object-store boundary instead of direct path assumptions
 - retrieval-backed chat and `/api/knowledge/*` contract family
 - local `simple_local_v1` vector index with optional lexical rerank and conservative query rewrite
 - image uploads for vision-capable chat via `POST /api/media/uploads`
@@ -28,7 +29,8 @@ Last updated: 2026-04-13
 ### Sessions, artifacts, and authorization
 
 - persisted session history with `session_messages` normalization and legacy compatibility
-- generated chat artifacts served from persisted artifact ids
+- generated chat artifacts served from persisted artifact ids while keeping `download_url` on the stable `/api/artifacts/{artifact_id}` contract
+- generated artifacts, media attachments, and future workspace-export blobs now resolve through the configured object store (`local` by default, `s3` optional)
 - credential-backed authorization context with tenant/principal scoping
 - explicit persisted-resource ownership envelopes at storage boundaries
 - capability gates that distinguish policy denial from runtime unavailability
@@ -82,8 +84,8 @@ Last updated: 2026-04-13
 - workbench public-web retrieval is now a bounded single-pass DDGS-backed evidence brief, not yet a multi-step autonomous research runtime
 - project memory and connectors are not implemented yet
 - future workbench, connector, and project-memory widening is now governed by the admission gate in `docs/standards/ENGINEERING_STANDARDS.md` rather than by roadmap notes alone
-- storage remains SQLite-first and single-writer by design
-- future storage-shape changes require a new migration/compatibility/rollback decision log
+- runtime metadata remains SQLite-first and single-writer by design, while persisted blobs now flow through the local/S3 object-store boundary
+- Phase 16D Postgres runtime persistence is not shipped; the current pre-implementation boundary now lives in `docs/architecture/POSTGRES_RUNTIME_PERSISTENCE_DECISION_PACKAGE.md`
 - Windows desktop packaging, signing, and provenance are ahead of macOS/Linux public packaged validation
 - pre-ready desktop restart/backoff is shipped, and the packaged-shell fault smoke in `desktop-package-windows` is now path-scoped, merge-blocking, and retention-backed for desktop-related changes
 - installed Windows startup evidence now stays auditable across release and scheduled workflows: signed installer validation lives in `.github/workflows/desktop-provenance.yml`, recurring installer drift detection lives in `.github/workflows/fault-injection.yml`, and both retain structured failure artifacts even when the drill fails
@@ -93,7 +95,7 @@ Last updated: 2026-04-13
 
 ## Shipped coverage by roadmap area
 
-- **16B storage evolution:** complete; repository ownership boundaries are explicit across sessions, artifacts, knowledge, media, workbench, and sandbox, and future datastore-shape changes require a separate decision package
+- **16B/16C storage evolution:** complete; repository ownership boundaries are explicit across sessions, artifacts, knowledge, media, workbench, and sandbox, persisted blobs now use `storage_key` plus the local/S3 object-store boundary, and Phase 16D is constrained by a separate Postgres runtime decision package
 - **17 runtime platform:** the shipped baseline includes durable workbench tasks, canvas/workspace-output persistence, session restoration, direct output reopen, output-to-artifact export linkage, and experimental DDGS-backed public-web retrieval
 - **18 sandbox follow-ons:** the shipped baseline includes the Docker-first sandbox MVP, queued-only async control-plane behavior, durable execution/event storage, and replayable sandbox logs
 - **19 desktop maturity:** the shipped baseline includes signed Windows packaging, packaged-desktop validation, installed Windows evidence retention, and pre-ready startup fault handling
@@ -105,6 +107,7 @@ Last updated: 2026-04-13
 - [ROADMAP.md](ROADMAP.md)
 - [ROADMAP_ARCHIVE.md](ROADMAP_ARCHIVE.md)
 - [OPERATIONS.md](../operations/OPERATIONS.md)
+- [OBJECT_STORAGE_CONTRACT.md](../architecture/OBJECT_STORAGE_CONTRACT.md)
 - [API_REFERENCE.md](../api/API_REFERENCE.md)
 - [API_ERRORS.md](../api/API_ERRORS.md)
 - [SECURITY.md](SECURITY.md)

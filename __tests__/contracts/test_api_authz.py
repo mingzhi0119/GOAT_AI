@@ -21,7 +21,11 @@ from backend.api_errors import (
     FEATURE_DISABLED,
     FEATURE_UNAVAILABLE,
 )
-from __tests__.helpers.api_contract import ContractFakeLLM, FakeTitleGenerator
+from __tests__.helpers.api_contract import (
+    ContractFakeLLM,
+    FakeTitleGenerator,
+    parse_sse_payloads,
+)
 from goat_ai.config.settings import Settings
 
 if TestClient is not None:
@@ -114,6 +118,7 @@ class ApiAuthzTests(unittest.TestCase):
             logo_svg=root / "logo.svg",
             log_db_path=root / "chat_logs.db",
             data_dir=root / "data",
+            object_store_root=root / "object-store",
             api_key="read-key",
             api_key_write="write-key",
             rate_limit_window_sec=60,
@@ -242,6 +247,48 @@ class ApiAuthzTests(unittest.TestCase):
             },
         )
         self.assertEqual(404, response.status_code)
+
+    def test_artifact_download_preserves_owner_scoping(self) -> None:
+        self.settings = replace(self.settings, require_session_owner=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        create = self.client.post(
+            "/api/chat",
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+            json={
+                "model": "blackbox-model",
+                "session_id": "artifact-authz-1",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Create a downloadable file with a short brief.",
+                    }
+                ],
+            },
+        )
+        self.assertEqual(200, create.status_code)
+        artifact = next(
+            event
+            for event in parse_sse_payloads(create.text)
+            if event.get("type") == "artifact"
+        )
+        self.assertTrue(artifact["download_url"].startswith("/api/artifacts/"))
+
+        denied = self.client.get(
+            artifact["download_url"],
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "bob"},
+        )
+        self.assertEqual(404, denied.status_code)
+
+        allowed = self.client.get(
+            artifact["download_url"],
+            headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "alice"},
+        )
+        self.assertEqual(200, allowed.status_code)
+        self.assertEqual(
+            'attachment; filename="brief.md"',
+            allowed.headers["content-disposition"],
+        )
 
     def test_workbench_owner_mismatch_returns_404(self) -> None:
         self.settings = replace(self.settings, feature_agent_workbench_enabled=True)

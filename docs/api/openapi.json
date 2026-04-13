@@ -1284,11 +1284,9 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Binary artifact download.",
             "content": {
-              "application/json": {
-                "schema": {}
-              }
+              "application/octet-stream": {}
             }
           },
           "401": {

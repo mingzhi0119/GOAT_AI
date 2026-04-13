@@ -30,6 +30,36 @@ def _ctx(*, scopes: frozenset[str], owner: str = "alice") -> AuthorizationContex
 
 
 class AuthorizerTests(unittest.TestCase):
+    def test_same_tenant_different_principal_still_allows_owned_artifact_read(
+        self,
+    ) -> None:
+        decision = authorize_artifact_read(
+            ctx=AuthorizationContext(
+                principal_id=PrincipalId("principal:reader"),
+                tenant_id=TenantId("tenant:test"),
+                scopes=frozenset({"artifact:read"}),
+                credential_id="cred:reader",
+                legacy_owner_id="alice",
+                auth_mode="test",
+            ),
+            artifact=PersistedArtifactRecord(
+                id="art-1",
+                session_id="sess-1",
+                owner_id="alice",
+                filename="a.txt",
+                mime_type="text/plain",
+                byte_size=1,
+                storage_path="a.txt",
+                source_message_index=0,
+                created_at="now",
+                tenant_id="tenant:test",
+                principal_id="principal:writer",
+            ),
+            require_owner_header=False,
+        )
+        self.assertTrue(decision.allowed)
+        self.assertEqual("ok", decision.reason_code)
+
     def test_scope_missing_denies_with_403_semantics(self) -> None:
         decision = authorize_session_read(
             ctx=_ctx(scopes=frozenset({"artifact:read"})),

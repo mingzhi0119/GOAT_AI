@@ -35,6 +35,7 @@ def _settings(root: Path) -> Settings:
         logo_svg=root / "logo.svg",
         log_db_path=root / "chat_logs.db",
         data_dir=root / "data",
+        object_store_root=root / "object-store",
         require_session_owner=True,
     )
 
@@ -177,6 +178,29 @@ class KnowledgeServiceTests(unittest.TestCase):
 
         self.assertEqual("indexed", response.status)
         self.assertEqual("doc-injected", response.document_id)
+
+    def test_create_knowledge_upload_persists_original_blob_in_object_store_root(
+        self,
+    ) -> None:
+        response = knowledge_service.create_knowledge_upload_from_bytes(
+            content=b"Porter Five Forces",
+            filename="strategy.txt",
+            content_type="text/plain",
+            settings=self.settings,
+            auth_context=_auth_context(),
+            repository=self.repository,
+        )
+
+        stored = self.repository.get_document(response.document_id)
+        self.assertIsNotNone(stored)
+        assert stored is not None
+        self.assertTrue(stored.storage_key.startswith("knowledge/"))
+        self.assertTrue(Path(stored.storage_path).is_file())
+        self.assertTrue(
+            str(Path(stored.storage_path)).startswith(
+                str(self.settings.object_store_root)
+            )
+        )
 
     def test_resolve_knowledge_documents_preserves_order_with_injected_repository(
         self,

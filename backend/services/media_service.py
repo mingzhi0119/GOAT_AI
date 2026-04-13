@@ -26,6 +26,11 @@ from backend.models.media import MediaUploadResponse
 from backend.services.exceptions import MediaNotFound, MediaValidationError
 from backend.services.authz_audit import emit_authorization_audit
 from backend.types import Settings
+from goat_ai.uploads import (
+    ObjectStore,
+    build_object_store,
+    media_object_key,
+)
 
 _ATT_ID_RE = re.compile(r"^att-[a-f0-9]{32}$")
 
@@ -43,6 +48,7 @@ class MediaUploadRecord:
     width_px: int | None
     height_px: int | None
     created_at: str
+    storage_key: str = ""
 
     @property
     def ownership(self) -> PersistedResourceOwnership:
@@ -68,8 +74,8 @@ class SQLiteMediaRepository:
             conn.execute(
                 """
                 INSERT INTO media_uploads
-                    (id, owner_id, tenant_id, principal_id, filename, mime_type, byte_size, storage_path, width_px, height_px, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (id, owner_id, tenant_id, principal_id, filename, mime_type, byte_size, storage_path, storage_key, width_px, height_px, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     record.id,
@@ -80,6 +86,7 @@ class SQLiteMediaRepository:
                     record.mime_type,
                     record.byte_size,
                     record.storage_path,
+                    record.storage_key,
                     record.width_px,
                     record.height_px,
                     record.created_at,
@@ -91,7 +98,7 @@ class SQLiteMediaRepository:
             conn.row_factory = sqlite3.Row
             row = conn.execute(
                 """
-                SELECT id, owner_id, tenant_id, principal_id, filename, mime_type, byte_size, storage_path, width_px, height_px, created_at
+                SELECT id, owner_id, tenant_id, principal_id, filename, mime_type, byte_size, storage_path, storage_key, width_px, height_px, created_at
                 FROM media_uploads
                 WHERE id = ?
                 """,
@@ -100,8 +107,13 @@ class SQLiteMediaRepository:
         return MediaUploadRecord(**dict(row)) if row is not None else None
 
 
-def _attachment_dir(settings: Settings, attachment_id: str) -> Path:
-    return settings.data_dir / "uploads" / "media" / attachment_id
+def media_storage_key(attachment_id: str, *, filename: str = "image.bin") -> str:
+    _ = filename
+    return media_object_key(attachment_id=attachment_id)
+
+
+def media_metadata_storage_key(attachment_id: str) -> str:
+    return f"uploads/media/{attachment_id}/meta.txt"
 
 
 def _resolve_repository(
@@ -138,6 +150,7 @@ def create_media_upload_from_bytes(
     auth_context: AuthorizationContext,
     request_id: str = "",
     repository: MediaRepository | None = None,
+    object_store: ObjectStore | None = None,
 ) -> MediaUploadResponse:
     """Validate, persist, and register one image for later vision chat."""
     if not content:
@@ -159,17 +172,17 @@ def create_media_upload_from_bytes(
             width_px, height_px = dims
 
     attachment_id = f"att-{uuid4().hex}"
-    base = _attachment_dir(settings, attachment_id)
-    base.mkdir(parents=True, exist_ok=True)
-    target = base / "image.bin"
-    target.write_bytes(content)
-
     orig_name = filename.strip() or "image"
-    meta = base / "meta.txt"
     mime_type = f"image/{kind}" if kind != "jpeg" else "image/jpeg"
-    meta.write_text(
-        f"filename={orig_name}\nkind={kind}\n",
-        encoding="utf-8",
+    metadata_key = media_metadata_storage_key(attachment_id)
+    store = object_store or build_object_store(settings)
+    stored = store.put_bytes(
+        storage_key=media_storage_key(attachment_id),
+        content=content,
+    )
+    store.put_bytes(
+        storage_key=metadata_key,
+        content=f"filename={orig_name}\nkind={kind}\n".encode("utf-8"),
     )
     record = MediaUploadRecord(
         id=attachment_id,
@@ -179,13 +192,19 @@ def create_media_upload_from_bytes(
         filename=orig_name,
         mime_type=mime_type,
         byte_size=len(content),
-        storage_path=str(target),
+        storage_path=str(stored.filesystem_path or ""),
+        storage_key=stored.storage_key,
         width_px=width_px,
         height_px=height_px,
         created_at=_now_iso(),
     )
     repository = _resolve_repository(settings=settings, repository=repository)
-    repository.create_media_upload(record)
+    try:
+        repository.create_media_upload(record)
+    except Exception:
+        store.delete(stored.storage_key)
+        store.delete(metadata_key)
+        raise
     emit_authorization_audit(
         ctx=auth_context,
         action="media.upload.create",
@@ -215,6 +234,7 @@ def load_normalized_base64_for_ollama(
     auth_context: AuthorizationContext,
     request_id: str = "",
     repository: MediaRepository | None = None,
+    object_store: ObjectStore | None = None,
 ) -> str:
     """Return base64-encoded image bytes for one attachment (Ollama ``images`` field)."""
     if not _ATT_ID_RE.match(attachment_id):
@@ -237,10 +257,11 @@ def load_normalized_base64_for_ollama(
     )
     if not decision.allowed:
         raise MediaNotFound("Image attachment not found.")
-    path = Path(record.storage_path)
-    if not path.is_file():
-        raise MediaNotFound("Image attachment not found.")
-    data = path.read_bytes()
+    data = read_media_bytes(
+        record=record,
+        settings=settings,
+        object_store=object_store,
+    )
     return base64.b64encode(data).decode("ascii")
 
 
@@ -251,6 +272,7 @@ def load_images_base64_for_chat(
     auth_context: AuthorizationContext,
     request_id: str = "",
     repository: MediaRepository | None = None,
+    object_store: ObjectStore | None = None,
 ) -> list[str]:
     """Load multiple attachments in request order."""
     out: list[str] = []
@@ -262,9 +284,25 @@ def load_images_base64_for_chat(
                 auth_context=auth_context,
                 request_id=request_id,
                 repository=repository,
+                object_store=object_store,
             )
         )
     return out
+
+
+def read_media_bytes(
+    *,
+    record: MediaUploadRecord,
+    settings: Settings,
+    object_store: ObjectStore | None = None,
+) -> bytes:
+    if record.storage_key:
+        store = object_store or build_object_store(settings)
+        return store.read_bytes(record.storage_key)
+    path = Path(record.storage_path)
+    if not path.is_file():
+        raise MediaNotFound("Image attachment not found.")
+    return path.read_bytes()
 
 
 def _now_iso() -> str:

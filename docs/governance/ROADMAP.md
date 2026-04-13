@@ -23,13 +23,20 @@ Completed phases, landed slices, and historical closeout notes live in:
    - `/api/workbench/sources` now exposes runtime-ready experimental DDGS-backed `web`
    - browse/deep-research still remain bounded single-pass evidence briefs
    - the next step is iterative planning, fetch, synthesis, and stronger safety boundaries
+   - evaluate a LangGraph-backed orchestration path for deeper multi-step research only if it can sit behind the existing `/api/workbench/*` contract instead of forcing a frontend-visible runtime rewrite
 
 2. **Project memory and connectors**
    - both are already advertised as future capability slots
    - the open work is still runtime foundations, tenancy rules, and connector boundaries that make those slots real
+   - if LangGraph is adopted, treat it as an internal execution/runtime option for long-running workbench tasks rather than as the public product contract
 
 3. **Desktop distribution maturity**
    - macOS/Linux public packaging, updater readiness, and deeper native runtime operations are still open
+
+4. **Hosted runtime persistence after the landed object-store boundary**
+   - uploads, artifacts, media, normalized knowledge payloads, and workspace-export blobs now persist through the shipped object-store contract
+   - the remaining storage work is the runtime metadata/store evolution from the current `SQLite-first` single-writer contract toward Postgres-backed deployments
+   - keep the existing API, authz, and recovery semantics intact while defining a hosted rollout posture
 
 ### Repository-native Skills and Agent Automation
 
@@ -79,6 +86,7 @@ Completed phases, landed slices, and historical closeout notes live in:
 - Remaining work:
   - staged safety boundaries for public web vs private retrieval
   - iterative multi-step research behavior instead of one bounded retrieval pass
+  - a concrete orchestration spike for whether LangGraph improves plan -> retrieve -> synthesize -> follow-up loops, checkpointing, and human-review pauses without weakening the current authz/event/audit model
   - remote connector adapters behind the shared source registry
 
 #### Phase 17E: project memory and connectors
@@ -89,6 +97,21 @@ Completed phases, landed slices, and historical closeout notes live in:
   - connector registry and capability metadata
   - memory write/read boundaries that do not bypass authz/resource rules
   - read-only retrieval contracts before any write-capable connector path is enabled
+  - keep any future LangGraph-style runtime integration behind the existing workbench/task boundary until project memory and connector authz semantics are mechanically proven
+
+### Storage evolution
+
+Phase 16C external object/file storage is now shipped. Remaining storage work is Phase 16D only.
+
+#### Phase 16D: Postgres-backed runtime persistence
+
+- Goal: evolve the current `SQLite-first` single-writer runtime toward a Postgres-backed deployment shape without breaking existing API, authz, or recovery semantics.
+- Remaining work:
+  - review and approve the implementation posture in [POSTGRES_RUNTIME_PERSISTENCE_DECISION_PACKAGE.md](../architecture/POSTGRES_RUNTIME_PERSISTENCE_DECISION_PACKAGE.md) before any hosted write-path cutover
+  - execute the package's governed inventory and parity plan for the SQLite-owned persistence surfaces that must move together, including sessions, artifacts, workbench tasks/events/outputs, sandbox executions/logs, and idempotency records
+  - preserve durable-task recovery, event ordering, ownership boundaries, and export/download behavior while replacing the storage engine
+  - define local-development and desktop expectations if desktop continues to use SQLite while hosted/server deployments move to Postgres
+  - add migration, compatibility, and failure-path coverage before any hosted deployment guidance widens
 
 ### Code sandbox follow-ons
 
@@ -174,7 +197,7 @@ These items should remain roadmap-only in the frontend until the corresponding b
 
 - Planning for future workbench, connector, project-memory, and other frontier surfaces should follow the canonical policy in [ENGINEERING_STANDARDS.md](../standards/ENGINEERING_STANDARDS.md), especially the admission-gate and capability-gate rules.
 - Shared runtime foundations still need to land before project-memory, connector, or broader frontend promises widen.
-- Storage-shape evolution remains downstream of a separate decision package while the current SQLite-first / single-writer contract stays in force.
+- Runtime-database evolution remains downstream of [POSTGRES_RUNTIME_PERSISTENCE_DECISION_PACKAGE.md](../architecture/POSTGRES_RUNTIME_PERSISTENCE_DECISION_PACKAGE.md) while the shipped object-store boundary and current SQLite-first / single-writer metadata contract stay in force.
 
 ---
 

@@ -59,6 +59,7 @@ from backend.services.knowledge_storage import (
     persist_knowledge_bytes,
 )
 from backend.types import AsyncUploadReader, Settings
+from goat_ai.uploads import build_object_store
 
 _VECTOR_BACKEND = "simple_local_v1"
 _MAX_READ_BYTES = 25 * 1024 * 1024
@@ -127,24 +128,29 @@ def create_knowledge_upload_from_bytes(
     now = _now_iso()
     repository = _resolve_repository(settings=settings, repository=repository)
     ownership = PersistedResourceOwnership.from_auth_context(auth_context)
-    repository.create_document(
-        KnowledgeDocumentRecord(
-            id=document_id,
-            source_type="upload",
-            original_filename=stored.filename,
-            mime_type=stored.mime_type,
-            sha256=stored.sha256,
-            storage_path=str(stored.storage_path),
-            byte_size=stored.byte_size,
-            status="uploaded",
-            created_at=now,
-            updated_at=now,
-            deleted_at=None,
-            owner_id=ownership.owner_id,
-            tenant_id=ownership.tenant_id,
-            principal_id=ownership.principal_id,
-        )
+    record = KnowledgeDocumentRecord(
+        id=document_id,
+        source_type="upload",
+        original_filename=stored.filename,
+        mime_type=stored.mime_type,
+        sha256=stored.sha256,
+        storage_path=str(stored.storage_path or ""),
+        storage_key=stored.storage_key,
+        byte_size=stored.byte_size,
+        status="uploaded",
+        created_at=now,
+        updated_at=now,
+        deleted_at=None,
+        owner_id=ownership.owner_id,
+        tenant_id=ownership.tenant_id,
+        principal_id=ownership.principal_id,
     )
+    try:
+        repository.create_document(record)
+    except Exception:
+        if stored.storage_key:
+            build_object_store(settings).delete(stored.storage_key)
+        raise
     emit_authorization_audit(
         ctx=auth_context,
         action="knowledge.document.create",
@@ -153,23 +159,7 @@ def create_knowledge_upload_from_bytes(
         ),
         decision=authorize_knowledge_document_write(
             ctx=auth_context,
-            document=repository.get_document(document_id)
-            or KnowledgeDocumentRecord(
-                id=document_id,
-                source_type="upload",
-                original_filename=stored.filename,
-                mime_type=stored.mime_type,
-                sha256=stored.sha256,
-                storage_path=str(stored.storage_path),
-                byte_size=stored.byte_size,
-                status="uploaded",
-                created_at=now,
-                updated_at=now,
-                deleted_at=None,
-                owner_id=ownership.owner_id,
-                tenant_id=ownership.tenant_id,
-                principal_id=ownership.principal_id,
-            ),
+            document=repository.get_document(document_id) or record,
             require_owner_header=settings.require_session_owner,
         ),
         request_id=request_id,
@@ -288,6 +278,8 @@ def start_knowledge_ingestion(
             settings=settings,
             document_id=document.id,
             filename=document.original_filename,
+            storage_key=document.storage_key or None,
+            storage_path=document.storage_path or None,
         )
         persist_normalized_text(
             settings=settings, document_id=document.id, text=normalized_text

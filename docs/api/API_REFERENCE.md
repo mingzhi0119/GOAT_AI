@@ -296,6 +296,7 @@ Notes:
 - Unsafe prompts are converted into a safe refusal instead of passing through the raw request
 - Unsafe model output is replaced server-side before streaming
 - Downloadable generated files are emitted as `artifact` events and must be fetched from the server-provided `download_url`
+- `download_url` should be treated as an opaque API route; clients should not infer filesystem paths or storage-provider URLs from it
 - Optional `Idempotency-Key` is supported when `session_id` is present
 - Duplicate `Idempotency-Key` plus the same payload replays the same SSE body and avoids duplicate session/conversation writes
 - Reusing a key with a different payload returns `409` with `code = IDEMPOTENCY_CONFLICT`
@@ -502,6 +503,8 @@ Current behavior:
 - missing or caller-invisible output ids return `404`
 - invalid export requests return `422`, for example when `filename` has an extension that does not match `format`
 - exported artifacts are appended to the output's `artifacts` list and are also visible through the existing `GET /api/artifacts/{artifact_id}` download route
+- exported artifact bytes use the same configured object-store boundary as chat-generated artifacts
+- the returned `download_url` remains an opaque API download route rather than a direct backend-storage URL
 
 ## `GET /api/workbench/tasks/{task_id}`
 
@@ -677,7 +680,7 @@ Persist a supported knowledge file and register document metadata.
 Current behavior:
 
 - Supported file types are `csv`, `xlsx`, `txt`, `md`, `pdf`, and `docx`
-- Raw files are stored under `GOAT_DATA_DIR/uploads/knowledge/<document_id>/original/`
+- Raw files are persisted through the configured object store using a canonical `storage_key`; `local` stores use `GOAT_OBJECT_STORE_ROOT`, while `s3` stores use the configured bucket/prefix
 - Returns `upload_id`, `document_id`, filename metadata, and `status = uploaded`
 
 ## `GET /api/knowledge/uploads/{document_id}`
@@ -697,7 +700,7 @@ Current behavior:
 
 - Normalizes supported source types into text
 - Chunks text into bounded sections
-- Writes SQLite metadata rows plus a local persistent vector index (`simple_local_v1`)
+- Persists normalized text/metadata and the current `simple_local_v1` vector-index payloads through the configured object store while SQLite keeps the metadata rows
 - Returns an ingestion record with `status = completed` when the synchronous MVP path succeeds
 
 ## `GET /api/knowledge/ingestions/{ingestion_id}`
@@ -736,7 +739,7 @@ Multipart upload of one image for vision chat.
 
 Current behavior:
 
-- Accepts **PNG**, **JPEG**, or **WebP**; validates size/type and persists under `GOAT_DATA_DIR` for the lifetime of the attachment id
+- Accepts **PNG**, **JPEG**, or **WebP**; validates size/type and persists through the configured object store for the lifetime of the attachment id
 - Returns `attachment_id`, `filename`, `mime_type`, `byte_size`, and optional `width_px` / `height_px`
 - Use the `attachment_id` values in `image_attachment_ids` on `POST /api/chat` when the model reports Ollama **vision** capability; otherwise the chat request may fail validation (`422`, `VISION_NOT_SUPPORTED`)
 
@@ -747,8 +750,10 @@ Download one persisted generated file from chat.
 Current behavior:
 
 - Returns the exact stored file with `Content-Disposition: attachment`
+- Resolves the payload by persisted `storage_key`; local backends may stream directly from disk, while remote backends proxy object bytes through the API response
 - Requires the same API key protection as the rest of `/api`
 - When session-owner scoping is enabled, download access is limited to the matching owner scope
+- clients should treat the route as the stable download contract even when the storage backend changes
 - Missing artifacts return `404`
 
 ## `GET /api/history`

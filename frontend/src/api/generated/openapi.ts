@@ -3212,13 +3212,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description Binary artifact download. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/octet-stream": unknown;
                 };
             };
             /** @description Unauthorized */

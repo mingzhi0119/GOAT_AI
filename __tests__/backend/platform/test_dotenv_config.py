@@ -59,6 +59,61 @@ class DotenvConfigTests(unittest.TestCase):
             else:
                 os.environ["GOAT_DEPLOY_TARGET"] = original
 
+    def test_load_settings_rejects_s3_backend_without_bucket(self) -> None:
+        original_env = _capture_env(
+            "GOAT_OBJECT_STORE_BACKEND", "GOAT_OBJECT_STORE_BUCKET"
+        )
+        try:
+            _clear_env(*original_env.keys())
+            os.environ["GOAT_OBJECT_STORE_BACKEND"] = "s3"
+            with self.assertRaisesRegex(ValueError, "GOAT_OBJECT_STORE_BUCKET"):
+                config.load_settings()
+        finally:
+            _restore_many(original_env)
+
+    def test_load_settings_parses_s3_object_store_env(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            app_root = Path(tmp)
+            runtime_root = app_root / "var"
+            original_env = _capture_env(
+                "GOAT_OBJECT_STORE_BACKEND",
+                "GOAT_OBJECT_STORE_BUCKET",
+                "GOAT_OBJECT_STORE_PREFIX",
+                "GOAT_OBJECT_STORE_ENDPOINT_URL",
+                "GOAT_OBJECT_STORE_REGION",
+                "GOAT_OBJECT_STORE_ACCESS_KEY_ID",
+                "GOAT_OBJECT_STORE_SECRET_ACCESS_KEY",
+                "GOAT_OBJECT_STORE_S3_ADDRESSING_STYLE",
+            )
+            try:
+                _clear_env(*original_env.keys())
+                os.environ["GOAT_OBJECT_STORE_BACKEND"] = "s3"
+                os.environ["GOAT_OBJECT_STORE_BUCKET"] = "goat-artifacts"
+                os.environ["GOAT_OBJECT_STORE_PREFIX"] = "tenant-a/runtime"
+                os.environ["GOAT_OBJECT_STORE_ENDPOINT_URL"] = "http://127.0.0.1:9000"
+                os.environ["GOAT_OBJECT_STORE_REGION"] = "us-east-1"
+                os.environ["GOAT_OBJECT_STORE_ACCESS_KEY_ID"] = "minio"
+                os.environ["GOAT_OBJECT_STORE_SECRET_ACCESS_KEY"] = "secret"
+                os.environ["GOAT_OBJECT_STORE_S3_ADDRESSING_STYLE"] = "path"
+                with (
+                    patch.object(config, "APP_ROOT", app_root),
+                    patch.object(config, "DEFAULT_RUNTIME_ROOT", runtime_root),
+                ):
+                    settings = config.load_settings()
+                self.assertEqual("s3", settings.object_store_backend)
+                self.assertEqual("goat-artifacts", settings.object_store_bucket)
+                self.assertEqual("tenant-a/runtime", settings.object_store_prefix)
+                self.assertEqual(
+                    "http://127.0.0.1:9000",
+                    settings.object_store_endpoint_url,
+                )
+                self.assertEqual("us-east-1", settings.object_store_region)
+                self.assertEqual("minio", settings.object_store_access_key_id)
+                self.assertEqual("secret", settings.object_store_secret_access_key)
+                self.assertEqual("path", settings.object_store_s3_addressing_style)
+            finally:
+                _restore_many(original_env)
+
     def test_load_settings_defaults_runtime_paths_to_var(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             app_root = Path(tmp)

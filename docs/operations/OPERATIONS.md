@@ -254,6 +254,11 @@ The full school-only runbook lives in [SCHOOL_UBUNTU_SERVER.md](SCHOOL_UBUNTU_SE
 
 ## Key environment variables
 
+Persisted blobs now flow through the configured object store. With
+`GOAT_OBJECT_STORE_BACKEND=local`, objects live under `GOAT_OBJECT_STORE_ROOT`
+(defaulting to `GOAT_DATA_DIR`). With `GOAT_OBJECT_STORE_BACKEND=s3`, blob payloads
+live in the configured bucket/prefix while SQLite metadata remains local.
+
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `OLLAMA_BASE_URL` | Ollama HTTP base URL | `http://127.0.0.1:11434` |
@@ -266,7 +271,16 @@ The full school-only runbook lives in [SCHOOL_UBUNTU_SERVER.md](SCHOOL_UBUNTU_SE
 | `GOAT_SYSTEM_PROMPT` | Override system prompt | built-in default |
 | `GOAT_SYSTEM_PROMPT_FILE` | Path to UTF-8 prompt file | empty |
 | `GOAT_LOG_PATH` | SQLite path | `<project>/var/chat_logs.db` |
-| `GOAT_DATA_DIR` | Root directory for persisted uploads, normalized knowledge text, vector indexes, and vision attachments | `<project>/var/data` (gitignored by default; do not commit) |
+| `GOAT_DATA_DIR` | Local runtime data root; also the default local object-store root when `GOAT_OBJECT_STORE_ROOT` is unset | `<project>/var/data` (gitignored by default; do not commit) |
+| `GOAT_OBJECT_STORE_BACKEND` | Blob/object-store backend for uploads, media, artifacts, normalized knowledge payloads, and workspace export files: `local` or `s3` | `local` |
+| `GOAT_OBJECT_STORE_ROOT` | Local object-store root when backend=`local`; defaults to `GOAT_DATA_DIR` | `<project>/var/data` |
+| `GOAT_OBJECT_STORE_BUCKET` | Required bucket when backend=`s3` | empty |
+| `GOAT_OBJECT_STORE_PREFIX` | Optional key prefix inside the configured bucket | empty |
+| `GOAT_OBJECT_STORE_ENDPOINT_URL` | Optional S3-compatible endpoint override | empty |
+| `GOAT_OBJECT_STORE_REGION` | Optional region for the S3 client/session | empty |
+| `GOAT_OBJECT_STORE_ACCESS_KEY_ID` | Optional access key id for the `s3` backend | empty |
+| `GOAT_OBJECT_STORE_SECRET_ACCESS_KEY` | Optional secret access key for the `s3` backend | empty |
+| `GOAT_OBJECT_STORE_S3_ADDRESSING_STYLE` | S3 addressing mode: `auto`, `path`, or `virtual` | `auto` |
 | `GOAT_API_KEY` | Protect non-health APIs via `X-GOAT-API-Key` | empty |
 | `GOAT_API_KEY_WRITE` | Optional second key: `GET`/`HEAD`/`OPTIONS` may use read key (`GOAT_API_KEY`); other methods require this write key when set | empty |
 | `GOAT_API_CREDENTIALS_JSON` | Optional JSON credential registry; each entry may provide `secret` or `secret_sha256`, and when empty the app derives default read/write credentials from `GOAT_API_KEY` and `GOAT_API_KEY_WRITE` | empty |
@@ -313,6 +327,15 @@ The full school-only runbook lives in [SCHOOL_UBUNTU_SERVER.md](SCHOOL_UBUNTU_SE
 | `GOAT_CODE_SANDBOX_CPU_LIMIT` | Docker CPU quota for each sandbox container | `0.5` |
 | `GOAT_CODE_SANDBOX_MEMORY_MB` | Docker memory limit (MB) for each sandbox container | `256` |
 
+### Object storage modes (Phase 16C)
+
+- Runtime metadata remains in SQLite at `GOAT_LOG_PATH`; Phase 16C only externalizes binary/object payloads.
+- `GOAT_OBJECT_STORE_BACKEND=local` keeps knowledge uploads, normalized payloads, vector payload JSON, media attachments, generated artifacts, and workspace-export files on the host filesystem under `GOAT_OBJECT_STORE_ROOT`.
+- `GOAT_OBJECT_STORE_BACKEND=s3` moves the same payload families behind an S3-compatible object-store contract. The backend environment must include `boto3` for this mode.
+- Read compatibility is preserved for older local files under `GOAT_DATA_DIR/uploads/*` and `GOAT_DATA_DIR/vector_index/*` while SQLite rows still reference legacy paths.
+- Backup, restore, and rollback should treat the SQLite snapshot plus the matching object-store snapshot as one recovery unit.
+- The canonical application/storage contract lives in [OBJECT_STORAGE_CONTRACT.md](../architecture/OBJECT_STORAGE_CONTRACT.md).
+
 ### Code sandbox operations (Phase 18)
 
 - `POST /api/code-sandbox/exec` now performs real provider-backed execution when:
@@ -352,7 +375,7 @@ Example line:
 ```json
 {"ts": "2026-04-07 12:00:00,000", "level": "INFO", "logger": "goat_ai.access", "message": "http_request", "request_id": "550e8400-e29b-41d4-a716-446655440000", "route": "/api/history", "status": 200, "duration_ms": 2.145}
 
-### Credential-backed authorization (Phase 16C)
+### Credential-backed authorization (historical authz 16C)
 
 - The server still accepts `X-GOAT-API-Key` at ingress, but requests now resolve to a request-scoped authorization context with:
   - `principal_id`
@@ -387,7 +410,7 @@ Example `GOAT_API_CREDENTIALS_JSON`:
 ]
 ```
 
-### Authorization audit events (Phase 16C)
+### Authorization audit events (historical authz 16C)
 
 - Logger: `goat_ai.authz`
 - Event name: `authorization_decision`
@@ -583,16 +606,19 @@ Graceful shutdown note:
 ## Rollback
 
 - Use [ROLLBACK.md](ROLLBACK.md) for the end-to-end ref rollback procedure
-- If the rollback is caused by a schema or data regression, pair it with [BACKUP_RESTORE.md](BACKUP_RESTORE.md)
+- If the rollback is caused by a schema, data, or object-store regression, pair it with [BACKUP_RESTORE.md](BACKUP_RESTORE.md)
+- Phase 16C means uploads, media, knowledge payloads, and generated artifacts may require a matched SQLite + object-store restore set instead of a code-only rollback
 
 ## Backup and restore
 
 - Runbook: [BACKUP_RESTORE.md](BACKUP_RESTORE.md)
-- One-command backup:
+- SQLite metadata backup:
 
 ```bash
 python -m tools.ops.backup_chat_db
 ```
+
+- Phase 16C note: `python -m tools.ops.backup_chat_db` backs up SQLite metadata only; object payloads must be captured from `GOAT_OBJECT_STORE_ROOT` or the configured bucket/prefix during the same maintenance window
 
 - Recovery drill:
 
@@ -602,6 +628,11 @@ python -m tools.ops.exercise_recovery_drill --src "$GOAT_LOG_PATH" --backup-dir 
 
 - Use the recovery drill when validating backup/restore readiness or when checking a
 host's ability to recover from a bad SQLite state.
+- When `GOAT_OBJECT_STORE_BACKEND=local`, snapshot `GOAT_OBJECT_STORE_ROOT`
+  alongside the SQLite backup so `storage_key` references still resolve after restore.
+- When `GOAT_OBJECT_STORE_BACKEND=s3`, pair the SQLite backup with a matching
+  bucket/prefix snapshot or versioned restore point; deploy rollback does not restore
+  remote objects by itself.
 
 ## GPU and telemetry
 

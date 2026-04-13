@@ -47,10 +47,6 @@ def _authorize_owned_workbench_resource(
     ownership = ownership_from_resource(resource)
     if ownership.tenant_id and ownership.tenant_id != ctx.tenant_id.value:
         return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
-    if ownership.principal_id and ownership.principal_id != ctx.principal_id.value:
-        return AuthorizationDecision(
-            False, "principal_mismatch", conceal_existence=True
-        )
     if not _owner_visible(
         resource_owner_id=ownership.owner_id,
         legacy_owner_id=ctx.legacy_owner_id,
@@ -86,10 +82,6 @@ def authorize_session_read(
     ownership = ownership_from_resource(session)
     if ownership.tenant_id and ownership.tenant_id != ctx.tenant_id.value:
         return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
-    if ownership.principal_id and ownership.principal_id != ctx.principal_id.value:
-        return AuthorizationDecision(
-            False, "principal_mismatch", conceal_existence=True
-        )
     if not _owner_visible(
         resource_owner_id=ownership.owner_id,
         legacy_owner_id=ctx.legacy_owner_id,
@@ -125,10 +117,6 @@ def authorize_artifact_read(
     ownership = ownership_from_resource(artifact)
     if ownership.tenant_id and ownership.tenant_id != ctx.tenant_id.value:
         return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
-    if ownership.principal_id and ownership.principal_id != ctx.principal_id.value:
-        return AuthorizationDecision(
-            False, "principal_mismatch", conceal_existence=True
-        )
     if not _owner_visible(
         resource_owner_id=ownership.owner_id,
         legacy_owner_id=ctx.legacy_owner_id,
@@ -149,10 +137,6 @@ def authorize_knowledge_document_read(
     ownership = ownership_from_resource(document)
     if ownership.tenant_id and ownership.tenant_id != ctx.tenant_id.value:
         return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
-    if ownership.principal_id and ownership.principal_id != ctx.principal_id.value:
-        return AuthorizationDecision(
-            False, "principal_mismatch", conceal_existence=True
-        )
     if not _owner_visible(
         resource_owner_id=ownership.owner_id,
         legacy_owner_id=ctx.legacy_owner_id,
@@ -188,10 +172,6 @@ def authorize_media_read(
     ownership = ownership_from_resource(media)
     if ownership.tenant_id and ownership.tenant_id != ctx.tenant_id.value:
         return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
-    if ownership.principal_id and ownership.principal_id != ctx.principal_id.value:
-        return AuthorizationDecision(
-            False, "principal_mismatch", conceal_existence=True
-        )
     if not _owner_visible(
         resource_owner_id=ownership.owner_id,
         legacy_owner_id=ctx.legacy_owner_id,
@@ -275,10 +255,6 @@ def authorize_code_sandbox_execution_read(
     ownership = ownership_from_resource(execution)
     if ownership.tenant_id and ownership.tenant_id != ctx.tenant_id.value:
         return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
-    if ownership.principal_id and ownership.principal_id != ctx.principal_id.value:
-        return AuthorizationDecision(
-            False, "principal_mismatch", conceal_existence=True
-        )
     if not _owner_visible(
         resource_owner_id=ownership.owner_id,
         legacy_owner_id=ctx.legacy_owner_id,

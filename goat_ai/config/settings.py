@@ -16,6 +16,8 @@ SCHOOL_OLLAMA_PROFILE = "school-ubuntu"
 ThemeStyleId = Literal["classic", "urochester", "thu"]
 CodeSandboxProviderId = Literal["docker", "localhost"]
 WorkbenchWebProviderId = Literal["disabled", "duckduckgo"]
+ObjectStoreBackendId = Literal["local", "s3"]
+ObjectStoreS3AddressingStyle = Literal["auto", "path", "virtual"]
 
 _DEFAULT_SYSTEM_PROMPTS: Final[dict[ThemeStyleId, str]] = {
     "classic": """You are GOAT AI, a helpful general-purpose assistant.
@@ -211,6 +213,15 @@ class Settings:
     log_dir: Path = DEFAULT_RUNTIME_ROOT / "logs"
     system_prompt_overridden: bool = False
     data_dir: Path = DEFAULT_RUNTIME_ROOT / "data"
+    object_store_backend: ObjectStoreBackendId = "local"
+    object_store_root: Path = DEFAULT_RUNTIME_ROOT / "data"
+    object_store_bucket: str = ""
+    object_store_prefix: str = ""
+    object_store_endpoint_url: str = ""
+    object_store_region: str = ""
+    object_store_access_key_id: str = ""
+    object_store_secret_access_key: str = ""
+    object_store_s3_addressing_style: ObjectStoreS3AddressingStyle = "auto"
     api_key: str = ""
     api_key_write: str = ""
     api_credentials_json: str = ""
@@ -357,6 +368,37 @@ def load_settings() -> Settings:
     _rag_rerank = os.environ.get("GOAT_RAG_RERANK_MODE", "passthrough").strip().lower()
     if _rag_rerank not in ("passthrough", "lexical"):
         raise ValueError("GOAT_RAG_RERANK_MODE must be one of: passthrough, lexical")
+    _object_store_backend = (
+        os.environ.get("GOAT_OBJECT_STORE_BACKEND", "local").strip().lower()
+    )
+    if _object_store_backend not in {"local", "s3"}:
+        raise ValueError("GOAT_OBJECT_STORE_BACKEND must be one of: local, s3")
+    _object_store_bucket = os.environ.get("GOAT_OBJECT_STORE_BUCKET", "").strip()
+    _object_store_prefix = (
+        os.environ.get("GOAT_OBJECT_STORE_PREFIX", "")
+        .strip()
+        .strip("/")
+        .replace("\\", "/")
+    )
+    _object_store_endpoint_url = os.environ.get(
+        "GOAT_OBJECT_STORE_ENDPOINT_URL", ""
+    ).strip()
+    _object_store_region = os.environ.get("GOAT_OBJECT_STORE_REGION", "").strip()
+    _object_store_access_key_id = os.environ.get(
+        "GOAT_OBJECT_STORE_ACCESS_KEY_ID", ""
+    ).strip()
+    _object_store_secret_access_key = os.environ.get(
+        "GOAT_OBJECT_STORE_SECRET_ACCESS_KEY", ""
+    ).strip()
+    _object_store_s3_addressing_style = (
+        os.environ.get("GOAT_OBJECT_STORE_S3_ADDRESSING_STYLE", "auto").strip().lower()
+    )
+    if _object_store_s3_addressing_style not in {"auto", "path", "virtual"}:
+        raise ValueError(
+            "GOAT_OBJECT_STORE_S3_ADDRESSING_STYLE must be one of: auto, path, virtual"
+        )
+    if _object_store_backend == "s3" and not _object_store_bucket:
+        raise ValueError("GOAT_OBJECT_STORE_BUCKET is required when backend is s3")
     _feature_sandbox = _env_bool("GOAT_FEATURE_CODE_SANDBOX", "false")
     _feature_agent_workbench = _env_bool("GOAT_FEATURE_AGENT_WORKBENCH", "false")
     _workbench_web_provider = (
@@ -481,6 +523,15 @@ def load_settings() -> Settings:
         ),
         label="GOAT_DATA_DIR",
     )
+    object_store_root = _resolve_env_path(
+        os.environ.get("GOAT_OBJECT_STORE_ROOT", str(data_dir)),
+        relative_to=APP_ROOT,
+    )
+    if _object_store_backend == "local":
+        object_store_root = _ensure_directory(
+            object_store_root,
+            label="GOAT_OBJECT_STORE_ROOT",
+        )
     if log_db_path.exists() and log_db_path.is_dir():
         raise ValueError(f"GOAT_LOG_PATH must point to a file path: {log_db_path}")
     log_db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -499,6 +550,17 @@ def load_settings() -> Settings:
         log_dir=log_dir,
         log_db_path=log_db_path,
         data_dir=data_dir,
+        object_store_backend=cast(ObjectStoreBackendId, _object_store_backend),
+        object_store_root=object_store_root,
+        object_store_bucket=_object_store_bucket,
+        object_store_prefix=_object_store_prefix,
+        object_store_endpoint_url=_object_store_endpoint_url,
+        object_store_region=_object_store_region,
+        object_store_access_key_id=_object_store_access_key_id,
+        object_store_secret_access_key=_object_store_secret_access_key,
+        object_store_s3_addressing_style=cast(
+            ObjectStoreS3AddressingStyle, _object_store_s3_addressing_style
+        ),
         api_key=_api_key,
         api_key_write=_api_key_write,
         api_credentials_json=_api_credentials_json,

@@ -51,8 +51,9 @@ Template:
 
 - Lightweight decision record example:
   [WORKBENCH_TERMINOLOGY_DECISION.md](../architecture/WORKBENCH_TERMINOLOGY_DECISION.md)
-- Heavy decision package example:
+- Heavy decision package examples:
   [STORAGE_EVOLUTION_DECISION_PACKAGE.md](../architecture/STORAGE_EVOLUTION_DECISION_PACKAGE.md)
+  [EXTERNAL_OBJECT_STORAGE_DECISION_PACKAGE.md](../architecture/EXTERNAL_OBJECT_STORAGE_DECISION_PACKAGE.md)
 
 ## PR guidance
 

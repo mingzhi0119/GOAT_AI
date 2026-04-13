@@ -1,9 +1,16 @@
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import MessageBubble from '../components/MessageBubble'
+import { API_KEY_STORAGE_KEY, OWNER_ID_STORAGE_KEY } from '../api/auth'
 import { brandingConfig } from '../config/branding'
 
 describe('MessageBubble', () => {
+  afterEach(() => {
+    localStorage.clear()
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
   it('renders visible user message content', () => {
     render(
       <MessageBubble message={{ id: 'm1', role: 'user', content: 'Hello from user' }} />,
@@ -34,6 +41,73 @@ describe('MessageBubble', () => {
     const link = screen.getAllByRole('link', { name: /brief\.md/i })[0]
     expect(link).toHaveAttribute('href', '/api/artifacts/art-1')
     expect(screen.getByText('128 B')).toBeInTheDocument()
+  })
+
+  it('downloads artifacts with stored protected-access headers', async () => {
+    localStorage.setItem(API_KEY_STORAGE_KEY, 'secret-123')
+    localStorage.setItem(OWNER_ID_STORAGE_KEY, 'alice')
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response('artifact body', {
+        status: 200,
+        headers: {
+          'Content-Disposition': 'attachment; filename="brief.md"',
+        },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const originalCreateObjectURL = URL.createObjectURL
+    const originalRevokeObjectURL = URL.revokeObjectURL
+    const createObjectURL = vi.fn(() => 'blob:artifact')
+    const revokeObjectURL = vi.fn()
+    Object.assign(URL, {
+      createObjectURL,
+      revokeObjectURL,
+    })
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => {})
+
+    try {
+      render(
+        <MessageBubble
+          message={{
+            id: 'm2b',
+            role: 'assistant',
+            content: '[brief.md](brief.md)',
+            artifacts: [
+              {
+                artifact_id: 'art-1',
+                filename: 'brief.md',
+                mime_type: 'text/markdown',
+                byte_size: 128,
+                download_url: '/api/artifacts/art-1',
+              },
+            ],
+          }}
+        />,
+      )
+
+      fireEvent.click(screen.getAllByRole('link', { name: /brief\.md/i })[0]!)
+
+      await waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith('/api/artifacts/art-1', {
+          method: 'GET',
+          headers: {
+            'X-GOAT-API-Key': 'secret-123',
+            'X-GOAT-Owner-Id': 'alice',
+          },
+        }),
+      )
+      expect(createObjectURL).toHaveBeenCalled()
+      expect(clickSpy).toHaveBeenCalled()
+    } finally {
+      Object.assign(URL, {
+        createObjectURL: originalCreateObjectURL,
+        revokeObjectURL: originalRevokeObjectURL,
+      })
+    }
   })
 
   it('does not render assistant markdown chrome labels for assistant messages', () => {

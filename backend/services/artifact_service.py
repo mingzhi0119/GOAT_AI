@@ -22,6 +22,12 @@ from openpyxl.styles import Alignment
 from backend.models.artifact import ChatArtifact
 from backend.services.exceptions import ArtifactNotFound
 from backend.types import Settings
+from goat_ai.uploads import (
+    ObjectStore,
+    ObjectNotFoundError,
+    artifact_object_key,
+    build_object_store,
+)
 
 _ARTIFACT_LINK_RE = re.compile(
     r"\[([^\]]+)\]\(([^)\s]+\.(?:md|txt|csv|xlsx|docx))\)",
@@ -48,6 +54,7 @@ class PersistedArtifactRecord:
     storage_path: str
     source_message_index: int
     created_at: str
+    storage_key: str = ""
     tenant_id: str = "tenant:default"
     principal_id: str = ""
 
@@ -119,13 +126,16 @@ def persist_artifact(
     principal_id: str,
     source_message_index: int,
     register_artifact: Callable[[PersistedArtifactRecord], None],
+    object_store: ObjectStore | None = None,
 ) -> PersistedArtifactRecord:
     """Persist one artifact file and register it via the caller-supplied repository hook."""
     artifact_id = f"art-{uuid4().hex}"
-    base = settings.data_dir / "uploads" / "artifacts" / artifact_id
-    base.mkdir(parents=True, exist_ok=True)
-    target = base / prepared.filename
-    target.write_bytes(prepared.content)
+    target_key = artifact_storage_key(
+        artifact_id=artifact_id,
+        filename=prepared.filename,
+    )
+    store = object_store or build_object_store(settings)
+    stored = store.put_bytes(storage_key=target_key, content=prepared.content)
     record = PersistedArtifactRecord(
         id=artifact_id,
         session_id=session_id,
@@ -133,7 +143,8 @@ def persist_artifact(
         filename=prepared.filename,
         mime_type=prepared.mime_type,
         byte_size=len(prepared.content),
-        storage_path=str(target),
+        storage_path=str(stored.filesystem_path or ""),
+        storage_key=stored.storage_key,
         source_message_index=source_message_index,
         created_at=_now_iso(),
         tenant_id=tenant_id,
@@ -143,11 +154,8 @@ def persist_artifact(
         register_artifact(record)
     except Exception:
         try:
-            if target.exists():
-                target.unlink()
-            if base.is_dir():
-                base.rmdir()
-        except OSError:
+            store.delete(stored.storage_key)
+        except Exception:
             pass
         raise
     return record
@@ -205,9 +213,38 @@ def load_artifact_for_download(
         and record.owner_id != request_owner
     ):
         raise ArtifactNotFound("Chat artifact not found.")
-    if not Path(record.storage_path).is_file():
+    if not artifact_exists(record=record, settings=settings):
         raise ArtifactNotFound("Chat artifact not found.")
     return record
+
+
+def artifact_storage_key(*, artifact_id: str, filename: str) -> str:
+    safe_name = Path(filename).name or "artifact.bin"
+    return artifact_object_key(artifact_id=artifact_id, filename=safe_name)
+
+
+def artifact_exists(*, record: PersistedArtifactRecord, settings: Settings) -> bool:
+    if record.storage_key:
+        if build_object_store(settings).exists(record.storage_key):
+            return True
+    if record.storage_path:
+        return Path(record.storage_path).is_file()
+    return False
+
+
+def read_artifact_bytes(
+    *, record: PersistedArtifactRecord, settings: Settings
+) -> bytes:
+    if record.storage_key:
+        try:
+            return build_object_store(settings).read_bytes(record.storage_key)
+        except ObjectNotFoundError:
+            pass
+    if record.storage_path:
+        path = Path(record.storage_path)
+        if path.is_file():
+            return path.read_bytes()
+    raise ArtifactNotFound("Chat artifact not found.")
 
 
 def _extract_artifact_candidates(*, assistant_text: str) -> list[PreparedArtifact]:
