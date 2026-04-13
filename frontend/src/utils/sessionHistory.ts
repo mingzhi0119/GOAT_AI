@@ -1,6 +1,6 @@
 import type { HistorySessionDetail } from '../api/history'
 import type { Message } from '../api/types'
-import type { FileContextItem } from '../hooks/useFileContext'
+import type { FileContextItem } from './fileContextTypes'
 
 export const FILE_CONTEXT_REPLY = 'I have loaded the file context.'
 

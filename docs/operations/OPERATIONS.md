@@ -60,6 +60,7 @@ Frontend:
 cd frontend
 npm ci
 npm run lint
+npm run depcruise
 npm run contract:check
 npx playwright install --with-deps chromium
 npm run test:e2e
@@ -74,6 +75,8 @@ API key and, when required, the owner ID. The SPA stores those values locally in
 the browser and attaches `X-GOAT-API-Key` / `X-GOAT-Owner-Id` to runtime API calls.
 Frontend API contract types are generated from `docs/api/openapi.json`; refresh them
 with `npm run contract:generate` whenever the backend contract changes.
+`npm run depcruise` enforces the frontend-only import-direction and cycle guardrails; keep
+new network calls inside `src/api/` rather than bypassing typed adapters from hooks or components.
 
 ### Windows desktop prerequisites
 
