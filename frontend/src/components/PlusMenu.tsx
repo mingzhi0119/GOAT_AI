@@ -6,7 +6,7 @@ import {
   type KeyboardEvent,
   type RefObject,
 } from 'react'
-import type { CodeSandboxFeature } from '../api/types'
+import type { CodeSandboxFeature, RuntimeFeature } from '../api/types'
 import {
   ChevronRightIcon,
   CodeSandboxIcon,
@@ -23,6 +23,8 @@ interface PlusMenuProps {
   triggerRef?: RefObject<HTMLButtonElement | null>
   codeSandboxFeature: CodeSandboxFeature | null
   planModeEnabled: boolean
+  planModeAvailability?: string
+  planModeFeature?: RuntimeFeature | null
   supportsThinking: boolean
   thinkingEnabled: boolean
   onClose: () => void
@@ -47,6 +49,8 @@ export default function PlusMenu({
   triggerRef,
   codeSandboxFeature,
   planModeEnabled,
+  planModeAvailability,
+  planModeFeature,
   supportsThinking,
   thinkingEnabled,
   onClose,
@@ -70,6 +74,10 @@ export default function PlusMenu({
 
   if (!isOpen) return null
 
+  const planModeCapabilityKnown = planModeFeature !== undefined
+  const planModeAvailable = planModeFeature
+    ? !!planModeFeature.effective_enabled
+    : !planModeCapabilityKnown
   const codeSandboxEnabled =
     !!codeSandboxFeature?.policy_allowed && !!codeSandboxFeature?.effective_enabled
   const localhostFallback = codeSandboxFeature?.provider_name === 'localhost'
@@ -88,6 +96,11 @@ export default function PlusMenu({
         : localhostFallback
           ? 'Run a short shell snippet on the local host shell (trusted-dev fallback)'
           : 'Run a short shell snippet in an isolated, no-network sandbox'
+  const planModeReason =
+    planModeAvailability ??
+    (planModeAvailable
+      ? 'Backend planning runtime is ready for this caller'
+      : 'Checking backend planning readiness')
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'Escape') return
@@ -188,21 +201,27 @@ export default function PlusMenu({
           </span>
           <span>
             <span className="block text-[13px] font-medium leading-none">Plan Mode</span>
-            <span className="block text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
-              Frontend feature flag for planning flows
+            <span className="block text-xs" style={{ color: 'var(--text-muted)' }}>
+              {planModeReason}
             </span>
           </span>
         </span>
         <button
           type="button"
           role="switch"
-          aria-label="Plan mode"
+          aria-label={
+            planModeAvailable ? 'Plan mode' : `Plan mode unavailable: ${planModeReason}`
+          }
           aria-checked={planModeEnabled}
-          onClick={onTogglePlanMode}
-          className="relative inline-flex h-5 w-[34px] items-center rounded-full transition-colors"
+          disabled={!planModeAvailable}
+          onClick={() => {
+            if (!planModeAvailable) return
+            onTogglePlanMode()
+          }}
+          className="relative inline-flex h-5 w-[34px] items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-70"
           style={{
             background: planModeEnabled ? '#3b82f6' : 'rgba(15,23,42,0.12)',
-            cursor: 'default',
+            cursor: planModeAvailable ? 'default' : 'not-allowed',
           }}
         >
           <span

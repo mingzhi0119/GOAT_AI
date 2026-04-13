@@ -19,6 +19,7 @@ interface ComposerControlsProps {
   supportsThinking: boolean
   thinkingEnabled: boolean
   planModeEnabled: boolean
+  planModeAvailable?: boolean
   onPlanModeChange: (enabled: boolean) => void
   plusMenuOpen: boolean
   modelMenuOpen: boolean
@@ -63,6 +64,7 @@ export default function ComposerControls({
   supportsThinking,
   thinkingEnabled,
   planModeEnabled,
+  planModeAvailable = true,
   onPlanModeChange,
   plusMenuOpen,
   modelMenuOpen,
@@ -166,7 +168,7 @@ export default function ComposerControls({
             </span>
           </button>
 
-          {planModeEnabled && (
+          {planModeAvailable && planModeEnabled && (
             <button
               type="button"
               className="relative inline-flex shrink-0 items-center gap-1 text-[13px] font-medium"

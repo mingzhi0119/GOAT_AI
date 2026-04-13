@@ -82,6 +82,51 @@ describe('PlusMenu', () => {
     expect(screen.getByRole('button', { name: /code sandbox unavailable/i })).toBeDisabled()
   })
 
+  it('keeps plan mode read-only when backend capability is unavailable', () => {
+    const onTogglePlanMode = vi.fn()
+
+    render(
+      <PlusMenu
+        isOpen={true}
+        isNarrow={false}
+        panelId="plus-menu"
+        codeSandboxFeature={{
+          policy_allowed: true,
+          allowed_by_config: true,
+          available_on_host: true,
+          effective_enabled: true,
+          provider_name: 'docker',
+          isolation_level: 'container',
+          network_policy_enforced: true,
+          deny_reason: null,
+        }}
+        planModeEnabled={false}
+        planModeAvailability="Disabled in this deployment configuration"
+        planModeFeature={{
+          allowed_by_config: false,
+          available_on_host: true,
+          effective_enabled: false,
+          deny_reason: null,
+        }}
+        supportsThinking={false}
+        thinkingEnabled={false}
+        onClose={vi.fn()}
+        onOpenCodeSandbox={vi.fn()}
+        onUploadFiles={vi.fn()}
+        onOpenManageUploads={vi.fn()}
+        onTogglePlanMode={onTogglePlanMode}
+        onToggleThinkingMode={vi.fn()}
+      />,
+    )
+
+    const planSwitch = screen.getByRole('switch', { name: /plan mode unavailable/i })
+    expect(planSwitch).toBeDisabled()
+    expect(screen.getByText('Disabled in this deployment configuration')).toBeInTheDocument()
+
+    fireEvent.click(planSwitch)
+    expect(onTogglePlanMode).not.toHaveBeenCalled()
+  })
+
   it('renders larger chevrons for submenu-style actions', () => {
     const { container } = render(
         <PlusMenu

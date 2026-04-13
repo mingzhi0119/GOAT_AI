@@ -261,4 +261,66 @@ describe('App protected access integration', () => {
     })
     expect(assistantReplies.length).toBeGreaterThan(0)
   })
+
+  it('refreshes capability discovery when protected access headers change', async () => {
+    const mockedFetch = buildFetchMock()
+    vi.stubGlobal('fetch', mockedFetch)
+
+    renderApp()
+    await waitForStartupFetches(mockedFetch)
+
+    const featureCallsBefore = mockedFetch.mock.calls.filter(
+      ([url]) => url === './api/system/features',
+    ).length
+
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+    fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'secret-rotated' } })
+    fireEvent.change(screen.getByLabelText('Owner ID'), { target: { value: 'owner-rotated' } })
+
+    await waitFor(() => {
+      const featureCalls = mockedFetch.mock.calls.filter(
+        ([url]) => url === './api/system/features',
+      )
+      expect(featureCalls.length).toBeGreaterThan(featureCallsBefore)
+    })
+
+    const featureCalls = mockedFetch.mock.calls.filter(([url]) => url === './api/system/features')
+    const latestFeatureCall = featureCalls[featureCalls.length - 1]
+    expect(latestFeatureCall?.[1]).toMatchObject({
+      headers: {
+        'X-GOAT-API-Key': 'secret-rotated',
+        'X-GOAT-Owner-Id': 'owner-rotated',
+      },
+    })
+  })
+
+  it('keeps plan mode disabled when backend capability discovery says it is unavailable', async () => {
+    const mockedFetch = buildFetchMock()
+    vi.stubGlobal('fetch', mockedFetch)
+
+    renderApp()
+    await waitForStartupFetches(mockedFetch)
+
+    fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
+
+    const planModeSwitch = screen.getByRole('switch', { name: /plan mode unavailable/i })
+    expect(planModeSwitch).toBeDisabled()
+    expect(screen.getByText('Disabled in this deployment configuration')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByPlaceholderText('Message GOAT'), {
+      target: { value: 'Tell me something careful' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+
+    await waitFor(() => {
+      expect(findCall(mockedFetch, './api/chat')).toBeTruthy()
+    })
+
+    const chatCall = findCall(mockedFetch, './api/chat')
+    const requestBody = JSON.parse(String(chatCall?.[1]?.body ?? '{}')) as {
+      plan_mode?: boolean
+    }
+    expect(requestBody.plan_mode).toBe(false)
+    expect(screen.queryByRole('button', { name: /plan enabled/i })).not.toBeInTheDocument()
+  })
 })

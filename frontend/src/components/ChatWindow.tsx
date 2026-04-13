@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, type FC } from 'react'
 import type { UploadStreamEvent } from '../api/upload'
 import type { GPUStatus, InferenceLatency } from '../api/system'
-import type { ChartSpec, CodeSandboxFeature, Message } from '../api/types'
+import type { ChartSpec, CodeSandboxFeature, Message, RuntimeFeature } from '../api/types'
 import type { FileBindingMode, FileContextItem } from '../hooks/useFileContext'
 import ChatComposer from './ChatComposer'
 import EmptyChatState, { type EmptyChatPrompt } from './EmptyChatState'
@@ -35,6 +35,9 @@ interface Props {
   inferenceLatency: InferenceLatency | null
   codeSandboxFeature: CodeSandboxFeature | null
   planModeEnabled: boolean
+  planModeAvailable?: boolean
+  planModeAvailability?: string
+  planModeFeature?: RuntimeFeature | null
   onPlanModeChange: (enabled: boolean) => void
   reasoningLevel: ReasoningLevel
   onReasoningLevelChange: (level: ReasoningLevel) => void
@@ -64,6 +67,9 @@ const ChatWindow: FC<Props> = ({
   inferenceLatency,
   codeSandboxFeature,
   planModeEnabled,
+  planModeAvailable = true,
+  planModeAvailability,
+  planModeFeature,
   onPlanModeChange,
   reasoningLevel,
   onReasoningLevelChange,
@@ -190,6 +196,9 @@ const ChatWindow: FC<Props> = ({
         inferenceLatency={inferenceLatency}
         codeSandboxFeature={codeSandboxFeature}
         planModeEnabled={planModeEnabled}
+        planModeAvailable={planModeAvailable}
+        planModeAvailability={planModeAvailability}
+        planModeFeature={planModeFeature}
         onPlanModeChange={onPlanModeChange}
         reasoningLevel={reasoningLevel}
         onReasoningLevelChange={onReasoningLevelChange}

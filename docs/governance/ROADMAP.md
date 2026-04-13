@@ -146,7 +146,7 @@ Desktop shell scaffolding and packaged backend sidecar are already landed and ar
 
 ### UI surfaces waiting on backend/runtime
 
-These items should remain roadmap-only in the frontend until the corresponding backend/runtime slice exists.
+These items should remain roadmap-only in the frontend until the corresponding backend/runtime slice exists. The shipped UI now treats `/api/system/features` as the capability truth for currently exposed workbench affordances, so future placeholders should stay hidden or diagnostic-only until the backend path is mechanically proven.
 
 - Cloud model API integration for non-local inference backends
 - Real Search / Browse mode

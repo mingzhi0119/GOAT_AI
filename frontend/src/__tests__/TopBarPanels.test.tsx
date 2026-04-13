@@ -147,6 +147,53 @@ describe('TopBarPanels', () => {
     expect(screen.getByText('C:/GOAT/Desktop/logs/desktop-shell.log')).toBeInTheDocument()
   })
 
+  it('keeps desktop diagnostics read-only when packaged runtime is absent', () => {
+    render(
+      <SettingsPanel
+        panelId="settings-panel"
+        triggerId="settings-trigger"
+        appearanceSummary="Classic System"
+        advancedOpen={false}
+        desktopDiagnostics={{
+          desktop_mode: false,
+          backend_base_url: null,
+          readiness_ok: null,
+          failing_checks: [],
+          skipped_checks: [],
+          code_sandbox_effective_enabled: null,
+          workbench_effective_enabled: null,
+          app_data_dir: null,
+          runtime_root: null,
+          data_dir: null,
+          log_dir: null,
+          log_db_path: null,
+          packaged_shell_log_path: null,
+        }}
+        apiKey=""
+        ownerId=""
+        systemInstruction=""
+        temperature={0.7}
+        maxTokens={1024}
+        topP={0.9}
+        onApiKeyChange={vi.fn()}
+        onOwnerIdChange={vi.fn()}
+        onSystemInstructionChange={vi.fn()}
+        onAdvancedOpenChange={vi.fn()}
+        onTemperatureChange={vi.fn()}
+        onMaxTokensChange={vi.fn()}
+        onTopPChange={vi.fn()}
+        onResetAdvanced={vi.fn()}
+        onOpenAppearance={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText(/read-only diagnostics/i)).toBeInTheDocument()
+    expect(screen.getByText('Desktop runtime not detected in this deployment.')).toBeInTheDocument()
+    expect(screen.queryByText('Summary')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Workbench on/i)).not.toBeInTheDocument()
+  })
+
   it('supports Escape close and focus cycling inside settings', async () => {
     const onClose = vi.fn()
 

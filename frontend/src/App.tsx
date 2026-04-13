@@ -15,12 +15,26 @@ import { useSystemFeatures } from './hooks/useSystemFeatures'
 import { useUserName } from './hooks/useUserName'
 import { getChatLayoutDecisions } from './utils/chatLayout'
 import { downloadChatAsMarkdown } from './utils/exportChatMarkdown'
+import type { RuntimeFeature } from './api/types'
 import ChatWindow from './components/ChatWindow'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
 
 const LazyAppearancePanel = lazy(() => import('./components/AppearancePanel'))
+
+function describePlanModeAvailability(feature: RuntimeFeature | null): string {
+  if (!feature) return 'Checking backend planning readiness'
+  if (feature.effective_enabled) return 'Backend planning runtime is ready for this caller'
+  if (feature.deny_reason === 'permission_denied') return 'Not available for this API key'
+  if (feature.deny_reason === 'disabled_by_operator') {
+    return 'Disabled by the operator on this deployment'
+  }
+  if (feature.deny_reason === 'not_implemented') return 'Not available on this deployment yet'
+  if (!feature.allowed_by_config) return 'Disabled in this deployment configuration'
+  if (!feature.available_on_host) return 'Backend planning runtime is not ready on this deployment'
+  return 'Backend planning runtime is unavailable on this deployment'
+}
 
 /** Root application: compose stateful controllers and render the shell UI. */
 export default function App() {
@@ -41,6 +55,7 @@ export default function App() {
   const { ownerId, setOwnerId } = useOwnerId()
   const { userName, setUserName } = useUserName()
   const { systemInstruction, setSystemInstruction } = useSystemInstruction()
+  const systemFeatureRefreshKey = `${apiKey}\n${ownerId}`
   const advanced = useAdvancedSettings()
   const ollamaOptions = advanced.getOptionsForRequest(
     effectiveThinkingEnabled ? reasoningLevel : false,
@@ -54,7 +69,10 @@ export default function App() {
     ollamaOptions,
   })
   const gpu = useGpuStatus(session.isStreaming)
-  const systemFeatures = useSystemFeatures()
+  const systemFeatures = useSystemFeatures(systemFeatureRefreshKey)
+  const planModeFeature = systemFeatures.features?.workbench.plan_mode ?? null
+  const planModeAvailable = !!planModeFeature?.effective_enabled
+  const planModeAvailability = describePlanModeAvailability(planModeFeature)
   const desktopDiagnostics = useDesktopDiagnostics()
   const {
     handleDeleteAllHistory,
@@ -71,6 +89,12 @@ export default function App() {
   useEffect(() => {
     setSidebarOpen(chatLayout.sidebarBehavior === 'docked')
   }, [chatLayout.sidebarBehavior])
+
+  useEffect(() => {
+    if (!planModeAvailable && planModeEnabled) {
+      setPlanModeEnabled(false)
+    }
+  }, [planModeAvailable, planModeEnabled])
 
   return (
     <div className="relative flex h-screen overflow-hidden" style={{ background: 'var(--bg-main)' }}>
@@ -164,6 +188,9 @@ export default function App() {
             inferenceLatency={gpu.inference}
             codeSandboxFeature={systemFeatures.features?.code_sandbox ?? null}
             planModeEnabled={planModeEnabled}
+            planModeAvailable={planModeAvailable}
+            planModeAvailability={planModeAvailability}
+            planModeFeature={planModeFeature}
             onPlanModeChange={setPlanModeEnabled}
             reasoningLevel={reasoningLevel}
             onReasoningLevelChange={setReasoningLevel}
