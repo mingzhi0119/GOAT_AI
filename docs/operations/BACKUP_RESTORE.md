@@ -37,7 +37,13 @@ python -m tools.ops.backup_chat_db --src /path/to/chat_logs.db --dest-dir /path/
    - local backend: copy or snapshot `GOAT_OBJECT_STORE_ROOT`
    - `s3` backend: capture a provider-native snapshot/version set for the configured
      bucket/prefix
-4. Record the SQLite backup filename and the object-store snapshot identifier
+4. Export a deterministic runtime metadata snapshot for the same SQLite window:
+
+```bash
+python -m tools.ops.export_runtime_metadata_snapshot --out /path/to/backups/runtime_metadata_YYYYMMDD_HHMMSS.json
+```
+
+5. Record the SQLite backup filename, the runtime metadata snapshot filename, and the object-store snapshot identifier
    together. They are one restore set.
 
 ## 2) Verify backup integrity
@@ -59,6 +65,14 @@ SQLite recovery drill:
 ```bash
 python -m tools.ops.exercise_recovery_drill --src /path/to/chat_logs.db --backup-dir /path/to/backups --required-table sessions --required-table session_messages
 ```
+
+Runtime metadata snapshot verification:
+
+- `python -m tools.ops.export_runtime_metadata_snapshot` should succeed against the
+  chosen backup candidate before you treat it as migration-ready
+- the exported JSON should include the full governed table family, including
+  sessions, artifacts, knowledge/media metadata, workbench tasks/events/outputs,
+  sandbox executions/events/logs, idempotency rows, and `schema_migrations`
 
 Object-payload verification:
 
@@ -103,6 +117,7 @@ before re-opening writes.
 
 - SQLite backup is online-safe via `sqlite3.Connection.backup()` in
   `tools/ops/backup_chat_db.py`.
+- `python -m tools.ops.export_runtime_metadata_snapshot` is the deterministic runtime metadata snapshot path for current Phase 16D parity work; keep it paired with the raw SQLite backup rather than treating it as a replacement.
 - `python -m tools.ops.exercise_recovery_drill` remains the preferred non-production
   rehearsal path for SQLite because it verifies backup integrity, restore bytes, and
   rollback bytes together instead of relying on a handwritten copy sequence.

@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from __tests__.helpers.repo_root import repo_root
 from backend.services.db_migrations import apply_migrations
+from backend.services.runtime_metadata_inventory import RUNTIME_METADATA_TABLES
 
 _REPO_MIGRATIONS = repo_root(Path(__file__)) / "backend" / "migrations"
 
@@ -195,6 +196,13 @@ class DbMigrationsTests(unittest.TestCase):
                 self.assertIn("seq", sandbox_log_cols)
                 self.assertIn("stream_name", sandbox_log_cols)
                 self.assertIn("chunk_text", sandbox_log_cols)
+                table_names = {
+                    str(row[0])
+                    for row in conn.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table'"
+                    ).fetchall()
+                }
+                self.assertTrue(set(RUNTIME_METADATA_TABLES) <= table_names)
             finally:
                 conn.close()
 

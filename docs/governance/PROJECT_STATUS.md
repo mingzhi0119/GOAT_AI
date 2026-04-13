@@ -85,7 +85,7 @@ Last updated: 2026-04-13
 - project memory and connectors are not implemented yet
 - future workbench, connector, and project-memory widening is now governed by the admission gate in `docs/standards/ENGINEERING_STANDARDS.md` rather than by roadmap notes alone
 - runtime metadata remains SQLite-first and single-writer by design, while persisted blobs now flow through the local/S3 object-store boundary
-- Phase 16D Postgres runtime persistence is not shipped; the current pre-implementation boundary now lives in `docs/architecture/POSTGRES_RUNTIME_PERSISTENCE_DECISION_PACKAGE.md`
+- Phase 16D Postgres runtime persistence is not shipped; the current pre-implementation boundary now lives in `docs/architecture/POSTGRES_RUNTIME_PERSISTENCE_DECISION_PACKAGE.md`, while backend-selection seams and deterministic SQLite runtime snapshot export are now landed groundwork only
 - Windows desktop packaging, signing, and provenance are ahead of macOS/Linux public packaged validation
 - pre-ready desktop restart/backoff is shipped, and the packaged-shell fault smoke in `desktop-package-windows` is now path-scoped, merge-blocking, and retention-backed for desktop-related changes
 - installed Windows startup evidence now stays auditable across release and scheduled workflows: signed installer validation lives in `.github/workflows/desktop-provenance.yml`, recurring installer drift detection lives in `.github/workflows/fault-injection.yml`, and both retain structured failure artifacts even when the drill fails

@@ -135,6 +135,16 @@ Implementation must follow these rules:
   - `docs/operations/OPERATIONS.md`
   - `docs/operations/BACKUP_RESTORE.md`
   - `docs/operations/ROLLBACK.md`
+  - `python -m tools.ops.export_runtime_metadata_snapshot`
+
+Current landed groundwork for this package:
+
+- runtime backend selection and fail-fast seams now live in
+  `goat_ai/config/settings.py` plus `backend/services/runtime_persistence.py`
+- the governed runtime metadata family now has one canonical inventory in
+  `backend/services/runtime_metadata_inventory.py`
+- deterministic SQLite export proof now starts with
+  `python -m tools.ops.export_runtime_metadata_snapshot`
 
 ## Open questions
 
