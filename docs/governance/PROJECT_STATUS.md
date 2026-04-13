@@ -43,6 +43,7 @@ Last updated: 2026-04-13
 - session-bound workspace outputs now restore through history reads, outputs can be reopened directly by durable id, and outputs can be exported into downloadable artifacts
 - declarative workbench source registry with `knowledge` ready and experimental DDGS-backed `web` retrieval now runtime-ready
 - bounded LangGraph-backed multi-step research for `browse` and `deep_research`, with durable plan/retrieval/follow-up/synthesis events and a private rollback switch to the legacy single-pass path
+- caller-scoped `project_memory` retrieval plus operator-provisioned read-only connector bindings are now part of the shipped source registry and bounded browse/deep-research runtime foundation
 - durable code sandbox execution with persisted events and replayable logs
 - Docker-first isolation with `localhost` as an explicit trusted-dev fallback
 
@@ -83,7 +84,7 @@ Last updated: 2026-04-13
 ## Current known boundaries
 
 - workbench browse/deep-research now use a bounded multi-step LangGraph loop rather than the earlier single-pass evidence brief, but the runtime is still intentionally step-limited instead of open-ended autonomous research
-- project memory and connectors are not implemented yet
+- read-only project memory and static connector bindings are shipped, but write-capable connectors, live remote adapters, and any project-memory mutation flow remain future work
 - future workbench, connector, and project-memory widening is now governed by the admission gate in `docs/standards/ENGINEERING_STANDARDS.md` rather than by roadmap notes alone
 - runtime metadata now supports an opt-in hosted/server Postgres backend with Alembic-owned schema truth and deterministic SQLite snapshot import/parity tooling, while local and desktop remain SQLite-first by design
 - Windows desktop packaging, signing, and provenance are ahead of macOS/Linux public packaged validation
@@ -97,7 +98,7 @@ Last updated: 2026-04-13
 
 - **16B/16C storage evolution:** complete; repository ownership boundaries are explicit across sessions, artifacts, knowledge, media, workbench, and sandbox, persisted blobs now use `storage_key` plus the local/S3 object-store boundary
 - **16D Postgres-backed runtime persistence:** complete for the hosted/server opt-in path; Alembic owns the Postgres runtime schema, repository adapters preserve the existing contracts, and SQLite snapshot export/import/parity plus rollback runbooks now anchor cutover proof
-- **17 runtime platform:** the shipped baseline includes durable workbench tasks, canvas/workspace-output persistence, session restoration, direct output reopen, output-to-artifact export linkage, experimental DDGS-backed public-web retrieval, and bounded LangGraph-backed multi-step research for browse/deep-research
+- **17 runtime platform:** the shipped baseline includes durable workbench tasks, canvas/workspace-output persistence, session restoration, direct output reopen, output-to-artifact export linkage, experimental DDGS-backed public-web retrieval, bounded LangGraph-backed multi-step research for browse/deep-research, read-only `project_memory` retrieval, and caller-scoped static connector bindings
 - **18 sandbox follow-ons:** the shipped baseline includes the Docker-first sandbox MVP, queued-only async control-plane behavior, durable execution/event storage, and replayable sandbox logs
 - **19 desktop maturity:** the shipped baseline includes signed Windows packaging, packaged-desktop validation, installed Windows evidence retention, and pre-ready startup fault handling
 - **governance tooling follow-ons:** decision records and PR guidance are landed, frontend-only `dependency-cruiser` is merge-blocking, current shipped frontend API adapters now validate JSON and current SSE boundaries through shared runtime parsers, and lightweight feature specs are available as a non-canonical pilot for complex brownfield changes

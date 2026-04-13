@@ -570,8 +570,8 @@ schemas:
     properties:
       source_id: string
       display_name: string
-      kind: builtin|knowledge|connector
-      scope_kind: global|knowledge_documents|connector_binding
+      kind: builtin|knowledge|connector|project_memory
+      scope_kind: global|knowledge_documents|connector_binding|project_scope
       capabilities: string[]
       task_kinds: plan|browse|deep_research|canvas[]
       read_only: boolean

@@ -1830,13 +1830,13 @@ export interface components {
              * @description High-level source family.
              * @enum {string}
              */
-            kind: "builtin" | "knowledge" | "connector";
+            kind: "builtin" | "knowledge" | "connector" | "project_memory";
             /**
              * Scope Kind
              * @description Whether the source is global, document-scoped, or connector-bound.
              * @enum {string}
              */
-            scope_kind: "global" | "knowledge_documents" | "connector_binding";
+            scope_kind: "global" | "knowledge_documents" | "connector_binding" | "project_scope";
             /**
              * Capabilities
              * @description Declared retrieval capabilities such as search, fetch, and citations.

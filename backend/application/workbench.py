@@ -184,6 +184,17 @@ def _ensure_sources_support_task_kind(
         )
 
 
+def _ensure_source_requirements(
+    *,
+    project_id: str | None,
+    sources: list[WorkbenchSourceDescriptor],
+) -> None:
+    if any(source.requires_project_id for source in sources) and not project_id:
+        raise WorkbenchSourceValidationError(
+            "Requested workbench sources require project_id: project_memory."
+        )
+
+
 def _build_task_create_payload(
     *,
     task_id: str,
@@ -290,6 +301,10 @@ def create_workbench_task(
         raise WorkbenchSourceValidationError(str(exc)) from exc
     _ensure_sources_support_task_kind(
         task_kind=request.task_kind,
+        sources=resolved_sources,
+    )
+    _ensure_source_requirements(
+        project_id=request.project_id,
         sources=resolved_sources,
     )
     if request.task_kind in {"browse", "deep_research"} and not any(
@@ -434,6 +449,10 @@ def retry_workbench_task(
         raise WorkbenchSourceValidationError(str(exc)) from exc
     _ensure_sources_support_task_kind(
         task_kind=task.task_kind,
+        sources=resolved_sources,
+    )
+    _ensure_source_requirements(
+        project_id=task.project_id,
         sources=resolved_sources,
     )
     now = _utc_now()

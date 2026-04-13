@@ -6,6 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Literal, cast
 
+from goat_ai.shared.workbench_connector_bindings import (
+    parse_workbench_connector_bindings_json,
+)
+
 _PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 APP_ROOT = _PACKAGE_ROOT.parent
 DEFAULT_RUNTIME_ROOT = APP_ROOT / "var"
@@ -262,6 +266,7 @@ class Settings:
     workbench_langgraph_enabled: bool = True
     workbench_browse_max_steps: int = 2
     workbench_deep_research_max_steps: int = 3
+    workbench_connector_bindings_json: str = ""
     docker_socket_path: str = ""
     code_sandbox_default_image: str = "python:3.12-slim"
     code_sandbox_localhost_shell: str = ""
@@ -448,6 +453,9 @@ def load_settings() -> Settings:
     _workbench_deep_research_max_steps = int(
         os.environ.get("GOAT_WORKBENCH_DEEP_RESEARCH_MAX_STEPS", "3")
     )
+    _workbench_connector_bindings_json = os.environ.get(
+        "GOAT_WORKBENCH_CONNECTOR_BINDINGS_JSON", ""
+    ).strip()
     _sandbox_provider = (
         os.environ.get("GOAT_CODE_SANDBOX_PROVIDER", "docker").strip().lower()
     )
@@ -508,6 +516,8 @@ def load_settings() -> Settings:
         raise ValueError(
             "GOAT_WORKBENCH_DEEP_RESEARCH_MAX_STEPS must be between 1 and 6"
         )
+    if _workbench_connector_bindings_json:
+        parse_workbench_connector_bindings_json(_workbench_connector_bindings_json)
     if _sandbox_default_timeout < 1:
         raise ValueError("GOAT_CODE_SANDBOX_DEFAULT_TIMEOUT_SEC must be >= 1")
     if _sandbox_max_timeout < _sandbox_default_timeout:
@@ -641,6 +651,7 @@ def load_settings() -> Settings:
         workbench_langgraph_enabled=_workbench_langgraph_enabled,
         workbench_browse_max_steps=_workbench_browse_max_steps,
         workbench_deep_research_max_steps=_workbench_deep_research_max_steps,
+        workbench_connector_bindings_json=_workbench_connector_bindings_json,
         code_sandbox_provider=cast(CodeSandboxProviderId, _sandbox_provider),
         docker_socket_path=_docker_sock,
         code_sandbox_default_image=_sandbox_image,

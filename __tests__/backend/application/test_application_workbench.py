@@ -844,6 +844,45 @@ class ApplicationWorkbenchTests(unittest.TestCase):
                 auth_context=_auth_context(),
             )
 
+    def test_create_workbench_task_rejects_project_memory_without_project_id(
+        self,
+    ) -> None:
+        repository = _FakeRepository()
+        project_memory_source = WorkbenchSourceDescriptor(
+            source_id="project_memory",
+            display_name="Project Memory",
+            kind="project_memory",
+            scope_kind="project_scope",
+            capabilities=("search", "citations"),
+            task_kinds=("browse", "deep_research"),
+            read_only=True,
+            runtime_ready=True,
+            deny_reason=None,
+            description="project memory",
+            requires_project_id=True,
+        )
+
+        from unittest.mock import patch
+
+        with patch(
+            "backend.application.workbench.resolve_requested_sources",
+            return_value=[project_memory_source],
+        ):
+            with self.assertRaisesRegex(
+                WorkbenchSourceValidationError,
+                "require project_id",
+            ):
+                create_workbench_task(
+                    request=WorkbenchTaskRequest(
+                        task_kind="browse",
+                        prompt="Search project memory",
+                        source_ids=["project_memory"],
+                    ),
+                    repository=repository,
+                    settings=_settings(),
+                    auth_context=_auth_context(),
+                )
+
     def test_get_workbench_workspace_output_conceals_unauthorized_records(self) -> None:
         repository = _FakeRepository()
         repository.workspace_outputs = [

@@ -20,6 +20,7 @@ from backend.services.workbench_web_search import (
 from backend.services.workbench_runtime import (
     SQLiteWorkbenchTaskRepository,
     WorkbenchTaskCreatePayload,
+    WorkbenchWorkspaceOutputCreatePayload,
 )
 from backend.services.workbench_source_registry import WorkbenchSourceDescriptor
 from goat_ai.config.settings import Settings
@@ -80,6 +81,8 @@ class WorkbenchExecutionServiceTests(unittest.TestCase):
         task_kind: str,
         source_ids: list[str] | None = None,
         knowledge_document_ids: list[str] | None = None,
+        project_id: str | None = None,
+        auth_scopes: list[str] | None = None,
     ) -> None:
         self.repository.create_task(
             WorkbenchTaskCreatePayload(
@@ -87,7 +90,7 @@ class WorkbenchExecutionServiceTests(unittest.TestCase):
                 task_kind=task_kind,
                 prompt="Investigate the docs",
                 session_id=None,
-                project_id=None,
+                project_id=project_id,
                 knowledge_document_ids=list(knowledge_document_ids or []),
                 connector_ids=[],
                 source_ids=list(source_ids or []),
@@ -96,7 +99,7 @@ class WorkbenchExecutionServiceTests(unittest.TestCase):
                 owner_id="owner-1",
                 tenant_id="tenant-1",
                 principal_id="principal-1",
-                auth_scopes=["workbench:read", "knowledge:read"],
+                auth_scopes=list(auth_scopes or ["workbench:read", "knowledge:read"]),
                 credential_id="cred-1",
                 auth_mode="api_key",
             )
@@ -308,6 +311,153 @@ class WorkbenchExecutionServiceTests(unittest.TestCase):
         self.assertIn(
             "research.synthesis.completed", [event.event_type for event in events]
         )
+
+    def test_browse_task_completes_with_project_memory_citations(self) -> None:
+        self._create_task(
+            task_id="wb-project-memory",
+            task_kind="browse",
+            source_ids=["project_memory"],
+            project_id="project-1",
+        )
+        self._create_task(
+            task_id="wb-project-seed",
+            task_kind="canvas",
+            project_id="project-1",
+        )
+        self.repository.create_workspace_output(
+            WorkbenchWorkspaceOutputCreatePayload(
+                output_id="wbo-project-1",
+                task_id="wb-project-seed",
+                output_kind="canvas_document",
+                title="Launch plan",
+                content_format="markdown",
+                content_text="Investigate the docs and timeline risks for the launch.",
+                created_at="2026-04-11T00:00:00+00:00",
+                updated_at="2026-04-11T00:00:00+00:00",
+                metadata={"project_id": "project-1"},
+                owner_id="owner-1",
+                tenant_id="tenant-1",
+                principal_id="principal-1",
+            )
+        )
+        project_memory_source = WorkbenchSourceDescriptor(
+            source_id="project_memory",
+            display_name="Project Memory",
+            kind="project_memory",
+            scope_kind="project_scope",
+            capabilities=("search", "citations"),
+            task_kinds=("browse", "deep_research"),
+            read_only=True,
+            runtime_ready=True,
+            deny_reason=None,
+            description="Project memory source",
+            requires_project_id=True,
+        )
+
+        with (
+            patch(
+                "backend.services.workbench_execution_service.resolve_requested_sources",
+                return_value=[project_memory_source],
+            ),
+            patch(
+                "backend.services.workbench_research_runtime.resolve_requested_sources",
+                return_value=[project_memory_source],
+            ),
+        ):
+            execute_workbench_task(
+                task_id="wb-project-memory",
+                repository=self.repository,
+                llm=_FakeLLM(),
+                settings=self.settings,
+            )
+
+        stored = self.repository.get_task("wb-project-memory")
+        assert stored is not None
+        self.assertEqual("completed", stored.status)
+        self.assertTrue(stored.result_citations)
+        self.assertEqual(
+            "workbench-output:wbo-project-1",
+            stored.result_citations[0]["document_id"],
+        )
+        events = self.repository.list_task_events("wb-project-memory")
+        project_memory_events = [
+            event
+            for event in events
+            if event.event_type == "retrieval.step.completed"
+            and event.metadata["source_id"] == "project_memory"
+        ]
+        self.assertGreaterEqual(len(project_memory_events), 1)
+
+    def test_browse_task_completes_with_connector_citations(self) -> None:
+        self.settings = replace(
+            self.settings,
+            workbench_connector_bindings_json="""
+            [
+              {
+                "source_id": "connector:ops-runbook",
+                "display_name": "Ops Runbook",
+                "documents": [
+                  {
+                    "document_id": "connector://ops/runbook",
+                    "title": "Ops Runbook",
+                    "content": "Investigate the docs with escalation and timeline guidance."
+                  }
+                ]
+              }
+            ]
+            """,
+        )
+        self._create_task(
+            task_id="wb-connector",
+            task_kind="browse",
+            source_ids=["connector:ops-runbook"],
+        )
+        connector_source = WorkbenchSourceDescriptor(
+            source_id="connector:ops-runbook",
+            display_name="Ops Runbook",
+            kind="connector",
+            scope_kind="connector_binding",
+            capabilities=("search", "citations"),
+            task_kinds=("browse", "deep_research"),
+            read_only=True,
+            runtime_ready=True,
+            deny_reason=None,
+            description="Connector source",
+        )
+
+        with (
+            patch(
+                "backend.services.workbench_execution_service.resolve_requested_sources",
+                return_value=[connector_source],
+            ),
+            patch(
+                "backend.services.workbench_research_runtime.resolve_requested_sources",
+                return_value=[connector_source],
+            ),
+        ):
+            execute_workbench_task(
+                task_id="wb-connector",
+                repository=self.repository,
+                llm=_FakeLLM(),
+                settings=self.settings,
+            )
+
+        stored = self.repository.get_task("wb-connector")
+        assert stored is not None
+        self.assertEqual("completed", stored.status)
+        self.assertTrue(stored.result_citations)
+        self.assertEqual(
+            "connector://ops/runbook",
+            stored.result_citations[0]["document_id"],
+        )
+        events = self.repository.list_task_events("wb-connector")
+        connector_events = [
+            event
+            for event in events
+            if event.event_type == "retrieval.step.completed"
+            and event.metadata["source_id"] == "connector:ops-runbook"
+        ]
+        self.assertGreaterEqual(len(connector_events), 1)
 
     def test_retrieval_task_fails_when_web_provider_errors_without_fallback(
         self,

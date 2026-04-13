@@ -31,8 +31,13 @@ WorkbenchTaskEventType = Literal[
     "task.completed",
     "task.failed",
 ]
-WorkbenchSourceKind = Literal["builtin", "knowledge", "connector"]
-WorkbenchSourceScopeKind = Literal["global", "knowledge_documents", "connector_binding"]
+WorkbenchSourceKind = Literal["builtin", "knowledge", "connector", "project_memory"]
+WorkbenchSourceScopeKind = Literal[
+    "global",
+    "knowledge_documents",
+    "connector_binding",
+    "project_scope",
+]
 
 
 class WorkbenchTaskRequest(BaseModel):

@@ -5219,7 +5219,8 @@
             "enum": [
               "builtin",
               "knowledge",
-              "connector"
+              "connector",
+              "project_memory"
             ],
             "title": "Kind",
             "description": "High-level source family."
@@ -5229,7 +5230,8 @@
             "enum": [
               "global",
               "knowledge_documents",
-              "connector_binding"
+              "connector_binding",
+              "project_scope"
             ],
             "title": "Scope Kind",
             "description": "Whether the source is global, document-scoped, or connector-bound."

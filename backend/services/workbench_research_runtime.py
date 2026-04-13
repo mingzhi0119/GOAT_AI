@@ -22,6 +22,11 @@ from backend.services.workbench_web_search import (
     WorkbenchWebSearchHit,
     search_public_web,
 )
+from backend.services.workbench_readonly_retrieval import (
+    WorkbenchConnectorBindingNotFound,
+    search_connector_binding,
+    search_project_memory,
+)
 from backend.types import LLMClient, Settings
 from goat_ai.shared.exceptions import OllamaUnavailable
 
@@ -80,6 +85,10 @@ def execute_langgraph_research_task(
     source_resolver: Callable[..., list[Any]] = resolve_requested_sources,
     knowledge_search: Callable[..., Any] = search_knowledge,
     web_search: Callable[..., list[WorkbenchWebSearchHit]] = search_public_web,
+    project_memory_search: Callable[
+        ..., list[KnowledgeCitation]
+    ] = search_project_memory,
+    connector_search: Callable[..., list[KnowledgeCitation]] = search_connector_binding,
 ) -> WorkbenchResearchExecutionResult:
     """Execute one browse/deep-research task through the LangGraph runtime."""
     graph = _compile_research_graph(
@@ -92,6 +101,8 @@ def execute_langgraph_research_task(
         source_resolver=source_resolver,
         knowledge_search=knowledge_search,
         web_search=web_search,
+        project_memory_search=project_memory_search,
+        connector_search=connector_search,
     )
     final_state = graph.invoke(
         _ResearchState(
@@ -143,6 +154,8 @@ def _compile_research_graph(
     source_resolver: Callable[..., list[Any]],
     knowledge_search: Callable[..., Any],
     web_search: Callable[..., list[WorkbenchWebSearchHit]],
+    project_memory_search: Callable[..., list[KnowledgeCitation]],
+    connector_search: Callable[..., list[KnowledgeCitation]],
 ) -> Any:
     from langgraph.graph import END, START, StateGraph
 
@@ -372,6 +385,169 @@ def _compile_research_graph(
                             settings=settings,
                         ),
                         "urls": [hit.url for hit in web_hits[:5]],
+                    },
+                )
+                continue
+
+            if source_id == "project_memory":
+                if not task.project_id:
+                    failure = {
+                        "source_id": "project_memory",
+                        "deny_reason": "project_scope_missing",
+                    }
+                    source_failures.append(failure)
+                    _append_task_event(
+                        repository=repository,
+                        task_id=task.id,
+                        event_type="retrieval.step.skipped",
+                        status="running",
+                        message="Project memory requires an explicit project scope.",
+                        metadata={
+                            **failure,
+                            "runtime": "langgraph",
+                            "step_index": step_number,
+                            "query": query,
+                        },
+                    )
+                    continue
+                try:
+                    project_hits = project_memory_search(
+                        task=task,
+                        repository=repository,
+                        settings=settings,
+                        auth_context=auth_context,
+                        query=query,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Workbench project-memory research step failed",
+                        extra={
+                            "task_id": task.id,
+                            "step_index": step_number,
+                            "query": query,
+                        },
+                        exc_info=exc,
+                    )
+                    failure = {
+                        "source_id": "project_memory",
+                        "deny_reason": "provider_error",
+                    }
+                    source_failures.append(failure)
+                    _append_task_event(
+                        repository=repository,
+                        task_id=task.id,
+                        event_type="retrieval.step.skipped",
+                        status="running",
+                        message="Source project_memory failed to return results.",
+                        metadata={
+                            **failure,
+                            "runtime": "langgraph",
+                            "step_index": step_number,
+                            "query": query,
+                        },
+                    )
+                    continue
+
+                all_step_citations.extend(project_hits)
+                completed_sources.append("project_memory")
+                step_successful_source_runs += 1
+                _append_task_event(
+                    repository=repository,
+                    task_id=task.id,
+                    event_type="retrieval.step.completed",
+                    status="running",
+                    message=(
+                        f"Step {step_number} source project_memory returned "
+                        f"{len(project_hits)} citations."
+                    ),
+                    metadata={
+                        "runtime": "langgraph",
+                        "step_index": step_number,
+                        "query": query,
+                        "source_id": "project_memory",
+                        "citation_count": len(project_hits),
+                        "project_id": task.project_id,
+                    },
+                )
+                continue
+
+            if source_id.startswith("connector:"):
+                try:
+                    connector_hits = connector_search(
+                        source_id=source_id,
+                        task_kind=task.task_kind,
+                        settings=settings,
+                        query=query,
+                    )
+                except WorkbenchConnectorBindingNotFound:
+                    failure = {
+                        "source_id": source_id,
+                        "deny_reason": "binding_unavailable",
+                    }
+                    source_failures.append(failure)
+                    _append_task_event(
+                        repository=repository,
+                        task_id=task.id,
+                        event_type="retrieval.step.skipped",
+                        status="running",
+                        message=f"Source {source_id} is no longer available.",
+                        metadata={
+                            **failure,
+                            "runtime": "langgraph",
+                            "step_index": step_number,
+                            "query": query,
+                        },
+                    )
+                    continue
+                except Exception as exc:
+                    logger.warning(
+                        "Workbench connector research step failed",
+                        extra={
+                            "task_id": task.id,
+                            "step_index": step_number,
+                            "query": query,
+                            "source_id": source_id,
+                        },
+                        exc_info=exc,
+                    )
+                    failure = {
+                        "source_id": source_id,
+                        "deny_reason": "provider_error",
+                    }
+                    source_failures.append(failure)
+                    _append_task_event(
+                        repository=repository,
+                        task_id=task.id,
+                        event_type="retrieval.step.skipped",
+                        status="running",
+                        message=f"Source {source_id} failed to return results.",
+                        metadata={
+                            **failure,
+                            "runtime": "langgraph",
+                            "step_index": step_number,
+                            "query": query,
+                        },
+                    )
+                    continue
+
+                all_step_citations.extend(connector_hits)
+                completed_sources.append(source_id)
+                step_successful_source_runs += 1
+                _append_task_event(
+                    repository=repository,
+                    task_id=task.id,
+                    event_type="retrieval.step.completed",
+                    status="running",
+                    message=(
+                        f"Step {step_number} source {source_id} returned "
+                        f"{len(connector_hits)} citations."
+                    ),
+                    metadata={
+                        "runtime": "langgraph",
+                        "step_index": step_number,
+                        "query": query,
+                        "source_id": source_id,
+                        "citation_count": len(connector_hits),
                     },
                 )
                 continue

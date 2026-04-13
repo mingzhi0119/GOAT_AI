@@ -1324,7 +1324,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertTrue(
             feature_body["workbench"]["artifact_workspace"]["effective_enabled"]
         )
-        self.assertFalse(
+        self.assertTrue(
             feature_body["workbench"]["project_memory"]["effective_enabled"]
         )
         self.assertFalse(feature_body["workbench"]["connectors"]["effective_enabled"])
@@ -1333,7 +1333,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(200, sources_response.status_code)
         sources_body = sources_response.json()
         self.assertEqual(
-            ["web", "knowledge"],
+            ["web", "knowledge", "project_memory"],
             [source["source_id"] for source in sources_body["sources"]],
         )
         self.assertTrue(sources_body["sources"][0]["runtime_ready"])
@@ -1344,6 +1344,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
             ["plan", "browse", "deep_research"],
             sources_body["sources"][1]["task_kinds"],
         )
+        self.assertEqual("project_memory", sources_body["sources"][2]["kind"])
+        self.assertEqual("project_scope", sources_body["sources"][2]["scope_kind"])
+        self.assertTrue(sources_body["sources"][2]["runtime_ready"])
 
         create_response = self.client.post(
             "/api/workbench/tasks",
@@ -1455,8 +1458,8 @@ class ApiBlackboxContractTests(unittest.TestCase):
             source_ids = {source["source_id"] for source in body["sources"]}
 
             self.assertIn("web", source_ids)
-            self.assertTrue(source_ids.issubset({"web", "knowledge"}))
-            self.assertNotIn("project_memory", source_ids)
+            self.assertIn("project_memory", source_ids)
+            self.assertTrue(source_ids.issubset({"web", "knowledge", "project_memory"}))
             self.assertNotIn("connectors", source_ids)
 
             for source in body["sources"]:
@@ -1572,9 +1575,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
             reader_workbench,
             "project_memory",
             allowed_by_config=True,
-            available_on_host=False,
-            effective_enabled=False,
-            deny_reason="not_implemented",
+            available_on_host=True,
+            effective_enabled=True,
+            deny_reason=None,
         )
         self.assert_workbench_feature_state(
             reader_workbench,
@@ -1629,9 +1632,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
             writer_workbench,
             "project_memory",
             allowed_by_config=True,
-            available_on_host=False,
-            effective_enabled=False,
-            deny_reason="not_implemented",
+            available_on_host=True,
+            effective_enabled=True,
+            deny_reason=None,
         )
         self.assert_workbench_feature_state(
             writer_workbench,

@@ -165,7 +165,8 @@ Notes:
 - `workbench.browse` / `workbench.deep_research` report capability-level readiness, not source-specific readiness; use `GET /api/workbench/sources` to decide whether the global `web` source itself is runnable
 - `workbench.artifact_workspace` reflects the shipped baseline for durable workspace output visibility
 - `workbench.artifact_exports` reflects the shipped export-to-artifact linkage and stays denied unless the caller also has `workbench:export` plus `artifact:write`
-- `workbench.project_memory` remains a caller-visible placeholder for future widening and should stay `deny_reason = "not_implemented"` until a real runtime exists
+- `workbench.project_memory` now reflects the landed read-only project-memory foundation and becomes runtime-ready when the caller can see the bounded `project_memory` source
+- `workbench.connectors` remains write-scoped even though `/api/workbench/sources` may expose read-only connector bindings to `workbench:read` callers; connector task execution still requires `workbench:write`
 - frontend UI should use this endpoint to hide or disable unavailable surfaces instead of assuming that a visible button implies runtime support
 
 ## `GET /api/models`
@@ -390,6 +391,7 @@ Notes:
 - when `knowledge_document_ids` are attached, the task implicitly includes the `knowledge` source even if the caller omitted it from `source_ids`
 - when `browse` or `deep_research` omits both `source_ids` and `knowledge_document_ids`, the task defaults to the global `web` source
 - every resolved source must explicitly advertise the requested `task_kind`; mixed source sets that include an incompatible source now fail fast with `422`
+- requesting `project_memory` without `project_id` fails fast with `422`
 - `browse` and `deep_research` now fail fast with `422` when no runtime-ready retrieval source is available to the caller
 - request shape is intentionally forward-compatible for future task execution and output linkage
 - current task-kind behavior:
@@ -411,6 +413,9 @@ Current behavior:
 - current built-in source ids are:
   - `web`
   - `knowledge`
+  - `project_memory`
+- callers may also see operator-provisioned read-only `connector:*` bindings when
+  the binding is visible to their tenant / principal / owner context
 - each source includes:
   - `source_id`
   - `display_name`
@@ -425,6 +430,10 @@ Current behavior:
 - `knowledge` is hidden unless the caller can read knowledge resources
 - `web` is runtime-ready by default when `GOAT_WORKBENCH_WEB_PROVIDER=duckduckgo`
 - `web` reports `runtime_ready = false` with `deny_reason = "disabled_by_operator"` when `GOAT_WORKBENCH_WEB_PROVIDER=disabled`
+- `project_memory` is read-only, supports `browse` / `deep_research`, and
+  requires an explicit `project_id` when referenced by a task
+- visible connector bindings are read-only, operator-provisioned, and hidden
+  entirely from callers who fail the binding visibility rules
 - current public-web retrieval is experimental and uses the DDGS DuckDuckGo-style provider to return bounded search-result evidence
 - callers without `workbench:read` receive `403`
 

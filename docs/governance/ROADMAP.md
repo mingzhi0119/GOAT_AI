@@ -19,12 +19,7 @@ Completed phases, landed slices, and historical closeout notes live in:
 
 ### Active priorities
 
-1. **Project memory and connectors**
-   - both are already advertised as future capability slots
-   - the open work is still runtime foundations, tenancy rules, and connector boundaries that make those slots real
-   - if LangGraph is adopted, treat it as an internal execution/runtime option for long-running workbench tasks rather than as the public product contract
-
-2. **Desktop distribution maturity**
+1. **Desktop distribution maturity**
    - macOS/Linux public packaging, updater readiness, and deeper native runtime operations are still open
 
 ### Repository-native Skills and Agent Automation
@@ -69,7 +64,7 @@ Completed phases, landed slices, and historical closeout notes live in:
 
 - Goal: finish the shared task/runtime primitives that Browse, Deep Research, Canvas, project memory, and connectors should all build on.
 - Remaining work:
-  - source registry extensions for real web and future connector-backed retrieval
+  - lift the now-landed workbench source descriptors, bounded research runtime, project-memory reads, and read-only connector bindings into a broader shared runtime control plane
   - broader runtime composition for project memory/connectors on top of the now-landed queued-only cancel/retry control plane
 - Sequencing rule:
   - finish shared runtime foundations before widening frontend promises
@@ -92,11 +87,10 @@ Completed phases, landed slices, and historical closeout notes live in:
 
 - Goal: add project-scoped memory and external source plumbing once runtime foundations are ready.
 - Remaining work:
-  - explicit project scope and tenancy rules
-  - connector registry and capability metadata
-  - memory write/read boundaries that do not bypass authz/resource rules
-  - read-only retrieval contracts before any write-capable connector path is enabled
-  - keep any future LangGraph-style runtime integration behind the existing workbench/task boundary until project memory and connector authz semantics are mechanically proven
+  - write-capable connector authorization and resource boundaries
+  - live remote connector adapters plus durable credential handling beyond the current operator-provisioned static bindings
+  - project-memory mutation or editing flows, if they are introduced later, without bypassing authz/resource rules
+  - keep future connector widening behind the existing workbench/task boundary until the stronger authz and rollback semantics are mechanically proven
 
 ### Code sandbox follow-ons
 

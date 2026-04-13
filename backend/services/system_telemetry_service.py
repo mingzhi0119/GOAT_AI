@@ -119,6 +119,12 @@ def build_system_features_response(
             for source in visible_sources
         )
 
+    def _has_visible_source(source_id: str) -> bool:
+        return any(
+            source.runtime_ready and source.source_id == source_id
+            for source in visible_sources
+        )
+
     return SystemFeaturesResponse(
         code_sandbox=CodeSandboxFeaturePayload(
             policy_allowed=code_sandbox_policy_allowed(auth_context),
@@ -151,7 +157,7 @@ def build_system_features_response(
             ),
             project_memory=_workbench_capability(
                 policy_allowed=workbench_read_allowed,
-                runtime_ready=False,
+                runtime_ready=_has_visible_source("project_memory"),
             ),
             connectors=_workbench_capability(
                 policy_allowed=workbench_write_allowed,

@@ -15,6 +15,10 @@ from backend.services.knowledge_service import (
     search_knowledge,
 )
 from backend.services.exceptions import KnowledgeDocumentNotFound
+from backend.services.workbench_readonly_retrieval import (
+    search_connector_binding,
+    search_project_memory,
+)
 from backend.services.workbench_research_runtime import (
     WorkbenchResearchExecutionFailed,
     WorkbenchResearchNoRunnableSources,
@@ -533,6 +537,8 @@ def execute_workbench_task(
                         source_resolver=resolve_requested_sources,
                         knowledge_search=search_knowledge,
                         web_search=search_public_web,
+                        project_memory_search=search_project_memory,
+                        connector_search=search_connector_binding,
                     )
                 except WorkbenchResearchNoRunnableSources:
                     repository.mark_task_failed(

@@ -8,6 +8,14 @@ from backend.domain.authz_types import AuthorizationContext
 from backend.domain.authorization import ResourceRef, Scope
 from backend.services.authz_audit import emit_authorization_audit
 from backend.services.authorizer import authorize_workbench_source_read
+from goat_ai.config.feature_gate_reasons import (
+    RUNTIME_DISABLED_BY_OPERATOR,
+    RUNTIME_NOT_IMPLEMENTED,
+)
+from goat_ai.shared.workbench_connector_bindings import (
+    WorkbenchConnectorBinding,
+    parse_workbench_connector_bindings_json,
+)
 from backend.services.workbench_web_search import (
     build_workbench_web_description,
     get_workbench_web_runtime_status,
@@ -30,6 +38,10 @@ class WorkbenchSourceDescriptor:
     deny_reason: str | None
     description: str
     required_scope: Scope | None = None
+    allowed_tenant_ids: tuple[str, ...] = ()
+    allowed_principal_ids: tuple[str, ...] = ()
+    allowed_owner_ids: tuple[str, ...] = ()
+    requires_project_id: bool = False
 
 
 def list_workbench_sources(
@@ -44,6 +56,10 @@ def list_workbench_sources(
         decision = authorize_workbench_source_read(
             ctx=auth_context,
             required_scope=descriptor.required_scope,
+            allowed_tenant_ids=descriptor.allowed_tenant_ids,
+            allowed_principal_ids=descriptor.allowed_principal_ids,
+            allowed_owner_ids=descriptor.allowed_owner_ids,
+            require_owner_header=settings.require_session_owner,
         )
         emit_authorization_audit(
             ctx=auth_context,
@@ -99,6 +115,10 @@ def resolve_requested_sources(
         decision = authorize_workbench_source_read(
             ctx=auth_context,
             required_scope=descriptor.required_scope,
+            allowed_tenant_ids=descriptor.allowed_tenant_ids,
+            allowed_principal_ids=descriptor.allowed_principal_ids,
+            allowed_owner_ids=descriptor.allowed_owner_ids,
+            require_owner_header=settings.require_session_owner,
         )
         emit_authorization_audit(
             ctx=auth_context,
@@ -110,7 +130,10 @@ def resolve_requested_sources(
             request_id=request_id,
         )
         if not decision.allowed:
-            denied.append(source_id)
+            if decision.conceal_existence:
+                missing.append(source_id)
+            else:
+                denied.append(source_id)
             continue
         resolved.append(descriptor)
     if denied:
@@ -128,6 +151,17 @@ def _all_source_descriptors(
     settings: Settings,
 ) -> tuple[WorkbenchSourceDescriptor, ...]:
     web_runtime_ready, web_deny_reason = get_workbench_web_runtime_status(settings)
+    runtime_ready, runtime_deny_reason = _readonly_source_runtime_status(settings)
+    connector_descriptors = tuple(
+        _connector_descriptor(
+            binding=binding,
+            runtime_ready=runtime_ready,
+            deny_reason=runtime_deny_reason,
+        )
+        for binding in parse_workbench_connector_bindings_json(
+            settings.workbench_connector_bindings_json
+        )
+    )
     return (
         WorkbenchSourceDescriptor(
             source_id="web",
@@ -157,4 +191,54 @@ def _all_source_descriptors(
             ),
             required_scope="knowledge:read",
         ),
+        WorkbenchSourceDescriptor(
+            source_id="project_memory",
+            display_name="Project Memory",
+            kind="project_memory",
+            scope_kind="project_scope",
+            capabilities=("search", "citations"),
+            task_kinds=("browse", "deep_research"),
+            read_only=True,
+            runtime_ready=runtime_ready,
+            deny_reason=runtime_deny_reason,
+            description=(
+                "Read-only retrieval over caller-visible durable workspace outputs "
+                "for the requested project scope."
+            ),
+            requires_project_id=True,
+        ),
+        *connector_descriptors,
+    )
+
+
+def _readonly_source_runtime_status(settings: Settings) -> tuple[bool, str | None]:
+    if not settings.workbench_langgraph_enabled:
+        return False, RUNTIME_DISABLED_BY_OPERATOR
+    try:
+        from langgraph.graph import END, START, StateGraph  # noqa: F401
+    except ImportError:
+        return False, RUNTIME_NOT_IMPLEMENTED
+    return True, None
+
+
+def _connector_descriptor(
+    *,
+    binding: WorkbenchConnectorBinding,
+    runtime_ready: bool,
+    deny_reason: str | None,
+) -> WorkbenchSourceDescriptor:
+    return WorkbenchSourceDescriptor(
+        source_id=binding.source_id,
+        display_name=binding.display_name,
+        kind="connector",
+        scope_kind="connector_binding",
+        capabilities=binding.capabilities,
+        task_kinds=binding.task_kinds,
+        read_only=True,
+        runtime_ready=runtime_ready,
+        deny_reason=deny_reason,
+        description=binding.description,
+        allowed_tenant_ids=binding.tenant_ids,
+        allowed_principal_ids=binding.principal_ids,
+        allowed_owner_ids=binding.owner_ids,
     )
