@@ -627,7 +627,31 @@ mod tests {
         wait_for_backend_with_probe, BackendStartupWaitOutcome, DATA_DIR_ENV,
         DESKTOP_SHELL_LOG_PATH_ENV, LOG_PATH_ENV,
     };
-    use std::{path::PathBuf, time::Duration};
+    use std::{path::PathBuf, sync::{Mutex, OnceLock}, time::Duration};
+
+    static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+    fn env_lock() -> std::sync::MutexGuard<'static, ()> {
+        ENV_LOCK
+            .get_or_init(|| Mutex::new(()))
+            .lock()
+            .expect("failed to acquire test env lock")
+    }
+
+    fn snapshot_env(keys: &[&str]) -> Vec<(String, Option<String>)> {
+        keys.iter()
+            .map(|name| (name.to_string(), std::env::var(name).ok()))
+            .collect()
+    }
+
+    fn restore_env(snapshot: Vec<(String, Option<String>)>) {
+        for (name, value) in snapshot {
+            match value {
+                Some(value) => unsafe { std::env::set_var(name, value) },
+                None => unsafe { std::env::remove_var(name) },
+            }
+        }
+    }
 
     #[test]
     fn normalize_configured_value_trims_and_falls_back() {
@@ -691,6 +715,8 @@ mod tests {
 
     #[test]
     fn configured_path_override_trims_and_rejects_blank_values() {
+        let _guard = env_lock();
+        let snapshot = snapshot_env(&[DESKTOP_SHELL_LOG_PATH_ENV]);
         unsafe {
             std::env::set_var(DESKTOP_SHELL_LOG_PATH_ENV, " C:/GOAT/logs/desktop-shell.log ");
         }
@@ -707,10 +733,13 @@ mod tests {
         unsafe {
             std::env::remove_var(DESKTOP_SHELL_LOG_PATH_ENV);
         }
+        restore_env(snapshot);
     }
 
     #[test]
     fn configured_release_paths_prefer_explicit_runtime_overrides() {
+        let _guard = env_lock();
+        let snapshot = snapshot_env(&[LOG_PATH_ENV, DATA_DIR_ENV, DESKTOP_SHELL_LOG_PATH_ENV]);
         unsafe {
             std::env::set_var(LOG_PATH_ENV, "C:/GOAT/runtime/chat_logs.db");
             std::env::set_var(DATA_DIR_ENV, "C:/GOAT/runtime/data");
@@ -736,6 +765,7 @@ mod tests {
             std::env::remove_var(DATA_DIR_ENV);
             std::env::remove_var(DESKTOP_SHELL_LOG_PATH_ENV);
         }
+        restore_env(snapshot);
     }
 
     #[test]
