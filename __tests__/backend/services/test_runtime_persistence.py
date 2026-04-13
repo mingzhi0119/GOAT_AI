@@ -3,17 +3,31 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from backend.services.chat_runtime import (
+    PostgresConversationLogger,
+    PostgresSessionRepository,
     SQLiteConversationLogger,
     SQLiteSessionRepository,
 )
-from backend.services.code_sandbox_runtime import SQLiteCodeSandboxExecutionRepository
-from backend.services.idempotency_service import SQLiteIdempotencyStore
-from backend.services.knowledge_repository import SQLiteKnowledgeRepository
-from backend.services.media_service import SQLiteMediaRepository
+from backend.services.code_sandbox_runtime import (
+    PostgresCodeSandboxExecutionRepository,
+    SQLiteCodeSandboxExecutionRepository,
+)
+from backend.services.idempotency_service import (
+    PostgresIdempotencyStore,
+    SQLiteIdempotencyStore,
+)
+from backend.services.knowledge_repository import (
+    PostgresKnowledgeRepository,
+    SQLiteKnowledgeRepository,
+)
+from backend.services.media_service import (
+    PostgresMediaRepository,
+    SQLiteMediaRepository,
+)
 from backend.services.runtime_persistence import (
-    UnsupportedRuntimeMetadataBackend,
     build_code_sandbox_execution_repository,
     build_conversation_logger,
     build_idempotency_store,
@@ -25,7 +39,10 @@ from backend.services.runtime_persistence import (
     initialize_runtime_metadata_store,
     runtime_storage_model_label,
 )
-from backend.services.workbench_runtime import SQLiteWorkbenchTaskRepository
+from backend.services.workbench_runtime import (
+    PostgresWorkbenchTaskRepository,
+    SQLiteWorkbenchTaskRepository,
+)
 from goat_ai.config.settings import Settings
 
 
@@ -77,26 +94,42 @@ class RuntimePersistenceFactoryTests(unittest.TestCase):
         self.assertIsInstance(build_idempotency_store(settings), SQLiteIdempotencyStore)
         self.assertEqual("sqlite-first", runtime_storage_model_label(settings))
 
-    def test_postgres_backend_fails_fast_until_adapters_land(self) -> None:
+    def test_postgres_backend_builders_return_postgres_implementations(self) -> None:
         settings = _settings(backend="postgres")
 
-        with self.assertRaisesRegex(
-            UnsupportedRuntimeMetadataBackend,
-            "Postgres runtime persistence is not implemented yet",
-        ):
-            ensure_supported_runtime_metadata_backend(settings)
-        with self.assertRaisesRegex(
-            UnsupportedRuntimeMetadataBackend,
-            "Postgres runtime persistence is not implemented yet",
-        ):
+        ensure_supported_runtime_metadata_backend(settings)
+        self.assertIsInstance(
+            build_conversation_logger(settings), PostgresConversationLogger
+        )
+        self.assertIsInstance(
+            build_session_repository(settings), PostgresSessionRepository
+        )
+        self.assertIsInstance(
+            build_workbench_task_repository(settings), PostgresWorkbenchTaskRepository
+        )
+        self.assertIsInstance(
+            build_code_sandbox_execution_repository(settings),
+            PostgresCodeSandboxExecutionRepository,
+        )
+        self.assertIsInstance(
+            build_knowledge_repository(settings), PostgresKnowledgeRepository
+        )
+        self.assertIsInstance(build_media_repository(settings), PostgresMediaRepository)
+        self.assertIsInstance(
+            build_idempotency_store(settings), PostgresIdempotencyStore
+        )
+        self.assertEqual("postgres-hosted", runtime_storage_model_label(settings))
+
+    def test_initialize_postgres_backend_runs_migrations(self) -> None:
+        settings = _settings(backend="postgres")
+
+        with patch(
+            "backend.services.postgres_runtime_support.run_postgres_runtime_migrations"
+        ) as run_postgres_runtime_migrations:
             initialize_runtime_metadata_store(settings)
-        with self.assertRaisesRegex(
-            UnsupportedRuntimeMetadataBackend,
-            "Postgres runtime persistence is not implemented yet",
-        ):
-            build_session_repository(settings)
-        self.assertEqual(
-            "postgres-server-preview", runtime_storage_model_label(settings)
+
+        run_postgres_runtime_migrations.assert_called_once_with(
+            settings.runtime_postgres_dsn
         )
 
 

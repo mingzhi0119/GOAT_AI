@@ -6,3 +6,7 @@ pytest-cov==6.0.0
 import-linter==2.1
 ruff==0.15.9
 pip-audit==2.10.0
+testcontainers==4.13.2
+psycopg[binary]==3.2.11
+SQLAlchemy==2.0.44
+alembic==1.16.5

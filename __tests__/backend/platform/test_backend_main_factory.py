@@ -8,9 +8,6 @@ from unittest.mock import patch
 
 from backend import main
 from backend.platform.otel_middleware import OtelTraceContextMiddleware
-from backend.services.runtime_persistence import (
-    UnsupportedRuntimeMetadataBackend,
-)
 from goat_ai.config.settings import Settings
 
 
@@ -101,7 +98,7 @@ class BackendMainFactoryTests(unittest.TestCase):
             [entry.cls for entry in app.user_middleware],
         )
 
-    def test_create_app_fails_fast_for_unsupported_runtime_metadata_backend(
+    def test_create_app_accepts_postgres_runtime_metadata_backend(
         self,
     ) -> None:
         postgres_settings = Settings(
@@ -120,11 +117,19 @@ class BackendMainFactoryTests(unittest.TestCase):
         with (
             patch.object(main, "get_settings", return_value=postgres_settings),
             patch.object(main, "configure_logging") as configure_logging,
+            patch.object(
+                main, "initialize_runtime_metadata_store"
+            ) as initialize_runtime_metadata_store,
+            patch.object(main, "init_latency_metrics") as init_latency_metrics,
+            patch.object(main, "init_otel_if_enabled") as init_otel_if_enabled,
+            patch.object(main, "is_otel_enabled", return_value=False),
         ):
-            with self.assertRaisesRegex(
-                UnsupportedRuntimeMetadataBackend,
-                "Postgres runtime persistence is not implemented yet",
-            ):
-                main.create_app()
+            app = main.create_app()
 
         configure_logging.assert_called_once_with()
+        initialize_runtime_metadata_store.assert_called_once_with(postgres_settings)
+        init_latency_metrics.assert_called_once_with(
+            postgres_settings.latency_rolling_max_samples
+        )
+        init_otel_if_enabled.assert_called_once_with()
+        self.assertIn("/api/health", app.openapi()["paths"])

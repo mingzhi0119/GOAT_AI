@@ -106,7 +106,8 @@ def test_phase16_storage_docs_align_across_live_and_archive_views() -> None:
         encoding="utf-8"
     )
 
-    assert "Phase 16C external object/file storage is now shipped." in roadmap
+    assert "Phase 16C external object/file storage is now shipped." not in roadmap
     assert "**16B/16C storage evolution:** complete" in status
     assert "### Phase 16C storage closeout" in archive
+    assert "### Phase 16D runtime persistence closeout" in archive
     assert "The historical 16C checklist covered:" in archive
