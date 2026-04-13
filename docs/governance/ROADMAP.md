@@ -117,6 +117,7 @@ secret availability.
 2. **Project memory and connectors**
    - both are already advertised as future capability slots
    - they should not grow UI promises until the runtime, tenancy, and connector boundaries are real
+   - any widening work should satisfy the admission gate in `docs/standards/ENGINEERING_STANDARDS.md` before implementation starts
 
 3. **Desktop distribution maturity**
    - signed Windows release and packaged CI validation are landed
@@ -152,6 +153,7 @@ secret availability.
   - decide whether future workbench, connector, or other newly shipped frontend surfaces should adopt the same runtime parser pattern when a real consumer lands, while keeping the current OpenAPI generation chain as the only contract source
   - decide whether the current frontend `dependency-cruiser` rules should widen after the present structure stabilizes, without expanding the tool to Python imports
   - decide whether feature-spec usage should grow beyond the current single real example, while keeping `AGENTS.md`, repo-local skills, roadmap, and status docs as the canonical governance layer
+  - keep applying the admission gate for future workbench, connector, and project-memory widening so those surfaces do not outrun tenancy, authz, contract-proof, and rollback planning
 - Non-goals:
   - do not introduce OpenAPI Generator alongside the current `docs/api/openapi.json -> openapi-typescript -> contract:check` path unless the repo explicitly chooses to replace that pipeline end to end
   - do not add a second constitution/process system that competes with the current standards, skills, roadmap, and status documents

@@ -61,6 +61,7 @@ Last updated: 2026-04-13
 - desktop provenance workflow for the Linux sidecar artifact plus signed Windows installer digests/attestations
 - merge-blocking backend CI now stages `backend-fast -> backend-heavy -> backend`, so triage clears changed-file Ruff/format blockers before reading deeper backend failures
 - repo-native decision records now have a canonical entrypoint under `docs/decisions/`, approved templates, and PR guidance for tradeoffs, rollback posture, and proof links
+- the engineering standards and PR template now include an explicit admission gate for future workbench, connector, and project-memory expansion, including feature-spec, decision-package, caller-scoped contract-proof, runtime-parser, and docs-sync requirements
 - frontend-only `dependency-cruiser` now runs in standard CI beside lint/build/contract gates to pin module direction, cycle checks, and API-layer import boundaries
 - frontend runtime schema parsing now covers the current shipped JSON adapters under `frontend/src/api/` plus the current chat/upload/code-sandbox SSE boundaries, while the existing `docs/api/openapi.json -> openapi-typescript -> contract:check` chain remains the only generated contract source
 - lightweight feature-scoped `spec/plan/tasks` artifacts now exist under `docs/governance/specs/` as a non-canonical pilot for complex brownfield changes
@@ -81,6 +82,7 @@ Last updated: 2026-04-13
 
 - workbench public-web retrieval is now a bounded single-pass DDGS-backed evidence brief, not yet a multi-step autonomous research runtime
 - project memory and connectors are not implemented yet
+- future workbench, connector, and project-memory widening is now governed by the admission gate in `docs/standards/ENGINEERING_STANDARDS.md` rather than by roadmap notes alone
 - storage remains SQLite-first and single-writer by design
 - future storage-shape changes require a new migration/compatibility/rollback decision log
 - Windows desktop packaging, signing, and provenance are ahead of macOS/Linux public packaged validation
