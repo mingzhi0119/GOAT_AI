@@ -94,6 +94,26 @@ describe('chat api', () => {
     )
   })
 
+  it('skips malformed SSE frames while keeping the stream alive', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        buildStreamResponse([
+          'data: {"type":"chart_spec","chart":{"version":"2.0","engine":"echarts"}}\n\n',
+          'data: {"type":"token","token":"Hello"}\n\n',
+          'data: {"type":"done"}\n\n',
+        ]),
+      ),
+    )
+
+    const events = []
+    for await (const event of streamChat(request)) {
+      events.push(event)
+    }
+
+    expect(events).toEqual([{ type: 'token', token: 'Hello' }, { type: 'done' }])
+  })
+
   it('throws for HTTP failures and missing response bodies', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce({ ok: false, status: 503 }))
 

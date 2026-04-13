@@ -41,6 +41,47 @@ describe('media api', () => {
     )
   })
 
+  it('normalizes missing optional image dimensions', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          attachment_id: 'att-1',
+          filename: 'chart.png',
+          mime_type: 'image/png',
+          byte_size: 12,
+        }),
+      }),
+    )
+
+    const file = new File(['img'], 'chart.png', { type: 'image/png' })
+    const payload = await uploadMediaImage(file)
+
+    expect(payload.width_px).toBeNull()
+    expect(payload.height_px).toBeNull()
+  })
+
+  it('rejects malformed upload payloads', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          attachment_id: 1,
+          filename: 'chart.png',
+          mime_type: 'image/png',
+          byte_size: 12,
+        }),
+      }),
+    )
+    const file = new File(['img'], 'chart.png', { type: 'image/png' })
+
+    await expect(uploadMediaImage(file)).rejects.toThrow(
+      /Media upload API returned an invalid response payload/,
+    )
+  })
+
   it('throws a stable error on upload failure', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 413 }))
     const file = new File(['img'], 'chart.png', { type: 'image/png' })

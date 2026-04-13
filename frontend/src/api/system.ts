@@ -1,6 +1,11 @@
 import { buildApiHeaders } from './auth'
 import { buildApiErrorMessage } from './errors'
-import { parseSystemFeaturesResponse } from './runtimeSchemas'
+import {
+  parseDesktopDiagnosticsResponse,
+  parseGpuStatusResponse,
+  parseInferenceLatencyResponse,
+  parseSystemFeaturesResponse,
+} from './runtimeSchemas'
 import type {
   DesktopDiagnostics,
   GPUStatus,
@@ -20,7 +25,7 @@ export async function fetchGpuStatus(): Promise<GPUStatus> {
     headers: buildApiHeaders(),
   })
   if (!resp.ok) throw new Error(await buildApiErrorMessage(resp, 'GPU status API'))
-  return (await resp.json()) as GPUStatus
+  return parseGpuStatusResponse(await resp.json())
 }
 
 export async function fetchInferenceLatency(): Promise<InferenceLatency> {
@@ -30,7 +35,7 @@ export async function fetchInferenceLatency(): Promise<InferenceLatency> {
   if (!resp.ok) {
     throw new Error(await buildApiErrorMessage(resp, 'Inference latency API'))
   }
-  return (await resp.json()) as InferenceLatency
+  return parseInferenceLatencyResponse(await resp.json())
 }
 
 export async function fetchSystemFeatures(): Promise<SystemFeatures> {
@@ -48,5 +53,5 @@ export async function fetchDesktopDiagnostics(): Promise<DesktopDiagnostics> {
   if (!resp.ok) {
     throw new Error(await buildApiErrorMessage(resp, 'Desktop diagnostics API'))
   }
-  return (await resp.json()) as DesktopDiagnostics
+  return parseDesktopDiagnosticsResponse(await resp.json())
 }

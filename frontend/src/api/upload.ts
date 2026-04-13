@@ -1,5 +1,6 @@
 import { buildApiHeaders } from './auth'
 import { buildApiErrorMessage } from './errors'
+import { parseUploadStreamEvent } from './runtimeSchemas'
 /** Stream file-ingestion events from the RAG knowledge upload pipeline. */
 
 export interface UploadFilePromptEvent {
@@ -34,38 +35,6 @@ export type UploadStreamEvent =
   | UploadErrorEvent
   | UploadDoneEvent
 
-function isUploadStreamEvent(payload: unknown): payload is UploadStreamEvent {
-  if (typeof payload !== 'object' || payload === null) return false
-  const event = payload as {
-    type?: string
-    filename?: unknown
-    suffix_prompt?: unknown
-    document_id?: unknown
-    ingestion_id?: unknown
-    status?: unknown
-    retrieval_mode?: unknown
-    template_prompt?: unknown
-    message?: unknown
-  }
-  if (event.type === 'file_prompt') {
-    return typeof event.filename === 'string' && typeof event.suffix_prompt === 'string'
-  }
-  if (event.type === 'knowledge_ready') {
-    return (
-      typeof event.filename === 'string' &&
-      typeof event.suffix_prompt === 'string' &&
-      typeof event.document_id === 'string' &&
-      typeof event.ingestion_id === 'string' &&
-      typeof event.status === 'string' &&
-      typeof event.retrieval_mode === 'string' &&
-      typeof event.template_prompt === 'string'
-    )
-  }
-  if (event.type === 'error') return typeof event.message === 'string'
-  if (event.type === 'done') return true
-  return false
-}
-
 /** Ingest a supported file and yield typed readiness events. */
 export async function* streamUpload(file: File): AsyncGenerator<UploadStreamEvent> {
   const form = new FormData()
@@ -94,9 +63,9 @@ export async function* streamUpload(file: File): AsyncGenerator<UploadStreamEven
       const raw = line.slice(6).trim()
       try {
         const payload = JSON.parse(raw) as unknown
-        if (!isUploadStreamEvent(payload)) continue
-        yield payload
-        if (payload.type === 'done') return
+        const event = parseUploadStreamEvent(payload)
+        yield event
+        if (event.type === 'done') return
       } catch {
         // skip malformed frames
       }

@@ -33,6 +33,8 @@ def test_frontend_dependency_guardrails_are_wired_into_repo_truth() -> None:
         "hooks-no-components",
         "utils-no-hooks-or-components",
         "generated-contracts-stay-behind-api",
+        "generated-contracts-only-through-types",
+        "runtime-parsers-stay-behind-api",
     ):
         assert snippet in config_text
 

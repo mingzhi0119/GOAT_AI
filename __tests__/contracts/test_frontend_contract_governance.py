@@ -76,12 +76,32 @@ def test_frontend_runtime_api_parsers_stay_inside_src_api() -> None:
     code_sandbox_api = (
         REPO_ROOT / "frontend" / "src" / "api" / "codeSandbox.ts"
     ).read_text(encoding="utf-8")
+    chat_api = (REPO_ROOT / "frontend" / "src" / "api" / "chat.ts").read_text(
+        encoding="utf-8"
+    )
+    upload_api = (REPO_ROOT / "frontend" / "src" / "api" / "upload.ts").read_text(
+        encoding="utf-8"
+    )
 
     assert "zod" in package_json["dependencies"]
     assert "parseSystemFeaturesResponse" in runtime_schemas
+    assert "parseGpuStatusResponse" in runtime_schemas
+    assert "parseInferenceLatencyResponse" in runtime_schemas
+    assert "parseDesktopDiagnosticsResponse" in runtime_schemas
+    assert "parseModelsResponse" in runtime_schemas
+    assert "parseModelCapabilitiesResponse" in runtime_schemas
+    assert "parseHistorySessionListResponse" in runtime_schemas
+    assert "parseHistorySessionDetailResponse" in runtime_schemas
+    assert "parseMediaUploadResponse" in runtime_schemas
+    assert "parseChatStreamEvent" in runtime_schemas
+    assert "parseUploadStreamEvent" in runtime_schemas
     assert "parseCodeSandboxExecutionResponse" in runtime_schemas
     assert "parseCodeSandboxExecutionEventsResponse" in runtime_schemas
+    assert "parseCodeSandboxLogStreamEvent" in runtime_schemas
     assert "return parseSystemFeaturesResponse(await resp.json())" in system_api
+    assert "return parseGpuStatusResponse(await resp.json())" in system_api
+    assert "return parseInferenceLatencyResponse(await resp.json())" in system_api
+    assert "return parseDesktopDiagnosticsResponse(await resp.json())" in system_api
     assert (
         "return parseCodeSandboxExecutionResponse(await resp.json())"
         in code_sandbox_api
@@ -89,3 +109,20 @@ def test_frontend_runtime_api_parsers_stay_inside_src_api() -> None:
     assert "return parseCodeSandboxExecutionEventsResponse(await resp.json())" in (
         code_sandbox_api
     )
+    assert "parseCodeSandboxLogStreamEvent" in code_sandbox_api
+    assert "parseChatStreamEvent" in chat_api
+    assert "parseUploadStreamEvent" in upload_api
+
+
+def test_frontend_json_api_adapters_do_not_use_unchecked_resp_json_casts() -> None:
+    api_root = REPO_ROOT / "frontend" / "src" / "api"
+    violations: list[str] = []
+
+    for path in sorted(api_root.glob("*.ts")):
+        if path.name == "errors.ts":
+            continue
+        text = path.read_text(encoding="utf-8")
+        if "resp.json()) as " in text:
+            violations.append(path.relative_to(REPO_ROOT).as_posix())
+
+    assert violations == []

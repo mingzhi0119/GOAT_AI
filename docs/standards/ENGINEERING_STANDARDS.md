@@ -118,6 +118,7 @@ Every change should preserve or improve the ten industrial-score dimensions belo
 - Use `src/api/types.ts` only for frontend-specific adapters or UI-only unions that cannot come straight from OpenAPI.
 - Keep network calls inside `src/api/`.
 - Keep generated OpenAPI imports and runtime API parsing behind `src/api/` rather than bypassing adapters from hooks, components, or utils.
+- Keep direct imports from `src/api/generated/openapi.ts` centralized in `src/api/types.ts`; route runtime validation through `src/api/runtimeSchemas.ts` instead of ad hoc casts in individual adapters.
 - Keep components focused and hooks typed.
 - Avoid business logic in JSX.
 - Keep frontend accessibility at WCAG 2.2 AA by default.

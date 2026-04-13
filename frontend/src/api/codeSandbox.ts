@@ -2,6 +2,7 @@ import { buildApiHeaders } from './auth'
 import { buildApiErrorMessage } from './errors'
 import {
   parseCodeSandboxExecutionEventsResponse,
+  parseCodeSandboxLogStreamEvent,
   parseCodeSandboxExecutionResponse,
 } from './runtimeSchemas'
 import type {
@@ -14,7 +15,7 @@ import type {
 function emitParsedEvent(line: string, onEvent: (event: CodeSandboxLogStreamEvent) => void): void {
   if (!line.startsWith('data: ')) return
   try {
-    onEvent(JSON.parse(line.slice(6).trim()) as CodeSandboxLogStreamEvent)
+    onEvent(parseCodeSandboxLogStreamEvent(JSON.parse(line.slice(6).trim()) as unknown))
   } catch {
     // Ignore malformed SSE frames and keep the stream alive.
   }

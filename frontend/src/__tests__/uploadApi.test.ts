@@ -49,4 +49,19 @@ describe('upload api', () => {
       }),
     )
   })
+
+  it('skips malformed upload frames and still yields later valid events', async () => {
+    const payload = [
+      'data: {"type":"knowledge_ready","filename":"data.csv"}\n',
+      'data: {"type":"done"}\n',
+    ].join('')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(sseResponse(payload)))
+
+    const events: unknown[] = []
+    for await (const event of streamUpload(new File(['x,y\n1,2'], 'data.csv'))) {
+      events.push(event)
+    }
+
+    expect(events).toEqual([{ type: 'done' }])
+  })
 })

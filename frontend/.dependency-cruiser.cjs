@@ -49,6 +49,27 @@ module.exports = {
         path: '^src/api/generated/',
       },
     },
+    {
+      name: 'generated-contracts-only-through-types',
+      severity: 'error',
+      from: {
+        path: '^src/api/',
+        pathNot: '^src/api/types\\.ts$',
+      },
+      to: {
+        path: '^src/api/generated/',
+      },
+    },
+    {
+      name: 'runtime-parsers-stay-behind-api',
+      severity: 'error',
+      from: {
+        pathNot: '^src/api/',
+      },
+      to: {
+        path: '^src/api/runtimeSchemas\\.ts$',
+      },
+    },
   ],
   options: {
     doNotFollow: {

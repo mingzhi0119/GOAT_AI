@@ -242,7 +242,10 @@ describe('code sandbox api', () => {
       body: new ReadableStream<Uint8Array>({
         start(controller) {
           controller.enqueue(
-            encoder.encode('data: {"type":"stdout","sequence":4,"chunk":"hello"}\n\n'),
+            encoder.encode(
+              'data: {"type":"stdout","sequence":"bad","chunk":"ignored"}\n\n' +
+                'data: {"type":"stdout","sequence":4,"chunk":"hello"}\n\n',
+            ),
           )
           controller.close()
         },
