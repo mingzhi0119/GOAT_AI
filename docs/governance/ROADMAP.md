@@ -36,7 +36,7 @@ Completed phases, landed slices, and historical closeout notes live in:
   - do not create a plugin marketplace or generic IDE macro bundle
   - do not collapse all governance work into one broad "catch-all skill"
 - Remaining work:
-  - extend forward-tested coverage beyond the current audit, ci-routing plus WSL composition, desktop plus governance-runbook linkage, frontend-exposed contract, authz, observability, and governance-sync task set; keep tightening references when new scenarios expose ambiguity or stale truth sources
+  - extend forward-tested coverage beyond the current audit, ci-routing plus WSL composition, desktop evidence, sandbox runtime proof, frontend-exposed contract, caller-scoped workbench/runtime proof, observability, and governance-sync task set; keep tightening references when new scenarios expose ambiguity or stale truth sources
   - add deterministic `scripts/` or `assets/` only where repeated usage shows a real need beyond the current shared prompt/output patterns and governance tests
   - extend the governance coverage around `.agents/skills/` as the inventory grows so future additions cannot drift in metadata, links, or directory shape
   - decide when the skill layer is stable enough to promote from roadmap follow-on work into shipped-status documentation

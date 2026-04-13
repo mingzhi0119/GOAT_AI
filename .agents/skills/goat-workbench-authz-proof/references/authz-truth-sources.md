@@ -8,8 +8,11 @@ Start from these implementation and contract files:
 - [backend/application/workbench.py](../../../../backend/application/workbench.py)
 - [backend/models/system.py](../../../../backend/models/system.py)
 - [backend/services/authorizer.py](../../../../backend/services/authorizer.py)
+- [backend/services/workbench_capability_surface.py](../../../../backend/services/workbench_capability_surface.py)
+- [backend/services/workbench_source_catalog.py](../../../../backend/services/workbench_source_catalog.py)
 - [backend/services/system_telemetry_service.py](../../../../backend/services/system_telemetry_service.py)
 - [backend/services/workbench_source_registry.py](../../../../backend/services/workbench_source_registry.py)
+- [backend/services/workbench_research_source_executors.py](../../../../backend/services/workbench_research_source_executors.py)
 - [API_REFERENCE.md](../../../../docs/api/API_REFERENCE.md)
 
 Primary proof tests:

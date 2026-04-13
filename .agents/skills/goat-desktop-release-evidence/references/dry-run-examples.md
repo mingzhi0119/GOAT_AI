@@ -53,3 +53,21 @@ Expected output:
 
 Validate with:
 - run `python -m pytest __tests__/desktop/test_desktop_release_governance.py __tests__/ops/test_ops_asset_contracts.py -q`
+
+## Example 4
+
+User asks:
+- "We changed Linux packaged-desktop proof and macOS blocker reporting in the same slice; what is actually landed?"
+
+First moves:
+- separate Linux packaged evidence, Windows installed evidence, and macOS blocker-report scaffolding before reasoning about shipped status
+- compose with `wsl-linux-rust-desktop` for Linux parity from Windows
+- keep external signing/notarization blockers separate from repo-landed workflow proof
+
+Expected output:
+- which platform proof path moved and whether it is packaged, installed, or blocker-only
+- which status wording can land today versus what must stay as external blocker text
+- the exact workflow/tests that prove the distinction
+
+Validate with:
+- run `python -m pytest __tests__/desktop/test_desktop_release_governance.py __tests__/ops/test_ops_asset_contracts.py -q` and the matching WSL Linux desktop validation when the Linux path changed

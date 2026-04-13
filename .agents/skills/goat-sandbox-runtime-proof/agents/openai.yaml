@@ -1,0 +1,7 @@
+interface:
+  display_name: "GOAT Sandbox Runtime Proof"
+  short_description: "Validate sandbox runtime, supervisor, and egress proof."
+  default_prompt: "Use $goat-sandbox-runtime-proof to verify GOAT AI sandbox runtime behavior, supervisor control, and egress contract proof."
+
+policy:
+  allow_implicit_invocation: true
