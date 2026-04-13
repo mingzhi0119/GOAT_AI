@@ -20,15 +20,24 @@ WorkbenchTaskEventType = Literal[
     "task.retry_requested",
     "task.retry_created",
     "retrieval.sources_resolved",
+    "research.plan.created",
+    "retrieval.step.started",
     "retrieval.step.completed",
     "retrieval.step.skipped",
+    "research.follow_up.scheduled",
+    "research.synthesis.completed",
     "workspace_output.created",
     "workspace_output.exported",
     "task.completed",
     "task.failed",
 ]
-WorkbenchSourceKind = Literal["builtin", "knowledge", "connector"]
-WorkbenchSourceScopeKind = Literal["global", "knowledge_documents", "connector_binding"]
+WorkbenchSourceKind = Literal["builtin", "knowledge", "connector", "project_memory"]
+WorkbenchSourceScopeKind = Literal[
+    "global",
+    "knowledge_documents",
+    "connector_binding",
+    "project_scope",
+]
 
 
 class WorkbenchTaskRequest(BaseModel):

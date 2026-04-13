@@ -19,19 +19,12 @@ Completed phases, landed slices, and historical closeout notes live in:
 
 ### Active priorities
 
-1. **Multi-step research behavior on top of landed web retrieval**
-   - `/api/workbench/sources` now exposes runtime-ready experimental DDGS-backed `web`
-   - browse/deep-research still remain bounded single-pass evidence briefs
-   - the next step is iterative planning, fetch, synthesis, and stronger safety boundaries
-   - evaluate a LangGraph-backed orchestration path for deeper multi-step research only if it can sit behind the existing `/api/workbench/*` contract instead of forcing a frontend-visible runtime rewrite
-
-2. **Project memory and connectors**
-   - both are already advertised as future capability slots
-   - the open work is still runtime foundations, tenancy rules, and connector boundaries that make those slots real
-   - if LangGraph is adopted, treat it as an internal execution/runtime option for long-running workbench tasks rather than as the public product contract
-
-3. **Desktop distribution maturity**
-   - macOS/Linux public packaging, updater readiness, and deeper native runtime operations are still open
+1. **Code sandbox follow-ons**
+   - running-state cancellation and restart recovery are landed, but
+     running-state retry semantics, allowlisted egress, richer workspace UX,
+     and Rust supervisor parity remain open
+2. **Desktop public release blockers**
+   - Linux packaged build/provenance and readiness docs are landed, but public macOS signing/notarization and updater enablement remain open
 
 ### Repository-native Skills and Agent Automation
 
@@ -41,7 +34,7 @@ Completed phases, landed slices, and historical closeout notes live in:
   - do not create a plugin marketplace or generic IDE macro bundle
   - do not collapse all governance work into one broad "catch-all skill"
 - Remaining work:
-  - extend forward-tested coverage beyond the current audit, ci-routing plus WSL composition, desktop plus governance-runbook linkage, frontend-exposed contract, authz, observability, and governance-sync task set; keep tightening references when new scenarios expose ambiguity or stale truth sources
+  - extend forward-tested coverage beyond the current audit, ci-routing plus WSL composition, desktop evidence, sandbox runtime proof, frontend-exposed contract, caller-scoped workbench/runtime proof, observability, and governance-sync task set; keep tightening references when new scenarios expose ambiguity or stale truth sources
   - add deterministic `scripts/` or `assets/` only where repeated usage shows a real need beyond the current shared prompt/output patterns and governance tests
   - extend the governance coverage around `.agents/skills/` as the inventory grows so future additions cannot drift in metadata, links, or directory shape
   - decide when the skill layer is stable enough to promote from roadmap follow-on work into shipped-status documentation
@@ -57,28 +50,7 @@ Completed phases, landed slices, and historical closeout notes live in:
   - decide whether the current frontend `dependency-cruiser` rules should widen after the present structure stabilizes, without expanding the tool to Python imports
   - decide whether feature-spec usage should grow beyond the current single real example, while keeping `AGENTS.md`, repo-local skills, roadmap, and status docs as the canonical governance layer
 
-### Atomicity and composition follow-ons
-
-- Goal: reduce the current brownfield orchestration hotspots so the repository more consistently follows the intended "small focused functions plus composed flows" structure without changing public behavior.
-- Remaining work:
-  - split `backend/services/workbench_execution_service.py` into smaller task-kind and source-kind executors so `execute_workbench_task()` stays as a dispatcher while retrieval, plan, and canvas flows move behind narrower seams
-  - extract the current retrieval-heavy `_execute_retrieval_task()` path into separate helpers for source resolution, knowledge execution, web execution, event emission, and result finalization instead of keeping the full state machine in one function
-  - break `backend/application/workbench.py` into narrower workbench application modules such as task lifecycle, source listing, and workspace-output/export use cases so create/retry/cancel/read/export flows do not continue to accumulate in one file
-  - isolate the knowledge-augmented chat path in `backend/services/chat_service.py` behind a dedicated flow module so knowledge lookup, safeguard handling, knowledge-instruction composition, and stream handoff no longer live in one orchestration function
-  - split `frontend/src/hooks/useChatSession.ts` into smaller controller hooks for session title derivation, history synchronization, and send-message orchestration so the current brownfield chat-session hook remains a composition root instead of a growing stateful hotspot
-- Sequencing rule:
-  - start with `backend/services/workbench_execution_service.py`, then `backend/application/workbench.py`, then `backend/services/chat_service.py`, and finally `frontend/src/hooks/useChatSession.ts` unless a user-facing bug forces a different order
-
 ### Runtime platform
-
-#### Phase 17 shared runtime foundations
-
-- Goal: finish the shared task/runtime primitives that Browse, Deep Research, Canvas, project memory, and connectors should all build on.
-- Remaining work:
-  - source registry extensions for real web and future connector-backed retrieval
-  - broader runtime composition for project memory/connectors on top of the now-landed queued-only cancel/retry control plane
-- Sequencing rule:
-  - finish shared runtime foundations before widening frontend promises
 
 #### Phase 17B: plan-mode follow-ons
 
@@ -89,22 +61,19 @@ Completed phases, landed slices, and historical closeout notes live in:
 
 #### Phase 17C: browse and deep-research runtime
 
-- Goal: replace the currently partial retrieval runtime with real web execution and stronger multi-step research behavior.
+- Goal: continue hardening the landed browse/deep-research runtime around safety boundaries, richer sources, and the now-landed shared runtime control plane.
 - Remaining work:
   - staged safety boundaries for public web vs private retrieval
-  - iterative multi-step research behavior instead of one bounded retrieval pass
-  - a concrete orchestration spike for whether LangGraph improves plan -> retrieve -> synthesize -> follow-up loops, checkpointing, and human-review pauses without weakening the current authz/event/audit model
   - remote connector adapters behind the shared source registry
 
 #### Phase 17E: project memory and connectors
 
 - Goal: add project-scoped memory and external source plumbing once runtime foundations are ready.
 - Remaining work:
-  - explicit project scope and tenancy rules
-  - connector registry and capability metadata
-  - memory write/read boundaries that do not bypass authz/resource rules
-  - read-only retrieval contracts before any write-capable connector path is enabled
-  - keep any future LangGraph-style runtime integration behind the existing workbench/task boundary until project memory and connector authz semantics are mechanically proven
+  - write-capable connector authorization and resource boundaries
+  - live remote connector adapters plus durable credential handling beyond the current operator-provisioned static bindings
+  - project-memory mutation or editing flows, if they are introduced later, without bypassing authz/resource rules
+  - keep future connector widening behind the existing workbench/task boundary until the stronger authz and rollback semantics are mechanically proven
 
 ### Code sandbox follow-ons
 
@@ -112,9 +81,10 @@ Completed phases, landed slices, and historical closeout notes live in:
 
 - Goal: extend the landed Docker-first sandbox without weakening the current operator/safety posture.
 - Remaining work:
-  - running-state cancellation / retry behavior beyond the current queued-only control plane
-  - multi-file workspace ergonomics beyond inline text seeding
-  - allowlisted egress modes instead of all-or-nothing disablement
+  - running-state retry semantics beyond the now-landed cancellation control seam
+  - multi-file workspace ergonomics beyond inline text seeding plus the landed
+    workspace manifest/runtime metadata hints
+  - allowlisted egress modes instead of the current disabled-only contract
   - alternate providers behind the same sandbox boundary
   - richer terminal / PTY UX beyond replayable chunked logs
 
@@ -136,20 +106,18 @@ Completed phases, landed slices, and historical closeout notes live in:
 
 ### Desktop distribution and native runtime
 
-Desktop shell scaffolding and packaged backend sidecar are already landed and archived. Remaining work starts at distribution maturity.
+Desktop shell scaffolding and packaged backend sidecar are already landed and archived. Signed Windows public packaging is shipped, Linux packaged-desktop CI/release scaffolding plus readiness docs are now landed, and the remaining work is the narrower public-release and deeper-native-runtime follow-on set below.
 
 #### Phase 19C: platform installers, signing, and updates
 
-- Goal: ship real installable desktop artifacts instead of developer-only bundles.
+- Goal: finish the remaining public-release blockers after the shipped Windows
+  path and the now-landed Linux packaged proof/readiness scaffolding.
 - Remaining work:
-  - macOS signing
-  - Linux packaged validation and release shape
+  - public macOS signing, notarization, and release-secret wiring
   - updater readiness after signing is stable
-  - explicit prerequisite/bootstrap story for end users and developers
 - Exit criteria:
   - supported public installers are produced in CI/release workflows
   - updater strategy is documented and wired only after signed release flow is stable
-  - prerequisite installation paths are explicit enough for new users
 
 #### Phase 19D: desktop-native UX and local-runtime operations
 
@@ -176,7 +144,7 @@ Desktop shell scaffolding and packaged backend sidecar are already landed and ar
 
 ### UI surfaces waiting on backend/runtime
 
-These items should remain roadmap-only in the frontend until the corresponding backend/runtime slice exists.
+These items should remain roadmap-only in the frontend until the corresponding backend/runtime slice exists. The shipped UI now treats `/api/system/features` as the capability truth for currently exposed workbench affordances, so future placeholders should stay hidden or diagnostic-only until the backend path is mechanically proven.
 
 - Cloud model API integration for non-local inference backends
 - Real Search / Browse mode
@@ -189,17 +157,7 @@ These items should remain roadmap-only in the frontend until the corresponding b
 ## Dependencies and constraints
 
 - Planning for future workbench, connector, project-memory, and other frontier surfaces should follow the canonical policy in [ENGINEERING_STANDARDS.md](../standards/ENGINEERING_STANDARDS.md), especially the admission-gate and capability-gate rules.
-- Shared runtime foundations still need to land before project-memory, connector, or broader frontend promises widen.
+- Future project-memory, connector, and frontend widening should build on the landed shared source catalog, capability assembly, and source-executor seams before promising broader runtime behavior.
 - Shared runtime foundations now build on the shipped object-store boundary plus the hosted/server Postgres runtime metadata posture in [POSTGRES_RUNTIME_PERSISTENCE_DECISION_PACKAGE.md](../architecture/POSTGRES_RUNTIME_PERSISTENCE_DECISION_PACKAGE.md), while local and desktop continue to default to SQLite.
 
 ---
-
-## Decision pending
-
-### `/api/knowledge/answers` semantic alignment
-
-The product still needs a decision on whether `/api/knowledge/answers` should keep returning a raw retrieved snippet summary or move to the same LLM-synthesis behavior used by chat with `knowledge_document_ids`.
-
-- Current state: chat synthesizes retrieved context; `/api/knowledge/answers` returns a snippet-style response
-- Decision needed: keep the divergence and document it, or unify the answer semantics
-- Impact: user expectations, API documentation, and the long-term retrieval UX

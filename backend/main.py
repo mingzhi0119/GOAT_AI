@@ -29,6 +29,7 @@ from backend.routers import (
 )
 from backend.services.code_sandbox_execution_service import (
     recover_queued_code_sandbox_executions,
+    reap_abandoned_running_code_sandbox_executions,
 )
 from backend.services.background_jobs import ThreadBackgroundJobRunner
 from backend.services.code_sandbox_provider import (
@@ -113,6 +114,9 @@ def _build_lifespan(settings: Settings):
         def run_code_sandbox_recovery() -> None:
             repository = build_code_sandbox_execution_repository(settings)
             provider = _build_code_sandbox_provider(settings)
+            reap_abandoned_running_code_sandbox_executions(
+                repository=repository,
+            )
             recover_queued_code_sandbox_executions(
                 repository=repository,
                 provider=provider,

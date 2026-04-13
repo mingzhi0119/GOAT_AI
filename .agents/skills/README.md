@@ -8,6 +8,7 @@ This directory contains GOAT AI repo-local Codex skills.
 - [goat-api-contract-proof](goat-api-contract-proof/SKILL.md): backend/docs/frontend API contract sync and proof; composes with black-box contract tests.
 - [goat-ci-surface-router](goat-ci-surface-router/SKILL.md): route a change set to the minimum required validation matrix and CI-equivalent checks.
 - [goat-desktop-release-evidence](goat-desktop-release-evidence/SKILL.md): packaged gate vs release evidence vs drill boundaries for desktop workflows and retained proof.
+- [goat-sandbox-runtime-proof](goat-sandbox-runtime-proof/SKILL.md): sandbox supervisor, cancellation/retry, egress, and contract-proof workflow for runtime changes.
 - [goat-workbench-authz-proof](goat-workbench-authz-proof/SKILL.md): caller-scoped workbench authz and future-widening prevention proof.
 - [goat-observability-contract-proof](goat-observability-contract-proof/SKILL.md): metric family plus label/query-shape proof across exporter, assets, and runbooks.
 - [goat-governance-sync](goat-governance-sync/SKILL.md): align roadmap, status, and ops docs with proved repo reality.
@@ -18,6 +19,7 @@ This directory contains GOAT AI repo-local Codex skills.
 - [API contract dry runs](goat-api-contract-proof/references/dry-run-examples.md): contract-sync prompts for backend, docs, and frontend surfaces.
 - [CI routing dry runs](goat-ci-surface-router/references/dry-run-examples.md): changed-file prompts that map to the minimum required validation matrix.
 - [desktop evidence dry runs](goat-desktop-release-evidence/references/dry-run-examples.md): packaged vs installed vs drill proof prompts.
+- [sandbox runtime dry runs](goat-sandbox-runtime-proof/references/dry-run-examples.md): supervisor, egress, and contract-proof prompts.
 - [workbench authz dry runs](goat-workbench-authz-proof/references/dry-run-examples.md): caller-scoped capability and widening-prevention prompts.
 - [observability proof dry runs](goat-observability-contract-proof/references/dry-run-examples.md): metric-label and selector-proof prompts.
 

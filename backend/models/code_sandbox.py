@@ -16,7 +16,7 @@ CodeSandboxStatus = Literal[
     "cancelled",
 ]
 CodeSandboxExecutionMode = Literal["sync", "async"]
-CodeSandboxNetworkPolicy = Literal["disabled", "allowlist", "enabled"]
+CodeSandboxNetworkPolicy = Literal["disabled"]
 CodeSandboxRuntimePreset = Literal["shell"]
 CodeSandboxIsolationLevel = Literal["container", "host"]
 
@@ -62,7 +62,7 @@ class CodeSandboxExecRequest(BaseModel):
     )
     network_policy: CodeSandboxNetworkPolicy | None = Field(
         default=None,
-        description="Reserved for future policies. Phase 18 only allows `disabled`.",
+        description="Execution network policy. The shipped runtime only accepts `disabled`.",
     )
     files: list[CodeSandboxInlineFile] = Field(
         default_factory=list,

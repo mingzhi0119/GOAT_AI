@@ -182,6 +182,7 @@ class SQLiteCodeSandboxExecutionStore:
         updated_at: str,
         finished_at: str,
         error_detail: str,
+        output_files: list[dict[str, object]] | None = None,
     ) -> None:
         try:
             with sqlite3.connect(self._db_path) as conn:
@@ -192,6 +193,7 @@ class SQLiteCodeSandboxExecutionStore:
                     updated_at=updated_at,
                     finished_at=finished_at,
                     error_detail=error_detail,
+                    output_files=output_files,
                 )
                 if not updated:
                     conn.rollback()
@@ -530,6 +532,7 @@ class SQLiteCodeSandboxExecutionStore:
         updated_at: str,
         finished_at: str,
         error_detail: str,
+        output_files: list[dict[str, object]] | None = None,
     ) -> bool:
         cursor = conn.execute(
             """
@@ -539,10 +542,16 @@ class SQLiteCodeSandboxExecutionStore:
                 finished_at = ?,
                 timed_out = 0,
                 error_detail = ?,
-                output_files_json = COALESCE(output_files_json, '[]')
-            WHERE id = ? AND status = 'queued'
+                output_files_json = ?
+            WHERE id = ? AND status IN ('queued', 'running')
             """,
-            (updated_at, finished_at, error_detail, execution_id),
+            (
+                updated_at,
+                finished_at,
+                error_detail,
+                encode_json(output_files or []),
+                execution_id,
+            ),
         )
         if cursor.rowcount == 0:
             return False

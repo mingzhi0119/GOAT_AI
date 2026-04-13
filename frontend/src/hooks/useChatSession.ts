@@ -1,10 +1,11 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { ChartSpec, OllamaOptionsPayload, ThemeStyle } from '../api/types'
 import { useChat } from './useChat'
 import { useFileContext, type FileBindingMode, type FileContextItem } from './useFileContext'
 import { useHistory } from './useHistory'
-import { historyKnowledgeAttachments } from '../utils/sessionHistory'
-import { normalizeSessionTitle, truncateSessionTitle } from '../utils/sessionTitle'
+import { useChatSendMessageController } from './useChatSendMessageController'
+import { useChatSessionHistorySync } from './useChatSessionHistorySync'
+import { useSessionTitle } from './useSessionTitle'
 
 interface UseChatSessionArgs {
   selectedModel: string
@@ -71,21 +72,11 @@ export function useChatSession({
   } = useFileContext()
   const [chartSpec, setChartSpec] = useState<ChartSpec | null>(null)
 
-  const sessionTitle = useMemo(() => {
-    const sessionId = chat.sessionId
-    if (!sessionId) return null
-    const fromHistory = history.sessions.find(session => session.id === sessionId)?.title?.trim()
-    if (fromHistory) return fromHistory
-    const firstUser = chat.messages.find(
-      message =>
-        message.role === 'user' &&
-        !message.isStreaming &&
-        !message.hidden &&
-        message.content.trim().length > 0,
-    )
-    if (!firstUser) return null
-    return truncateSessionTitle(firstUser.content)
-  }, [chat.messages, chat.sessionId, history.sessions])
+  const sessionTitle = useSessionTitle({
+    sessionId: chat.sessionId,
+    messages: chat.messages,
+    historySessions: history.sessions,
+  })
 
   const clearChatSession = useCallback(() => {
     chat.clearMessages()
@@ -106,69 +97,27 @@ export function useChatSession({
     [setFileContextMode],
   )
 
-  const loadHistorySession = useCallback(
-    async (sessionId: string) => {
-      const session = await history.loadSession(sessionId)
-      setChartSpec(session.chart_spec)
-      chat.loadSession(session)
-      const attachments = historyKnowledgeAttachments(session)
-      if (attachments.length > 0) replaceFileContexts(attachments)
-      else clearFileContext()
-    },
-    [chat, clearFileContext, history, replaceFileContexts],
-  )
+  const loadHistorySession = useChatSessionHistorySync({
+    chat,
+    history,
+    setChartSpec,
+    replaceFileContexts,
+    clearFileContext,
+  })
 
-  const sendMessage = useCallback(
-    async (content: string, imageAttachmentIds?: string[]) => {
-      const activeSessionId = chat.sessionId ?? crypto.randomUUID()
-      const optimisticTitle = normalizeSessionTitle(content) || 'New Chat'
-      const nowIso = new Date().toISOString()
-      history.upsertSession({
-        id: activeSessionId,
-        title: optimisticTitle,
-        model: selectedModel,
-        schema_version: 1,
-        created_at: nowIso,
-        updated_at: nowIso,
-        owner_id: '',
-      })
-
-      const knowledgeDocumentIds = fileContexts
-        .filter(item => item.documentId && item.bindingMode !== 'idle')
-        .map(item => item.documentId!)
-
-      const shouldAttachKnowledge = knowledgeDocumentIds.length > 0 && !imageAttachmentIds?.length
-      await chat.sendMessage(
-        content,
-        selectedModel,
-        userName,
-        shouldAttachKnowledge ? knowledgeDocumentIds : undefined,
-        planModeEnabled,
-        systemInstruction,
-        themeStyle,
-        ollamaOptions,
-        setChartSpec,
-        imageAttachmentIds,
-        activeSessionId,
-      )
-      fileContexts
-        .filter(item => item.bindingMode === 'single')
-        .forEach(item => setFileContextMode(item.id, 'idle'))
-      await history.refresh()
-    },
-    [
-      chat,
-      fileContexts,
-      history,
-      ollamaOptions,
-      selectedModel,
-      planModeEnabled,
-      setFileContextMode,
-      systemInstruction,
-      themeStyle,
-      userName,
-    ],
-  )
+  const sendMessage = useChatSendMessageController({
+    chat,
+    history,
+    fileContexts,
+    selectedModel,
+    userName,
+    systemInstruction,
+    planModeEnabled,
+    themeStyle,
+    ollamaOptions,
+    setChartSpec,
+    setFileContextMode,
+  })
 
   return {
     messages: chat.messages,

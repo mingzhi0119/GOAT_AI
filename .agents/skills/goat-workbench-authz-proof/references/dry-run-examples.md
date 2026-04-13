@@ -35,3 +35,21 @@ Expected output:
 
 Validate with:
 - name the exact contract or service tests that prove the behavior is intended rather than an accidental widening or narrowing
+
+## Example 3
+
+User asks:
+- "We moved workbench source logic into shared runtime helpers; how do we prove `/api/system/features` and `/api/workbench/sources` still tell the same caller-scoped truth?"
+
+First moves:
+- read the source catalog, capability assembly, registry wrapper, and caller-scoped checklist together
+- confirm hidden connector or project-memory visibility still resolves as concealed rather than denied
+- separate shared runtime extraction from any supposed frontend promise widening
+
+Expected output:
+- whether the shared-runtime extraction preserved caller-scoped semantics
+- the exact service and contract tests that prove source inventory and capability discovery still match
+- any remaining follow-on work that is still out of scope
+
+Validate with:
+- run the relevant service tests plus `__tests__/contracts/test_api_authz.py` and `__tests__/contracts/test_api_blackbox_contract.py`

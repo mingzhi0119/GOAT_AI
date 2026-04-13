@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import tempfile
+import time
 import unittest
 from dataclasses import replace
 from pathlib import Path
@@ -87,7 +88,7 @@ class FakeTitleGenerator:
 class FakeCodeSandboxProvider:
     provider_name = "fake-docker"
 
-    def run_stream(self, request: SandboxProviderRequest):
+    def run_stream(self, request: SandboxProviderRequest, *, cancel_requested=None):
         output_files: list[dict[str, object]] = []
         if request.command == "touch outputs/report.txt":
             output_files.append({"path": "report.txt", "byte_size": 12})
@@ -97,6 +98,38 @@ class FakeCodeSandboxProvider:
                 created_at="2026-04-10T00:00:00Z",
                 text="async log line\n",
             )
+        if request.command == "hold-cancellable":
+            yield SandboxProviderLogChunk(
+                stream_name="stdout",
+                created_at="2026-04-10T00:00:00Z",
+                text="holding\n",
+            )
+            deadline = time.monotonic() + 1.0
+            while time.monotonic() < deadline:
+                if cancel_requested is not None and cancel_requested():
+                    yield SandboxProviderResult(
+                        provider_name=self.provider_name,
+                        exit_code=None,
+                        stdout="",
+                        stderr="",
+                        timed_out=False,
+                        cancelled=True,
+                        error_detail="Execution cancelled by request.",
+                        output_files=[],
+                    )
+                    return
+                time.sleep(0.02)
+            yield SandboxProviderResult(
+                provider_name=self.provider_name,
+                exit_code=0,
+                stdout="finished after hold",
+                stderr="",
+                timed_out=False,
+                cancelled=False,
+                error_detail=None,
+                output_files=[],
+            )
+            return
         if request.command == "sleep-forever":
             yield SandboxProviderResult(
                 provider_name=self.provider_name,
@@ -104,6 +137,7 @@ class FakeCodeSandboxProvider:
                 stdout="",
                 stderr="",
                 timed_out=True,
+                cancelled=False,
                 error_detail="Execution timed out.",
                 output_files=[],
             )
@@ -115,6 +149,7 @@ class FakeCodeSandboxProvider:
                 stdout="",
                 stderr="bad exit",
                 timed_out=False,
+                cancelled=False,
                 error_detail="Execution exited with a non-zero status.",
                 output_files=[],
             )
@@ -125,6 +160,7 @@ class FakeCodeSandboxProvider:
             stdout="sandbox ok",
             stderr="",
             timed_out=False,
+            cancelled=False,
             error_detail=None,
             output_files=output_files,
         )
@@ -284,6 +320,13 @@ class ContractFakeLLM:
         *,
         ollama_options: dict[str, float | int] | None = None,
     ) -> str:
+        if (
+            "You are answering a user question with retrieved knowledge context."
+            in prompt
+        ):
+            if "competitive pressure" in prompt:
+                return "Porter Five Forces explains competitive pressure."
+            return "I could not find evidence in the indexed knowledge base for that question."
         return (
             "## Goal\n"
             "- Produce a concise plan\n\n"
@@ -968,6 +1011,8 @@ class ApiBlackboxContractTests(unittest.TestCase):
         answer_body = answer.json()
         self.assertTrue(answer_body["answer"])
         self.assertGreaterEqual(len(answer_body["citations"]), 1)
+        self.assertNotIn("Relevant retrieved context:", answer_body["answer"])
+        self.assertIn("competitive pressure", answer_body["answer"])
 
         no_hit = self.client.post(
             "/api/knowledge/answers",
@@ -976,9 +1021,22 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(200, no_hit.status_code)
         self.assertEqual([], no_hit.json()["citations"])
         self.assertEqual(
-            "No relevant context found in the indexed knowledge base.",
+            "I could not find evidence in the indexed knowledge base for that question.",
             no_hit.json()["answer"],
         )
+
+        self.client.app.dependency_overrides[get_llm_client] = lambda: UnavailableLLM()
+        try:
+            unavailable = self.client.post(
+                "/api/knowledge/answers",
+                json={"query": "Porter competitive pressure summary", "top_k": 3},
+            )
+        finally:
+            self.client.app.dependency_overrides[get_llm_client] = lambda: (
+                ContractFakeLLM()
+            )
+        self.assertEqual(503, unavailable.status_code)
+        self.assertEqual("AI backend unavailable", unavailable.json()["detail"])
 
         rag_chat = self.client.post(
             "/api/chat",
@@ -1324,7 +1382,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertTrue(
             feature_body["workbench"]["artifact_workspace"]["effective_enabled"]
         )
-        self.assertFalse(
+        self.assertTrue(
             feature_body["workbench"]["project_memory"]["effective_enabled"]
         )
         self.assertFalse(feature_body["workbench"]["connectors"]["effective_enabled"])
@@ -1333,7 +1391,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(200, sources_response.status_code)
         sources_body = sources_response.json()
         self.assertEqual(
-            ["web", "knowledge"],
+            ["web", "knowledge", "project_memory"],
             [source["source_id"] for source in sources_body["sources"]],
         )
         self.assertTrue(sources_body["sources"][0]["runtime_ready"])
@@ -1344,6 +1402,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
             ["plan", "browse", "deep_research"],
             sources_body["sources"][1]["task_kinds"],
         )
+        self.assertEqual("project_memory", sources_body["sources"][2]["kind"])
+        self.assertEqual("project_scope", sources_body["sources"][2]["scope_kind"])
+        self.assertTrue(sources_body["sources"][2]["runtime_ready"])
 
         create_response = self.client.post(
             "/api/workbench/tasks",
@@ -1455,8 +1516,8 @@ class ApiBlackboxContractTests(unittest.TestCase):
             source_ids = {source["source_id"] for source in body["sources"]}
 
             self.assertIn("web", source_ids)
-            self.assertTrue(source_ids.issubset({"web", "knowledge"}))
-            self.assertNotIn("project_memory", source_ids)
+            self.assertIn("project_memory", source_ids)
+            self.assertTrue(source_ids.issubset({"web", "knowledge", "project_memory"}))
             self.assertNotIn("connectors", source_ids)
 
             for source in body["sources"]:
@@ -1572,9 +1633,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
             reader_workbench,
             "project_memory",
             allowed_by_config=True,
-            available_on_host=False,
-            effective_enabled=False,
-            deny_reason="not_implemented",
+            available_on_host=True,
+            effective_enabled=True,
+            deny_reason=None,
         )
         self.assert_workbench_feature_state(
             reader_workbench,
@@ -1629,9 +1690,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
             writer_workbench,
             "project_memory",
             allowed_by_config=True,
-            available_on_host=False,
-            effective_enabled=False,
-            deny_reason="not_implemented",
+            available_on_host=True,
+            effective_enabled=True,
+            deny_reason=None,
         )
         self.assert_workbench_feature_state(
             writer_workbench,
@@ -1900,6 +1961,59 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertIn("async log line", final_status.json()["stdout"])
 
     @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
+    def test_code_sandbox_cancel_can_stop_running_execution(
+        self, _mock: object
+    ) -> None:
+        self.settings = replace(self.settings, feature_code_sandbox_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+        self.client.app.dependency_overrides[get_code_sandbox_provider] = lambda: (
+            FakeCodeSandboxProvider()
+        )
+
+        created = self.client.post(
+            "/api/code-sandbox/exec",
+            json={
+                "execution_mode": "async",
+                "code": "echo sandbox ok",
+                "command": "hold-cancellable",
+            },
+        )
+        self.assertEqual(202, created.status_code)
+        execution_id = created.json()["execution_id"]
+
+        status = self.client.get(f"/api/code-sandbox/executions/{execution_id}")
+        deadline = time.monotonic() + 2.0
+        while status.status_code == 200 and status.json()["status"] != "running":
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(0.02)
+            status = self.client.get(f"/api/code-sandbox/executions/{execution_id}")
+
+        self.assertEqual(200, status.status_code)
+        self.assertEqual("running", status.json()["status"])
+
+        cancel = self.client.post(f"/api/code-sandbox/executions/{execution_id}/cancel")
+        self.assertEqual(200, cancel.status_code)
+        self.assertEqual("cancelled", cancel.json()["status"])
+        self.assertEqual(
+            "Execution cancelled by request.",
+            cancel.json()["error_detail"],
+        )
+
+        events = self.client.get(f"/api/code-sandbox/executions/{execution_id}/events")
+        self.assertEqual(200, events.status_code)
+        self.assertEqual(
+            [
+                "execution.queued",
+                "execution.started",
+                "execution.log.stdout",
+                "execution.cancel_requested",
+                "execution.cancelled",
+            ],
+            [event["event_type"] for event in events.json()["events"]],
+        )
+
+    @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
     def test_code_sandbox_cancel_cancels_queued_execution_and_finishes_logs(
         self, _mock: object
     ) -> None:
@@ -1950,6 +2064,40 @@ class ApiBlackboxContractTests(unittest.TestCase):
         )
         self.assertEqual(409, conflict.status_code)
         self.assertEqual(RESOURCE_CONFLICT, conflict.json()["code"])
+
+    @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
+    def test_code_sandbox_retry_rejects_running_execution(self, _mock: object) -> None:
+        self.settings = replace(self.settings, feature_code_sandbox_enabled=True)
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+        self.client.app.dependency_overrides[get_code_sandbox_provider] = lambda: (
+            FakeCodeSandboxProvider()
+        )
+
+        created = self.client.post(
+            "/api/code-sandbox/exec",
+            json={
+                "execution_mode": "async",
+                "code": "echo sandbox ok",
+                "command": "hold-cancellable",
+            },
+        )
+        self.assertEqual(202, created.status_code)
+        execution_id = created.json()["execution_id"]
+
+        status = self.client.get(f"/api/code-sandbox/executions/{execution_id}")
+        deadline = time.monotonic() + 2.0
+        while status.status_code == 200 and status.json()["status"] != "running":
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(0.02)
+            status = self.client.get(f"/api/code-sandbox/executions/{execution_id}")
+
+        self.assertEqual(200, status.status_code)
+        self.assertEqual("running", status.json()["status"])
+
+        retry = self.client.post(f"/api/code-sandbox/executions/{execution_id}/retry")
+        self.assertEqual(409, retry.status_code)
+        self.assertEqual(RESOURCE_CONFLICT, retry.json()["code"])
 
     @patch("goat_ai.config.feature_gates.probe_docker_available", return_value=True)
     def test_code_sandbox_retry_creates_new_execution_with_lineage(
@@ -2149,20 +2297,24 @@ class ApiBlackboxContractTests(unittest.TestCase):
 
         events_response = self.client.get(f"/api/workbench/tasks/{task_id}/events")
         self.assertEqual(200, events_response.status_code)
-        self.assertEqual(
-            [
-                "task.queued",
-                "task.started",
-                "retrieval.sources_resolved",
-                "retrieval.step.completed",
-                "task.completed",
-            ],
-            [event["event_type"] for event in events_response.json()["events"]],
-        )
-        self.assertEqual(
-            "knowledge",
-            events_response.json()["events"][3]["metadata"]["source_id"],
-        )
+        event_types = [
+            event["event_type"] for event in events_response.json()["events"]
+        ]
+        self.assertEqual("task.queued", event_types[0])
+        self.assertEqual("task.started", event_types[1])
+        self.assertIn("retrieval.sources_resolved", event_types)
+        self.assertIn("research.plan.created", event_types)
+        self.assertIn("retrieval.step.started", event_types)
+        self.assertIn("retrieval.step.completed", event_types)
+        self.assertIn("research.synthesis.completed", event_types)
+        self.assertEqual("task.completed", event_types[-1])
+        knowledge_events = [
+            event
+            for event in events_response.json()["events"]
+            if event["event_type"] == "retrieval.step.completed"
+            and event["metadata"].get("source_id") == "knowledge"
+        ]
+        self.assertGreaterEqual(len(knowledge_events), 1)
 
     def test_workbench_deep_research_with_web_only_completes_with_web_citations(
         self,
@@ -2208,13 +2360,15 @@ class ApiBlackboxContractTests(unittest.TestCase):
 
         events_response = self.client.get(f"/api/workbench/tasks/{task_id}/events")
         self.assertEqual(200, events_response.status_code)
-        self.assertEqual(
-            "web",
-            events_response.json()["events"][3]["metadata"]["source_id"],
-        )
-        self.assertEqual(
-            "duckduckgo",
-            events_response.json()["events"][3]["metadata"]["provider"],
+        web_events = [
+            event
+            for event in events_response.json()["events"]
+            if event["event_type"] == "retrieval.step.completed"
+            and event["metadata"].get("source_id") == "web"
+        ]
+        self.assertGreaterEqual(len(web_events), 1)
+        self.assertTrue(
+            all(event["metadata"]["provider"] == "duckduckgo" for event in web_events)
         )
 
     def test_workbench_canvas_task_completes_with_workspace_output(self) -> None:

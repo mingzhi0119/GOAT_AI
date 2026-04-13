@@ -109,8 +109,14 @@ class KnowledgeAnswerRequest(BaseModel):
 class KnowledgeAnswerResponse(BaseModel):
     """Retrieval-backed answer contract."""
 
-    answer: str
-    citations: list[KnowledgeCitation] = Field(default_factory=list)
+    answer: str = Field(
+        ...,
+        description="Synthesized answer grounded in the retrieved knowledge context.",
+    )
+    citations: list[KnowledgeCitation] = Field(
+        default_factory=list,
+        description="Retrieved citations used as evidence for the synthesized answer.",
+    )
 
 
 class KnowledgeUploadStatusResponse(BaseModel):

@@ -19,6 +19,7 @@ REQUIRED_SKILLS = {
     "goat-engineering-audit",
     "goat-governance-sync",
     "goat-observability-contract-proof",
+    "goat-sandbox-runtime-proof",
     "goat-workbench-authz-proof",
     "wsl-linux-build",
     "wsl-linux-ops-checks",
@@ -228,6 +229,7 @@ def test_agents_guidance_mentions_repo_skill_layers_and_entry_points() -> None:
         "$goat-api-contract-proof",
         "$goat-ci-surface-router",
         "$goat-desktop-release-evidence",
+        "$goat-sandbox-runtime-proof",
         "$goat-workbench-authz-proof",
         "$goat-observability-contract-proof",
         "$goat-governance-sync",
@@ -267,6 +269,10 @@ def test_targeted_skills_keep_required_truth_sources_and_validation_clues() -> N
         SKILLS_ROOT / "goat-workbench-authz-proof" / "SKILL.md": [
             "/api/system/features",
             "__tests__/contracts/",
+        ],
+        SKILLS_ROOT / "goat-sandbox-runtime-proof" / "SKILL.md": [
+            "/api/code-sandbox/*",
+            "__tests__/backend/",
         ],
         SKILLS_ROOT / "goat-observability-contract-proof" / "SKILL.md": [
             "__tests__/ops/test_observability_asset_contract.py",

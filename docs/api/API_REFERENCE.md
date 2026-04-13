@@ -52,7 +52,7 @@ Base path: `/api`
 | `GET` | `/api/system/desktop` | Desktop runtime diagnostics for packaged installs |
 | `POST` | `/api/code-sandbox/exec` | Execute one sandbox run in `sync` or `async` mode |
 | `GET` | `/api/code-sandbox/executions/{execution_id}` | Read one persisted sandbox execution |
-| `POST` | `/api/code-sandbox/executions/{execution_id}/cancel` | Cancel one queued sandbox execution |
+| `POST` | `/api/code-sandbox/executions/{execution_id}/cancel` | Cancel one queued or running sandbox execution |
 | `POST` | `/api/code-sandbox/executions/{execution_id}/retry` | Retry one terminal sandbox execution as a new durable run |
 | `GET` | `/api/code-sandbox/executions/{execution_id}/events` | Read one persisted sandbox execution timeline |
 | `GET` | `/api/code-sandbox/executions/{execution_id}/logs` | Stream replayable sandbox logs over SSE |
@@ -165,7 +165,9 @@ Notes:
 - `workbench.browse` / `workbench.deep_research` report capability-level readiness, not source-specific readiness; use `GET /api/workbench/sources` to decide whether the global `web` source itself is runnable
 - `workbench.artifact_workspace` reflects the shipped baseline for durable workspace output visibility
 - `workbench.artifact_exports` reflects the shipped export-to-artifact linkage and stays denied unless the caller also has `workbench:export` plus `artifact:write`
-- `workbench.project_memory` remains a caller-visible placeholder for future widening and should stay `deny_reason = "not_implemented"` until a real runtime exists
+- `workbench.project_memory` now reflects the landed read-only project-memory foundation and becomes runtime-ready when the caller can see the bounded `project_memory` source
+- `workbench.connectors` remains write-scoped even though `/api/workbench/sources` may expose read-only connector bindings to `workbench:read` callers; connector task execution still requires `workbench:write`
+- `/api/system/features` and `/api/workbench/sources` now derive from the same caller-visible source facts, so hidden connector bindings stay concealed instead of leaking through capability discovery
 - frontend UI should use this endpoint to hide or disable unavailable surfaces instead of assuming that a visible button implies runtime support
 
 ## `GET /api/models`
@@ -390,12 +392,13 @@ Notes:
 - when `knowledge_document_ids` are attached, the task implicitly includes the `knowledge` source even if the caller omitted it from `source_ids`
 - when `browse` or `deep_research` omits both `source_ids` and `knowledge_document_ids`, the task defaults to the global `web` source
 - every resolved source must explicitly advertise the requested `task_kind`; mixed source sets that include an incompatible source now fail fast with `422`
+- requesting `project_memory` without `project_id` fails fast with `422`
 - `browse` and `deep_research` now fail fast with `422` when no runtime-ready retrieval source is available to the caller
 - request shape is intentionally forward-compatible for future task execution and output linkage
 - current task-kind behavior:
   - `plan`: completed markdown result
-  - `browse`: minimal retrieval execution over runtime-ready sources; completed results may include citations
-  - `deep_research`: same bounded retrieval chain with more results; current runtime is still an evidence brief, not iterative autonomous long-horizon research
+  - `browse`: bounded multi-step plan -> retrieve -> synthesize execution over runtime-ready sources; completed results may include citations and additive timeline detail
+  - `deep_research`: same bounded multi-step runtime with a larger step budget and evidence surface; it is step-limited research, not open-ended autonomous long-horizon execution
   - `canvas`: completes with a durable `canvas_document` workspace output plus inline markdown result content; that output can later be exported to a downloadable artifact
 - unknown or caller-invisible source ids return `422`
 - missing workbench scopes or denied requested-source scopes return `403`
@@ -411,6 +414,9 @@ Current behavior:
 - current built-in source ids are:
   - `web`
   - `knowledge`
+  - `project_memory`
+- callers may also see operator-provisioned read-only `connector:*` bindings when
+  the binding is visible to their tenant / principal / owner context
 - each source includes:
   - `source_id`
   - `display_name`
@@ -425,6 +431,10 @@ Current behavior:
 - `knowledge` is hidden unless the caller can read knowledge resources
 - `web` is runtime-ready by default when `GOAT_WORKBENCH_WEB_PROVIDER=duckduckgo`
 - `web` reports `runtime_ready = false` with `deny_reason = "disabled_by_operator"` when `GOAT_WORKBENCH_WEB_PROVIDER=disabled`
+- `project_memory` is read-only, supports `browse` / `deep_research`, and
+  requires an explicit `project_id` when referenced by a task
+- visible connector bindings are read-only, operator-provisioned, and hidden
+  entirely from callers who fail the binding visibility rules
 - current public-web retrieval is experimental and uses the DDGS DuckDuckGo-style provider to return bounded search-result evidence
 - callers without `workbench:read` receive `403`
 
@@ -663,8 +673,12 @@ Current behavior:
   - `task.retry_requested`
   - `task.retry_created`
   - `retrieval.sources_resolved`
+  - `research.plan.created`
+  - `retrieval.step.started`
   - `retrieval.step.completed`
   - `retrieval.step.skipped`
+  - `research.follow_up.scheduled`
+  - `research.synthesis.completed`
   - `workspace_output.created`
   - `workspace_output.exported`
 - `task.completed`
@@ -730,7 +744,8 @@ Retrieval-backed answer endpoint outside the chat session contract.
 Current behavior:
 
 - Returns a retrieval-backed answer plus citation payloads
-- Defines explicit no-hit behavior: `No relevant context found in the indexed knowledge base.`
+- Synthesizes the answer text from the same retrieved context pattern used by chat with `knowledge_document_ids`, while preserving the `answer` plus `citations` shape
+- When retrieval finds no evidence, returns a brief synthesized insufficiency answer with an empty citation list
 - When `document_ids` are provided and lexical retrieval misses, the first indexed chunks from those attached documents are used as a bounded fallback scope
 
 ## `POST /api/media/uploads`
@@ -963,7 +978,7 @@ Executes one shell run through the configured sandbox provider. Phase 18A uses:
 - an ephemeral workspace
 - Docker isolation with **network disabled by default**, or a localhost dev fallback when `GOAT_CODE_SANDBOX_PROVIDER=localhost`
 - durable execution, event, and log rows in SQLite for later reads
-- `sync` by default, with optional in-process durable `async` dispatch plus queued-execution recovery on startup
+- `sync` by default, with optional in-process durable `async` dispatch plus startup recovery that replays queued executions and fails abandoned running executions closed
 
 Request body:
 
@@ -991,6 +1006,11 @@ Behavior:
 - when `command` is omitted, the server executes `code` as a shell script
 - inline files must use relative workspace paths only
 - files created under `outputs/` are reported back as metadata in the response
+- each workspace also receives `.goat/workspace_manifest.json` plus
+  `GOAT_SANDBOX_EXECUTION_ID`, `GOAT_SANDBOX_WORKSPACE`,
+  `GOAT_SANDBOX_OUTPUTS_DIR`, `GOAT_SANDBOX_MANIFEST`, and
+  `GOAT_SANDBOX_NETWORK_POLICY` so scripts can discover the current execution
+  boundary without guessing paths
 - `network_policy` currently only allows `disabled`; other values return `422`
 - Docker enforces that policy. The `localhost` provider reports `network_policy_enforced: false` and should be treated as a trusted development fallback rather than a strong-isolation sandbox
 - `execution_mode` defaults to `sync`; `async` returns immediately after durable acceptance and continues in a background dispatcher
@@ -1037,14 +1057,23 @@ Returns the same durable execution shape as `POST /api/code-sandbox/exec` after 
 
 ## `POST /api/code-sandbox/executions/{execution_id}/cancel`
 
-Cancels one visible `queued` sandbox execution.
+Cancels one visible `queued` or `running` sandbox execution.
 
 Current behavior:
 
-- only `queued` executions can be cancelled
-- success returns `200` with the normal durable execution payload and `status = cancelled`
-- cancelled executions set `finished_at` and `error_detail = "Execution cancelled before start."`
-- running or terminal executions return `409` with `code = RESOURCE_CONFLICT`
+- queued cancellations return `200` with the normal durable execution payload
+  and `status = cancelled`
+- running cancellations append `execution.cancel_requested`, ask the current
+  in-process supervisor seam to stop the provider, and return `200` once the
+  durable record reaches `status = cancelled`
+- queued cancellations set `finished_at` and
+  `error_detail = "Execution cancelled before start."`
+- running cancellations set
+  `error_detail = "Execution cancelled by request."` when acknowledgement
+  completes inside the bounded wait window
+- terminal executions return `409` with `code = RESOURCE_CONFLICT`
+- a running execution also returns `409` if cancellation acknowledgement does
+  not complete before the bounded API wait window expires
 - missing or caller-invisible execution ids return `404`
 - cancelled executions are terminal and cause `GET /logs` to emit a final `done` event
 
@@ -1120,7 +1149,11 @@ Returns the durable execution timeline:
 
 Additional lifecycle events include:
 
+- `execution.cancel_requested` when a running execution receives a cooperative
+  cancellation request
 - `execution.cancelled` when a queued execution is cancelled before start
+- `execution.recovered_after_restart` when startup recovery finds an abandoned
+  `running` execution and fails it closed
 - `execution.retry_requested` on the original record, with `metadata.retry_execution_id`
 - `execution.retry_created` on the new record, with `metadata.source_execution_id`
 

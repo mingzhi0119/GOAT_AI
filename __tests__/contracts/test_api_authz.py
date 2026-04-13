@@ -53,14 +53,16 @@ if TestClient is not None:
 class AuthzFakeCodeSandboxProvider:
     provider_name = "fake-docker"
 
-    def run_stream(self, request: SandboxProviderRequest):
+    def run_stream(self, request: SandboxProviderRequest, *, cancel_requested=None):
         _ = request
+        _ = cancel_requested
         yield SandboxProviderResult(
             provider_name=self.provider_name,
             exit_code=0,
             stdout="sandbox ok",
             stderr="",
             timed_out=False,
+            cancelled=False,
             error_detail=None,
             output_files=[],
         )
@@ -429,7 +431,8 @@ class ApiAuthzTests(unittest.TestCase):
         )
         self.assertEqual(200, response.status_code)
         self.assertEqual(
-            ["web"], [item["source_id"] for item in response.json()["sources"]]
+            ["web", "project_memory"],
+            [item["source_id"] for item in response.json()["sources"]],
         )
 
         features = self.client.get(
@@ -482,9 +485,9 @@ class ApiAuthzTests(unittest.TestCase):
             workbench,
             "project_memory",
             allowed_by_config=True,
-            available_on_host=False,
-            effective_enabled=False,
-            deny_reason="not_implemented",
+            available_on_host=True,
+            effective_enabled=True,
+            deny_reason=None,
         )
         self.assert_workbench_feature_state(
             workbench,
@@ -501,6 +504,97 @@ class ApiAuthzTests(unittest.TestCase):
         )
         self.assertEqual(200, desktop.status_code)
         self.assertFalse(desktop.json()["desktop_mode"])
+
+    def test_connector_inventory_and_features_are_concealed_per_caller(self) -> None:
+        self.settings = replace(
+            self.settings,
+            feature_agent_workbench_enabled=True,
+            api_key="bootstrap-auth-enabled",
+            api_key_write="",
+            api_credentials_json="""
+            [
+              {
+                "credential_id": "cred-workbench-reader",
+                "secret": "workbench-reader",
+                "principal_id": "principal:reader",
+                "tenant_id": "tenant:default",
+                "status": "active",
+                "scopes": ["history:read", "workbench:read"]
+              },
+              {
+                "credential_id": "cred-workbench-writer",
+                "secret": "workbench-writer",
+                "principal_id": "principal:writer",
+                "tenant_id": "tenant:default",
+                "status": "active",
+                "scopes": ["history:read", "workbench:read", "workbench:write"]
+              }
+            ]
+            """,
+            workbench_connector_bindings_json="""
+            [
+              {
+                "source_id": "connector:ops-runbook",
+                "display_name": "Ops Runbook",
+                "documents": [
+                  {
+                    "document_id": "connector://ops/runbook",
+                    "title": "Ops Runbook",
+                    "content": "Escalation guidance for workbench research."
+                  }
+                ],
+                "principal_ids": ["principal:writer"]
+              }
+            ]
+            """,
+        )
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        reader_sources = self.client.get(
+            "/api/workbench/sources",
+            headers={"X-GOAT-API-Key": "workbench-reader"},
+        )
+        writer_sources = self.client.get(
+            "/api/workbench/sources",
+            headers={"X-GOAT-API-Key": "workbench-writer"},
+        )
+        self.assertEqual(200, reader_sources.status_code)
+        self.assertEqual(200, writer_sources.status_code)
+        self.assertNotIn(
+            "connector:ops-runbook",
+            {source["source_id"] for source in reader_sources.json()["sources"]},
+        )
+        self.assertIn(
+            "connector:ops-runbook",
+            {source["source_id"] for source in writer_sources.json()["sources"]},
+        )
+
+        reader_features = self.client.get(
+            "/api/system/features",
+            headers={"X-GOAT-API-Key": "workbench-reader"},
+        )
+        writer_features = self.client.get(
+            "/api/system/features",
+            headers={"X-GOAT-API-Key": "workbench-writer"},
+        )
+        self.assertEqual(200, reader_features.status_code)
+        self.assertEqual(200, writer_features.status_code)
+        self.assert_workbench_feature_state(
+            reader_features.json()["workbench"],
+            "connectors",
+            allowed_by_config=False,
+            available_on_host=False,
+            effective_enabled=False,
+            deny_reason="permission_denied",
+        )
+        self.assert_workbench_feature_state(
+            writer_features.json()["workbench"],
+            "connectors",
+            allowed_by_config=True,
+            available_on_host=True,
+            effective_enabled=True,
+            deny_reason=None,
+        )
 
     def test_workbench_routes_require_scope_family(self) -> None:
         self.settings = replace(

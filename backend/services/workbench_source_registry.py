@@ -2,34 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from backend.domain.authz_types import AuthorizationContext
-from backend.domain.authorization import ResourceRef, Scope
+from backend.domain.authorization import ResourceRef
 from backend.services.authz_audit import emit_authorization_audit
 from backend.services.authorizer import authorize_workbench_source_read
-from backend.services.workbench_web_search import (
-    build_workbench_web_description,
-    get_workbench_web_runtime_status,
+from backend.services.workbench_source_catalog import (
+    WorkbenchSourceDescriptor,
+    build_workbench_source_catalog,
+    build_workbench_source_catalog_by_id,
 )
 from backend.types import Settings
-
-
-@dataclass(frozen=True, kw_only=True)
-class WorkbenchSourceDescriptor:
-    """One declarative retrieval source exposed to workbench tasks."""
-
-    source_id: str
-    display_name: str
-    kind: str
-    scope_kind: str
-    capabilities: tuple[str, ...]
-    task_kinds: tuple[str, ...]
-    read_only: bool
-    runtime_ready: bool
-    deny_reason: str | None
-    description: str
-    required_scope: Scope | None = None
 
 
 def list_workbench_sources(
@@ -40,10 +22,14 @@ def list_workbench_sources(
 ) -> list[WorkbenchSourceDescriptor]:
     """Return the visible workbench retrieval sources for the current caller."""
     visible: list[WorkbenchSourceDescriptor] = []
-    for descriptor in _all_source_descriptors(settings):
+    for descriptor in build_workbench_source_catalog(settings):
         decision = authorize_workbench_source_read(
             ctx=auth_context,
             required_scope=descriptor.required_scope,
+            allowed_tenant_ids=descriptor.allowed_tenant_ids,
+            allowed_principal_ids=descriptor.allowed_principal_ids,
+            allowed_owner_ids=descriptor.allowed_owner_ids,
+            require_owner_header=settings.require_session_owner,
         )
         emit_authorization_audit(
             ctx=auth_context,
@@ -84,10 +70,7 @@ def resolve_requested_sources(
     request_id: str = "",
 ) -> list[WorkbenchSourceDescriptor]:
     """Resolve requested source ids and preserve auth-vs-unknown distinctions."""
-    descriptors = {
-        descriptor.source_id: descriptor
-        for descriptor in _all_source_descriptors(settings)
-    }
+    descriptors = build_workbench_source_catalog_by_id(settings)
     resolved: list[WorkbenchSourceDescriptor] = []
     missing: list[str] = []
     denied: list[str] = []
@@ -99,6 +82,10 @@ def resolve_requested_sources(
         decision = authorize_workbench_source_read(
             ctx=auth_context,
             required_scope=descriptor.required_scope,
+            allowed_tenant_ids=descriptor.allowed_tenant_ids,
+            allowed_principal_ids=descriptor.allowed_principal_ids,
+            allowed_owner_ids=descriptor.allowed_owner_ids,
+            require_owner_header=settings.require_session_owner,
         )
         emit_authorization_audit(
             ctx=auth_context,
@@ -110,7 +97,10 @@ def resolve_requested_sources(
             request_id=request_id,
         )
         if not decision.allowed:
-            denied.append(source_id)
+            if decision.conceal_existence:
+                missing.append(source_id)
+            else:
+                denied.append(source_id)
             continue
         resolved.append(descriptor)
     if denied:
@@ -122,39 +112,3 @@ def resolve_requested_sources(
         joined = ", ".join(sorted(dict.fromkeys(missing)))
         raise ValueError(f"Unknown or unavailable workbench sources: {joined}")
     return resolved
-
-
-def _all_source_descriptors(
-    settings: Settings,
-) -> tuple[WorkbenchSourceDescriptor, ...]:
-    web_runtime_ready, web_deny_reason = get_workbench_web_runtime_status(settings)
-    return (
-        WorkbenchSourceDescriptor(
-            source_id="web",
-            display_name="Public Web",
-            kind="builtin",
-            scope_kind="global",
-            capabilities=("search", "citations"),
-            task_kinds=("browse", "deep_research"),
-            read_only=True,
-            runtime_ready=web_runtime_ready,
-            deny_reason=web_deny_reason,
-            description=build_workbench_web_description(settings),
-            required_scope=None,
-        ),
-        WorkbenchSourceDescriptor(
-            source_id="knowledge",
-            display_name="Knowledge Base",
-            kind="knowledge",
-            scope_kind="knowledge_documents",
-            capabilities=("search", "fetch", "citations"),
-            task_kinds=("plan", "browse", "deep_research"),
-            read_only=True,
-            runtime_ready=True,
-            deny_reason=None,
-            description=(
-                "Indexed GOAT AI knowledge documents scoped by tenant, principal, and owner visibility."
-            ),
-            required_scope="knowledge:read",
-        ),
-    )

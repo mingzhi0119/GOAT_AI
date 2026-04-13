@@ -270,6 +270,9 @@ class DotenvConfigTests(unittest.TestCase):
                 "GOAT_WORKBENCH_WEB_TIMEOUT_SEC",
                 "GOAT_WORKBENCH_WEB_REGION",
                 "GOAT_WORKBENCH_WEB_SAFESEARCH",
+                "GOAT_WORKBENCH_LANGGRAPH_ENABLED",
+                "GOAT_WORKBENCH_BROWSE_MAX_STEPS",
+                "GOAT_WORKBENCH_DEEP_RESEARCH_MAX_STEPS",
             )
             try:
                 _clear_env(*original_env.keys())
@@ -278,6 +281,9 @@ class DotenvConfigTests(unittest.TestCase):
                 os.environ["GOAT_WORKBENCH_WEB_TIMEOUT_SEC"] = "11"
                 os.environ["GOAT_WORKBENCH_WEB_REGION"] = "us-en"
                 os.environ["GOAT_WORKBENCH_WEB_SAFESEARCH"] = "off"
+                os.environ["GOAT_WORKBENCH_LANGGRAPH_ENABLED"] = "false"
+                os.environ["GOAT_WORKBENCH_BROWSE_MAX_STEPS"] = "1"
+                os.environ["GOAT_WORKBENCH_DEEP_RESEARCH_MAX_STEPS"] = "4"
                 with (
                     patch.object(config, "APP_ROOT", app_root),
                     patch.object(config, "DEFAULT_RUNTIME_ROOT", runtime_root),
@@ -288,8 +294,80 @@ class DotenvConfigTests(unittest.TestCase):
                 self.assertEqual(11, settings.workbench_web_timeout_sec)
                 self.assertEqual("us-en", settings.workbench_web_region)
                 self.assertEqual("off", settings.workbench_web_safesearch)
+                self.assertFalse(settings.workbench_langgraph_enabled)
+                self.assertEqual(1, settings.workbench_browse_max_steps)
+                self.assertEqual(4, settings.workbench_deep_research_max_steps)
             finally:
                 _restore_many(original_env)
+
+    def test_load_settings_rejects_invalid_workbench_step_limits(self) -> None:
+        original_env = _capture_env(
+            "GOAT_WORKBENCH_BROWSE_MAX_STEPS",
+            "GOAT_WORKBENCH_DEEP_RESEARCH_MAX_STEPS",
+        )
+        try:
+            _clear_env(*original_env.keys())
+            os.environ["GOAT_WORKBENCH_BROWSE_MAX_STEPS"] = "0"
+            with self.assertRaisesRegex(ValueError, "GOAT_WORKBENCH_BROWSE_MAX_STEPS"):
+                config.load_settings()
+        finally:
+            _restore_many(original_env)
+
+    def test_load_settings_parses_workbench_connector_bindings_env(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            app_root = Path(tmp)
+            runtime_root = app_root / "var"
+            original_env = _capture_env("GOAT_WORKBENCH_CONNECTOR_BINDINGS_JSON")
+            try:
+                _clear_env(*original_env.keys())
+                os.environ["GOAT_WORKBENCH_CONNECTOR_BINDINGS_JSON"] = """
+                [
+                  {
+                    "source_id": "connector:ops-runbook",
+                    "display_name": "Ops Runbook",
+                    "documents": [
+                      {
+                        "document_id": "connector://ops/runbook",
+                        "title": "Ops Runbook",
+                        "content": "Escalation runbook"
+                      }
+                    ],
+                    "tenant_ids": ["tenant:default"]
+                  }
+                ]
+                """
+                with (
+                    patch.object(config, "APP_ROOT", app_root),
+                    patch.object(config, "DEFAULT_RUNTIME_ROOT", runtime_root),
+                ):
+                    settings = config.load_settings()
+                self.assertIn(
+                    "connector:ops-runbook",
+                    settings.workbench_connector_bindings_json,
+                )
+            finally:
+                _restore_many(original_env)
+
+    def test_load_settings_rejects_invalid_workbench_connector_bindings(self) -> None:
+        original_env = _capture_env("GOAT_WORKBENCH_CONNECTOR_BINDINGS_JSON")
+        try:
+            _clear_env(*original_env.keys())
+            os.environ["GOAT_WORKBENCH_CONNECTOR_BINDINGS_JSON"] = """
+            [
+              {
+                "source_id": "connector:ops-runbook",
+                "display_name": "Ops Runbook",
+                "documents": []
+              }
+            ]
+            """
+            with self.assertRaisesRegex(
+                ValueError,
+                "GOAT_WORKBENCH_CONNECTOR_BINDINGS_JSON documents must not be empty",
+            ):
+                config.load_settings()
+        finally:
+            _restore_many(original_env)
 
     def test_load_settings_uses_school_ollama_profile_only_when_opted_in(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

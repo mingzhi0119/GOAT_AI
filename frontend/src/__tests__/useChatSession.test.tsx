@@ -125,4 +125,90 @@ describe('useChatSession', () => {
     )
     expect(upsertHistorySessionMock).toHaveBeenCalledTimes(1)
   })
+
+  it('does not attach knowledge documents when image attachments are present', async () => {
+    const { result } = renderHook(() =>
+      useChatSession({
+        selectedModel: 'test-model',
+        userName: 'Simon',
+        systemInstruction: '',
+        planModeEnabled: false,
+        themeStyle: 'urochester',
+      }),
+    )
+
+    act(() => {
+      result.current.upsertFileContext({
+        filename: 'Quiz4_Cheat_Sheet.md',
+        documentId: 'doc-quiz-4',
+        bindingMode: 'single',
+        status: 'ready',
+      })
+    })
+
+    await act(async () => {
+      await result.current.sendMessage('Use the uploaded file', ['img-1'])
+    })
+
+    expect(sendMessageMock).toHaveBeenCalledWith(
+      'Use the uploaded file',
+      'test-model',
+      'Simon',
+      undefined,
+      false,
+      '',
+      'urochester',
+      undefined,
+      expect.any(Function),
+      ['img-1'],
+      expect.any(String),
+    )
+  })
+
+  it('clears stale file contexts when a history session has no knowledge attachments', async () => {
+    loadHistoryMock.mockResolvedValueOnce({
+      id: 'session-1',
+      title: 'Saved session',
+      model: 'test-model',
+      schema_version: 1,
+      created_at: '2026-04-13T00:00:00Z',
+      updated_at: '2026-04-13T00:00:01Z',
+      owner_id: 'owner-1',
+      messages: [],
+      chart_spec: null,
+      file_context: null,
+      knowledge_documents: [],
+      workspace_outputs: [],
+      chart_data_source: null,
+    })
+
+    const { result } = renderHook(() =>
+      useChatSession({
+        selectedModel: 'test-model',
+        userName: 'Simon',
+        systemInstruction: '',
+        planModeEnabled: false,
+        themeStyle: 'urochester',
+      }),
+    )
+
+    act(() => {
+      result.current.upsertFileContext({
+        filename: 'Stale.md',
+        documentId: 'doc-stale',
+        bindingMode: 'single',
+        status: 'ready',
+      })
+    })
+
+    expect(result.current.fileContexts).toHaveLength(1)
+
+    await act(async () => {
+      await result.current.loadHistorySession('session-1')
+    })
+
+    expect(loadSessionMock).toHaveBeenCalledTimes(1)
+    expect(loadHistoryMock).toHaveBeenCalledWith('session-1')
+    expect(result.current.fileContexts).toEqual([])
+  })
 })

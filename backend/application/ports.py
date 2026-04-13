@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Protocol
 
 from backend.services.chat_capacity_service import (
@@ -53,9 +54,20 @@ class CodeSandboxExecutionDispatcher(Protocol):
     ) -> None: ...
 
 
+class CodeSandboxExecutionSupervisor(Protocol):
+    """Application-facing boundary for running-state sandbox control."""
+
+    def register_execution(self, *, execution_id: str) -> Callable[[], bool]: ...
+
+    def request_cancel(self, *, execution_id: str) -> None: ...
+
+    def release_execution(self, *, execution_id: str) -> None: ...
+
+
 __all__ = [
     "ChatCapacityError",
     "CodeSandboxExecutionDispatcher",
+    "CodeSandboxExecutionSupervisor",
     "ConversationLogger",
     "ArtifactNotFound",
     "CodeSandboxExecutionRepository",

@@ -28,7 +28,9 @@ Use this skill when the task touches desktop packaging, release evidence, or ins
 2. Verify workflow boundaries in docs and tests before concluding a capability is landed.
 3. Treat MSI and NSIS as dual installed-artifact paths; failure-state evidence still needs to remain diagnosable.
 4. Use the desktop tests and runbooks as proof, not just workflow text.
-5. When Linux desktop parity is required from Windows, compose with [wsl-linux-rust-desktop](../wsl-linux-rust-desktop/SKILL.md).
+5. Treat Linux packaged-desktop proof and macOS blocker-report scaffolding as
+   separate evidence states rather than as implied public release support.
+6. When Linux desktop parity is required from Windows, compose with [wsl-linux-rust-desktop](../wsl-linux-rust-desktop/SKILL.md).
 
 ## Guardrails
 

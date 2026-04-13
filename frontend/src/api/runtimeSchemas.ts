@@ -27,7 +27,7 @@ const codeSandboxExecutionStatuses = [
   'cancelled',
 ] as const
 const codeSandboxExecutionModes = ['sync', 'async'] as const
-const codeSandboxNetworkPolicies = ['disabled', 'allowlist', 'enabled'] as const
+const codeSandboxNetworkPolicies = ['disabled'] as const
 const chatKinds = ['line', 'bar', 'stacked_bar', 'area', 'scatter', 'pie'] as const
 const historyChartDataSources = ['uploaded', 'demo', 'none'] as const
 const codeSandboxLogEventTypes = ['stdout', 'stderr', 'status', 'done'] as const

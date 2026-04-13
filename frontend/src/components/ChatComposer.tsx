@@ -1,7 +1,7 @@
 import { Suspense, lazy, useId, useMemo, useRef, type FC, type MouseEvent as ReactMouseEvent } from 'react'
 import type { UploadStreamEvent } from '../api/upload'
 import type { GPUStatus, InferenceLatency } from '../api/system'
-import type { CodeSandboxFeature } from '../api/types'
+import type { CodeSandboxFeature, RuntimeFeature } from '../api/types'
 import type { FileBindingMode, FileContextItem } from '../hooks/useFileContext'
 import { useChatComposerState } from '../hooks/useChatComposerState'
 import { useCodeSandboxController } from '../hooks/useCodeSandboxController'
@@ -38,6 +38,9 @@ export interface ChatComposerProps {
   inferenceLatency: InferenceLatency | null
   codeSandboxFeature: CodeSandboxFeature | null
   planModeEnabled: boolean
+  planModeAvailable?: boolean
+  planModeAvailability?: string
+  planModeFeature?: RuntimeFeature | null
   onPlanModeChange: (enabled: boolean) => void
   reasoningLevel: ReasoningLevel
   onReasoningLevelChange: (level: ReasoningLevel) => void
@@ -76,6 +79,9 @@ const ChatComposer: FC<ChatComposerProps> = ({
   inferenceLatency,
   codeSandboxFeature,
   planModeEnabled,
+  planModeAvailable = true,
+  planModeAvailability,
+  planModeFeature,
   onPlanModeChange,
   reasoningLevel,
   onReasoningLevelChange,
@@ -185,6 +191,8 @@ const ChatComposer: FC<ChatComposerProps> = ({
               triggerRef={plusButtonRef}
               codeSandboxFeature={codeSandboxFeature}
               planModeEnabled={planModeEnabled}
+              planModeAvailability={planModeAvailability}
+              planModeFeature={planModeFeature}
               supportsThinking={supportsThinking}
               thinkingEnabled={thinkingEnabled}
               onClose={closeActivePanel}
@@ -312,6 +320,7 @@ const ChatComposer: FC<ChatComposerProps> = ({
                 supportsThinking={supportsThinking}
                 thinkingEnabled={thinkingEnabled}
                 planModeEnabled={planModeEnabled}
+                planModeAvailable={planModeAvailable}
                 onPlanModeChange={onPlanModeChange}
                 plusMenuOpen={plusMenuOpen}
                 modelMenuOpen={modelMenuOpen}

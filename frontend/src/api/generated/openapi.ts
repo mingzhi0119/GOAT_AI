@@ -271,8 +271,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Generate a retrieval-backed answer
-         * @description Return a retrieval-backed answer with citations.
+         * Generate a synthesized retrieval-backed answer
+         * @description Return a synthesized retrieval-backed answer with citations.
          */
         post: operations["post_knowledge_answer_api_knowledge_answers_post"];
         delete?: never;
@@ -511,8 +511,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Cancel one queued code sandbox execution
-         * @description Cancel one visible queued sandbox execution.
+         * Cancel one queued or running code sandbox execution
+         * @description Cancel one visible queued or running sandbox execution.
          */
         post: operations["post_code_sandbox_execution_cancel_route_api_code_sandbox_executions__execution_id__cancel_post"];
         delete?: never;
@@ -947,9 +947,9 @@ export interface components {
             timeout_sec?: number | null;
             /**
              * Network Policy
-             * @description Reserved for future policies. Phase 18 only allows `disabled`.
+             * @description Execution network policy. The shipped runtime only accepts `disabled`.
              */
-            network_policy?: ("disabled" | "allowlist" | "enabled") | null;
+            network_policy?: "disabled" | null;
             /**
              * Files
              * @description Optional inline text files seeded into the temporary workspace.
@@ -1010,9 +1010,9 @@ export interface components {
             runtime_preset: "shell";
             /**
              * Network Policy
-             * @enum {string}
+             * @constant
              */
-            network_policy: "disabled" | "allowlist" | "enabled";
+            network_policy: "disabled";
             /** Created At */
             created_at: string;
             /** Updated At */
@@ -1404,9 +1404,15 @@ export interface components {
          * @description Retrieval-backed answer contract.
          */
         KnowledgeAnswerResponse: {
-            /** Answer */
+            /**
+             * Answer
+             * @description Synthesized answer grounded in the retrieved knowledge context.
+             */
             answer: string;
-            /** Citations */
+            /**
+             * Citations
+             * @description Retrieved citations used as evidence for the synthesized answer.
+             */
             citations?: components["schemas"]["KnowledgeCitation"][];
         };
         /**
@@ -1830,13 +1836,13 @@ export interface components {
              * @description High-level source family.
              * @enum {string}
              */
-            kind: "builtin" | "knowledge" | "connector";
+            kind: "builtin" | "knowledge" | "connector" | "project_memory";
             /**
              * Scope Kind
              * @description Whether the source is global, document-scoped, or connector-bound.
              * @enum {string}
              */
-            scope_kind: "global" | "knowledge_documents" | "connector_binding";
+            scope_kind: "global" | "knowledge_documents" | "connector_binding" | "project_scope";
             /**
              * Capabilities
              * @description Declared retrieval capabilities such as search, fetch, and citations.
@@ -1923,7 +1929,7 @@ export interface components {
              * @description Stable event name for this task lifecycle update.
              * @enum {string}
              */
-            event_type: "task.queued" | "task.started" | "task.cancelled" | "task.retry_requested" | "task.retry_created" | "retrieval.sources_resolved" | "retrieval.step.completed" | "retrieval.step.skipped" | "workspace_output.created" | "workspace_output.exported" | "task.completed" | "task.failed";
+            event_type: "task.queued" | "task.started" | "task.cancelled" | "task.retry_requested" | "task.retry_created" | "retrieval.sources_resolved" | "research.plan.created" | "retrieval.step.started" | "retrieval.step.completed" | "retrieval.step.skipped" | "research.follow_up.scheduled" | "research.synthesis.completed" | "workspace_output.created" | "workspace_output.exported" | "task.completed" | "task.failed";
             /**
              * Created At
              * @description UTC ISO-8601 event timestamp.
@@ -3123,6 +3129,15 @@ export interface operations {
             };
             /** @description Too Many Requests */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

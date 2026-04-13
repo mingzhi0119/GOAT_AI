@@ -129,6 +129,9 @@ def test_release_docs_and_status_match_current_truth() -> None:
     release_doc = (
         REPO_ROOT / "docs" / "operations" / "RELEASE_GOVERNANCE.md"
     ).read_text(encoding="utf-8")
+    desktop_readiness_doc = (
+        REPO_ROOT / "docs" / "operations" / "DESKTOP_DISTRIBUTION_READINESS.md"
+    ).read_text(encoding="utf-8")
     backup_restore_doc = (
         REPO_ROOT / "docs" / "operations" / "BACKUP_RESTORE.md"
     ).read_text(encoding="utf-8")
@@ -175,6 +178,8 @@ def test_release_docs_and_status_match_current_truth() -> None:
         "python -m tools.desktop.installed_windows_desktop_fault_smoke"
         in operations_doc
     )
+    assert "desktop-linux-ci-provenance.json" in operations_doc
+    assert "DESKTOP_DISTRIBUTION_READINESS.md" in operations_doc
     assert "`GOAT_OBJECT_STORE_BACKEND`" in operations_doc
     assert "`GOAT_OBJECT_STORE_ROOT`" in operations_doc
     assert "`GOAT_OBJECT_STORE_BUCKET`" in operations_doc
@@ -222,6 +227,13 @@ def test_release_docs_and_status_match_current_truth() -> None:
     assert "backend-fast -> backend-heavy -> backend" in project_status
     assert "desktop-package-windows" in project_status
     assert "installed Windows evidence" in project_status
+    assert "DESKTOP_DISTRIBUTION_READINESS.md" in release_doc
+    assert "Linux packaged-desktop path" in release_doc
+    assert "macOS public distribution remains blocked" in release_doc
+    assert "Platform matrix" in desktop_readiness_doc
+    assert "macOS public distribution blockers" in desktop_readiness_doc
+    assert "Updater readiness gate" in desktop_readiness_doc
+    assert "GOAT_RUNTIME_ROOT" in desktop_readiness_doc
     assert "OBJECT_STORAGE_CONTRACT.md" in project_status
     assert "Phase 16C storage closeout" in roadmap_archive
     assert "GOAT_OBJECT_STORE_ROOT" in roadmap_archive

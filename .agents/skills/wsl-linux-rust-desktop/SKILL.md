@@ -20,6 +20,8 @@ Use this skill for Linux-targeted desktop validation and packaging in this repos
    - install Linux packages if needed
    - build the Linux desktop sidecar
    - run `cargo test --manifest-path frontend/src-tauri/Cargo.toml`
+   - when desktop packaging or provenance changed, also validate the packaged
+     Linux bundle path and any provenance helper used by workflow proof
 3. If the change touches Tauri bundle resources such as icons, binaries, or config, validate the Linux path in WSL even if Windows cargo tests are already green.
 4. Keep sidecar artifacts aligned with `frontend/src-tauri/binaries` and the target triple expected by the CI job.
 

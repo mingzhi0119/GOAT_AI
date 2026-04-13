@@ -132,6 +132,9 @@ Important notes:
 - `desktop-package-windows` is still the PR packaged-binary gate only; it does not install MSI/NSIS artifacts
 - `desktop-package-windows` should trigger for desktop build inputs, not just Rust shell files: `frontend/src/**`, `frontend/public/**`, `frontend/index.html`, Vite/Tailwind/PostCSS/TS config, desktop scripts, desktop tooling, and desktop governance tests/workflows are part of the packaged-build truth set
 - non-desktop-only backend or documentation changes should not burn the Windows packaged PR gate when they do not affect the packaged desktop build surface
+- `desktop-supply-chain` now also builds Linux packaged desktop artifacts and
+  retains `desktop-linux-ci-provenance.json` plus packaged `AppImage` / `deb`
+  artifacts for CI-parity diagnostics
 - the `desktop-windows-fault-smoke` artifact should contain at least `build.log`, `packaged-shell-fault-smoke.log`, top-level `summary.json`, and per-scenario logs/result JSON so packaged PR failures stay diagnosable without rerunning the workflow
 - when the Windows package build succeeds, CI should still retain packaged installers plus `desktop-windows-ci-provenance.json` even if the packaged fault smoke fails later in the same job
 - `desktop-supply-chain` remains the Linux sidecar/provenance/cargo-audit gate; it does not own the Windows pre-ready retry semantics
@@ -150,6 +153,17 @@ Desktop sidecar writable paths:
 - SQLite DB: `<app_local_data_dir>/chat_logs.db`
 - persisted app data: `<app_local_data_dir>/data`
 - packaged desktop shell diagnostics now append to `<app_log_dir>/desktop-shell.log`
+
+Packaged desktop runtime diagnostics should first check:
+
+- `GET /api/system/desktop`
+- `<app_log_dir>/desktop-shell.log`
+- `GOAT_RUNTIME_ROOT`, `GOAT_LOG_DIR`, `GOAT_LOG_PATH`, `GOAT_DATA_DIR`
+- `GOAT_SERVER_PORT`, `GOAT_LOCAL_PORT`, `GOAT_DEPLOY_TARGET=local`
+- `GOAT_DESKTOP_SHELL_LOG_PATH`
+
+Cross-platform release prerequisites, updater gates, and macOS blockers live in
+[DESKTOP_DISTRIBUTION_READINESS.md](DESKTOP_DISTRIBUTION_READINESS.md).
 - Tauri startup now emits explicit diagnostics when sidecar spawn fails, `/api/health` does not become ready before the window reveal timeout, or the bundled backend exits unexpectedly after startup
 - before the main window is revealed, the Rust shell now allows only a small bounded sidecar restart/backoff budget; after reveal, unexpected sidecar exits still fail closed instead of silently recovering
 - packaged desktop startup still fails closed instead of revealing the main window on a broken backend
@@ -347,18 +361,29 @@ live in the configured bucket/prefix while SQLite metadata remains local.
   - the selected provider probe succeeds
   - the caller credential includes `sandbox:execute`
 - Phase 18A remains intentionally conservative:
-  - `sync` is the default; `async` uses in-process dispatch plus queued-execution recovery on startup
+  - `sync` is the default; `async` uses in-process dispatch plus startup
+    recovery that replays `queued` executions and fails abandoned `running`
+    executions closed
   - short-lived execution only
   - one shell-capable preset
   - Docker enforces `network_policy=disabled` by default; `localhost` reports a degraded contract and does not enforce the same network boundary
   - `docker`: no privileged mode and no host Docker socket mounted into the sandbox container
   - `localhost`: intended for trusted local development only; it does not provide Docker-grade isolation
+- visible `queued` and `running` executions can be cancelled through the
+  existing cancel route; running cancellation remains cooperative and returns a
+  conflict if the execution does not acknowledge within the bounded API wait
+  window
 - The execution contract persists durable rows, event timelines, and replayable log chunks in SQLite:
   - `GET /api/code-sandbox/executions/{execution_id}`
   - `GET /api/code-sandbox/executions/{execution_id}/events`
   - `GET /api/code-sandbox/executions/{execution_id}/logs`
 - `GET /api/code-sandbox/executions/{execution_id}/logs` is an SSE stream for stdout/stderr replay plus status updates; clients may reconnect with `after_seq=<last_seen_log_sequence>`
 - Files written under `outputs/` are surfaced as metadata in the API response, but they are not yet promoted into the artifact workspace model.
+- Each workspace also gets `.goat/workspace_manifest.json` and the
+  `GOAT_SANDBOX_EXECUTION_ID`, `GOAT_SANDBOX_WORKSPACE`,
+  `GOAT_SANDBOX_OUTPUTS_DIR`, `GOAT_SANDBOX_MANIFEST`, and
+  `GOAT_SANDBOX_NETWORK_POLICY` environment variables so scripts can discover
+  their runtime context without guessing local paths.
 
 ### OpenTelemetry (optional, Phase 15.6)
 
@@ -521,7 +546,7 @@ exercises the retrieval-quality golden set and matches the backend CI proof surf
 | `retrieval_profile` | `POST /api/knowledge/search` body | `default` - uses `GOAT_RAG_RERANK_MODE`; `rag3_lexical` / `rag3_quality` - always lexical rerank; `rag3_quality` also enables conservative whitespace query rewrite before search. |
 | Vector similarity | Implementation | Scores are backend-specific; there is **no** global numeric score threshold in config-triage uses **hit vs miss** (see metrics) and eval cases. |
 
-**No-hit behavior:** search returns zero citations when nothing ranks above the empty list; `POST /api/knowledge/answers` returns the documented fixed sentence when no hits (after optional attached-document fallback).
+**No-hit behavior:** search returns zero citations when nothing ranks above the empty list; `POST /api/knowledge/answers` now returns a brief synthesized insufficiency answer plus an empty citation list when no hits remain after the optional attached-document fallback.
 
 **Observability (`GET /api/system/metrics`):**
 

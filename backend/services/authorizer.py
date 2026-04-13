@@ -268,10 +268,35 @@ def authorize_workbench_source_read(
     *,
     ctx: AuthorizationContext,
     required_scope: Scope | None,
+    allowed_tenant_ids: tuple[str, ...] = (),
+    allowed_principal_ids: tuple[str, ...] = (),
+    allowed_owner_ids: tuple[str, ...] = (),
+    require_owner_header: bool = False,
 ) -> AuthorizationDecision:
     """Authorize visibility for a declarative workbench retrieval source."""
     if not _has_scope(ctx, WORKBENCH_READ_SCOPE):
         return AuthorizationDecision(False, "scope_missing")
     if required_scope is not None and not _has_scope(ctx, required_scope):
         return AuthorizationDecision(False, "scope_missing")
+    if allowed_tenant_ids and ctx.tenant_id.value not in allowed_tenant_ids:
+        return AuthorizationDecision(False, "tenant_mismatch", conceal_existence=True)
+    if allowed_principal_ids and ctx.principal_id.value not in allowed_principal_ids:
+        return AuthorizationDecision(
+            False,
+            "principal_mismatch",
+            conceal_existence=True,
+        )
+    if allowed_owner_ids:
+        if require_owner_header and not ctx.legacy_owner_id:
+            return AuthorizationDecision(
+                False,
+                "owner_mismatch",
+                conceal_existence=True,
+            )
+        if ctx.legacy_owner_id not in allowed_owner_ids:
+            return AuthorizationDecision(
+                False,
+                "owner_mismatch",
+                conceal_existence=True,
+            )
     return AuthorizationDecision(True, "ok")

@@ -59,4 +59,44 @@ describe('useSystemFeatures', () => {
     })
     expect(result.current.features).toBeNull()
   })
+
+  it('clears stale features when a refresh fails after prior success', async () => {
+    vi.mocked(fetchSystemFeatures)
+      .mockResolvedValueOnce({
+        code_sandbox: {
+          policy_allowed: true,
+          allowed_by_config: true,
+          available_on_host: true,
+          effective_enabled: true,
+          provider_name: 'docker',
+          isolation_level: 'container',
+          network_policy_enforced: true,
+          deny_reason: null,
+        },
+        workbench: {
+          agent_tasks: { allowed_by_config: true, available_on_host: true, effective_enabled: true, deny_reason: null },
+          plan_mode: { allowed_by_config: true, available_on_host: true, effective_enabled: true, deny_reason: null },
+          browse: { allowed_by_config: true, available_on_host: true, effective_enabled: true, deny_reason: null },
+          deep_research: { allowed_by_config: false, available_on_host: false, effective_enabled: false, deny_reason: null },
+          artifact_workspace: { allowed_by_config: false, available_on_host: false, effective_enabled: false, deny_reason: null },
+          artifact_exports: { allowed_by_config: false, available_on_host: false, effective_enabled: false, deny_reason: null },
+          project_memory: { allowed_by_config: false, available_on_host: false, effective_enabled: false, deny_reason: null },
+          connectors: { allowed_by_config: false, available_on_host: false, effective_enabled: false, deny_reason: null },
+        },
+      })
+      .mockRejectedValueOnce(new Error('feature gate unavailable'))
+
+    const { result } = renderHook(() => useSystemFeatures())
+
+    await waitFor(() => {
+      expect(result.current.features?.workbench.plan_mode.effective_enabled).toBe(true)
+    })
+
+    await act(async () => {
+      await result.current.refreshNow()
+    })
+
+    expect(result.current.features).toBeNull()
+    expect(result.current.error).toBe('feature gate unavailable')
+  })
 })

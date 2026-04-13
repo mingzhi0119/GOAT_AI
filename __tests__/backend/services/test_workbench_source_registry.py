@@ -65,7 +65,9 @@ class WorkbenchSourceRegistryTests(unittest.TestCase):
                 settings=_settings(Path(tmp)),
                 auth_context=_auth_context(scopes=frozenset({"workbench:read"})),
             )
-        self.assertEqual(["web"], [source.source_id for source in sources])
+        self.assertEqual(
+            ["web", "project_memory"], [source.source_id for source in sources]
+        )
         self.assertTrue(sources[0].runtime_ready)
         self.assertIsNone(sources[0].deny_reason)
         self.assertIn("DDGS", sources[0].description)
@@ -80,7 +82,9 @@ class WorkbenchSourceRegistryTests(unittest.TestCase):
                 settings=settings,
                 auth_context=_auth_context(scopes=frozenset({"workbench:read"})),
             )
-        self.assertEqual(["web"], [source.source_id for source in sources])
+        self.assertEqual(
+            ["web", "project_memory"], [source.source_id for source in sources]
+        )
         self.assertFalse(sources[0].runtime_ready)
         self.assertEqual("disabled_by_operator", sources[0].deny_reason)
 
@@ -101,6 +105,75 @@ class WorkbenchSourceRegistryTests(unittest.TestCase):
                     settings=_settings(Path(tmp)),
                     auth_context=_auth_context(
                         scopes=frozenset({"workbench:read", "knowledge:read"})
+                    ),
+                )
+
+    def test_connector_bindings_are_caller_scoped_and_hidden_when_invisible(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            settings = replace(
+                _settings(Path(tmp)),
+                workbench_connector_bindings_json="""
+                [
+                  {
+                    "source_id": "connector:ops-runbook",
+                    "display_name": "Ops Runbook",
+                    "documents": [
+                      {
+                        "document_id": "connector://ops/runbook",
+                        "title": "Ops Runbook",
+                        "content": "Incident response and escalation guidance."
+                      }
+                    ],
+                    "owner_ids": ["owner-allowed"]
+                  }
+                ]
+                """,
+            )
+            visible = list_workbench_sources(
+                settings=settings,
+                auth_context=AuthorizationContext(
+                    principal_id=PrincipalId("principal:test"),
+                    tenant_id=TenantId("tenant:default"),
+                    scopes=frozenset({"workbench:read"}),
+                    credential_id="cred-visible",
+                    legacy_owner_id="owner-allowed",
+                    auth_mode="api_key",
+                ),
+            )
+            hidden = list_workbench_sources(
+                settings=settings,
+                auth_context=AuthorizationContext(
+                    principal_id=PrincipalId("principal:test"),
+                    tenant_id=TenantId("tenant:default"),
+                    scopes=frozenset({"workbench:read"}),
+                    credential_id="cred-hidden",
+                    legacy_owner_id="owner-hidden",
+                    auth_mode="api_key",
+                ),
+            )
+
+            self.assertIn(
+                "connector:ops-runbook",
+                [source.source_id for source in visible],
+            )
+            self.assertNotIn(
+                "connector:ops-runbook",
+                [source.source_id for source in hidden],
+            )
+
+            with self.assertRaisesRegex(ValueError, "Unknown or unavailable"):
+                resolve_requested_sources(
+                    source_ids=["connector:ops-runbook"],
+                    settings=settings,
+                    auth_context=AuthorizationContext(
+                        principal_id=PrincipalId("principal:test"),
+                        tenant_id=TenantId("tenant:default"),
+                        scopes=frozenset({"workbench:read"}),
+                        credential_id="cred-hidden",
+                        legacy_owner_id="owner-hidden",
+                        auth_mode="api_key",
                     ),
                 )
 

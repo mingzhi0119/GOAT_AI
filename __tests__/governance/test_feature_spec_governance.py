@@ -13,7 +13,15 @@ def test_feature_specs_pilot_uses_a_narrow_allowed_file_set() -> None:
     assert SPECS_ROOT.is_dir()
 
     directories = sorted(path.name for path in SPECS_ROOT.iterdir() if path.is_dir())
-    assert directories == ["_template", "governance-tooling-follow-ons"]
+    assert directories == [
+        "_template",
+        "code-sandbox-runtime-follow-ons",
+        "desktop-distribution-maturity",
+        "governance-tooling-follow-ons",
+        "project-memory-connectors-foundation",
+        "runtime-platform-shared-foundations",
+        "workbench-multi-step-research",
+    ]
 
     expected_files = {"plan.md", "spec.md", "tasks.md"}
     for directory in directories:
@@ -29,6 +37,21 @@ def test_feature_specs_docs_remain_explicitly_non_canonical() -> None:
     example_spec = (SPECS_ROOT / "governance-tooling-follow-ons" / "spec.md").read_text(
         encoding="utf-8"
     )
+    task_two_spec = (
+        SPECS_ROOT / "project-memory-connectors-foundation" / "spec.md"
+    ).read_text(encoding="utf-8")
+    task_one_spec = (
+        SPECS_ROOT / "workbench-multi-step-research" / "spec.md"
+    ).read_text(encoding="utf-8")
+    task_three_spec = (
+        SPECS_ROOT / "desktop-distribution-maturity" / "spec.md"
+    ).read_text(encoding="utf-8")
+    task_four_spec = (
+        SPECS_ROOT / "code-sandbox-runtime-follow-ons" / "spec.md"
+    ).read_text(encoding="utf-8")
+    task_six_spec = (
+        SPECS_ROOT / "runtime-platform-shared-foundations" / "spec.md"
+    ).read_text(encoding="utf-8")
 
     assert "not a second governance system" in readme
     assert "ROADMAP.md" in readme
@@ -37,3 +60,8 @@ def test_feature_specs_docs_remain_explicitly_non_canonical() -> None:
     assert "repo-local skills" in readme
     assert "non-canonical working artifact" in template_spec
     assert "non-canonical working artifact" in example_spec
+    assert "non-canonical working artifact" in task_two_spec
+    assert "non-canonical working artifact" in task_one_spec
+    assert "non-canonical working artifact" in task_three_spec
+    assert "non-canonical working artifact" in task_four_spec
+    assert "non-canonical working artifact" in task_six_spec

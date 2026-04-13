@@ -170,6 +170,17 @@ class SystemTelemetryServiceTests(unittest.TestCase):
                         "Source",
                         (),
                         {
+                            "source_id": "project_memory",
+                            "runtime_ready": True,
+                            "task_kinds": ["browse", "deep_research"],
+                            "kind": "project_memory",
+                        },
+                    )(),
+                    type(
+                        "Source",
+                        (),
+                        {
+                            "source_id": "connector:ops-runbook",
                             "runtime_ready": True,
                             "task_kinds": ["browse", "deep_research"],
                             "kind": "connector",
@@ -179,6 +190,7 @@ class SystemTelemetryServiceTests(unittest.TestCase):
                         "Source",
                         (),
                         {
+                            "source_id": "knowledge",
                             "runtime_ready": False,
                             "task_kinds": ["browse"],
                             "kind": "knowledge_base",
@@ -196,6 +208,7 @@ class SystemTelemetryServiceTests(unittest.TestCase):
         self.assertIsNone(response.workbench.artifact_workspace.deny_reason)
         self.assertTrue(response.workbench.artifact_exports.effective_enabled)
         self.assertIsNone(response.workbench.artifact_exports.deny_reason)
+        self.assertTrue(response.workbench.project_memory.effective_enabled)
         self.assertTrue(response.workbench.connectors.effective_enabled)
 
     def test_workbench_features_become_scope_aware(self) -> None:

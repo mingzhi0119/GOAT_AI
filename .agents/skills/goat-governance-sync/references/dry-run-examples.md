@@ -53,3 +53,21 @@ Expected output:
 
 Validate with:
 - run `python -m pytest __tests__/desktop/test_desktop_release_governance.py __tests__/ops/test_ops_asset_contracts.py -q`
+
+## Example 4
+
+User asks:
+- "A shared runtime foundation landed under existing wrappers; which governance docs should move, and what should stay as future runtime follow-on work?"
+
+First moves:
+- confirm the proof is already landed in code, contract tests, and governance tests
+- move only the finished foundation slice out of `ROADMAP.md`
+- keep later frontend widening, remote connectors, or richer runtime follow-ons as unfinished work
+
+Expected output:
+- whether the shared-foundations wording belongs in `PROJECT_STATUS.md`, `ROADMAP.md`, `DOMAIN.md`, API reference notes, or some combination
+- which follow-on runtime items must stay open
+- the exact proof files that justify the closeout wording
+
+Validate with:
+- rerun the matching governance tests after editing roadmap, status, or architecture truth

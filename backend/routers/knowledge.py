@@ -14,10 +14,12 @@ from backend.application.knowledge import (
 from backend.application.ports import (
     KnowledgeDocumentNotFound,
     KnowledgeValidationError,
+    LLMClient,
+    OllamaUnavailable,
     Settings,
 )
 from backend.platform.config import get_settings
-from backend.platform.dependencies import get_authorization_context
+from backend.platform.dependencies import get_authorization_context, get_llm_client
 from backend.models.common import ErrorResponse
 from backend.models.knowledge import (
     KnowledgeAnswerRequest,
@@ -186,22 +188,32 @@ def post_knowledge_search(
 @router.post(
     "/knowledge/answers",
     response_model=KnowledgeAnswerResponse,
-    summary="Generate a retrieval-backed answer",
-    responses={401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
+    summary="Generate a synthesized retrieval-backed answer",
+    responses={
+        401: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+    },
 )
 def post_knowledge_answer(
     request: KnowledgeAnswerRequest,
     http_request: Request,
+    llm: LLMClient = Depends(get_llm_client),
     settings: Settings = Depends(get_settings),
     auth_context: AuthorizationContext = Depends(get_authorization_context),
 ) -> KnowledgeAnswerResponse:
-    """Return a retrieval-backed answer with citations."""
+    """Return a synthesized retrieval-backed answer with citations."""
     try:
         return answer(
             request=request,
+            llm=llm,
             settings=settings,
             auth_context=auth_context,
             request_id=getattr(http_request.state, "request_id", ""),
         )
     except KnowledgeValidationError as exc:
         _raise_bad_request(exc)
+    except OllamaUnavailable as exc:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=503, detail="AI backend unavailable") from exc
