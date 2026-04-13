@@ -9,8 +9,8 @@ Use this skill for Linux-targeted desktop validation and packaging in this repos
 
 ## Read First
 
-- [`.github/workflows/ci.yml`](../../../../.github/workflows/ci.yml)
-- [`frontend/src-tauri/tauri.conf.json`](../../../../frontend/src-tauri/tauri.conf.json)
+- [`.github/workflows/ci.yml`](../../../.github/workflows/ci.yml)
+- [`frontend/src-tauri/tauri.conf.json`](../../../frontend/src-tauri/tauri.conf.json)
 - [`references/ubuntu-packages.md`](references/ubuntu-packages.md)
 
 ## Workflow

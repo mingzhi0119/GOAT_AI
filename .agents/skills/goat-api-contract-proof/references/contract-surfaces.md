@@ -7,6 +7,8 @@ Treat these files as one governed surface:
 - [api.llm.yaml](../../../../docs/api/api.llm.yaml)
 - [frontend generated OpenAPI types](../../../../frontend/src/api/generated/openapi.ts)
 - [frontend API adapter types](../../../../frontend/src/api/types.ts)
+- [frontend package scripts](../../../../frontend/package.json)
+- [ci.yml](../../../../.github/workflows/ci.yml)
 - [backend routers](../../../../backend/routers)
 - [backend API models](../../../../backend/models)
 

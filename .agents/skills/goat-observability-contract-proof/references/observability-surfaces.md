@@ -11,6 +11,7 @@ Operator-facing docs:
 
 - [OPERATIONS.md](../../../../docs/operations/OPERATIONS.md)
 - [INCIDENT_TRIAGE.md](../../../../docs/operations/INCIDENT_TRIAGE.md)
+- [ci.yml](../../../../.github/workflows/ci.yml)
 
 Primary proof tests:
 

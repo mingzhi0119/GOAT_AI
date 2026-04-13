@@ -35,5 +35,4 @@ Use this skill when the change touches workbench authorization, source visibilit
 
 - Run the relevant black-box contract tests in `__tests__/contracts/`.
 - Add service-level tests when the logic depends on source registry or system feature assembly.
-- If the change also affects public API shape, compose with [goat-api-contract-proof](../../goat-api-contract-proof/SKILL.md).
-
+- If the change also affects public API shape, compose with [goat-api-contract-proof](../goat-api-contract-proof/SKILL.md).

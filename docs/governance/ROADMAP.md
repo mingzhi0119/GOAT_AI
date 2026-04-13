@@ -126,28 +126,16 @@ secret availability.
 
 ### Repository-native Skills and Agent Automation
 
-- Goal: codify GOAT AI's repeatable audit, proof, CI-routing, and governance-sync workflows as repo-local Codex skills instead of relying on thread-by-thread memory.
+- Goal: keep hardening the repo-local Codex skill layer so audit, proof, CI-routing, and governance-sync workflows stay repeatable without reverting to thread-by-thread memory.
 - Non-goals:
   - do not replace [`AGENTS.md`](../../AGENTS.md) or the engineering standards as the permanent policy layer
   - do not create a plugin marketplace or generic IDE macro bundle
-  - do not collapse all governance work into one broad "万能 skill"
-- Initial skill set:
-  - `goat-engineering-audit`
-  - `goat-api-contract-proof`
-  - `goat-ci-surface-router`
-  - `goat-desktop-release-evidence`
-  - `goat-workbench-authz-proof`
-  - `goat-observability-contract-proof`
-  - `goat-governance-sync`
-- Sequencing:
-  - Phase A: roadmap framing, naming, and shared directory conventions under `.agents/skills/`
-  - Phase B: foundation skills for audit, API contract proof, and CI routing
-  - Phase C: domain proof skills for desktop evidence, workbench/authz, and observability
-  - Phase D: governance sync plus a human-readable skills index after the repo-local skill set becomes large enough to need one
-- Exit criteria:
-  - the seven skills exist with `SKILL.md`, `agents/openai.yaml`, and repo-specific references
-  - the skill set is discoverable from agent guidance without inventing unpublished workflows
-  - a light governance test guards the repo-local skill inventory and catches stale links or missing metadata
+  - do not collapse all governance work into one broad "catch-all skill"
+- Remaining work:
+  - forward-test the repo-native skills on live audit, contract, desktop, and observability tasks, then tighten references where usage exposes ambiguity or stale truth sources
+  - add deterministic `scripts/` or `assets/` only where repeated usage shows a real need beyond the current markdown/reference layer
+  - extend the governance coverage around `.agents/skills/` as the inventory grows so future additions cannot drift in metadata, links, or directory shape
+  - decide when the skill layer is stable enough to promote from roadmap follow-on work into shipped-status documentation
 - Relationship to existing skills:
   - `wsl-linux-build`, `wsl-linux-ops-checks`, and `wsl-linux-rust-desktop` remain the execution-layer helpers for Linux-targeted validation from Windows
   - the new `goat-*` skills sit above them as governance/proof workflows and may compose with them when Linux parity is required

@@ -33,5 +33,4 @@ Use this skill when the change touches metrics, observability assets, or runbook
 
 - Run [__tests__/ops/test_observability_asset_contract.py](../../../__tests__/ops/test_observability_asset_contract.py).
 - Include the relevant backend observability tests when exporter behavior or OTel-enabled paths change.
-- If the change alters the validation matrix, compose with [goat-ci-surface-router](../../goat-ci-surface-router/SKILL.md).
-
+- If the change alters the validation matrix, compose with [goat-ci-surface-router](../goat-ci-surface-router/SKILL.md).

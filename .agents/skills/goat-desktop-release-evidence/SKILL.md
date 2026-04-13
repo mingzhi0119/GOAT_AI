@@ -23,7 +23,7 @@ Use this skill when the task touches desktop packaging, release evidence, or ins
 2. Verify workflow boundaries in docs and tests before concluding a capability is landed.
 3. Treat MSI and NSIS as dual installed-artifact paths; failure-state evidence still needs to remain diagnosable.
 4. Use the desktop tests and runbooks as proof, not just workflow text.
-5. When Linux desktop parity is required from Windows, compose with [wsl-linux-rust-desktop](../../wsl-linux-rust-desktop/SKILL.md).
+5. When Linux desktop parity is required from Windows, compose with [wsl-linux-rust-desktop](../wsl-linux-rust-desktop/SKILL.md).
 
 ## Guardrails
 
@@ -36,4 +36,3 @@ Use this skill when the task touches desktop packaging, release evidence, or ins
 - Run the narrowest relevant tests under `__tests__/desktop/`.
 - For workflow-shape or retention changes, include [test_desktop_release_governance.py](../../../__tests__/desktop/test_desktop_release_governance.py).
 - For tool changes, include the matching packaged or installed smoke tests.
-

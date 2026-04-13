@@ -2,7 +2,9 @@
 
 Start from these implementation and contract files:
 
+- [backend/domain/scope_catalog.py](../../../../backend/domain/scope_catalog.py)
 - [backend/application/workbench.py](../../../../backend/application/workbench.py)
+- [backend/models/system.py](../../../../backend/models/system.py)
 - [backend/services/authorizer.py](../../../../backend/services/authorizer.py)
 - [backend/services/system_telemetry_service.py](../../../../backend/services/system_telemetry_service.py)
 - [backend/services/workbench_source_registry.py](../../../../backend/services/workbench_source_registry.py)
