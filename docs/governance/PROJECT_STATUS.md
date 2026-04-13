@@ -1,6 +1,6 @@
 # GOAT AI Project Status
 
-Last updated: 2026-04-12
+Last updated: 2026-04-13
 
 ## Release snapshot
 
@@ -60,6 +60,10 @@ Last updated: 2026-04-12
 - artifact-first staged release governance workflow and approval gate
 - desktop provenance workflow for the Linux sidecar artifact plus signed Windows installer digests/attestations
 - merge-blocking backend CI now stages `backend-fast -> backend-heavy -> backend`, so triage clears changed-file Ruff/format blockers before reading deeper backend failures
+- repo-native decision records now have a canonical entrypoint under `docs/decisions/`, approved templates, and PR guidance for tradeoffs, rollback posture, and proof links
+- frontend-only `dependency-cruiser` now runs in standard CI beside lint/build/contract gates to pin module direction, cycle checks, and API-layer import boundaries
+- frontend runtime schema parsing is now piloted at `/api/system/features` and code sandbox JSON boundaries with `zod`, while the existing `docs/api/openapi.json -> openapi-typescript -> contract:check` chain remains the only generated contract source
+- lightweight feature-scoped `spec/plan/tasks` artifacts now exist under `docs/governance/specs/` as a non-canonical pilot for complex brownfield changes
 - versioned observability assets in-repo
 - nightly performance smoke with explicit budgets
 - merge-blocking PR latency gate for the core in-process chat path
@@ -83,6 +87,8 @@ Last updated: 2026-04-12
 - pre-ready desktop restart/backoff is shipped, and the packaged-shell fault smoke in `desktop-package-windows` is now path-scoped, merge-blocking, and retention-backed for desktop-related changes
 - installed Windows startup evidence now stays auditable across release and scheduled workflows: signed installer validation lives in `.github/workflows/desktop-provenance.yml`, recurring installer drift detection lives in `.github/workflows/fault-injection.yml`, and both retain structured failure artifacts even when the drill fails
 - GitHub-side branch protection wiring, signing-secret availability, and hosted Windows runner behavior remain external conditions outside repo-only proof
+- frontend runtime schema parsing is intentionally still a pilot on `/api/system/features` and code sandbox JSON rather than a repo-wide `zod` rollout
+- `docs/governance/specs/` is intentionally a narrow working-artifact pilot, not a second governance source
 
 ## Status by active roadmap area
 
@@ -90,6 +96,7 @@ Last updated: 2026-04-12
 - **17 runtime platform:** partial workbench runtime is landed; canvas, typed workspace outputs, session restoration, direct output reopen, output-to-artifact export linkage, and experimental DDGS-backed public-web retrieval are now in place, while deeper multi-step research behavior, project memory, and connectors remain open
 - **18 sandbox follow-ons:** MVP is landed; richer async control, egress policy, and Rust supervisor work remain open
 - **19 desktop maturity:** signed Windows packaging and packaged validation are landed; macOS/Linux public packaged validation, updater readiness, and deeper native runtime operations remain open
+- **governance tooling follow-ons:** decision records and PR guidance are landed, frontend-only `dependency-cruiser` is merge-blocking, `zod` runtime parsing is piloted on `/api/system/features` and code sandbox JSON, and lightweight feature specs are available as a non-canonical pilot; broader rollout remains intentionally limited
 - **engineering quality uplift:** audit remediation through the 2026-04-12 P3 governance-maintenance closeout is complete inside the repository; the current industrial-score floor is now backed by mechanical gates, workflow evidence, and contract tests, while remaining residual risk is limited to the external GitHub/release conditions named in [ROADMAP.md](ROADMAP.md)
 
 ## Recommended live references

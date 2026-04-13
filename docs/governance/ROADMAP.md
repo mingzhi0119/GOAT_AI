@@ -1,6 +1,6 @@
 # GOAT AI Roadmap
 
-> Last updated: 2026-04-12
+> Last updated: 2026-04-13
 > Current release tag: **v1.2.0**
 > Shipped status: [PROJECT_STATUS.md](PROJECT_STATUS.md)
 
@@ -139,6 +139,22 @@ secret availability.
 - Relationship to existing skills:
   - `wsl-linux-build`, `wsl-linux-ops-checks`, and `wsl-linux-rust-desktop` remain the execution-layer helpers for Linux-targeted validation from Windows
   - the new `goat-*` skills sit above them as governance/proof workflows and may compose with them when Linux parity is required
+
+### Governance tooling follow-ons
+
+- Goal: extend the now-landed governance tooling pilot only where additional scope still has clear payback.
+- Already landed and tracked in [PROJECT_STATUS.md](PROJECT_STATUS.md):
+  - repo-native decision-record templates and PR guidance
+  - frontend-only `dependency-cruiser`
+  - `zod` runtime parsing pilot at `/api/system/features` and code sandbox JSON boundaries
+  - lightweight non-canonical `spec/plan/tasks` pilot under `docs/governance/specs/`
+- Remaining work:
+  - decide whether additional high-risk frontend API boundaries justify runtime parsing beyond `/api/system/features` and code sandbox JSON, while keeping the current OpenAPI generation chain as the only contract source
+  - decide whether the current frontend `dependency-cruiser` rules should widen after the present structure stabilizes, without expanding the tool to Python imports
+  - decide whether feature-spec usage should grow beyond the current single real example, while keeping `AGENTS.md`, repo-local skills, roadmap, and status docs as the canonical governance layer
+- Non-goals:
+  - do not introduce OpenAPI Generator alongside the current `docs/api/openapi.json -> openapi-typescript -> contract:check` path unless the repo explicitly chooses to replace that pipeline end to end
+  - do not add a second constitution/process system that competes with the current standards, skills, roadmap, and status documents
 
 ### Runtime platform
 
