@@ -40,6 +40,13 @@ class FakeClock:
     )
     _mono: float = 0.0
 
+    def __post_init__(self) -> None:
+        if isinstance(self._utc, str):
+            parsed = datetime.fromisoformat(self._utc.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            self._utc = parsed
+
     def utc_now(self) -> datetime:
         return self._utc
 

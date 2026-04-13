@@ -28,9 +28,9 @@ def ensure_supported_runtime_metadata_backend(settings: Settings) -> None:
 def initialize_runtime_metadata_store(settings: Settings) -> None:
     """Initialize the active runtime-metadata store for application startup."""
     if settings.runtime_metadata_backend == "sqlite":
-        from backend.services import log_service
+        from backend.services import db_migrations
 
-        log_service.init_db(settings.log_db_path)
+        db_migrations.apply_migrations(settings.log_db_path)
         return
     if settings.runtime_metadata_backend == "postgres":
         from backend.services.postgres_runtime_support import (
