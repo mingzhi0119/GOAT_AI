@@ -60,9 +60,7 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.text("1"),
         ),
-        sa.Column(
-            "owner_id", sa.Text(), nullable=False, server_default=sa.text("''")
-        ),
+        sa.Column("owner_id", sa.Text(), nullable=False, server_default=sa.text("''")),
         sa.Column(
             "tenant_id",
             sa.Text(),
@@ -112,9 +110,7 @@ def upgrade() -> None:
         sa.Column(
             "session_id", sa.Text(), nullable=False, server_default=sa.text("''")
         ),
-        sa.Column(
-            "owner_id", sa.Text(), nullable=False, server_default=sa.text("''")
-        ),
+        sa.Column("owner_id", sa.Text(), nullable=False, server_default=sa.text("''")),
         sa.Column("filename", sa.Text(), nullable=False),
         sa.Column("mime_type", sa.Text(), nullable=False),
         sa.Column("byte_size", sa.Integer(), nullable=False),
@@ -156,9 +152,7 @@ def upgrade() -> None:
         sa.Column("created_at", sa.Text(), nullable=False),
         sa.Column("updated_at", sa.Text(), nullable=False),
         sa.Column("deleted_at", sa.Text(), nullable=True),
-        sa.Column(
-            "owner_id", sa.Text(), nullable=False, server_default=sa.text("''")
-        ),
+        sa.Column("owner_id", sa.Text(), nullable=False, server_default=sa.text("''")),
         sa.Column(
             "tenant_id",
             sa.Text(),
@@ -172,9 +166,7 @@ def upgrade() -> None:
             "storage_key", sa.Text(), nullable=False, server_default=sa.text("''")
         ),
     )
-    op.create_index(
-        "idx_knowledge_documents_status", "knowledge_documents", ["status"]
-    )
+    op.create_index("idx_knowledge_documents_status", "knowledge_documents", ["status"])
     op.create_index(
         "idx_knowledge_documents_created_at", "knowledge_documents", ["created_at"]
     )
@@ -243,14 +235,14 @@ def upgrade() -> None:
     op.create_index(
         "idx_knowledge_chunks_document_id", "knowledge_chunks", ["document_id"]
     )
-    op.create_index("idx_knowledge_chunks_vector_ref", "knowledge_chunks", ["vector_ref"])
+    op.create_index(
+        "idx_knowledge_chunks_vector_ref", "knowledge_chunks", ["vector_ref"]
+    )
 
     op.create_table(
         "media_uploads",
         sa.Column("id", sa.Text(), primary_key=True, nullable=False),
-        sa.Column(
-            "owner_id", sa.Text(), nullable=False, server_default=sa.text("''")
-        ),
+        sa.Column("owner_id", sa.Text(), nullable=False, server_default=sa.text("''")),
         sa.Column(
             "tenant_id",
             sa.Text(),
@@ -307,12 +299,8 @@ def upgrade() -> None:
         sa.Column(
             "credential_id", sa.Text(), nullable=False, server_default=sa.text("''")
         ),
-        sa.Column(
-            "auth_mode", sa.Text(), nullable=False, server_default=sa.text("''")
-        ),
-        sa.Column(
-            "owner_id", sa.Text(), nullable=False, server_default=sa.text("''")
-        ),
+        sa.Column("auth_mode", sa.Text(), nullable=False, server_default=sa.text("''")),
+        sa.Column("owner_id", sa.Text(), nullable=False, server_default=sa.text("''")),
         sa.Column(
             "tenant_id",
             sa.Text(),
@@ -358,7 +346,9 @@ def upgrade() -> None:
         sa.Column("status", sa.Text(), nullable=True),
         sa.Column("message", sa.Text(), nullable=True),
         sa.Column("metadata_json", sa.Text(), nullable=True),
-        sa.ForeignKeyConstraint(["task_id"], ["workbench_tasks.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["task_id"], ["workbench_tasks.id"], ondelete="CASCADE"
+        ),
     )
     op.create_index(
         "idx_workbench_task_events_task_seq",
@@ -402,9 +392,7 @@ def upgrade() -> None:
         sa.Column(
             "provider_name", sa.Text(), nullable=False, server_default=sa.text("''")
         ),
-        sa.Column(
-            "owner_id", sa.Text(), nullable=False, server_default=sa.text("''")
-        ),
+        sa.Column("owner_id", sa.Text(), nullable=False, server_default=sa.text("''")),
         sa.Column(
             "tenant_id",
             sa.Text(),
@@ -423,18 +411,14 @@ def upgrade() -> None:
         sa.Column(
             "credential_id", sa.Text(), nullable=False, server_default=sa.text("''")
         ),
-        sa.Column(
-            "auth_mode", sa.Text(), nullable=False, server_default=sa.text("''")
-        ),
+        sa.Column("auth_mode", sa.Text(), nullable=False, server_default=sa.text("''")),
         sa.Column(
             "execution_mode",
             sa.Text(),
             nullable=False,
             server_default=sa.text("'sync'"),
         ),
-        sa.Column(
-            "queued_at", sa.Text(), nullable=False, server_default=sa.text("''")
-        ),
+        sa.Column("queued_at", sa.Text(), nullable=False, server_default=sa.text("''")),
         sa.Column(
             "timeout_sec", sa.Integer(), nullable=False, server_default=sa.text("8")
         ),
@@ -501,9 +485,7 @@ def upgrade() -> None:
         sa.Column("metadata_json", sa.Text(), nullable=True),
         sa.Column("created_at", sa.Text(), nullable=False),
         sa.Column("updated_at", sa.Text(), nullable=False),
-        sa.Column(
-            "owner_id", sa.Text(), nullable=False, server_default=sa.text("''")
-        ),
+        sa.Column("owner_id", sa.Text(), nullable=False, server_default=sa.text("''")),
         sa.Column(
             "tenant_id",
             sa.Text(),
@@ -513,7 +495,9 @@ def upgrade() -> None:
         sa.Column(
             "principal_id", sa.Text(), nullable=False, server_default=sa.text("''")
         ),
-        sa.ForeignKeyConstraint(["task_id"], ["workbench_tasks.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["task_id"], ["workbench_tasks.id"], ondelete="CASCADE"
+        ),
         sa.CheckConstraint(
             "output_kind IN ('canvas_document')",
             name="ck_workbench_workspace_outputs_output_kind",
