@@ -286,6 +286,14 @@ def test_wsl_ops_skill_mentions_ci_router_for_linux_parity_decisions() -> None:
     assert "goat-ci-surface-router" in text
 
 
+def test_wsl_linux_build_exposes_python_ci_helper() -> None:
+    wsl_build_skill = SKILLS_ROOT / "wsl-linux-build" / "SKILL.md"
+    helper_script = SKILLS_ROOT / "wsl-linux-build" / "scripts" / "run_python_ci.sh"
+    text = wsl_build_skill.read_text(encoding="utf-8")
+    assert helper_script.is_file()
+    assert "run_python_ci.sh" in text
+
+
 def test_authz_truth_sources_include_scope_and_gate_reason_files() -> None:
     authz_truth_sources = (
         SKILLS_ROOT
@@ -335,8 +343,9 @@ def test_shared_forward_test_patterns_capture_live_prompt_and_output_shape() -> 
         "## Repeated output pattern",
         "## Script decision",
         "Read-only review of <scope>",
-        "No shared script landed in this pass.",
+        "One minimal script landed in this pass:",
         "invoke-wsl-command.ps1",
+        "run_python_ci.sh",
         "test_desktop_release_governance.py __tests__/ops/test_ops_asset_contracts.py -q",
         "cd frontend && npm run contract:check",
         "$goat-ci-surface-router",
@@ -344,4 +353,43 @@ def test_shared_forward_test_patterns_capture_live_prompt_and_output_shape() -> 
     ):
         assert snippet in text, (
             f"{shared_patterns.relative_to(REPO_ROOT)} missing `{snippet}`"
+        )
+
+
+def test_observability_dry_run_examples_cover_wsl_backend_heavy_chain() -> None:
+    dry_run_examples = (
+        SKILLS_ROOT
+        / "goat-observability-contract-proof"
+        / "references"
+        / "dry-run-examples.md"
+    )
+    text = dry_run_examples.read_text(encoding="utf-8")
+    for snippet in (
+        "## Example 3",
+        "run_python_ci.sh",
+        "__tests__/backend/platform/test_otel_tracing.py",
+        "__tests__/backend/platform/test_backend_main_factory.py",
+        "__tests__/ops/test_observability_asset_contract.py",
+    ):
+        assert snippet in text, (
+            f"{dry_run_examples.relative_to(REPO_ROOT)} missing `{snippet}`"
+        )
+
+
+def test_desktop_dry_run_examples_cover_governance_sync_chain() -> None:
+    dry_run_examples = (
+        SKILLS_ROOT
+        / "goat-desktop-release-evidence"
+        / "references"
+        / "dry-run-examples.md"
+    )
+    text = dry_run_examples.read_text(encoding="utf-8")
+    for snippet in (
+        "## Example 3",
+        "goat-ci-surface-router",
+        "goat-governance-sync",
+        "__tests__/desktop/test_desktop_release_governance.py __tests__/ops/test_ops_asset_contracts.py -q",
+    ):
+        assert snippet in text, (
+            f"{dry_run_examples.relative_to(REPO_ROOT)} missing `{snippet}`"
         )
