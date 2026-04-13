@@ -53,15 +53,26 @@ Last updated: 2026-04-13
 - PyInstaller-built backend sidecar
 - working Windows packaging flow producing `.msi` and NSIS installers
 - signed Windows desktop release path in `.github/workflows/desktop-provenance.yml`
+- Linux packaged-desktop build/provenance now runs in CI and the release
+  provenance workflow, retaining `.AppImage` / `.deb` artifacts plus packaged
+  provenance alongside the existing sidecar proof
+- macOS packaged-desktop workflow scaffolding now emits a blocker report and
+  stays manually gated so the repo does not misrepresent public macOS release
+  support before signing/notarization proof exists
 - desktop smoke coverage for sidecar boot and startup diagnostics
 - packaged desktop shell diagnostics persisted under the platform app-log directory
 - packaged desktop startup now uses bounded pre-ready restart/backoff before the main window is revealed, then still fails explicitly if the sidecar never becomes ready or exits unexpectedly after reveal
 - release governance now retains installed Windows evidence for both MSI and NSIS artifacts before signed installers are uploaded
+- `docs/operations/DESKTOP_DISTRIBUTION_READINESS.md` now records packaged
+  prerequisites, updater gating, and runtime diagnostic inputs for Windows,
+  Linux, and the currently blocked macOS public path
 
 ### Governance and operations
 
 - artifact-first staged release governance workflow and approval gate
-- desktop provenance workflow for the Linux sidecar artifact plus signed Windows installer digests/attestations
+- desktop provenance workflow for the Linux sidecar artifact, Linux packaged
+  desktop provenance/assets, macOS blocker-report scaffolding, and signed
+  Windows installer digests/attestations
 - merge-blocking backend CI now stages `backend-fast -> backend-heavy -> backend`, so triage clears changed-file Ruff/format blockers before reading deeper backend failures
 - repo-native decision records now have a canonical entrypoint under `docs/decisions/`, approved templates, and PR guidance for tradeoffs, rollback posture, and proof links
 - the engineering standards and PR template now include an explicit admission gate for future workbench, connector, and project-memory expansion, including feature-spec, decision-package, caller-scoped contract-proof, runtime-parser, and docs-sync requirements
@@ -87,7 +98,9 @@ Last updated: 2026-04-13
 - read-only project memory and static connector bindings are shipped, but write-capable connectors, live remote adapters, and any project-memory mutation flow remain future work
 - future workbench, connector, and project-memory widening is now governed by the admission gate in `docs/standards/ENGINEERING_STANDARDS.md` rather than by roadmap notes alone
 - runtime metadata now supports an opt-in hosted/server Postgres backend with Alembic-owned schema truth and deterministic SQLite snapshot import/parity tooling, while local and desktop remain SQLite-first by design
-- Windows desktop packaging, signing, and provenance are ahead of macOS/Linux public packaged validation
+- signed Windows public packaging is shipped, and Linux packaged proof plus
+  readiness docs are landed, but public macOS signing/notarization and updater
+  activation remain open
 - pre-ready desktop restart/backoff is shipped, and the packaged-shell fault smoke in `desktop-package-windows` is now path-scoped, merge-blocking, and retention-backed for desktop-related changes
 - installed Windows startup evidence now stays auditable across release and scheduled workflows: signed installer validation lives in `.github/workflows/desktop-provenance.yml`, recurring installer drift detection lives in `.github/workflows/fault-injection.yml`, and both retain structured failure artifacts even when the drill fails
 - GitHub-side branch protection wiring, signing-secret availability, and hosted Windows runner behavior remain external conditions outside repo-only proof
@@ -100,7 +113,11 @@ Last updated: 2026-04-13
 - **16D Postgres-backed runtime persistence:** complete for the hosted/server opt-in path; Alembic owns the Postgres runtime schema, repository adapters preserve the existing contracts, and SQLite snapshot export/import/parity plus rollback runbooks now anchor cutover proof
 - **17 runtime platform:** the shipped baseline includes durable workbench tasks, canvas/workspace-output persistence, session restoration, direct output reopen, output-to-artifact export linkage, experimental DDGS-backed public-web retrieval, bounded LangGraph-backed multi-step research for browse/deep-research, read-only `project_memory` retrieval, and caller-scoped static connector bindings
 - **18 sandbox follow-ons:** the shipped baseline includes the Docker-first sandbox MVP, queued-only async control-plane behavior, durable execution/event storage, and replayable sandbox logs
-- **19 desktop maturity:** the shipped baseline includes signed Windows packaging, packaged-desktop validation, installed Windows evidence retention, and pre-ready startup fault handling
+- **19 desktop maturity:** the shipped baseline includes signed Windows
+  packaging, Linux packaged-desktop CI/release scaffolding with retained
+  provenance, macOS blocker-report workflow scaffolding, packaged-readiness
+  docs, installed Windows evidence retention, and pre-ready startup fault
+  handling
 - **governance tooling follow-ons:** decision records and PR guidance are landed, frontend-only `dependency-cruiser` is merge-blocking, current shipped frontend API adapters now validate JSON and current SSE boundaries through shared runtime parsers, and lightweight feature specs are available as a non-canonical pilot for complex brownfield changes
 - **engineering quality uplift:** audit remediation through the 2026-04-12 P3 governance-maintenance closeout is complete inside the repository, and the current industrial-score floor is backed by mechanical gates, workflow evidence, and contract tests
 

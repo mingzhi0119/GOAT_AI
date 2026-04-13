@@ -83,6 +83,156 @@ jobs:
           subject-path: frontend/src-tauri/binaries/goat-backend-x86_64-unknown-linux-gnu
           sbom-path: desktop-sidecar.spdx.json
 
+  linux-packaged-desktop:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_ref || github.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: "pip"
+          cache-dependency-path: requirements-desktop-build.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.14.1"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install Tauri Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            curl \
+            file \
+            libayatana-appindicator3-dev \
+            libglib2.0-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            wget
+      - name: Install desktop sidecar build dependencies
+        run: python -m pip install -r requirements-desktop-build.txt
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: frontend/src-tauri -> target
+      - name: Build Linux packaged desktop
+        working-directory: frontend
+        run: npm run desktop:build
+      - name: Write Linux packaged desktop provenance
+        run: |
+          python -m tools.desktop.write_desktop_release_provenance \
+            --bundle-root frontend/src-tauri/target/release/bundle \
+            --pattern "appimage/*.AppImage" \
+            --pattern "deb/*.deb" \
+            --output desktop-linux-release-provenance.json \
+            --release-ref "${{ inputs.release_ref || github.ref_name }}" \
+            --resolved-sha "${{ github.sha }}" \
+            --platform linux-x64 \
+            --distribution-channel "${{ inputs.distribution_channel || 'public' }}"
+      - name: Upload Linux packaged desktop assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-linux-release-assets
+          path: |
+            frontend/src-tauri/target/release/bundle/appimage/*.AppImage
+            frontend/src-tauri/target/release/bundle/deb/*.deb
+            desktop-linux-release-provenance.json
+
+  macos-packaged-desktop:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: macos-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_ref || github.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: "pip"
+          cache-dependency-path: requirements-desktop-build.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.14.1"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install desktop sidecar build dependencies
+        run: python -m pip install -r requirements-desktop-build.txt
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: frontend/src-tauri -> target
+      - name: Build macOS packaged desktop
+        working-directory: frontend
+        run: npm run desktop:build
+      - name: Write macOS internal-test provenance
+        run: |
+          python -m tools.desktop.write_desktop_release_provenance \
+            --bundle-root frontend/src-tauri/target/release/bundle \
+            --pattern "macos/*.app" \
+            --pattern "dmg/*.dmg" \
+            --output desktop-macos-provenance.json \
+            --release-ref "${{ inputs.release_ref || github.ref_name }}" \
+            --resolved-sha "${{ github.sha }}" \
+            --platform macos-universal \
+            --distribution-channel "${{ inputs.distribution_channel || 'internal_test' }}"
+      - name: Report macOS public release blockers
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          channel = "${{ inputs.distribution_channel || 'internal_test' }}"
+          payload = {
+              "platform": "macos",
+              "distribution_channel": channel,
+              "public_release_ready": False,
+              "blockers": [
+                  "Apple signing certificate import is not automated yet.",
+                  "Notarization credentials and submission flow are not wired yet.",
+                  "Installed macOS smoke evidence is not part of the release proof chain yet.",
+              ],
+              "readiness_doc": "docs/operations/DESKTOP_DISTRIBUTION_READINESS.md",
+          }
+          Path("desktop-macos-blockers.json").write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          if channel == "public":
+              raise SystemExit(
+                  "Public macOS desktop distribution remains blocked; see desktop-macos-blockers.json."
+              )
+          PY
+      - name: Upload macOS packaged desktop assets
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos-release-assets
+          path: |
+            frontend/src-tauri/target/release/bundle/macos/*.app
+            frontend/src-tauri/target/release/bundle/dmg/*.dmg
+            desktop-macos-provenance.json
+            desktop-macos-blockers.json
+
   windows-packaged-desktop:
     runs-on: windows-latest
     permissions:

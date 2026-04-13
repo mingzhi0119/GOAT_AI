@@ -132,6 +132,9 @@ Important notes:
 - `desktop-package-windows` is still the PR packaged-binary gate only; it does not install MSI/NSIS artifacts
 - `desktop-package-windows` should trigger for desktop build inputs, not just Rust shell files: `frontend/src/**`, `frontend/public/**`, `frontend/index.html`, Vite/Tailwind/PostCSS/TS config, desktop scripts, desktop tooling, and desktop governance tests/workflows are part of the packaged-build truth set
 - non-desktop-only backend or documentation changes should not burn the Windows packaged PR gate when they do not affect the packaged desktop build surface
+- `desktop-supply-chain` now also builds Linux packaged desktop artifacts and
+  retains `desktop-linux-ci-provenance.json` plus packaged `AppImage` / `deb`
+  artifacts for CI-parity diagnostics
 - the `desktop-windows-fault-smoke` artifact should contain at least `build.log`, `packaged-shell-fault-smoke.log`, top-level `summary.json`, and per-scenario logs/result JSON so packaged PR failures stay diagnosable without rerunning the workflow
 - when the Windows package build succeeds, CI should still retain packaged installers plus `desktop-windows-ci-provenance.json` even if the packaged fault smoke fails later in the same job
 - `desktop-supply-chain` remains the Linux sidecar/provenance/cargo-audit gate; it does not own the Windows pre-ready retry semantics
@@ -150,6 +153,17 @@ Desktop sidecar writable paths:
 - SQLite DB: `<app_local_data_dir>/chat_logs.db`
 - persisted app data: `<app_local_data_dir>/data`
 - packaged desktop shell diagnostics now append to `<app_log_dir>/desktop-shell.log`
+
+Packaged desktop runtime diagnostics should first check:
+
+- `GET /api/system/desktop`
+- `<app_log_dir>/desktop-shell.log`
+- `GOAT_RUNTIME_ROOT`, `GOAT_LOG_DIR`, `GOAT_LOG_PATH`, `GOAT_DATA_DIR`
+- `GOAT_SERVER_PORT`, `GOAT_LOCAL_PORT`, `GOAT_DEPLOY_TARGET=local`
+- `GOAT_DESKTOP_SHELL_LOG_PATH`
+
+Cross-platform release prerequisites, updater gates, and macOS blockers live in
+[DESKTOP_DISTRIBUTION_READINESS.md](DESKTOP_DISTRIBUTION_READINESS.md).
 - Tauri startup now emits explicit diagnostics when sidecar spawn fails, `/api/health` does not become ready before the window reveal timeout, or the bundled backend exits unexpectedly after startup
 - before the main window is revealed, the Rust shell now allows only a small bounded sidecar restart/backoff budget; after reveal, unexpected sidecar exits still fail closed instead of silently recovering
 - packaged desktop startup still fails closed instead of revealing the main window on a broken backend

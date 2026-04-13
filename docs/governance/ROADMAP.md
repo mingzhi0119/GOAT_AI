@@ -19,8 +19,12 @@ Completed phases, landed slices, and historical closeout notes live in:
 
 ### Active priorities
 
-1. **Desktop distribution maturity**
-   - macOS/Linux public packaging, updater readiness, and deeper native runtime operations are still open
+1. **Code sandbox follow-ons**
+   - running-state cancellation/retry, allowlisted egress, richer workspace UX, and supervisor parity remain open
+2. **Desktop public release blockers**
+   - Linux packaged build/provenance and readiness docs are landed, but public macOS signing/notarization and updater enablement remain open
+3. **`/api/knowledge/answers` semantic alignment**
+   - the snippet-versus-synthesis contract decision still blocks final API alignment
 
 ### Repository-native Skills and Agent Automation
 
@@ -122,20 +126,18 @@ Completed phases, landed slices, and historical closeout notes live in:
 
 ### Desktop distribution and native runtime
 
-Desktop shell scaffolding and packaged backend sidecar are already landed and archived. Remaining work starts at distribution maturity.
+Desktop shell scaffolding and packaged backend sidecar are already landed and archived. Signed Windows public packaging is shipped, Linux packaged-desktop CI/release scaffolding plus readiness docs are now landed, and the remaining work is the narrower public-release and deeper-native-runtime follow-on set below.
 
 #### Phase 19C: platform installers, signing, and updates
 
-- Goal: ship real installable desktop artifacts instead of developer-only bundles.
+- Goal: finish the remaining public-release blockers after the shipped Windows
+  path and the now-landed Linux packaged proof/readiness scaffolding.
 - Remaining work:
-  - macOS signing
-  - Linux packaged validation and release shape
+  - public macOS signing, notarization, and release-secret wiring
   - updater readiness after signing is stable
-  - explicit prerequisite/bootstrap story for end users and developers
 - Exit criteria:
   - supported public installers are produced in CI/release workflows
   - updater strategy is documented and wired only after signed release flow is stable
-  - prerequisite installation paths are explicit enough for new users
 
 #### Phase 19D: desktop-native UX and local-runtime operations
 

@@ -15,6 +15,7 @@ def test_feature_specs_pilot_uses_a_narrow_allowed_file_set() -> None:
     directories = sorted(path.name for path in SPECS_ROOT.iterdir() if path.is_dir())
     assert directories == [
         "_template",
+        "desktop-distribution-maturity",
         "governance-tooling-follow-ons",
         "project-memory-connectors-foundation",
         "workbench-multi-step-research",
@@ -40,6 +41,9 @@ def test_feature_specs_docs_remain_explicitly_non_canonical() -> None:
     task_one_spec = (
         SPECS_ROOT / "workbench-multi-step-research" / "spec.md"
     ).read_text(encoding="utf-8")
+    task_three_spec = (
+        SPECS_ROOT / "desktop-distribution-maturity" / "spec.md"
+    ).read_text(encoding="utf-8")
 
     assert "not a second governance system" in readme
     assert "ROADMAP.md" in readme
@@ -50,3 +54,4 @@ def test_feature_specs_docs_remain_explicitly_non_canonical() -> None:
     assert "non-canonical working artifact" in example_spec
     assert "non-canonical working artifact" in task_two_spec
     assert "non-canonical working artifact" in task_one_spec
+    assert "non-canonical working artifact" in task_three_spec

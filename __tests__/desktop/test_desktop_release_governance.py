@@ -140,6 +140,12 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     changes_filter = _workflow_filter_block(ci_workflow, "desktop")
     desktop_windows_job = _workflow_job_block(ci_workflow, "desktop-package-windows")
     desktop_supply_chain_job = _workflow_job_block(ci_workflow, "desktop-supply-chain")
+    linux_packaged_release_job = _workflow_job_block(
+        desktop_provenance, "linux-packaged-desktop"
+    )
+    macos_packaged_release_job = _workflow_job_block(
+        desktop_provenance, "macos-packaged-desktop"
+    )
     installed_nsis_release_step = _workflow_step_block(
         desktop_provenance, "Run installed NSIS desktop smoke"
     )
@@ -191,6 +197,12 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
         in ci_workflow
     )
     assert "Build Linux desktop sidecar" in desktop_supply_chain_job
+    assert "actions/setup-node@v4" in desktop_supply_chain_job
+    assert "npm ci" in desktop_supply_chain_job
+    assert "Build Linux packaged desktop" in desktop_supply_chain_job
+    assert "npm run desktop:build" in desktop_supply_chain_job
+    assert "desktop-linux-ci-provenance.json" in desktop_supply_chain_job
+    assert "desktop-linux-ci-artifacts" in desktop_supply_chain_job
     assert "Rust dependency audit" in desktop_supply_chain_job
     assert "python -m tools.desktop.write_desktop_release_provenance" in ci_workflow
 
@@ -199,6 +211,22 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     )
     assert "desktop-sidecar.spdx.json" in desktop_provenance
     assert "x86_64-unknown-linux-gnu" in desktop_provenance
+    assert "linux-packaged-desktop" in desktop_provenance
+    assert "Build Linux packaged desktop" in linux_packaged_release_job
+    assert "desktop-linux-release-provenance.json" in linux_packaged_release_job
+    assert "appimage/*.AppImage" in linux_packaged_release_job
+    assert "deb/*.deb" in linux_packaged_release_job
+    assert "desktop-linux-release-assets" in linux_packaged_release_job
+    assert "macos-packaged-desktop" in desktop_provenance
+    assert "runs-on: macos-latest" in macos_packaged_release_job
+    assert "Build macOS packaged desktop" in macos_packaged_release_job
+    assert "desktop-macos-provenance.json" in macos_packaged_release_job
+    assert "desktop-macos-blockers.json" in macos_packaged_release_job
+    assert (
+        "Public macOS desktop distribution remains blocked"
+        in macos_packaged_release_job
+    )
+    assert "desktop-macos-release-assets" in macos_packaged_release_job
     assert "GOAT_DESKTOP_SIGNING_CERT_BASE64" in desktop_provenance
     assert "sign_windows_desktop_artifacts.ps1" in desktop_provenance
     assert "desktop-windows-provenance.json" in desktop_provenance
@@ -236,6 +264,11 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
 
     assert "signed Windows desktop release path" in release_doc
     assert "Linux desktop sidecar provenance record" in release_doc
+    assert "Linux packaged-desktop path" in release_doc
+    assert "desktop-linux-release-provenance.json" in release_doc
+    assert "macOS packaged-desktop scaffold" in release_doc
+    assert "desktop-macos-blockers.json" in release_doc
+    assert "DESKTOP_DISTRIBUTION_READINESS.md" in release_doc
     assert "packaged-shell fault smoke" in release_doc
     assert "installed Windows startup evidence" in release_doc
     assert "desktop-windows-installed-smoke" not in release_doc
@@ -249,6 +282,8 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     assert "packaged-build truth set" in operations_doc
     assert "non-desktop-only backend or documentation changes" in operations_doc
     assert "desktop-windows-fault-smoke" in operations_doc
+    assert "desktop-linux-ci-provenance.json" in operations_doc
+    assert "DESKTOP_DISTRIBUTION_READINESS.md" in operations_doc
     assert "artifact should contain at least" in operations_doc
     assert "build.log" in operations_doc
     assert "summary.json" in operations_doc

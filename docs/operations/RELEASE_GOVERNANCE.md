@@ -81,10 +81,17 @@ That workflow covers:
   - a Linux desktop sidecar provenance record
   - an SPDX SBOM
   - GitHub artifact attestations when the repository plan or repo variables permit it
+- the Linux packaged-desktop path by generating:
+  - packaged `AppImage` and `deb` desktop artifacts
+  - a packaged-desktop provenance manifest with digests
 - the signed Windows desktop release path by generating:
   - real packaged `.msi` and NSIS installers
   - an installer provenance manifest with digests and signature status
   - GitHub artifact attestations for the shipped installers when supported
+- the macOS packaged-desktop scaffold on manual/internal-test runs by generating:
+  - packaged `.app` and `.dmg` artifacts
+  - an internal-test provenance manifest
+  - a blocker report for public-signing/notarization gaps when those are still unresolved
 
 The signed Windows desktop release path is the default public-distribution path.
 Manual or local unsigned desktop builds remain internal/test-only artifacts.
@@ -93,11 +100,13 @@ Desktop release steps:
 
 1. Trigger `.github/workflows/desktop-provenance.yml` from a release tag or manual dispatch.
 2. Build the Linux desktop sidecar and write its provenance record with `python -m tools.desktop.write_linux_sidecar_provenance`.
-3. Build real Windows packaged installers from the same requested ref.
-4. Sign the Windows installers when `distribution_channel=public` (the tag path always requires this).
-5. Run `python -m tools.desktop.installed_windows_desktop_fault_smoke` against both the signed MSI and NSIS installers, continuing to the second installer even if the first one fails, and retain the installed-app evidence bundle.
-6. Write `desktop-windows-provenance.json` with artifact digests and signature status.
-7. Upload the installers plus provenance assets and installed-smoke evidence, then emit installer attestations when supported.
+3. Build Linux packaged desktop artifacts and write `desktop-linux-release-provenance.json`.
+4. Build real Windows packaged installers from the same requested ref.
+5. Sign the Windows installers when `distribution_channel=public` (the tag path always requires this).
+6. Run `python -m tools.desktop.installed_windows_desktop_fault_smoke` against both the signed MSI and NSIS installers, continuing to the second installer even if the first one fails, and retain the installed-app evidence bundle.
+7. Write `desktop-windows-provenance.json` with artifact digests and signature status.
+8. On manual dispatch, build macOS packaged artifacts and retain `desktop-macos-blockers.json`; internal-test runs keep the artifacts, while public runs must fail closed until signing/notarization automation is ready.
+9. Upload the platform artifacts plus provenance assets and installed-smoke evidence, then emit installer attestations when supported.
 
 The installed Windows evidence bundle should retain `desktop-installed-smoke/*/summary.json`
 even when install, startup, or uninstall fails. That summary is the audit entrypoint
@@ -121,6 +130,9 @@ The workflow boundaries stay distinct:
 - `.github/workflows/desktop-provenance.yml`: signed installer provenance plus installed Windows startup evidence, including healthy/fault evidence for release artifacts
 - `.github/workflows/fault-injection.yml`: recurring installed Windows drill to catch regression drift between releases; it replays the same installed-desktop proof without owning release signing
 
+Current platform blockers and updater-readiness gates are tracked in
+[DESKTOP_DISTRIBUTION_READINESS.md](DESKTOP_DISTRIBUTION_READINESS.md).
+
 For PR packaged diagnostics, `desktop-package-windows` should retain a
 `desktop-windows-fault-smoke` artifact containing at least the packaged-build
 log, packaged-shell smoke log, top-level `summary.json`, and per-scenario result
@@ -138,6 +150,10 @@ Required desktop signing secrets:
 
 If public desktop signing secrets are missing, the public tagged workflow must
 fail closed rather than silently shipping unsigned installers.
+
+macOS public distribution remains blocked until Apple signing, notarization, and
+installed-smoke automation move from the readiness document into the workflow
+proof chain.
 
 If artifact attestations are not available for the repository plan, keep the digest
 manifests and SBOM outputs as the minimum provenance record and enable attestations
