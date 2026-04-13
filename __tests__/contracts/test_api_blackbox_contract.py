@@ -2149,20 +2149,24 @@ class ApiBlackboxContractTests(unittest.TestCase):
 
         events_response = self.client.get(f"/api/workbench/tasks/{task_id}/events")
         self.assertEqual(200, events_response.status_code)
-        self.assertEqual(
-            [
-                "task.queued",
-                "task.started",
-                "retrieval.sources_resolved",
-                "retrieval.step.completed",
-                "task.completed",
-            ],
-            [event["event_type"] for event in events_response.json()["events"]],
-        )
-        self.assertEqual(
-            "knowledge",
-            events_response.json()["events"][3]["metadata"]["source_id"],
-        )
+        event_types = [
+            event["event_type"] for event in events_response.json()["events"]
+        ]
+        self.assertEqual("task.queued", event_types[0])
+        self.assertEqual("task.started", event_types[1])
+        self.assertIn("retrieval.sources_resolved", event_types)
+        self.assertIn("research.plan.created", event_types)
+        self.assertIn("retrieval.step.started", event_types)
+        self.assertIn("retrieval.step.completed", event_types)
+        self.assertIn("research.synthesis.completed", event_types)
+        self.assertEqual("task.completed", event_types[-1])
+        knowledge_events = [
+            event
+            for event in events_response.json()["events"]
+            if event["event_type"] == "retrieval.step.completed"
+            and event["metadata"].get("source_id") == "knowledge"
+        ]
+        self.assertGreaterEqual(len(knowledge_events), 1)
 
     def test_workbench_deep_research_with_web_only_completes_with_web_citations(
         self,
@@ -2208,13 +2212,15 @@ class ApiBlackboxContractTests(unittest.TestCase):
 
         events_response = self.client.get(f"/api/workbench/tasks/{task_id}/events")
         self.assertEqual(200, events_response.status_code)
-        self.assertEqual(
-            "web",
-            events_response.json()["events"][3]["metadata"]["source_id"],
-        )
-        self.assertEqual(
-            "duckduckgo",
-            events_response.json()["events"][3]["metadata"]["provider"],
+        web_events = [
+            event
+            for event in events_response.json()["events"]
+            if event["event_type"] == "retrieval.step.completed"
+            and event["metadata"].get("source_id") == "web"
+        ]
+        self.assertGreaterEqual(len(web_events), 1)
+        self.assertTrue(
+            all(event["metadata"]["provider"] == "duckduckgo" for event in web_events)
         )
 
     def test_workbench_canvas_task_completes_with_workspace_output(self) -> None:

@@ -259,6 +259,9 @@ class Settings:
     workbench_web_timeout_sec: int = 15
     workbench_web_region: str = "wt-wt"
     workbench_web_safesearch: Literal["on", "moderate", "off"] = "moderate"
+    workbench_langgraph_enabled: bool = True
+    workbench_browse_max_steps: int = 2
+    workbench_deep_research_max_steps: int = 3
     docker_socket_path: str = ""
     code_sandbox_default_image: str = "python:3.12-slim"
     code_sandbox_localhost_shell: str = ""
@@ -438,6 +441,13 @@ def load_settings() -> Settings:
     _workbench_web_safesearch = (
         os.environ.get("GOAT_WORKBENCH_WEB_SAFESEARCH", "moderate").strip().lower()
     )
+    _workbench_langgraph_enabled = _env_bool("GOAT_WORKBENCH_LANGGRAPH_ENABLED", "true")
+    _workbench_browse_max_steps = int(
+        os.environ.get("GOAT_WORKBENCH_BROWSE_MAX_STEPS", "2")
+    )
+    _workbench_deep_research_max_steps = int(
+        os.environ.get("GOAT_WORKBENCH_DEEP_RESEARCH_MAX_STEPS", "3")
+    )
     _sandbox_provider = (
         os.environ.get("GOAT_CODE_SANDBOX_PROVIDER", "docker").strip().lower()
     )
@@ -491,6 +501,12 @@ def load_settings() -> Settings:
     if _workbench_web_safesearch not in {"on", "moderate", "off"}:
         raise ValueError(
             "GOAT_WORKBENCH_WEB_SAFESEARCH must be one of: on, moderate, off"
+        )
+    if _workbench_browse_max_steps < 1 or _workbench_browse_max_steps > 4:
+        raise ValueError("GOAT_WORKBENCH_BROWSE_MAX_STEPS must be between 1 and 4")
+    if _workbench_deep_research_max_steps < 1 or _workbench_deep_research_max_steps > 6:
+        raise ValueError(
+            "GOAT_WORKBENCH_DEEP_RESEARCH_MAX_STEPS must be between 1 and 6"
         )
     if _sandbox_default_timeout < 1:
         raise ValueError("GOAT_CODE_SANDBOX_DEFAULT_TIMEOUT_SEC must be >= 1")
@@ -622,6 +638,9 @@ def load_settings() -> Settings:
         workbench_web_safesearch=cast(
             Literal["on", "moderate", "off"], _workbench_web_safesearch
         ),
+        workbench_langgraph_enabled=_workbench_langgraph_enabled,
+        workbench_browse_max_steps=_workbench_browse_max_steps,
+        workbench_deep_research_max_steps=_workbench_deep_research_max_steps,
         code_sandbox_provider=cast(CodeSandboxProviderId, _sandbox_provider),
         docker_socket_path=_docker_sock,
         code_sandbox_default_image=_sandbox_image,

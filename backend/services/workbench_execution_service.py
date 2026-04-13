@@ -15,6 +15,12 @@ from backend.services.knowledge_service import (
     search_knowledge,
 )
 from backend.services.exceptions import KnowledgeDocumentNotFound
+from backend.services.workbench_research_runtime import (
+    WorkbenchResearchExecutionFailed,
+    WorkbenchResearchNoRunnableSources,
+    execute_langgraph_research_task,
+    langgraph_runtime_available,
+)
 from backend.services.workbench_source_registry import resolve_requested_sources
 from backend.services.workbench_web_search import (
     WorkbenchWebSearchHit,
@@ -515,6 +521,50 @@ def execute_workbench_task(
 
     try:
         if claimed.task_kind in {"browse", "deep_research"}:
+            if settings.workbench_langgraph_enabled and langgraph_runtime_available():
+                try:
+                    research_result = execute_langgraph_research_task(
+                        task=claimed,
+                        repository=repository,
+                        llm=llm,
+                        settings=settings,
+                        auth_context=auth_context,
+                        request_id=request_id,
+                        source_resolver=resolve_requested_sources,
+                        knowledge_search=search_knowledge,
+                        web_search=search_public_web,
+                    )
+                except WorkbenchResearchNoRunnableSources:
+                    repository.mark_task_failed(
+                        task_id,
+                        updated_at=_now_iso(),
+                        error_detail=_RETRIEVAL_NO_RUNNABLE_SOURCES,
+                    )
+                    return
+                except WorkbenchResearchExecutionFailed:
+                    repository.mark_task_failed(
+                        task_id,
+                        updated_at=_now_iso(),
+                        error_detail=_RETRIEVAL_EXECUTION_FAILED,
+                    )
+                    return
+                repository.mark_task_completed(
+                    task_id,
+                    updated_at=_now_iso(),
+                    result_text=research_result.result_text,
+                    result_citations=[
+                        citation.model_dump(mode="python")
+                        for citation in research_result.citations
+                    ],
+                    workspace_output_count=0,
+                )
+                return
+            if settings.workbench_langgraph_enabled:
+                logger.warning(
+                    "LangGraph runtime is enabled in config but unavailable; "
+                    "falling back to legacy workbench retrieval.",
+                    extra={"task_id": task_id},
+                )
             _execute_retrieval_task(
                 task=claimed,
                 repository=repository,

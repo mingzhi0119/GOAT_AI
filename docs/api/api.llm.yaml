@@ -602,7 +602,7 @@ schemas:
       - created_at
     properties:
       sequence: integer
-      event_type: task.queued|task.started|task.cancelled|task.retry_requested|task.retry_created|retrieval.sources_resolved|retrieval.step.completed|retrieval.step.skipped|workspace_output.created|workspace_output.exported|task.completed|task.failed
+      event_type: task.queued|task.started|task.cancelled|task.retry_requested|task.retry_created|retrieval.sources_resolved|research.plan.created|retrieval.step.started|retrieval.step.completed|retrieval.step.skipped|research.follow_up.scheduled|research.synthesis.completed|workspace_output.created|workspace_output.exported|task.completed|task.failed
       created_at: string
       status: queued|running|completed|failed|cancelled|null
       message: string|null

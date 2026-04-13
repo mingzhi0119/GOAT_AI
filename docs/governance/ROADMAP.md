@@ -19,18 +19,12 @@ Completed phases, landed slices, and historical closeout notes live in:
 
 ### Active priorities
 
-1. **Multi-step research behavior on top of landed web retrieval**
-   - `/api/workbench/sources` now exposes runtime-ready experimental DDGS-backed `web`
-   - browse/deep-research still remain bounded single-pass evidence briefs
-   - the next step is iterative planning, fetch, synthesis, and stronger safety boundaries
-   - evaluate a LangGraph-backed orchestration path for deeper multi-step research only if it can sit behind the existing `/api/workbench/*` contract instead of forcing a frontend-visible runtime rewrite
-
-2. **Project memory and connectors**
+1. **Project memory and connectors**
    - both are already advertised as future capability slots
    - the open work is still runtime foundations, tenancy rules, and connector boundaries that make those slots real
    - if LangGraph is adopted, treat it as an internal execution/runtime option for long-running workbench tasks rather than as the public product contract
 
-3. **Desktop distribution maturity**
+2. **Desktop distribution maturity**
    - macOS/Linux public packaging, updater readiness, and deeper native runtime operations are still open
 
 ### Repository-native Skills and Agent Automation
@@ -89,11 +83,9 @@ Completed phases, landed slices, and historical closeout notes live in:
 
 #### Phase 17C: browse and deep-research runtime
 
-- Goal: replace the currently partial retrieval runtime with real web execution and stronger multi-step research behavior.
+- Goal: continue hardening the landed browse/deep-research runtime around safety boundaries, richer sources, and shared-runtime composition.
 - Remaining work:
   - staged safety boundaries for public web vs private retrieval
-  - iterative multi-step research behavior instead of one bounded retrieval pass
-  - a concrete orchestration spike for whether LangGraph improves plan -> retrieve -> synthesize -> follow-up loops, checkpointing, and human-review pauses without weakening the current authz/event/audit model
   - remote connector adapters behind the shared source registry
 
 #### Phase 17E: project memory and connectors

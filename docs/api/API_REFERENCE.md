@@ -394,8 +394,8 @@ Notes:
 - request shape is intentionally forward-compatible for future task execution and output linkage
 - current task-kind behavior:
   - `plan`: completed markdown result
-  - `browse`: minimal retrieval execution over runtime-ready sources; completed results may include citations
-  - `deep_research`: same bounded retrieval chain with more results; current runtime is still an evidence brief, not iterative autonomous long-horizon research
+  - `browse`: bounded multi-step plan -> retrieve -> synthesize execution over runtime-ready sources; completed results may include citations and additive timeline detail
+  - `deep_research`: same bounded multi-step runtime with a larger step budget and evidence surface; it is step-limited research, not open-ended autonomous long-horizon execution
   - `canvas`: completes with a durable `canvas_document` workspace output plus inline markdown result content; that output can later be exported to a downloadable artifact
 - unknown or caller-invisible source ids return `422`
 - missing workbench scopes or denied requested-source scopes return `403`
@@ -663,8 +663,12 @@ Current behavior:
   - `task.retry_requested`
   - `task.retry_created`
   - `retrieval.sources_resolved`
+  - `research.plan.created`
+  - `retrieval.step.started`
   - `retrieval.step.completed`
   - `retrieval.step.skipped`
+  - `research.follow_up.scheduled`
+  - `research.synthesis.completed`
   - `workspace_output.created`
   - `workspace_output.exported`
 - `task.completed`

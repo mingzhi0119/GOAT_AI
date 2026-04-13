@@ -1923,7 +1923,7 @@ export interface components {
              * @description Stable event name for this task lifecycle update.
              * @enum {string}
              */
-            event_type: "task.queued" | "task.started" | "task.cancelled" | "task.retry_requested" | "task.retry_created" | "retrieval.sources_resolved" | "retrieval.step.completed" | "retrieval.step.skipped" | "workspace_output.created" | "workspace_output.exported" | "task.completed" | "task.failed";
+            event_type: "task.queued" | "task.started" | "task.cancelled" | "task.retry_requested" | "task.retry_created" | "retrieval.sources_resolved" | "research.plan.created" | "retrieval.step.started" | "retrieval.step.completed" | "retrieval.step.skipped" | "research.follow_up.scheduled" | "research.synthesis.completed" | "workspace_output.created" | "workspace_output.exported" | "task.completed" | "task.failed";
             /**
              * Created At
              * @description UTC ISO-8601 event timestamp.
