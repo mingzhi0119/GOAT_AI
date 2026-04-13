@@ -62,6 +62,18 @@ Completed phases, landed slices, and historical closeout notes live in:
   - decide whether the current frontend `dependency-cruiser` rules should widen after the present structure stabilizes, without expanding the tool to Python imports
   - decide whether feature-spec usage should grow beyond the current single real example, while keeping `AGENTS.md`, repo-local skills, roadmap, and status docs as the canonical governance layer
 
+### Atomicity and composition follow-ons
+
+- Goal: reduce the current brownfield orchestration hotspots so the repository more consistently follows the intended "small focused functions plus composed flows" structure without changing public behavior.
+- Remaining work:
+  - split `backend/services/workbench_execution_service.py` into smaller task-kind and source-kind executors so `execute_workbench_task()` stays as a dispatcher while retrieval, plan, and canvas flows move behind narrower seams
+  - extract the current retrieval-heavy `_execute_retrieval_task()` path into separate helpers for source resolution, knowledge execution, web execution, event emission, and result finalization instead of keeping the full state machine in one function
+  - break `backend/application/workbench.py` into narrower workbench application modules such as task lifecycle, source listing, and workspace-output/export use cases so create/retry/cancel/read/export flows do not continue to accumulate in one file
+  - isolate the knowledge-augmented chat path in `backend/services/chat_service.py` behind a dedicated flow module so knowledge lookup, safeguard handling, knowledge-instruction composition, and stream handoff no longer live in one orchestration function
+  - split `frontend/src/hooks/useChatSession.ts` into smaller controller hooks for session title derivation, history synchronization, and send-message orchestration so the current brownfield chat-session hook remains a composition root instead of a growing stateful hotspot
+- Sequencing rule:
+  - start with `backend/services/workbench_execution_service.py`, then `backend/application/workbench.py`, then `backend/services/chat_service.py`, and finally `frontend/src/hooks/useChatSession.ts` unless a user-facing bug forces a different order
+
 ### Runtime platform
 
 #### Phase 17 shared runtime foundations
