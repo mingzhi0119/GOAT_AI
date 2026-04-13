@@ -263,3 +263,33 @@ Every change should preserve or improve the ten industrial-score dimensions belo
 - Do not conflate UI availability with backend permission or execution safety.
 - Document gate behavior and safe failure modes.
 - Do not advertise a capability as ready in UI, docs, or release notes while build, runtime, or policy gates for that capability are known-red.
+
+## 16. Workbench / Connector Admission Gate
+
+Any change that newly exposes or materially widens a `workbench`, `project memory`,
+`connector`, `source registry`, or other future durable-task / workspace capability
+must satisfy this admission gate before the repo treats the surface as real.
+
+- Write or update a feature spec under `docs/governance/specs/` before implementation
+  when the change creates a new user-visible workbench or connector surface, spans
+  multiple layers, changes brownfield runtime behavior, or will likely land in
+  multiple reviewable slices.
+- Link a heavy decision package under `docs/decisions/` before implementation when the
+  change affects storage shape, tenant or owner semantics, credential handling,
+  external connector trust boundaries, write-capable connector flows, project-memory
+  persistence, or rollback-sensitive compatibility behavior.
+- Add or update caller-scoped contract tests when scopes, source visibility,
+  `/api/system/features`, `/api/workbench/*`, workspace-output visibility, export
+  behavior, or runtime-vs-policy denial semantics change.
+- Any frontend consumer of `/api/workbench*`, `/api/connectors*`, `/api/projects*`, or
+  another newly risky capability surface must route through `src/api/types.ts` and
+  `src/api/runtimeSchemas.ts`; do not add direct `src/api/generated/openapi.ts`
+  imports or unchecked `resp.json() as ...` casts in new adapters.
+- Update the owning runbooks and status docs in the same change when operator-facing
+  config, feature flags, credential expectations, runtime dependencies, release
+  promises, or recovery steps change.
+- Keep unfinished expansion work in `docs/governance/ROADMAP.md` and move only landed
+  facts into `docs/governance/PROJECT_STATUS.md`.
+- Do not widen UI promises for project memory, connectors, or future workbench
+  surfaces until the runtime boundary, tenancy/authz rules, contract proof, and
+  recovery story are all real and green.

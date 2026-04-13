@@ -14,6 +14,7 @@
 <!-- For architecture-sensitive, compatibility-sensitive, or rollback-sensitive changes: -->
 
 - Decision artifact link: <!-- Link to `docs/decisions/` material, or write `N/A`. -->
+- Admission gate evidence for workbench / connector / project-memory / frontier surfaces: <!-- feature spec, decision package, caller-scoped contract tests, runtime parser, docs/runbook sync, or `N/A`. -->
 - Trade-offs / non-goals:
 - Rollback / failure surface:
 - Proof links: <!-- Tests, contracts, workflows, runbooks, or retained artifacts. -->

@@ -17,6 +17,7 @@ def test_pr_template_keeps_governance_prompts_for_risky_changes() -> None:
         "## User-visible behavior",
         "## Decision And Risk",
         "Decision artifact link",
+        "Admission gate evidence for workbench / connector / project-memory / frontier surfaces",
         "Trade-offs / non-goals",
         "Rollback / failure surface",
         "Proof links",

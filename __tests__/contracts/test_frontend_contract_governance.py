@@ -126,3 +126,20 @@ def test_frontend_json_api_adapters_do_not_use_unchecked_resp_json_casts() -> No
             violations.append(path.relative_to(REPO_ROOT).as_posix())
 
     assert violations == []
+
+
+def test_future_workbench_frontend_adapters_must_use_shared_runtime_boundaries() -> (
+    None
+):
+    api_root = REPO_ROOT / "frontend" / "src" / "api"
+
+    for path in sorted(api_root.glob("*.ts")):
+        text = path.read_text(encoding="utf-8")
+        if "/api/workbench" not in text:
+            continue
+
+        assert "runtimeSchemas" in text
+        assert "from './types'" in text or 'from "./types"' in text
+        assert "from './generated/openapi'" not in text
+        assert 'from "./generated/openapi"' not in text
+        assert "resp.json()) as " not in text
