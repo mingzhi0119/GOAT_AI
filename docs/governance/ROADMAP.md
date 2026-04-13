@@ -17,96 +17,6 @@ Completed phases, landed slices, and historical closeout notes live in:
 
 ## Open Work
 
-### Audit remediation backlog
-
-These items come from the April 2026 lifecycle audit and should take priority over
-new capability expansion. The goal is to close industrial-score gaps before
-widening product promises.
-
-No open P0 audit items remain after the 2026-04-11 remediation pass.
-
-The 2026-04-11 P1 pass also closed the deploy/ops asset-governance slice
-(direct tests now cover deploy/service/health/watchdog/phase0 contracts) and
-closed the contract-tooling startup-side-effect slice (API contract tooling no
-longer needs runtime DB/telemetry initialization just to inspect OpenAPI).
-
-The same 2026-04-11 remediation sequence also closed the remaining non-desktop
-P1 audit slices:
-
-- immutable artifact promotion now builds once in CI, promotes the same retained
-  bundle through staging and production, records per-environment promotion
-  evidence, and exercises artifact rollback via
-  `python -m tools.release.exercise_release_rollback_drill`
-- frontend browser-level protected-flow coverage, lint, bundle-budget checks,
-  and Playwright regression gates are now part of the standard CI path
-- backend provider drift is closed; the repo is now explicit that the active LLM
-  runtime is Ollama-only until a future provider decision lands end to end
-- request correlation and durable packaged-desktop diagnostics are surfaced
-  consistently enough to close the cross-surface observability P1 slice
-- the single-writer contract is now exposed via `/api/system/runtime-target`, and
-  merge-blocking latency smoke runs in CI through
-  `python -m tools.quality.run_pr_latency_gate`
-
-No open P1 audit items remain after the 2026-04-11 desktop release-maturity
-closure. The final desktop slice now has:
-
-- merge-blocking Windows packaged-desktop validation in CI
-- a signed Windows desktop release path in
-  `.github/workflows/desktop-provenance.yml`
-- packaged-artifact provenance for Windows installers plus the existing Linux
-  sidecar digest/SBOM record
-- explicit packaged-app failure handling in the Tauri shell so startup timeout
-  and sidecar exit paths do not silently reveal a broken UI
-
-The 2026-04-12 P2 closeout completed the original lifecycle-audit backlog. That pass:
-
-- extracted remaining composer-panel and attachment-strip responsibilities out of
-  the largest frontend hotspot so `ChatWindow` no longer owns the full popover
-  state machine inline
-- tightened bundle-budget thresholds after the async chunk split reduced the main
-  entry cost to a governed baseline
-- expanded automated accessibility coverage for the plus-menu and upload-manager
-  focus contracts instead of relying on manual review alone
-- promoted repository-layout truth and industrial-score guardrails into
-  merge-blocking governance tests so docs drift and stale paths are less likely
-  to re-enter the repo unnoticed
-
-The same-day engineering-score follow-on pass also closed the last open `P2`
-gaps:
-
-- backend runtime persistence and stream hotspots are now split into smaller
-  modules instead of concentrating state transitions, storage mapping, and
-  orchestration in a few oversized files
-- workbench now has dedicated `workbench:read`, `workbench:write`, and
-  `workbench:export` scopes, with route/authz semantics proven through contract
-  and application tests
-- OTel enabled-path behavior and observability assets are now mechanically
-  verified in `backend-heavy`
-- top-bar settings/actions now use real keyboard/focus semantics, and chat
-  composer state has been extracted out of the largest frontend hotspot
-- Windows desktop evidence now covers installed MSI/NSIS startup behavior in the
-  release workflow plus a recurring installed-desktop drill
-
-No open `P2` engineering-score items remain after the 2026-04-12 closeout.
-
-The same 2026-04-12 governance-maintenance pass also closed the prior `P3`
-watchpoints:
-
-- `desktop-package-windows` now has path-truth gating, merge-blocking packaged-shell fault smoke, retained failure logs/summaries, and governance tests that pin the packaged-desktop PR workflow shape
-- `.github/workflows/desktop-provenance.yml` and
-  `.github/workflows/fault-injection.yml` now retain structured installed
-  Windows evidence for both MSI and NSIS across install -> healthy launch ->
-  pre-ready fault scenarios -> uninstall, with release-vs-drill ownership
-  boundaries documented in ops runbooks
-- workbench/authz and observability widening risk is now mechanically guarded
-  through caller-scoped `/api/system/features` contract tests, workbench
-  compatibility/visibility tests, and bidirectional metric-asset contracts
-
-No open `P3` governance-maintenance watchpoints remain inside the repository.
-Remaining audit-adjacent risk now sits in external GitHub/release conditions
-such as branch-protection wiring, hosted Windows runner execution, and signing
-secret availability.
-
 ### Active priorities
 
 1. **Multi-step research behavior on top of landed web retrieval**
@@ -116,14 +26,10 @@ secret availability.
 
 2. **Project memory and connectors**
    - both are already advertised as future capability slots
-   - they should not grow UI promises until the runtime, tenancy, and connector boundaries are real
-   - any widening work should satisfy the admission gate in `docs/standards/ENGINEERING_STANDARDS.md` before implementation starts
+   - the open work is still runtime foundations, tenancy rules, and connector boundaries that make those slots real
 
 3. **Desktop distribution maturity**
-   - signed Windows release and packaged CI validation are landed
    - macOS/Linux public packaging, updater readiness, and deeper native runtime operations are still open
-   - current governance order is: clear `backend-fast` first, then inspect `backend-heavy`, and only then move to `desktop-package-windows` / `desktop-supply-chain`
-   - pre-ready restart/backoff is shipped, and the PR packaged-binary smoke plus release/scheduled installed-desktop evidence are now fixed governance mechanisms rather than ad hoc watchpoints
 
 ### Repository-native Skills and Agent Automation
 
@@ -144,19 +50,10 @@ secret availability.
 ### Governance tooling follow-ons
 
 - Goal: extend the now-landed governance tooling pilot only where additional scope still has clear payback.
-- Already landed and tracked in [PROJECT_STATUS.md](PROJECT_STATUS.md):
-  - repo-native decision-record templates and PR guidance
-  - frontend-only `dependency-cruiser`
-  - shared runtime parsing across the current shipped frontend JSON adapters plus current chat/upload/code-sandbox SSE boundaries
-  - lightweight non-canonical `spec/plan/tasks` pilot under `docs/governance/specs/`
 - Remaining work:
   - decide whether future workbench, connector, or other newly shipped frontend surfaces should adopt the same runtime parser pattern when a real consumer lands, while keeping the current OpenAPI generation chain as the only contract source
   - decide whether the current frontend `dependency-cruiser` rules should widen after the present structure stabilizes, without expanding the tool to Python imports
   - decide whether feature-spec usage should grow beyond the current single real example, while keeping `AGENTS.md`, repo-local skills, roadmap, and status docs as the canonical governance layer
-  - keep applying the admission gate for future workbench, connector, and project-memory widening so those surfaces do not outrun tenancy, authz, contract-proof, and rollback planning
-- Non-goals:
-  - do not introduce OpenAPI Generator alongside the current `docs/api/openapi.json -> openapi-typescript -> contract:check` path unless the repo explicitly chooses to replace that pipeline end to end
-  - do not add a second constitution/process system that competes with the current standards, skills, roadmap, and status documents
 
 ### Runtime platform
 
@@ -257,8 +154,6 @@ Desktop shell scaffolding and packaged backend sidecar are already landed and ar
   - native log sink wiring
   - restart/backoff and clearer first-run failure reporting
   - desktop-safe local data and path handling
-- Current governance focus:
-  - the runtime behavior and its evidence gates are landed; remaining work in this phase is product/runtime breadth rather than keeping packaged-binary and installed-evidence guardrails alive by convention
 - Non-goals:
   - no SPA rewrite into Rust
   - no backend business-logic rewrite solely for desktop packaging
@@ -277,10 +172,9 @@ These items should remain roadmap-only in the frontend until the corresponding b
 
 ## Dependencies and constraints
 
-- Capability gates must continue to separate runtime unavailability from policy denial.
-- Storage evolution must preserve the current SQLite-first / single-writer operational contract unless a separate decision log changes that assumption.
-- Search, research, canvas, connector UI, and future cloud model selection should not expose fake capabilities before the backend/runtime can actually support them.
-- Shared runtime foundations should land before feature-specific frontend promises widen.
+- Planning for future workbench, connector, project-memory, and other frontier surfaces should follow the canonical policy in [ENGINEERING_STANDARDS.md](../standards/ENGINEERING_STANDARDS.md), especially the admission-gate and capability-gate rules.
+- Shared runtime foundations still need to land before project-memory, connector, or broader frontend promises widen.
+- Storage-shape evolution remains downstream of a separate decision package while the current SQLite-first / single-writer contract stays in force.
 
 ---
 

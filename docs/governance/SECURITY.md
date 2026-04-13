@@ -1,6 +1,7 @@
 # GOAT AI Security Notes
 
-This document records the current threat model and the guardrails that matter for Phase 13.5.
+This document records the current threat model and the shipped guardrails that
+matter for the repository's current security posture.
 
 ## Authentication and trust model
 
@@ -53,6 +54,6 @@ This document records the current threat model and the guardrails that matter fo
 ## Related docs
 
 - [OPERATIONS.md](../operations/OPERATIONS.md)
-- [ROADMAP.md](ROADMAP.md)
 - [PROJECT_STATUS.md](PROJECT_STATUS.md)
+- [ROADMAP_ARCHIVE.md](ROADMAP_ARCHIVE.md)
 - [SECURITY_RESPONSE.md](SECURITY_RESPONSE.md)

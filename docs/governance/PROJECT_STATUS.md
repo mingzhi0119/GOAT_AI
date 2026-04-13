@@ -6,7 +6,6 @@ Last updated: 2026-04-13
 
 - **Current release:** `v1.2.0`
 - **Shipped baseline:** phases 11-15 are complete and documented
-- **Current planning horizon:** deeper workbench/runtime completion, sandbox follow-ons, and desktop distribution maturity
 
 ## Shipped platform summary
 
@@ -92,18 +91,19 @@ Last updated: 2026-04-13
 - frontend runtime schema parsing now covers the current shipped frontend API adapters, but future workbench/frontier surfaces should adopt the same pattern only when a real frontend consumer lands
 - `docs/governance/specs/` is intentionally a narrow working-artifact pilot, not a second governance source
 
-## Status by active roadmap area
+## Shipped coverage by roadmap area
 
 - **16B storage evolution:** complete; repository ownership boundaries are explicit across sessions, artifacts, knowledge, media, workbench, and sandbox, and future datastore-shape changes require a separate decision package
-- **17 runtime platform:** partial workbench runtime is landed; canvas, typed workspace outputs, session restoration, direct output reopen, output-to-artifact export linkage, and experimental DDGS-backed public-web retrieval are now in place, while deeper multi-step research behavior, project memory, and connectors remain open
-- **18 sandbox follow-ons:** MVP is landed; richer async control, egress policy, and Rust supervisor work remain open
-- **19 desktop maturity:** signed Windows packaging and packaged validation are landed; macOS/Linux public packaged validation, updater readiness, and deeper native runtime operations remain open
-- **governance tooling follow-ons:** decision records and PR guidance are landed, frontend-only `dependency-cruiser` is merge-blocking, current shipped frontend API adapters now validate JSON and current SSE boundaries through shared runtime parsers, and lightweight feature specs are available as a non-canonical pilot; broader rollout remains intentionally limited to real shipped surfaces
-- **engineering quality uplift:** audit remediation through the 2026-04-12 P3 governance-maintenance closeout is complete inside the repository; the current industrial-score floor is now backed by mechanical gates, workflow evidence, and contract tests, while remaining residual risk is limited to the external GitHub/release conditions named in [ROADMAP.md](ROADMAP.md)
+- **17 runtime platform:** the shipped baseline includes durable workbench tasks, canvas/workspace-output persistence, session restoration, direct output reopen, output-to-artifact export linkage, and experimental DDGS-backed public-web retrieval
+- **18 sandbox follow-ons:** the shipped baseline includes the Docker-first sandbox MVP, queued-only async control-plane behavior, durable execution/event storage, and replayable sandbox logs
+- **19 desktop maturity:** the shipped baseline includes signed Windows packaging, packaged-desktop validation, installed Windows evidence retention, and pre-ready startup fault handling
+- **governance tooling follow-ons:** decision records and PR guidance are landed, frontend-only `dependency-cruiser` is merge-blocking, current shipped frontend API adapters now validate JSON and current SSE boundaries through shared runtime parsers, and lightweight feature specs are available as a non-canonical pilot for complex brownfield changes
+- **engineering quality uplift:** audit remediation through the 2026-04-12 P3 governance-maintenance closeout is complete inside the repository, and the current industrial-score floor is backed by mechanical gates, workflow evidence, and contract tests
 
 ## Recommended live references
 
 - [ROADMAP.md](ROADMAP.md)
+- [ROADMAP_ARCHIVE.md](ROADMAP_ARCHIVE.md)
 - [OPERATIONS.md](../operations/OPERATIONS.md)
 - [API_REFERENCE.md](../api/API_REFERENCE.md)
 - [API_ERRORS.md](../api/API_ERRORS.md)

@@ -1,4 +1,4 @@
-# API error model (Phase 13 Section 13.0)
+# API error model
 
 JSON error responses use a **stable envelope** so logs, metrics, and clients share the same semantics:
 
@@ -46,5 +46,7 @@ JSON error responses use a **stable envelope** so logs, metrics, and clients sha
 
 ## Related
 
-- [ROADMAP.md](../governance/ROADMAP.md) Phase 13 Section 13.0  
-- [ENGINEERING_STANDARDS.md](../standards/ENGINEERING_STANDARDS.md) - [AGENTS.md](../../AGENTS.md) (agent memory and collaboration guide)
+- [OPERATIONS.md](../operations/OPERATIONS.md)
+- [ENGINEERING_STANDARDS.md](../standards/ENGINEERING_STANDARDS.md)
+- [ROADMAP_ARCHIVE.md](../governance/ROADMAP_ARCHIVE.md) for the historical rollout context
+- [AGENTS.md](../../AGENTS.md) for agent operating guidance

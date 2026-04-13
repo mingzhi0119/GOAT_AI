@@ -11,7 +11,7 @@ Strategic Intelligence assistant for Simon Business School, University of Roches
 ## Environments
 
 - **Portable by design:** the same repo is meant to run on **Windows, macOS, and Linux** for development, and on **various Linux (or container) server layouts** for production, not tied to a single school-owned Ubuntu image. Paths, ports, GPU selection, and secrets are **environment-driven** (see `.env.example` and [docs/operations/OPERATIONS.md](docs/operations/OPERATIONS.md)); avoid hardcoding host-specific assumptions in code.
-- **Reference vs local:** a documented production URL in [docs/governance/PROJECT_STATUS.md](docs/governance/PROJECT_STATUS.md) is a **reference deployment**, not a constraint on where you may install or develop.
+- **Reference vs local:** the example public deployment listed above is a **reference deployment**, not a constraint on where you may install or develop.
 
 ### Windows development
 

@@ -75,8 +75,11 @@ API key and, when required, the owner ID. The SPA stores those values locally in
 the browser and attaches `X-GOAT-API-Key` / `X-GOAT-Owner-Id` to runtime API calls.
 Frontend API contract types are generated from `docs/api/openapi.json`; refresh them
 with `npm run contract:generate` whenever the backend contract changes.
-`npm run depcruise` enforces the frontend-only import-direction and cycle guardrails; keep
-new network calls inside `src/api/` rather than bypassing typed adapters from hooks or components.
+`npm run depcruise` exercises the frontend-only import-direction and cycle guardrails for
+the current app structure.
+
+Permanent contributor policy for code placement, contract boundaries, and required
+change-time gates lives in [ENGINEERING_STANDARDS.md](../standards/ENGINEERING_STANDARDS.md).
 
 ### Windows desktop prerequisites
 
@@ -480,7 +483,8 @@ Setting `GOAT_SAFEGUARD_ENABLED=false` and `GOAT_SAFEGUARD_MODE=off` are equival
 
 ### RAG retrieval quality (Phase 14.7)
 
-**Regression:** run `python -m tools.quality.run_rag_eval` (from the repository root) before merge when changing `backend/services/retrieval_quality/`, `tools/quality/run_rag_eval.py`, or `evaldata/`. CI enforces this on every backend job.
+**Regression helper:** `python -m tools.quality.run_rag_eval` (from the repository root)
+exercises the retrieval-quality golden set and matches the backend CI proof surface.
 
 **Knobs (environment + request):**
 
@@ -596,7 +600,8 @@ python -m tools.ops.backup_chat_db
 python -m tools.ops.exercise_recovery_drill --src "$GOAT_LOG_PATH" --backup-dir ./backups --required-table sessions --required-table session_messages
 ```
 
-- The recovery drill is now covered by automated tests; keep it passing whenever backup, restore, rollback, or SQLite persistence behavior changes.
+- Use the recovery drill when validating backup/restore readiness or when checking a
+host's ability to recover from a bad SQLite state.
 
 ## GPU and telemetry
 
@@ -607,14 +612,14 @@ Telemetry endpoints:
 
 If `nvidia-smi` is unavailable or unreadable, GPU telemetry should degrade gracefully instead of showing fake values.
 
-## Phase 13 risk triggers
+## Operational stop signs
 
-Treat the following as operational stop signs during Phase 13 rollout work:
+Treat the following as operational stop signs during runtime, persistence, or rollout changes:
 
 | Trigger | Response |
 |---------|----------|
 | Repeated SSE failure or timeout in post-deploy contract checks | Pause Wave B work, inspect `var/logs/fastapi.log` and Ollama logs, and do not advance the rollout until `/api/chat` emits SSE again. |
-| `/api/ready` flapping or sustained non-200 responses | Block Phase 15 structural refactors until readiness and deploy checks are stable across a full deploy cycle. |
+| `/api/ready` flapping or sustained non-200 responses | Block broader structural or rollout changes until readiness and deploy checks are stable across a full deploy cycle. |
 | `sqlite_log_write_failures_total` rising over a sustained window | Prioritize backup/restore drill and recovery work before any new persistence feature lands. |
 
 ## API ops summary
