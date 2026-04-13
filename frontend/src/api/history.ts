@@ -1,5 +1,9 @@
 import { buildApiHeaders } from './auth'
 import { buildApiErrorMessage } from './errors'
+import {
+  parseHistorySessionDetailResponse,
+  parseHistorySessionListResponse,
+} from './runtimeSchemas'
 import type { HistorySessionDetail, HistorySessionItem } from './types'
 
 export type { HistorySessionDetail, HistorySessionItem } from './types'
@@ -9,8 +13,7 @@ export async function fetchHistory(): Promise<HistorySessionItem[]> {
     headers: buildApiHeaders(),
   })
   if (!resp.ok) throw new Error(await buildApiErrorMessage(resp, 'History API'))
-  const data = (await resp.json()) as { sessions?: HistorySessionItem[] }
-  return Array.isArray(data.sessions) ? data.sessions : []
+  return parseHistorySessionListResponse(await resp.json())
 }
 
 export async function fetchSession(sessionId: string): Promise<HistorySessionDetail> {
@@ -18,7 +21,7 @@ export async function fetchSession(sessionId: string): Promise<HistorySessionDet
     headers: buildApiHeaders(),
   })
   if (!resp.ok) throw new Error(await buildApiErrorMessage(resp, 'History session API'))
-  return (await resp.json()) as HistorySessionDetail
+  return parseHistorySessionDetailResponse(await resp.json())
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {

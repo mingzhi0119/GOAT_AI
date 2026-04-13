@@ -172,9 +172,9 @@ jobs:
       - name: Frontend dependency audit
         working-directory: frontend
         run: npm audit --audit-level=high
-      - name: Frontend lint, contract, tests, and build
+      - name: Frontend lint, dependency boundaries, contract, tests, and build
         working-directory: frontend
-        run: npm run lint && npm run contract:check && npm run test:coverage && npm run build && npm run bundle:check && npm run test:e2e
+        run: npm run lint && npm run depcruise && npm run contract:check && npm run test:coverage && npm run build && npm run bundle:check && npm run test:e2e
 
   desktop-supply-chain:
     runs-on: ubuntu-latest

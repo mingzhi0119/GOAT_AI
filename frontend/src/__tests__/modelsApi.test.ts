@@ -50,6 +50,57 @@ describe('models api', () => {
     })
   })
 
+  it('normalizes missing optional model capability fields', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          model: 'gemma4:26b',
+          capabilities: ['completion'],
+          supports_tool_calling: false,
+          supports_chart_tools: false,
+          supports_vision: false,
+          supports_thinking: false,
+        }),
+      }),
+    )
+
+    const capabilities = await fetchModelCapabilities('gemma4:26b')
+
+    expect(capabilities.context_length).toBeNull()
+  })
+
+  it('rejects malformed JSON payloads', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ models: [123] }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            model: 'gemma4:26b',
+            capabilities: 'completion',
+            supports_tool_calling: false,
+            supports_chart_tools: false,
+            supports_vision: false,
+            supports_thinking: false,
+          }),
+        }),
+    )
+
+    await expect(fetchModels()).rejects.toThrow(
+      /Models API returned an invalid response payload/,
+    )
+    await expect(fetchModelCapabilities('gemma4:26b')).rejects.toThrow(
+      /Model capabilities API returned an invalid response payload/,
+    )
+  })
+
   it('throws typed errors when endpoints fail', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }))
     await expect(fetchModels()).rejects.toThrow('Models API: HTTP 503')

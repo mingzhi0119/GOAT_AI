@@ -9,6 +9,16 @@
 - [ ] I updated [`docs/architecture/DOMAIN.md`](../docs/architecture/DOMAIN.md) (or confirm no domain-term changes).
 - [ ] I regenerated OpenAPI / `docs/api/api.llm.yaml` if endpoints or schemas changed (`python -m tools.contracts.regenerate_openapi_json` then `python -m tools.contracts.generate_llm_api_yaml`; verify with `python -m tools.contracts.check_api_contract_sync` from repo root).
 
+## Decision And Risk
+
+<!-- For architecture-sensitive, compatibility-sensitive, or rollback-sensitive changes: -->
+
+- Decision artifact link: <!-- Link to `docs/decisions/` material, or write `N/A`. -->
+- Admission gate evidence for workbench / connector / project-memory / frontier surfaces: <!-- feature spec, decision package, caller-scoped contract tests, runtime parser, docs/runbook sync, or `N/A`. -->
+- Trade-offs / non-goals:
+- Rollback / failure surface:
+- Proof links: <!-- Tests, contracts, workflows, runbooks, or retained artifacts. -->
+
 ## Testing
 
 <!-- How you verified (commands). -->

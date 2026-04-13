@@ -1,40 +1,11 @@
 import { buildApiHeaders } from './auth'
 import { buildApiErrorMessage } from './errors'
-import type { ChatRequest, ChatStreamEvent, ChartSpec } from './types'
+import { parseChatStreamEvent } from './runtimeSchemas'
+import type { ChatRequest, ChatStreamEvent } from './types'
 
 export interface StreamChatOptions {
   signal?: AbortSignal
   userName?: string
-}
-
-function isChatStreamEvent(payload: unknown): payload is ChatStreamEvent {
-  if (typeof payload !== 'object' || payload === null) return false
-  const event = payload as {
-    type?: string
-    token?: unknown
-    chart?: unknown
-    message?: unknown
-    artifact_id?: unknown
-    filename?: unknown
-    mime_type?: unknown
-    byte_size?: unknown
-    download_url?: unknown
-  }
-  if (event.type === 'token') return typeof event.token === 'string'
-  if (event.type === 'thinking') return typeof event.token === 'string'
-  if (event.type === 'chart_spec') return !!event.chart && typeof event.chart === 'object'
-  if (event.type === 'artifact') {
-    return (
-      typeof event.artifact_id === 'string' &&
-      typeof event.filename === 'string' &&
-      typeof event.mime_type === 'string' &&
-      typeof event.byte_size === 'number' &&
-      typeof event.download_url === 'string'
-    )
-  }
-  if (event.type === 'done') return true
-  if (event.type === 'error') return typeof event.message === 'string'
-  return false
 }
 
 /** Parse completed SSE lines and yield typed chat stream events. */
@@ -44,15 +15,9 @@ function* parseSSELines(lines: string[]): Generator<ChatStreamEvent> {
     const raw = line.slice(6).trim()
     try {
       const payload = JSON.parse(raw) as unknown
-      if (!isChatStreamEvent(payload)) continue
-
-      if (payload.type === 'chart_spec') {
-        const chart = payload.chart as ChartSpec
-        if (!chart || typeof chart !== 'object') continue
-      }
-
-      yield payload
-      if (payload.type === 'done') return
+      const event = parseChatStreamEvent(payload)
+      yield event
+      if (event.type === 'done') return
     } catch {
       // skip malformed frames
     }

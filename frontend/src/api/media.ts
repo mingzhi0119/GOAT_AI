@@ -1,5 +1,6 @@
 import { buildApiHeaders } from './auth'
 import { buildApiErrorMessage } from './errors'
+import { parseMediaUploadResponse } from './runtimeSchemas'
 
 /** POST /api/media/uploads - vision image attachments. */
 export interface MediaUploadResponse {
@@ -22,5 +23,5 @@ export async function uploadMediaImage(file: File): Promise<MediaUploadResponse>
   if (!resp.ok) {
     throw new Error(await buildApiErrorMessage(resp, 'Media upload API'))
   }
-  return (await resp.json()) as MediaUploadResponse
+  return parseMediaUploadResponse(await resp.json())
 }

@@ -13,7 +13,19 @@ describe('history api', () => {
     localStorage.setItem(OWNER_ID_STORAGE_KEY, 'alice')
     const mockedFetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ sessions: [{ id: 's1', title: 't', model: 'm', created_at: 'c', updated_at: 'u' }] }),
+      json: async () => ({
+        sessions: [
+          {
+            id: 's1',
+            title: 't',
+            model: 'm',
+            schema_version: 2,
+            created_at: 'c',
+            updated_at: 'u',
+            owner_id: 'alice',
+          },
+        ],
+      }),
     })
     vi.stubGlobal('fetch', mockedFetch)
 
@@ -36,11 +48,29 @@ describe('history api', () => {
         id: 's1',
         title: 't',
         model: 'm',
+        schema_version: 2,
         created_at: 'c',
         updated_at: 'u',
-        chart_spec: { version: '2.0', engine: 'echarts' },
+        owner_id: 'alice',
+        chart_spec: {
+          version: '2.0',
+          engine: 'echarts',
+          kind: 'line',
+          title: 'Trend',
+          description: '',
+          dataset: [],
+          option: {},
+          meta: {
+            row_count: 0,
+            truncated: false,
+            warnings: [],
+            source_columns: [],
+          },
+        },
         file_context: { prompt: 'prompt' },
         knowledge_documents: [{ document_id: 'doc-1', filename: 'strategy.pdf', mime_type: 'application/pdf' }],
+        workspace_outputs: [],
+        chart_data_source: 'uploaded',
         messages: [
           {
             role: 'assistant',
@@ -62,7 +92,21 @@ describe('history api', () => {
 
     const detail = await fetchSession('s1')
     expect(detail.id).toBe('s1')
-    expect(detail.chart_spec).toEqual({ version: '2.0', engine: 'echarts' })
+    expect(detail.chart_spec).toEqual({
+      version: '2.0',
+      engine: 'echarts',
+      kind: 'line',
+      title: 'Trend',
+      description: '',
+      dataset: [],
+      option: {},
+      meta: {
+        row_count: 0,
+        truncated: false,
+        warnings: [],
+        source_columns: [],
+      },
+    })
     expect(detail.file_context).toEqual({ prompt: 'prompt' })
     expect(detail.knowledge_documents).toEqual([
       { document_id: 'doc-1', filename: 'strategy.pdf', mime_type: 'application/pdf' },
@@ -82,6 +126,68 @@ describe('history api', () => {
         'X-GOAT-Owner-Id': 'alice',
       },
     })
+  })
+
+  it('keeps an empty history list when sessions is omitted', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      }),
+    )
+
+    await expect(fetchHistory()).resolves.toEqual([])
+  })
+
+  it('normalizes optional history detail fields', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          id: 's2',
+          title: 'Second session',
+          model: 'gemma4:26b',
+          schema_version: 2,
+          created_at: '2026-04-13T00:00:00Z',
+          updated_at: '2026-04-13T00:00:01Z',
+          owner_id: 'alice',
+          messages: [],
+        }),
+      }),
+    )
+
+    const detail = await fetchSession('s2')
+
+    expect(detail.chart_spec).toBeNull()
+    expect(detail.file_context).toBeNull()
+    expect(detail.knowledge_documents).toEqual([])
+    expect(detail.workspace_outputs).toEqual([])
+    expect(detail.chart_data_source).toBeNull()
+  })
+
+  it('rejects malformed history detail payloads', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          id: 's3',
+          title: 'Bad session',
+          model: 'gemma4:26b',
+          schema_version: 2,
+          created_at: '2026-04-13T00:00:00Z',
+          updated_at: '2026-04-13T00:00:01Z',
+          owner_id: 'alice',
+          messages: 'bad',
+        }),
+      }),
+    )
+
+    await expect(fetchSession('s3')).rejects.toThrow(
+      /History session API returned an invalid response payload/,
+    )
   })
 
   it('deletes a session', async () => {

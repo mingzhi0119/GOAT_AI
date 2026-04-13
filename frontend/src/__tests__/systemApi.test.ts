@@ -50,6 +50,24 @@ describe('system api', () => {
       json: async () => ({
         chat_avg_ms: 1200.5,
         chat_sample_count: 3,
+        chat_p50_ms: 1100,
+        chat_p95_ms: 1500,
+        first_token_avg_ms: 220,
+        first_token_sample_count: 3,
+        first_token_p50_ms: 200,
+        first_token_p95_ms: 260,
+        model_buckets: {
+          'gemma4:26b': {
+            chat_avg_ms: 1200.5,
+            chat_p50_ms: 1100,
+            chat_p95_ms: 1500,
+            chat_sample_count: 3,
+            first_token_avg_ms: 220,
+            first_token_p50_ms: 200,
+            first_token_p95_ms: 260,
+            first_token_sample_count: 3,
+          },
+        },
       }),
     })
     vi.stubGlobal('fetch', mockedFetch)
@@ -141,6 +159,144 @@ describe('system api', () => {
         'X-GOAT-Owner-Id': 'alice',
       },
     })
+  })
+
+  it('normalizes missing deny reasons in system feature payloads', async () => {
+    const mockedFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code_sandbox: {
+          policy_allowed: true,
+          allowed_by_config: true,
+          available_on_host: true,
+          effective_enabled: true,
+          provider_name: 'docker',
+          isolation_level: 'container',
+          network_policy_enforced: true,
+        },
+        workbench: {
+          agent_tasks: {
+            allowed_by_config: true,
+            available_on_host: true,
+            effective_enabled: true,
+          },
+          plan_mode: {
+            allowed_by_config: true,
+            available_on_host: true,
+            effective_enabled: true,
+          },
+          browse: {
+            allowed_by_config: true,
+            available_on_host: true,
+            effective_enabled: true,
+          },
+          deep_research: {
+            allowed_by_config: true,
+            available_on_host: false,
+            effective_enabled: false,
+          },
+          artifact_workspace: {
+            allowed_by_config: true,
+            available_on_host: true,
+            effective_enabled: true,
+          },
+          artifact_exports: {
+            allowed_by_config: false,
+            available_on_host: true,
+            effective_enabled: false,
+          },
+          project_memory: {
+            allowed_by_config: true,
+            available_on_host: false,
+            effective_enabled: false,
+          },
+          connectors: {
+            allowed_by_config: true,
+            available_on_host: true,
+            effective_enabled: true,
+          },
+        },
+      }),
+    })
+    vi.stubGlobal('fetch', mockedFetch)
+
+    const payload = await fetchSystemFeatures()
+
+    expect(payload.code_sandbox.deny_reason).toBeNull()
+    expect(payload.workbench.deep_research.deny_reason).toBeNull()
+  })
+
+  it('normalizes optional desktop diagnostics fields', async () => {
+    const mockedFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        desktop_mode: false,
+      }),
+    })
+    vi.stubGlobal('fetch', mockedFetch)
+
+    const payload = await fetchDesktopDiagnostics()
+
+    expect(payload.failing_checks).toEqual([])
+    expect(payload.skipped_checks).toEqual([])
+    expect(payload.backend_base_url).toBeNull()
+    expect(payload.readiness_ok).toBeNull()
+  })
+
+  it('rejects malformed system features payloads', async () => {
+    const mockedFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code_sandbox: {
+          policy_allowed: 'yes',
+          allowed_by_config: true,
+          available_on_host: true,
+          effective_enabled: true,
+          provider_name: 'docker',
+          isolation_level: 'container',
+          network_policy_enforced: true,
+          deny_reason: null,
+        },
+        workbench: {},
+      }),
+    })
+    vi.stubGlobal('fetch', mockedFetch)
+
+    await expect(fetchSystemFeatures()).rejects.toThrow(
+      /System features API returned an invalid response payload/,
+    )
+  })
+
+  it('rejects malformed gpu and diagnostics payloads', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            available: 'yes',
+            active: true,
+            message: 'ok',
+            name: 'A100',
+            uuid: 'GPU-abc',
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            desktop_mode: true,
+            failing_checks: 'bad',
+          }),
+        }),
+    )
+
+    await expect(fetchGpuStatus()).rejects.toThrow(
+      /GPU status API returned an invalid response payload/,
+    )
+    await expect(fetchDesktopDiagnostics()).rejects.toThrow(
+      /Desktop diagnostics API returned an invalid response payload/,
+    )
   })
 
   it('fetches desktop diagnostics payload', async () => {

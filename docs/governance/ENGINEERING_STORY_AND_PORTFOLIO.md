@@ -2,11 +2,17 @@
 
 This document is a **durable narrative and checklist** for presenting GOAT AI on a personal homepage **when the industrial work is real**, not when a version number increments. The bar is intentional:
 
+This is a portfolio narrative, not a canonical repository-truth surface. Use
+[PROJECT_STATUS.md](PROJECT_STATUS.md), [ROADMAP.md](ROADMAP.md),
+[ROADMAP_ARCHIVE.md](ROADMAP_ARCHIVE.md), and
+[ENGINEERING_STANDARDS.md](../standards/ENGINEERING_STANDARDS.md) for the live
+repo state and policy split.
+
 - **Six-month maintainable** - changes do not require archeology across implicit coupling.
 - **Shared, no-root host** - deployable where you do not own the machine.
 - **SQLite-first** - honest data posture for the current scale and ops model.
 - **Ollama-backed** - local inference boundary, not a thin wrapper around a hosted API only.
-- **Ten-axis industrial bar toward ~9/10 *for this codebase*** - as defined in [ROADMAP.md](ROADMAP.md) Phases 13-17, with `v1.2.0` now carrying not only Phases 13-15 hardening and frontend control-surface polish, but also the first real workbench/runtime slice: durable tasks, task events, source registry, and capability-gated retrieval execution.
+- **Ten-axis industrial bar toward ~9/10 *for this codebase*** - as defined by the canonical engineering contract in [ENGINEERING_STANDARDS.md](../standards/ENGINEERING_STANDARDS.md), evidenced by shipped state in [PROJECT_STATUS.md](PROJECT_STATUS.md), and sequenced through the historical phase record in [ROADMAP_ARCHIVE.md](ROADMAP_ARCHIVE.md).
 
 **Homepage signal:** you are not claiming "I called an LLM." You are claiming **you can run an AI product as an engineering system under real constraints**.
 
@@ -21,7 +27,7 @@ Keep these artifacts **current** as release-quality work lands. They become your
 | **Dated snapshots of constraints** | Example: shared host, no `sudo`, reverse proxy + single port, sub-path deployment-proves the design fits **real** constraints, not only a greenfield stack. |
 | **Phase / release exit criteria -> evidence** | Each completed phase or release slice should map to a **PR, doc section, or runbook command** - not "we improved logging" in the abstract. |
 | **Before/after bullets** | Short list: what was true *before* Wave A (e.g. text logs only, no `/ready`, silent persistence failures) vs *after*. |
-| **Trade-off log** | Link to [ROADMAP.md](ROADMAP.md) Decision Log; add 1-2 sentences per major choice (Postgres deferred, error model before big split, policies before directory migration). |
+| **Trade-off log** | Link to [decision records](../decisions/README.md); add 1-2 sentences per major choice (Postgres deferred, error model before big split, policies before directory migration). |
 | **Quantified quality** | Test counts, black-box coverage areas, CI gates (`lint-imports`, contract sync), latency percentiles you actually expose - **numbers you can defend**. |
 | **Runbook pointers** | Where to read: deploy, rollback, backup, metrics scrape, readiness check - even if some sections are "TODO until Wave A lands."|
 
@@ -70,7 +76,7 @@ Use this arc on a homepage or case-study page. Dates and scores are **yours to f
 
 ## 4. Key engineering decisions (senior-visible)
 
-These are worth a **"Trade-offs"** subsection on a homepage. Align wording with [ROADMAP.md](ROADMAP.md) Decision Log.
+These are worth a **"Trade-offs"** subsection on a homepage. Align wording with the repo-native [decision record entrypoint](../decisions/README.md).
 
 | Decision | Rough story |
 |----------|-------------|
@@ -130,7 +136,7 @@ Treat the project as **homepage-worthy** when **most** of the following are true
 - [ ] Clear **README** + **architecture overview** (diagram or layered description).
 - [ ] **Demo** (short video or screenshots) showing chat + upload + chart path -product, not only infra.
 - [ ] A **before ->after** engineering section (this file or a linked case study) with **dated** milestones.
-- [ ] A **trade-offs / decisions** page or section (can be this doc + ROADMAP Decision Log).
+- [ ] A **trade-offs / decisions** page or section (can be this doc + [decision records](../decisions/README.md)).
 - [ ] **Quantified** testing and CI story (what gates exist, what they protect).
 - [ ] **Operational evidence**: how logs and metrics are consumed; how readiness and rollback are run; how migrations are validated.
 - [ ] **Honest constraint paragraph**: shared host, no root, SQLite-first -and why that is **reasonable**, not accidental.
@@ -154,7 +160,9 @@ The differentiator is not the stack list; it is **the documented path from demo-
 
 ## Related documents
 
-- [ROADMAP.md](ROADMAP.md) -Phase 13 (Section 13.0, Wave A/B), Phase 14 RAG-first sequencing, and Phase 15 structural semantics.
+- [PROJECT_STATUS.md](PROJECT_STATUS.md) - shipped release inventory and current known boundaries.
+- [ROADMAP_ARCHIVE.md](ROADMAP_ARCHIVE.md) - historical phase closeouts and archived sequencing context.
+- [ROADMAP.md](ROADMAP.md) - unfinished work only.
 - [OPERATIONS.md](../operations/OPERATIONS.md) -deploy, env, host constraints (keep aligned with claims on your homepage).
 - [ENGINEERING_STANDARDS.md](../standards/ENGINEERING_STANDARDS.md) - canonical engineering contract.
 - [AGENTS.md](../../AGENTS.md) - agent memory and collaboration guide; canonical engineering rules stay in ENGINEERING_STANDARDS.
@@ -173,12 +181,10 @@ The differentiator is not the stack list; it is **the documented path from demo-
 - clearer multi-thread development governance via ownership, review, and contract-sync discipline
 - supporting docs that explain not just what shipped, but why the sequencing and trade-offs were chosen
 
-That does **not** mean the story is "finished." The next senior-visible chapter is still Phase 16: authorization context, capability gates, and the storage decisions that follow from them.
+That does **not** mean the story is "finished." The next senior-visible chapter is the unfinished work still tracked in [ROADMAP.md](ROADMAP.md): deeper workbench/runtime behavior, project memory and connectors, sandbox follow-ons, and broader desktop distribution maturity.
 
 An honest homepage summary at this point is not "I built an AGI product." It is: **I turned an AI app into an increasingly governable system, then started building the runtime substrate that future agent workflows can safely stand on.**
 
 ---
 
-*Last updated: 2026-04-10 - aligned with **v1.2.0** and the landed Phase 17 runtime slices so the portfolio narrative stays tied to shipped engineering outcomes, not version marketing.*
-
-
+*Last updated: 2026-04-13 - aligned with the current roadmap/status/archive split so the portfolio narrative stays separate from canonical repo-truth docs.*

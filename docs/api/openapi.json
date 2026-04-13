@@ -3710,6 +3710,10 @@
           },
           "isolation_level": {
             "type": "string",
+            "enum": [
+              "container",
+              "host"
+            ],
             "title": "Isolation Level",
             "description": "Isolation tier for the active provider: container or host."
           },

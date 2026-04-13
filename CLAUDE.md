@@ -130,6 +130,7 @@ Run from the repo root - `tools/` is a package, no `PYTHONPATH` tricks needed.
 | Session JSON shape / versioning | [`docs/architecture/SESSION_SCHEMA.md`](docs/architecture/SESSION_SCHEMA.md) |
 | Injectable ports (Protocols) | [`docs/architecture/PORTS.md`](docs/architecture/PORTS.md) |
 | Env vars, deploy, ops | [`docs/operations/OPERATIONS.md`](docs/operations/OPERATIONS.md) |
+| Architecture-sensitive tradeoffs / rollback planning | [`docs/decisions/README.md`](docs/decisions/README.md) |
 | Current shipped state | [`docs/governance/PROJECT_STATUS.md`](docs/governance/PROJECT_STATUS.md) |
 | Phase history and next work | [`docs/governance/ROADMAP.md`](docs/governance/ROADMAP.md) |
 | Error codes / envelope | [`docs/api/API_ERRORS.md`](docs/api/API_ERRORS.md) |
@@ -140,7 +141,7 @@ Run from the repo root - `tools/` is a package, no `PYTHONPATH` tricks needed.
 
 All work through **Phase 15.11** is complete on `main`.
 
-Phase 16 items (code sandbox, Postgres, multi-tenant AuthN) each require a Decision Log entry before implementation.
+Phase 16 items (code sandbox, Postgres, multi-tenant AuthN) each require a decision record or decision package under `docs/decisions/` before implementation.
 
 ---
 
@@ -157,6 +158,7 @@ Phase 16 items (code sandbox, Postgres, multi-tenant AuthN) each require a Decis
 | Session JSON shape or `SESSION_PAYLOAD_VERSION` | `docs/architecture/SESSION_SCHEMA.md` |
 | Injectable ports or import-layer rules | `docs/architecture/PORTS.md`, `docs/architecture/DEPENDENCY_GRAPH.md` |
 | New env var or startup step | `docs/operations/OPERATIONS.md`, `.env.example` |
+| Architecture-sensitive tradeoffs, compatibility, or rollback posture | `docs/decisions/README.md` plus the relevant template or linked artifact |
 | Current shipped state | `docs/governance/PROJECT_STATUS.md` |
 | Phase completion or new planned work | `docs/governance/ROADMAP.md` |
 | RAG retrieval / rerank / eval cases | `evaldata/README.md`, `evaldata/VERSION` |

@@ -19,7 +19,7 @@ If there are no normalized rows, behavior matches pre-15.4 (decode from JSON or 
 
 ## Cutover (future)
 
-A later phase may stop duplicating message text in JSON or make `session_messages` the sole source for chat rows. That requires a Decision Log entry, codec updates, and backward compatibility tests.
+A later phase may stop duplicating message text in JSON or make `session_messages` the sole source for chat rows. That requires a decision record or decision package, codec updates, and backward compatibility tests.
 
 ## Rollback
 
@@ -30,4 +30,3 @@ A later phase may stop duplicating message text in JSON or make `session_message
 
 - [SESSION_SCHEMA.md](SESSION_SCHEMA.md) - versioned JSON shape.
 - [BACKUP_RESTORE.md](../operations/BACKUP_RESTORE.md) - SQLite backup discipline.
-

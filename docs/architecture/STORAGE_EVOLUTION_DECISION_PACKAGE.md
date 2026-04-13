@@ -20,7 +20,7 @@ Phase 16B is complete with a conservative outcome:
 
 ## Fixed constraints
 
-- Preserve the current **SQLite-first** operational model unless a separate decision log approves a different write path.
+- Preserve the current **SQLite-first** operational model unless a separate decision record or decision package approves a different write path.
 - Preserve the current **single-writer** safety assumptions for the deployed app.
 - Keep **tenant scoping** explicit for persisted resources; Phase 16A and 16C remain the source of truth for authorization semantics.
 - Do not weaken existing rollback expectations for `sessions`, `chat_artifacts`, `knowledge_documents`, `knowledge ingestions`, or `media_uploads`.
@@ -79,4 +79,4 @@ Phase 16B is complete with a conservative outcome:
 - End-user identity
 - New frontend capability exposure
 - `/api/knowledge/answers` semantic changes
-- Replacing SQLite during Phase 16B without a separate approved decision log
+- Replacing SQLite during Phase 16B without a separate approved decision artifact

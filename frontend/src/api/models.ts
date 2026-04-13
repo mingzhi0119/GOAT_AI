@@ -1,5 +1,9 @@
 import { buildApiHeaders } from './auth'
 import { buildApiErrorMessage } from './errors'
+import {
+  parseModelCapabilitiesResponse,
+  parseModelsResponse,
+} from './runtimeSchemas'
 import type { ModelCapabilitiesResponse, ModelsResponse } from './types'
 
 /** Fetch the list of available Ollama model names from the backend. */
@@ -8,7 +12,7 @@ export async function fetchModels(): Promise<string[]> {
     headers: buildApiHeaders(),
   })
   if (!resp.ok) throw new Error(await buildApiErrorMessage(resp, 'Models API'))
-  const data = (await resp.json()) as ModelsResponse
+  const data: ModelsResponse = parseModelsResponse(await resp.json())
   return data.models
 }
 
@@ -20,5 +24,5 @@ export async function fetchModelCapabilities(model: string): Promise<ModelCapabi
   if (!resp.ok) {
     throw new Error(await buildApiErrorMessage(resp, 'Model capabilities API'))
   }
-  return (await resp.json()) as ModelCapabilitiesResponse
+  return parseModelCapabilitiesResponse(await resp.json())
 }

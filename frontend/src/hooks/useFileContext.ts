@@ -1,33 +1,19 @@
 import { useCallback, useMemo, useState } from 'react'
+import type {
+  FileBindingMode,
+  FileContextItem,
+  FileContextUpdate,
+  FileUploadStatus,
+} from '../utils/fileContextTypes'
+
+export type {
+  FileBindingMode,
+  FileContextItem,
+  FileContextUpdate,
+  FileUploadStatus,
+} from '../utils/fileContextTypes'
 
 const STORAGE_KEY = 'goat-ai-file-context'
-
-export type FileBindingMode = 'idle' | 'single' | 'persistent'
-export type FileUploadStatus = 'processing' | 'ready'
-
-export interface FileContextItem {
-  id: string
-  filename: string
-  documentId?: string
-  ingestionId?: string
-  retrievalMode?: string
-  suffixPrompt?: string
-  templatePrompt?: string
-  bindingMode: FileBindingMode
-  status: FileUploadStatus
-}
-
-export interface FileContextUpdate {
-  id?: string
-  filename: string
-  documentId?: string
-  ingestionId?: string
-  retrievalMode?: string
-  suffixPrompt?: string
-  templatePrompt?: string
-  bindingMode?: FileBindingMode
-  status?: FileUploadStatus
-}
 
 export interface UseFileContextReturn {
   fileContexts: FileContextItem[]

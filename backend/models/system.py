@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from backend.models.code_sandbox import CodeSandboxIsolationLevel
+
 
 class GPUStatusResponse(BaseModel):
     """GPU telemetry payload used by sidebar status strip."""
@@ -82,7 +84,7 @@ class CodeSandboxFeaturePayload(BaseModel):
     provider_name: str = Field(
         description="Selected runtime provider for code sandbox execution."
     )
-    isolation_level: str = Field(
+    isolation_level: CodeSandboxIsolationLevel = Field(
         description="Isolation tier for the active provider: container or host."
     )
     network_policy_enforced: bool = Field(

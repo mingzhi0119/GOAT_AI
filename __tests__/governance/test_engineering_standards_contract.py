@@ -11,6 +11,7 @@ STANDARDS_PATH = REPO_ROOT / "docs" / "standards" / "ENGINEERING_STANDARDS.md"
 REQUIRED_HEADINGS = [
     "## 0B. Canonical Repository Layout",
     "## 0C. Industrial Score Gate Map",
+    "## 16. Workbench / Connector Admission Gate",
 ]
 
 REQUIRED_LAYOUT_SNIPPETS = [
@@ -37,6 +38,16 @@ REQUIRED_DIMENSION_SNIPPETS = [
     "delivery maturity",
 ]
 
+REQUIRED_ADMISSION_GATE_SNIPPETS = [
+    "feature spec",
+    "decision package",
+    "caller-scoped contract tests",
+    "`/api/workbench/*`",
+    "`src/api/runtimeSchemas.ts`",
+    "ROADMAP.md",
+    "PROJECT_STATUS.md",
+]
+
 
 def test_engineering_standards_capture_repo_layout_and_score_guardrails() -> None:
     text = STANDARDS_PATH.read_text(encoding="utf-8")
@@ -47,6 +58,7 @@ def test_engineering_standards_capture_repo_layout_and_score_guardrails() -> Non
             *REQUIRED_HEADINGS,
             *REQUIRED_LAYOUT_SNIPPETS,
             *REQUIRED_DIMENSION_SNIPPETS,
+            *REQUIRED_ADMISSION_GATE_SNIPPETS,
         )
         if snippet not in text
     ]

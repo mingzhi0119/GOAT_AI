@@ -39,7 +39,7 @@ Treat the repository structure as an engineering contract, not as a convenience 
   - `goat_ai/`: shared runtime packages that must not import `backend/`
   - `tools/`: canonical Python CLIs grouped by `contracts/`, `desktop/`, `ops/`, `quality/`, and `release/`
   - `ops/`: checked-in operator assets grouped by `deploy/`, `observability/`, `systemd/`, and `verification/`
-  - `docs/`: canonical documentation grouped by `api/`, `architecture/`, `governance/`, `operations/`, and `standards/`
+- `docs/`: canonical documentation grouped by `api/`, `architecture/`, `decisions/`, `governance/`, `operations/`, and `standards/`
   - `__tests__/`: automated checks grouped by `backend/`, `contracts/`, `desktop/`, `governance/`, `helpers/`, `integration/`, and `ops/`
   - `scripts/`: shell or PowerShell entrypoints only; canonical Python CLIs belong under `tools/`
 - Root files should stay limited to entrypoints, manifests, and repo-governance files such as `README.md`, `AGENTS.md`, `CLAUDE.md`, `server.py`, `pyproject.toml`, `requirements*.txt`, and `.env.example`.
@@ -117,6 +117,8 @@ Every change should preserve or improve the ten industrial-score dimensions belo
 - Keep generated contract types under `src/api/generated/` and regenerate them from `docs/api/openapi.json`.
 - Use `src/api/types.ts` only for frontend-specific adapters or UI-only unions that cannot come straight from OpenAPI.
 - Keep network calls inside `src/api/`.
+- Keep generated OpenAPI imports and runtime API parsing behind `src/api/` rather than bypassing adapters from hooks, components, or utils.
+- Keep direct imports from `src/api/generated/openapi.ts` centralized in `src/api/types.ts`; route runtime validation through `src/api/runtimeSchemas.ts` instead of ad hoc casts in individual adapters.
 - Keep components focused and hooks typed.
 - Avoid business logic in JSX.
 - Keep frontend accessibility at WCAG 2.2 AA by default.
@@ -143,7 +145,7 @@ Every change should preserve or improve the ten industrial-score dimensions belo
 - When fixing a bug, add or update the test that would have caught it before the fix.
 - Prefer direct tests for decision-heavy modules; do not rely only on end-to-end or black-box coverage when the internal branch logic is complex.
 - Run the relevant CI-equivalent checks for the layer you changed.
-- For frontend changes, run `cd frontend && npm ci && npm run lint && npm run contract:check && npm test -- --run`.
+- For frontend changes, run `cd frontend && npm ci && npm run lint && npm run depcruise && npm run contract:check && npm test -- --run`.
 - CI also runs `cd frontend && npm run build && npm run bundle:check && npm run test:e2e`; run those locally for frontend changes that touch types, build inputs, protected browser flows, packaging, or any path that may compile differently from `vitest`.
 - Desktop shell changes must keep `cargo test --manifest-path frontend/src-tauri/Cargo.toml` green.
 - Delivery and desktop wrapper changes must keep the scripted smoke coverage green (`python -m pytest __tests__/desktop/test_desktop_smoke.py` and any affected script tests).
@@ -193,6 +195,7 @@ Every change should preserve or improve the ten industrial-score dimensions belo
 - Reject changes that leave touched layers with red `lint`, `test`, `build`, `contract`, or security gates.
 - Treat user-visible garbled text, encoding regressions, or broken diagnostics as correctness issues, not cosmetic follow-ups.
 - Flag growing hotspot files early; if a touched mixed-concern file is already oversized, prefer extraction over further inline expansion.
+- Architecture-sensitive, compatibility-sensitive, or rollback-sensitive changes should link a decision record or decision package under `docs/decisions/` from the PR, or state `N/A` explicitly.
 - Keep `.github/CODEOWNERS` as the source of truth for default directory ownership.
 - Keep `.github/workflows/release-governance.yml` and the GitHub Environment approval rules aligned with the documented release process in `docs/operations/RELEASE_GOVERNANCE.md`.
 - Keep `.github/workflows/quality-trends.yml`, `tools/quality/quality_snapshot.py`, and `docs/governance/QUALITY_TRENDS.md` aligned when quality-trend inputs change.
@@ -235,6 +238,7 @@ Every change should preserve or improve the ten industrial-score dimensions belo
 - Keep docs UTF-8 without BOM.
 - Update related docs when user-visible semantics change.
 - Update roadmap, operations, or project-status docs when release gates, runbooks, or score-protection policies materially change.
+- Add or update a decision record or decision package under `docs/decisions/` when a change materially affects architecture, compatibility, rollback posture, or repo-governance tradeoffs.
 - Update `docs/governance/SECURITY_RESPONSE.md` when vulnerability response targets, dependency-refresh cadence, or credential-rotation expectations change.
 - When changing operator-facing metrics, update the versioned observability assets under `ops/observability/` and any affected incident runbooks in the same change.
 - When changing performance budgets or smoke-test semantics, update `tools/quality/load_chat_smoke.py`, the scheduled workflow, and `docs/operations/OPERATIONS.md` together.
@@ -259,3 +263,33 @@ Every change should preserve or improve the ten industrial-score dimensions belo
 - Do not conflate UI availability with backend permission or execution safety.
 - Document gate behavior and safe failure modes.
 - Do not advertise a capability as ready in UI, docs, or release notes while build, runtime, or policy gates for that capability are known-red.
+
+## 16. Workbench / Connector Admission Gate
+
+Any change that newly exposes or materially widens a `workbench`, `project memory`,
+`connector`, `source registry`, or other future durable-task / workspace capability
+must satisfy this admission gate before the repo treats the surface as real.
+
+- Write or update a feature spec under `docs/governance/specs/` before implementation
+  when the change creates a new user-visible workbench or connector surface, spans
+  multiple layers, changes brownfield runtime behavior, or will likely land in
+  multiple reviewable slices.
+- Link a heavy decision package under `docs/decisions/` before implementation when the
+  change affects storage shape, tenant or owner semantics, credential handling,
+  external connector trust boundaries, write-capable connector flows, project-memory
+  persistence, or rollback-sensitive compatibility behavior.
+- Add or update caller-scoped contract tests when scopes, source visibility,
+  `/api/system/features`, `/api/workbench/*`, workspace-output visibility, export
+  behavior, or runtime-vs-policy denial semantics change.
+- Any frontend consumer of `/api/workbench*`, `/api/connectors*`, `/api/projects*`, or
+  another newly risky capability surface must route through `src/api/types.ts` and
+  `src/api/runtimeSchemas.ts`; do not add direct `src/api/generated/openapi.ts`
+  imports or unchecked `resp.json() as ...` casts in new adapters.
+- Update the owning runbooks and status docs in the same change when operator-facing
+  config, feature flags, credential expectations, runtime dependencies, release
+  promises, or recovery steps change.
+- Keep unfinished expansion work in `docs/governance/ROADMAP.md` and move only landed
+  facts into `docs/governance/PROJECT_STATUS.md`.
+- Do not widen UI promises for project memory, connectors, or future workbench
+  surfaces until the runtime boundary, tenancy/authz rules, contract proof, and
+  recovery story are all real and green.

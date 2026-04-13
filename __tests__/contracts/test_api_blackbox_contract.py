@@ -1198,6 +1198,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertIn("workbench", feat_body)
         self.assertTrue(feat_body["code_sandbox"]["policy_allowed"])
         self.assertFalse(feat_body["code_sandbox"]["effective_enabled"])
+        self.assertIn(
+            feat_body["code_sandbox"]["isolation_level"], {"container", "host"}
+        )
         self.assertFalse(feat_body["workbench"]["agent_tasks"]["effective_enabled"])
         self.assertFalse(feat_body["workbench"]["plan_mode"]["effective_enabled"])
         self.assertFalse(feat_body["workbench"]["browse"]["effective_enabled"])
@@ -1396,6 +1399,74 @@ class ApiBlackboxContractTests(unittest.TestCase):
         missing = self.client.get("/api/workbench/tasks/wb-missing")
         self.assertEqual(404, missing.status_code)
         self.assertEqual("Workbench task not found", missing.json()["detail"])
+
+    def test_workbench_sources_endpoint_respects_runtime_gate_and_current_visible_inventory(
+        self,
+    ) -> None:
+        unavailable = self.client.get("/api/workbench/sources")
+        self.assertEqual(503, unavailable.status_code)
+        self.assertEqual(FEATURE_UNAVAILABLE, unavailable.json()["code"])
+
+        self.settings = replace(
+            self.settings,
+            feature_agent_workbench_enabled=True,
+            api_key="bootstrap-auth-enabled",
+            api_key_write="",
+            api_credentials_json="""
+            [
+              {
+                "credential_id": "cred-workbench-reader",
+                "secret": "workbench-reader",
+                "principal_id": "principal:reader",
+                "tenant_id": "tenant:default",
+                "status": "active",
+                "scopes": ["history:read", "workbench:read"]
+              },
+              {
+                "credential_id": "cred-workbench-writer",
+                "secret": "workbench-writer",
+                "principal_id": "principal:writer",
+                "tenant_id": "tenant:default",
+                "status": "active",
+                "scopes": ["history:read", "workbench:read", "workbench:write"]
+              },
+              {
+                "credential_id": "cred-workbench-exporter",
+                "secret": "workbench-exporter",
+                "principal_id": "principal:exporter",
+                "tenant_id": "tenant:default",
+                "status": "active",
+                "scopes": ["artifact:write", "history:read", "workbench:export", "workbench:read"]
+              }
+            ]
+            """,
+        )
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        for api_key in ("workbench-reader", "workbench-writer", "workbench-exporter"):
+            response = self.client.get(
+                "/api/workbench/sources",
+                headers={"X-GOAT-API-Key": api_key},
+            )
+            self.assertEqual(200, response.status_code)
+            body = response.json()
+            source_ids = {source["source_id"] for source in body["sources"]}
+
+            self.assertIn("web", source_ids)
+            self.assertTrue(source_ids.issubset({"web", "knowledge"}))
+            self.assertNotIn("project_memory", source_ids)
+            self.assertNotIn("connectors", source_ids)
+
+            for source in body["sources"]:
+                self.assertIn("display_name", source)
+                self.assertIn("kind", source)
+                self.assertIn("scope_kind", source)
+                self.assertIn("read_only", source)
+                self.assertIn("runtime_ready", source)
+                self.assertIn("task_kinds", source)
+                self.assertTrue(source["runtime_ready"])
+                self.assertTrue(source["read_only"])
+                self.assertIsNone(source["deny_reason"])
 
     def test_system_features_workbench_entries_are_caller_scoped_capability_view(
         self,
@@ -1743,6 +1814,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
         features = self.client.get("/api/system/features")
         self.assertEqual(200, features.status_code)
         self.assertTrue(features.json()["code_sandbox"]["effective_enabled"])
+        self.assertEqual(
+            "container", features.json()["code_sandbox"]["isolation_level"]
+        )
 
         response = self.client.post(
             "/api/code-sandbox/exec",

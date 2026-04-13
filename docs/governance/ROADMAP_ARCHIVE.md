@@ -2,6 +2,22 @@
 
 This file preserves historical roadmap content that was removed from [ROADMAP.md](ROADMAP.md) on 2026-04-09. The active roadmap now tracks only unfinished work.
 
+## 2026-04-13 roadmap cleanup
+
+The live roadmap was trimmed again on 2026-04-13 so it stops carrying shipped
+closeout detail, operator instructions, or engineering-policy reminders that
+already have canonical homes elsewhere.
+
+The following content moved out of the active roadmap in this cleanup:
+
+- April 2026 audit-remediation closeout narrative and shipped evidence bullets,
+  which now belong in this archive and in [PROJECT_STATUS.md](PROJECT_STATUS.md)
+- landed governance-tooling pilot inventory, which remains tracked in
+  [PROJECT_STATUS.md](PROJECT_STATUS.md)
+- CI triage and admission-gate reminders that are already canonical in
+  [OPERATIONS.md](../operations/OPERATIONS.md) and
+  [ENGINEERING_STANDARDS.md](../standards/ENGINEERING_STANDARDS.md)
+
 ## 2026-04-11 roadmap cleanup
 
 The live roadmap was reduced again on 2026-04-11 so it only tracks open work.
