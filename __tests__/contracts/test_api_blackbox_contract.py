@@ -1422,6 +1422,14 @@ class ApiBlackboxContractTests(unittest.TestCase):
                 "tenant_id": "tenant:default",
                 "status": "active",
                 "scopes": ["history:read", "workbench:read", "workbench:write"]
+              },
+              {
+                "credential_id": "cred-workbench-exporter",
+                "secret": "workbench-exporter",
+                "principal_id": "principal:exporter",
+                "tenant_id": "tenant:default",
+                "status": "active",
+                "scopes": ["artifact:write", "history:read", "workbench:export", "workbench:read"]
               }
             ]
             """,
@@ -1436,10 +1444,16 @@ class ApiBlackboxContractTests(unittest.TestCase):
             "/api/system/features",
             headers={"X-GOAT-API-Key": "workbench-writer"},
         )
+        exporter_features = self.client.get(
+            "/api/system/features",
+            headers={"X-GOAT-API-Key": "workbench-exporter"},
+        )
         self.assertEqual(200, reader_features.status_code)
         self.assertEqual(200, writer_features.status_code)
+        self.assertEqual(200, exporter_features.status_code)
         reader_workbench = reader_features.json()["workbench"]
         writer_workbench = writer_features.json()["workbench"]
+        exporter_workbench = exporter_features.json()["workbench"]
 
         self.assert_workbench_feature_state(
             reader_workbench,
@@ -1472,6 +1486,14 @@ class ApiBlackboxContractTests(unittest.TestCase):
             available_on_host=True,
             effective_enabled=True,
             deny_reason=None,
+        )
+        self.assert_workbench_feature_state(
+            reader_workbench,
+            "artifact_exports",
+            allowed_by_config=False,
+            available_on_host=True,
+            effective_enabled=False,
+            deny_reason="permission_denied",
         )
         self.assert_workbench_feature_state(
             reader_workbench,
@@ -1524,6 +1546,14 @@ class ApiBlackboxContractTests(unittest.TestCase):
         )
         self.assert_workbench_feature_state(
             writer_workbench,
+            "artifact_exports",
+            allowed_by_config=False,
+            available_on_host=True,
+            effective_enabled=False,
+            deny_reason="permission_denied",
+        )
+        self.assert_workbench_feature_state(
+            writer_workbench,
             "project_memory",
             allowed_by_config=True,
             available_on_host=False,
@@ -1537,6 +1567,38 @@ class ApiBlackboxContractTests(unittest.TestCase):
             available_on_host=False,
             effective_enabled=False,
             deny_reason="not_implemented",
+        )
+        self.assert_workbench_feature_state(
+            exporter_workbench,
+            "agent_tasks",
+            allowed_by_config=False,
+            available_on_host=True,
+            effective_enabled=False,
+            deny_reason="permission_denied",
+        )
+        self.assert_workbench_feature_state(
+            exporter_workbench,
+            "artifact_workspace",
+            allowed_by_config=True,
+            available_on_host=True,
+            effective_enabled=True,
+            deny_reason=None,
+        )
+        self.assert_workbench_feature_state(
+            exporter_workbench,
+            "artifact_exports",
+            allowed_by_config=True,
+            available_on_host=True,
+            effective_enabled=True,
+            deny_reason=None,
+        )
+        self.assert_workbench_feature_state(
+            exporter_workbench,
+            "connectors",
+            allowed_by_config=False,
+            available_on_host=False,
+            effective_enabled=False,
+            deny_reason="permission_denied",
         )
 
         self.assertNotEqual(
@@ -1546,6 +1608,10 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertNotEqual(
             reader_workbench["browse"],
             writer_workbench["browse"],
+        )
+        self.assertNotEqual(
+            writer_workbench["artifact_exports"],
+            exporter_workbench["artifact_exports"],
         )
 
     def test_workbench_rejects_incompatible_source_for_task_kind(self) -> None:

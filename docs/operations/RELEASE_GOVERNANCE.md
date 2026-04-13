@@ -95,14 +95,16 @@ Desktop release steps:
 2. Build the Linux desktop sidecar and write its provenance record with `python -m tools.desktop.write_linux_sidecar_provenance`.
 3. Build real Windows packaged installers from the same requested ref.
 4. Sign the Windows installers when `distribution_channel=public` (the tag path always requires this).
-5. Run `python -m tools.desktop.installed_windows_desktop_fault_smoke` against both the signed MSI and NSIS installers and retain the installed-app evidence bundle.
+5. Run `python -m tools.desktop.installed_windows_desktop_fault_smoke` against both the signed MSI and NSIS installers, continuing to the second installer even if the first one fails, and retain the installed-app evidence bundle.
 6. Write `desktop-windows-provenance.json` with artifact digests and signature status.
 7. Upload the installers plus provenance assets and installed-smoke evidence, then emit installer attestations when supported.
 
 The installed Windows evidence bundle should retain `desktop-installed-smoke/*/summary.json`
 even when install, startup, or uninstall fails. That summary is the audit entrypoint
 for installer kind, installer digest, install root, resolved SHA, distribution channel,
-healthy launch status, partial scenario results, and uninstall outcome.
+healthy launch status, partial scenario results, uninstall outcome, and any retained
+`primary_failure_phase` / `primary_failure_error` fields when uninstall failure is
+not the first fault.
 
 The installed evidence order is fixed: install, healthy launch, health/ready proof,
 controlled shutdown, pre-ready fault scenarios, then uninstall. The healthy launch

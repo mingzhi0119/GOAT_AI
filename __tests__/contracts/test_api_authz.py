@@ -425,6 +425,14 @@ class ApiAuthzTests(unittest.TestCase):
         )
         self.assert_workbench_feature_state(
             workbench,
+            "artifact_exports",
+            allowed_by_config=False,
+            available_on_host=True,
+            effective_enabled=False,
+            deny_reason="permission_denied",
+        )
+        self.assert_workbench_feature_state(
+            workbench,
             "project_memory",
             allowed_by_config=True,
             available_on_host=False,

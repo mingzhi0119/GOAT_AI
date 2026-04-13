@@ -34,6 +34,19 @@ def _workflow_filter_block(workflow_text: str, filter_name: str) -> str:
     return "\n".join(block_lines)
 
 
+def _workflow_step_block(workflow_text: str, step_name: str) -> str:
+    lines = workflow_text.splitlines()
+    start_index = lines.index(f"      - name: {step_name}")
+    block_lines = [lines[start_index]]
+    for line in lines[start_index + 1 :]:
+        if line.startswith("      - name:"):
+            break
+        if line.startswith("  ") and not line.startswith("    "):
+            break
+        block_lines.append(line)
+    return "\n".join(block_lines)
+
+
 def test_build_provenance_payload_records_expected_artifacts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -121,6 +134,15 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     changes_filter = _workflow_filter_block(ci_workflow, "desktop")
     desktop_windows_job = _workflow_job_block(ci_workflow, "desktop-package-windows")
     desktop_supply_chain_job = _workflow_job_block(ci_workflow, "desktop-supply-chain")
+    installed_nsis_release_step = _workflow_step_block(
+        desktop_provenance, "Run installed NSIS desktop smoke"
+    )
+    release_assets_step = _workflow_step_block(
+        desktop_provenance, "Upload Windows desktop release assets"
+    )
+    installed_nsis_drill_step = _workflow_step_block(
+        fault_injection, "Run installed NSIS desktop drill"
+    )
 
     assert "desktop-package-windows" in ci_workflow
     assert "runs-on: windows-latest" in ci_workflow
@@ -184,8 +206,11 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     assert "--distribution-channel" in desktop_provenance
     assert "desktop-windows-installed-smoke" in desktop_provenance
     assert "if: ${{ always() }}" in desktop_provenance
+    assert "if: ${{ always() }}" in installed_nsis_release_step
+    assert "if: ${{ always() }}" in release_assets_step
     assert "GITHUB_STEP_SUMMARY" in desktop_provenance
     assert "healthy_launch" in desktop_provenance
+    assert "primary_failure" in desktop_provenance
     assert desktop_provenance.count("actions/attest@v4") >= 4
     assert "windows-installed-desktop-drill" in fault_injection
     assert (
@@ -197,8 +222,10 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     assert "--workflow-role fault_injection_drill" in fault_injection
     assert "desktop-installed-drill" in fault_injection
     assert "if: ${{ always() }}" in fault_injection
+    assert "if: ${{ always() }}" in installed_nsis_drill_step
     assert "GITHUB_STEP_SUMMARY" in fault_injection
     assert "healthy_launch" in fault_injection
+    assert "primary_failure" in fault_injection
     assert "python -m tools.desktop.packaged_shell_fault_smoke" not in fault_injection
 
     assert "signed Windows desktop release path" in release_doc

@@ -118,6 +118,7 @@ class WorkbenchFeaturePayload(BaseModel):
     browse: RuntimeFeaturePayload
     deep_research: RuntimeFeaturePayload
     artifact_workspace: RuntimeFeaturePayload
+    artifact_exports: RuntimeFeaturePayload
     project_memory: RuntimeFeaturePayload
     connectors: RuntimeFeaturePayload
 

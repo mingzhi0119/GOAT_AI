@@ -18,7 +18,7 @@ Use this runbook when staging or production health regresses and you need a fast
 6. Do not expect `desktop-package-windows` for non-desktop-only backend or documentation changes when the packaged Windows build surface is untouched.
 7. Treat `.github/workflows/desktop-provenance.yml` as the source of truth for installed Windows release evidence and `.github/workflows/fault-injection.yml` as the recurring installed-desktop drill; do not mix those failures into the PR packaged gate.
 8. When `desktop-package-windows` fails, check `desktop-fault-smoke/summary.json` first, then `desktop-fault-smoke/build.log` and `desktop-fault-smoke/packaged-shell-fault-smoke.log`; those retained artifacts are the expected packaged PR evidence bundle.
-9. For installed Windows failures, expect `desktop-installed-smoke/*/summary.json` even when install, startup, or uninstall fails; use that summary as the source of truth for installer kind, install root, log paths, resolved SHA, healthy launch evidence, and uninstall outcome before reading raw logs.
+9. For installed Windows failures, expect `desktop-installed-smoke/*/summary.json` even when install, startup, or uninstall fails; use that summary as the source of truth for installer kind, install root, log paths, resolved SHA, healthy launch evidence, uninstall outcome, and any `primary_failure_phase` / `primary_failure_error` fields before reading raw logs.
 
 ## What to look at first
 

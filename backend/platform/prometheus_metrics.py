@@ -61,6 +61,17 @@ EXPORTED_METRIC_FAMILIES: frozenset[str] = frozenset(
     }
 )
 
+EXPORTED_METRIC_LABELS: dict[str, frozenset[str]] = {
+    HTTP_REQUESTS_TOTAL: frozenset({"method", "route", "status"}),
+    HTTP_REQUEST_DURATION_SECONDS: frozenset({"le"}),
+    CHAT_STREAM_COMPLETED_TOTAL: frozenset(),
+    OLLAMA_ERRORS_TOTAL: frozenset({"code", "endpoint", "http_status"}),
+    SQLITE_LOG_WRITE_FAILURES_TOTAL: frozenset({"operation", "code"}),
+    FEATURE_GATE_DENIALS_TOTAL: frozenset({"feature", "gate_kind", "reason"}),
+    KNOWLEDGE_RETRIEVAL_REQUESTS_TOTAL: frozenset({"retrieval_profile", "outcome"}),
+    KNOWLEDGE_QUERY_REWRITE_APPLIED_TOTAL: frozenset({"retrieval_profile"}),
+}
+
 
 def _escape_label_value(value: str) -> str:
     return value.replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')

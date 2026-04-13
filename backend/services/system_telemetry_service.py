@@ -20,6 +20,7 @@ from backend.models.system import (
 from backend.platform.readiness_service import evaluate_readiness
 from backend.services.feature_gate_service import code_sandbox_policy_allowed
 from backend.services.authorizer import (
+    workbench_export_policy_allowed,
     workbench_read_policy_allowed,
     workbench_write_policy_allowed,
 )
@@ -70,6 +71,11 @@ def build_system_features_response(
     )
     workbench_read_allowed = workbench_read_policy_allowed(auth_context)
     workbench_write_allowed = workbench_write_policy_allowed(auth_context)
+    artifact_export_allowed = (
+        workbench_read_allowed
+        and workbench_export_policy_allowed(auth_context)
+        and "artifact:write" in auth_context.scopes
+    )
 
     def _runtime_payload(snapshot: RuntimeFeatureSnapshot) -> RuntimeFeaturePayload:
         return RuntimeFeaturePayload(
@@ -136,6 +142,10 @@ def build_system_features_response(
             ),
             artifact_workspace=_workbench_capability(
                 policy_allowed=workbench_read_allowed,
+                runtime_ready=True,
+            ),
+            artifact_exports=_workbench_capability(
+                policy_allowed=artifact_export_allowed,
                 runtime_ready=True,
             ),
             project_memory=_workbench_capability(

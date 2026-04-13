@@ -122,6 +122,12 @@ async function installApiMocks(
               effective_enabled: false,
               deny_reason: null,
             },
+            artifact_exports: {
+              allowed_by_config: false,
+              available_on_host: false,
+              effective_enabled: false,
+              deny_reason: null,
+            },
             project_memory: {
               allowed_by_config: false,
               available_on_host: false,

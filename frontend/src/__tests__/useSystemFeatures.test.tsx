@@ -31,6 +31,7 @@ describe('useSystemFeatures', () => {
         browse: { allowed_by_config: true, available_on_host: true, effective_enabled: true, deny_reason: null },
         deep_research: { allowed_by_config: true, available_on_host: false, effective_enabled: false, deny_reason: 'not_implemented' },
         artifact_workspace: { allowed_by_config: true, available_on_host: false, effective_enabled: false, deny_reason: 'not_implemented' },
+        artifact_exports: { allowed_by_config: false, available_on_host: true, effective_enabled: false, deny_reason: 'permission_denied' },
         project_memory: { allowed_by_config: true, available_on_host: false, effective_enabled: false, deny_reason: 'not_implemented' },
         connectors: { allowed_by_config: true, available_on_host: true, effective_enabled: true, deny_reason: null },
       },

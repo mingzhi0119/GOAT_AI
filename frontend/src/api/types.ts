@@ -151,6 +151,7 @@ export interface WorkbenchFeatures {
   browse: RuntimeFeature
   deep_research: RuntimeFeature
   artifact_workspace: RuntimeFeature
+  artifact_exports: RuntimeFeature
   project_memory: RuntimeFeature
   connectors: RuntimeFeature
 }

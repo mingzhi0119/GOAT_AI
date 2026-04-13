@@ -966,6 +966,8 @@ def _build_summary_payload(
     status: str,
     phase: str,
     error: str | None,
+    primary_failure_phase: str | None,
+    primary_failure_error: str | None,
     scenarios: list[str],
     startup_timeout_sec: float,
     health_timeout_sec: int,
@@ -984,6 +986,8 @@ def _build_summary_payload(
         "status": status,
         "phase": phase,
         "error": error,
+        "primary_failure_phase": primary_failure_phase,
+        "primary_failure_error": primary_failure_error,
         "started_at_utc": started_at_utc,
         "completed_at_utc": utc_now(),
         "workflow_context": {
@@ -1054,6 +1058,18 @@ def main() -> None:
     status = "passed"
     phase = "completed"
     error: str | None = None
+    primary_failure_phase: str | None = None
+    primary_failure_error: str | None = None
+
+    def _record_failure(*, failure_phase: str, failure_error: str) -> None:
+        nonlocal status, phase, error, primary_failure_phase, primary_failure_error
+        status = "failed"
+        if primary_failure_phase is None:
+            primary_failure_phase = failure_phase
+            primary_failure_error = failure_error
+            phase = failure_phase
+            error = failure_error
+
     try:
         installation = install_desktop_artifact(
             installer_path=installer_path,
@@ -1080,19 +1096,13 @@ def main() -> None:
             app_identifier=args.app_identifier,
         )
     except InstalledWindowsHealthyLaunchError as exc:
-        status = "failed"
-        phase = exc.phase
-        error = str(exc)
+        _record_failure(failure_phase=exc.phase, failure_error=str(exc))
         healthy_launch_result = exc.result
     except InstalledWindowsFaultSmokeError as exc:
-        status = "failed"
-        phase = exc.phase
-        error = str(exc)
+        _record_failure(failure_phase=exc.phase, failure_error=str(exc))
         results = list(exc.results)
     except SystemExit as exc:
-        status = "failed"
-        phase = "install"
-        error = str(exc)
+        _record_failure(failure_phase="install", failure_error=str(exc))
     finally:
         if installation is not None:
             try:
@@ -1102,9 +1112,7 @@ def main() -> None:
                     uninstall_timeout_sec=args.uninstall_timeout_sec,
                 )
             except SystemExit as exc:
-                status = "failed"
-                phase = "uninstall"
-                error = str(exc)
+                _record_failure(failure_phase="uninstall", failure_error=str(exc))
                 uninstall_result = _build_failed_uninstall_result(
                     installation=installation,
                     artifact_dir=artifact_dir,
@@ -1122,6 +1130,8 @@ def main() -> None:
         status=status,
         phase=phase,
         error=error,
+        primary_failure_phase=primary_failure_phase,
+        primary_failure_error=primary_failure_error,
         scenarios=scenarios,
         startup_timeout_sec=args.startup_timeout_sec,
         health_timeout_sec=args.health_timeout_sec,

@@ -42,7 +42,9 @@ def _auth_context() -> AuthorizationContext:
         scopes=frozenset(
             {
                 "sandbox:execute",
+                "artifact:write",
                 "knowledge:read",
+                "workbench:export",
                 "workbench:read",
                 "workbench:write",
             }
@@ -192,6 +194,8 @@ class SystemTelemetryServiceTests(unittest.TestCase):
         self.assertTrue(response.workbench.deep_research.effective_enabled)
         self.assertTrue(response.workbench.artifact_workspace.effective_enabled)
         self.assertIsNone(response.workbench.artifact_workspace.deny_reason)
+        self.assertTrue(response.workbench.artifact_exports.effective_enabled)
+        self.assertIsNone(response.workbench.artifact_exports.deny_reason)
         self.assertTrue(response.workbench.connectors.effective_enabled)
 
     def test_workbench_features_become_scope_aware(self) -> None:
@@ -245,6 +249,10 @@ class SystemTelemetryServiceTests(unittest.TestCase):
         self.assertEqual(
             "permission_denied", response.workbench.artifact_workspace.deny_reason
         )
+        self.assertFalse(response.workbench.artifact_exports.effective_enabled)
+        self.assertEqual(
+            "permission_denied", response.workbench.artifact_exports.deny_reason
+        )
 
     def test_preserves_operator_disabled_workbench_snapshot(self) -> None:
         with (
@@ -282,6 +290,9 @@ class SystemTelemetryServiceTests(unittest.TestCase):
 
         self.assertFalse(response.code_sandbox.effective_enabled)
         self.assertEqual("disabled_by_operator", response.workbench.browse.deny_reason)
+        self.assertEqual(
+            "disabled_by_operator", response.workbench.artifact_exports.deny_reason
+        )
         self.assertFalse(response.workbench.connectors.effective_enabled)
 
     def test_runtime_target_response_exposes_single_instance_contract(self) -> None:

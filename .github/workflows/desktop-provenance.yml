@@ -203,6 +203,7 @@ jobs:
             --resolved-sha "${{ github.sha }}" `
             --distribution-channel "${{ steps.distribution.outputs.channel }}"
       - name: Run installed NSIS desktop smoke
+        if: ${{ always() }}
         shell: pwsh
         run: |
           python -m tools.desktop.installed_windows_desktop_fault_smoke `
@@ -229,9 +230,11 @@ jobs:
             $healthyLaunch = $payload.healthy_launch
             $readyStatus = if ($null -eq $healthyLaunch) { "<none>" } else { $healthyLaunch.ready_status }
             $healthyStatus = if ($null -eq $healthyLaunch) { "<none>" } else { $healthyLaunch.status }
+            $primaryPhase = if ([string]::IsNullOrWhiteSpace($payload.primary_failure_phase)) { $payload.phase } else { $payload.primary_failure_phase }
             Add-Content $env:GITHUB_STEP_SUMMARY ""
-            Add-Content $env:GITHUB_STEP_SUMMARY "* $($payload.installer_kind): status=$($payload.status), phase=$($payload.phase), healthy_launch=$healthyStatus, ready_status=$readyStatus, summary=$($summaryPath.FullName)"
+            Add-Content $env:GITHUB_STEP_SUMMARY "* $($payload.installer_kind): status=$($payload.status), phase=$($payload.phase), primary_failure=$primaryPhase, healthy_launch=$healthyStatus, ready_status=$readyStatus, summary=$($summaryPath.FullName)"
       - name: Upload Windows desktop release assets
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: desktop-windows-release-assets

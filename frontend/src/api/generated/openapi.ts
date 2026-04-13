@@ -1805,6 +1805,7 @@ export interface components {
             browse: components["schemas"]["RuntimeFeaturePayload"];
             deep_research: components["schemas"]["RuntimeFeaturePayload"];
             artifact_workspace: components["schemas"]["RuntimeFeaturePayload"];
+            artifact_exports: components["schemas"]["RuntimeFeaturePayload"];
             project_memory: components["schemas"]["RuntimeFeaturePayload"];
             connectors: components["schemas"]["RuntimeFeaturePayload"];
         };

@@ -210,6 +210,8 @@ def test_main_writes_summary_json(
     assert order == ["healthy_launch", "fault_smoke"]
     assert summary["status"] == "passed"
     assert summary["phase"] == "completed"
+    assert summary["primary_failure_phase"] is None
+    assert summary["primary_failure_error"] is None
     assert summary["config"]["healthy_startup_timeout_sec"] == 45.0
     assert summary["installation"]["installer_kind"] == "nsis"
     assert summary["installer_kind"] == "nsis"
@@ -302,6 +304,11 @@ def test_main_writes_failed_summary_json_when_healthy_launch_fails(
     summary = json.loads((artifact_dir / "summary.json").read_text(encoding="utf-8"))
     assert summary["status"] == "failed"
     assert summary["phase"] == "healthy_launch:ready"
+    assert summary["primary_failure_phase"] == "healthy_launch:ready"
+    assert (
+        summary["primary_failure_error"]
+        == "Installed desktop reached /api/health but did not report readiness."
+    )
     assert summary["healthy_launch"]["status"] == "failed"
     assert summary["healthy_launch"]["phase"] == "ready"
     assert summary["healthy_launch"]["ready_status"] == 503
@@ -355,10 +362,101 @@ def test_main_writes_failed_summary_json_when_install_fails(
     assert summary["status"] == "failed"
     assert summary["phase"] == "install"
     assert summary["error"] == "NSIS install failed with exit code 1."
+    assert summary["primary_failure_phase"] == "install"
+    assert summary["primary_failure_error"] == "NSIS install failed with exit code 1."
     assert summary["results"] == []
     assert summary["healthy_launch"] is None
     assert summary["uninstall"] is None
     assert summary["installer_sha256"]
+
+
+def test_main_preserves_primary_failure_when_uninstall_also_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    artifact_dir = tmp_path / "artifacts"
+    installer = tmp_path / "setup.exe"
+    installer.write_text("", encoding="utf-8")
+    installation = subject.DesktopInstallation(
+        installer_kind="nsis",
+        installer_path=str(installer),
+        install_root=str(tmp_path / "install-root"),
+        desktop_exe=str(tmp_path / "install-root" / "goat-ai-desktop.exe"),
+        sidecar_path=str(tmp_path / "install-root" / "goat-backend.exe"),
+        uninstall_command=str(tmp_path / "install-root" / "uninstall.exe"),
+        install_log_path=None,
+        install_stdout_path="install.stdout.log",
+        install_stderr_path="install.stderr.log",
+    )
+    monkeypatch.setattr(
+        subject,
+        "_build_parser",
+        lambda: _parser_with_namespace(
+            installer=installer,
+            installer_kind="nsis",
+            artifact_dir=artifact_dir,
+            scenarios=["missing_sidecar"],
+            startup_timeout_sec=15.0,
+            health_timeout_sec=2,
+            restart_limit=1,
+            backoff_ms=100,
+            hang_sec=5.0,
+            healthy_startup_timeout_sec=45.0,
+            healthy_shutdown_timeout_sec=20.0,
+            install_timeout_sec=30.0,
+            uninstall_timeout_sec=30.0,
+            app_identifier=packaged_smoke.DEFAULT_WINDOWS_APP_IDENTIFIER,
+            workflow_role="fault_injection_drill",
+            release_ref="main",
+            resolved_sha="def456",
+            distribution_channel="internal_test",
+        ),
+    )
+    monkeypatch.setattr(subject, "install_desktop_artifact", lambda **_: installation)
+    monkeypatch.setattr(
+        subject,
+        "run_installed_healthy_launch",
+        lambda **_: _healthy_launch_result(tmp_path=tmp_path),
+    )
+    monkeypatch.setattr(
+        subject,
+        "run_installed_fault_smoke",
+        lambda **_: (_ for _ in ()).throw(
+            subject.InstalledWindowsFaultSmokeError(
+                "Fault smoke detected missing sidecar.",
+                phase="scenario:missing_sidecar",
+                results=[
+                    packaged_smoke.PackagedShellFaultResult(
+                        scenario="missing_sidecar",
+                        exit_code=1,
+                        failure_stage="backend_spawn_failed",
+                        log_path="desktop-shell.log",
+                        stdout_path="stdout.log",
+                        stderr_path="stderr.log",
+                    )
+                ],
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        subject,
+        "uninstall_desktop_artifact",
+        lambda **_: (_ for _ in ()).throw(
+            SystemExit("NSIS uninstall failed with exit code 1.")
+        ),
+    )
+    monkeypatch.setattr(subject.os, "name", "nt", raising=False)
+
+    with pytest.raises(SystemExit, match="Fault smoke detected missing sidecar"):
+        subject.main()
+
+    summary = json.loads((artifact_dir / "summary.json").read_text(encoding="utf-8"))
+    assert summary["status"] == "failed"
+    assert summary["phase"] == "scenario:missing_sidecar"
+    assert summary["error"] == "Fault smoke detected missing sidecar."
+    assert summary["primary_failure_phase"] == "scenario:missing_sidecar"
+    assert summary["primary_failure_error"] == "Fault smoke detected missing sidecar."
+    assert summary["uninstall"]["succeeded"] is False
+    assert "uninstall failed" in summary["uninstall"]["error"].lower()
 
 
 def test_main_rejects_non_windows_hosts(
