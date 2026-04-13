@@ -34,7 +34,9 @@ SKILL_TOKEN_RE = re.compile(r"\$([a-z0-9-]+)")
 
 
 def _skill_dirs() -> list[Path]:
-    return sorted(path for path in SKILLS_ROOT.iterdir() if path.is_dir())
+    return sorted(
+        path for path in SKILLS_ROOT.iterdir() if (path / "SKILL.md").is_file()
+    )
 
 
 def _parse_frontmatter(skill_path: Path) -> dict[str, str]:
@@ -175,6 +177,14 @@ def test_repo_local_skill_readme_exposes_high_frequency_dry_runs() -> None:
     assert dry_run_targets == expected
 
 
+def test_repo_local_skill_readme_links_shared_forward_test_patterns() -> None:
+    forward_test_section = _extract_markdown_section(
+        README_PATH, "Forward-tested patterns"
+    )
+    targets = set(_iter_markdown_link_targets(forward_test_section))
+    assert targets == {"goat-engineering-audit/references/forward-test-patterns.md"}
+
+
 def test_repo_local_goat_skill_policy_flags_match_expected_invocation_rules() -> None:
     for skill_name in GOAT_SKILLS:
         policy_path = SKILLS_ROOT / skill_name / "agents" / "openai.yaml"
@@ -201,6 +211,7 @@ def test_high_frequency_goat_skills_have_dry_run_examples() -> None:
             "## Example 2",
             "User asks:",
             "First moves:",
+            "Expected output:",
             "Validate with:",
         ):
             assert snippet in dry_run_text, (
@@ -300,3 +311,25 @@ def test_observability_approved_surfaces_reference_matches_contract_test_surface
         path.relative_to(REPO_ROOT).as_posix() for path in APPROVED_SURFACE_PATHS
     }
     assert actual == expected
+
+
+def test_shared_forward_test_patterns_capture_live_prompt_and_output_shape() -> None:
+    shared_patterns = (
+        SKILLS_ROOT
+        / "goat-engineering-audit"
+        / "references"
+        / "forward-test-patterns.md"
+    )
+    text = shared_patterns.read_text(encoding="utf-8")
+    for snippet in (
+        "## Tasks exercised",
+        "## Checks exercised",
+        "## Repeated prompt pattern",
+        "## Repeated output pattern",
+        "## Script decision",
+        "Read-only review of <scope>",
+        "No shared script landed in this pass.",
+    ):
+        assert snippet in text, (
+            f"{shared_patterns.relative_to(REPO_ROOT)} missing `{snippet}`"
+        )
