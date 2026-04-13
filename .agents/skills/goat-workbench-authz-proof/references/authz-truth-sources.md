@@ -1,0 +1,16 @@
+# Workbench Authz Truth Sources
+
+Start from these implementation and contract files:
+
+- [backend/application/workbench.py](../../../../backend/application/workbench.py)
+- [backend/services/authorizer.py](../../../../backend/services/authorizer.py)
+- [backend/services/system_telemetry_service.py](../../../../backend/services/system_telemetry_service.py)
+- [backend/services/workbench_source_registry.py](../../../../backend/services/workbench_source_registry.py)
+- [API_REFERENCE.md](../../../../docs/api/API_REFERENCE.md)
+
+Primary proof tests:
+
+- [__tests__/contracts/test_api_authz.py](../../../../__tests__/contracts/test_api_authz.py)
+- [__tests__/contracts/test_api_blackbox_contract.py](../../../../__tests__/contracts/test_api_blackbox_contract.py)
+- [__tests__/backend/services/test_system_telemetry_service.py](../../../../__tests__/backend/services/test_system_telemetry_service.py)
+- [__tests__/backend/services/test_workbench_source_registry.py](../../../../__tests__/backend/services/test_workbench_source_registry.py)

@@ -1,0 +1,7 @@
+interface:
+  display_name: "GOAT Workbench Authz Proof"
+  short_description: "Prove caller-scoped workbench and authz behavior."
+  default_prompt: "Use $goat-workbench-authz-proof to validate GOAT AI workbench authorization, visibility, and future-widening safeguards."
+
+policy:
+  allow_implicit_invocation: true
