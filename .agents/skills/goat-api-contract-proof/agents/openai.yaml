@@ -1,0 +1,7 @@
+interface:
+  display_name: "GOAT API Contract Proof"
+  short_description: "Keep backend, docs, and frontend API contracts in sync."
+  default_prompt: "Use $goat-api-contract-proof to validate GOAT AI API contract changes and proof surfaces."
+
+policy:
+  allow_implicit_invocation: true
