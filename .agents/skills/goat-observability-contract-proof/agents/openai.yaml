@@ -1,0 +1,7 @@
+interface:
+  display_name: "GOAT Observability Contract Proof"
+  short_description: "Validate metrics, labels, selectors, and runbook observability proof."
+  default_prompt: "Use $goat-observability-contract-proof to verify GOAT AI observability contracts across exporter, assets, and runbooks."
+
+policy:
+  allow_implicit_invocation: true

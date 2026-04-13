@@ -124,6 +124,22 @@ secret availability.
    - current governance order is: clear `backend-fast` first, then inspect `backend-heavy`, and only then move to `desktop-package-windows` / `desktop-supply-chain`
    - pre-ready restart/backoff is shipped, and the PR packaged-binary smoke plus release/scheduled installed-desktop evidence are now fixed governance mechanisms rather than ad hoc watchpoints
 
+### Repository-native Skills and Agent Automation
+
+- Goal: keep hardening the repo-local Codex skill layer so audit, proof, CI-routing, and governance-sync workflows stay repeatable without reverting to thread-by-thread memory.
+- Non-goals:
+  - do not replace [`AGENTS.md`](../../AGENTS.md) or the engineering standards as the permanent policy layer
+  - do not create a plugin marketplace or generic IDE macro bundle
+  - do not collapse all governance work into one broad "catch-all skill"
+- Remaining work:
+  - extend forward-tested coverage beyond the current audit, ci-routing plus WSL composition, desktop plus governance-runbook linkage, frontend-exposed contract, authz, observability, and governance-sync task set; keep tightening references when new scenarios expose ambiguity or stale truth sources
+  - add deterministic `scripts/` or `assets/` only where repeated usage shows a real need beyond the current shared prompt/output patterns and governance tests
+  - extend the governance coverage around `.agents/skills/` as the inventory grows so future additions cannot drift in metadata, links, or directory shape
+  - decide when the skill layer is stable enough to promote from roadmap follow-on work into shipped-status documentation
+- Relationship to existing skills:
+  - `wsl-linux-build`, `wsl-linux-ops-checks`, and `wsl-linux-rust-desktop` remain the execution-layer helpers for Linux-targeted validation from Windows
+  - the new `goat-*` skills sit above them as governance/proof workflows and may compose with them when Linux parity is required
+
 ### Runtime platform
 
 #### Phase 17 shared runtime foundations

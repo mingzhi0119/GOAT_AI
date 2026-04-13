@@ -1,0 +1,7 @@
+interface:
+  display_name: "GOAT Desktop Release Evidence"
+  short_description: "Validate packaged, release, and drill desktop proof chains."
+  default_prompt: "Use $goat-desktop-release-evidence to verify GOAT AI desktop evidence boundaries, retention, and proof."
+
+policy:
+  allow_implicit_invocation: true

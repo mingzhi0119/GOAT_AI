@@ -1,0 +1,7 @@
+interface:
+  display_name: "GOAT Engineering Audit"
+  short_description: "Run repository-grounded readiness and governance audits."
+  default_prompt: "Use $goat-engineering-audit to assess current GOAT AI engineering readiness from repository truth."
+
+policy:
+  allow_implicit_invocation: true

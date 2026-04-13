@@ -1,0 +1,7 @@
+interface:
+  display_name: "GOAT CI Surface Router"
+  short_description: "Map changes to the minimum required GOAT AI validation gates."
+  default_prompt: "Use $goat-ci-surface-router to determine the smallest correct validation matrix for this GOAT AI change."
+
+policy:
+  allow_implicit_invocation: true

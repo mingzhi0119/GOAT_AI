@@ -1,0 +1,7 @@
+interface:
+  display_name: "GOAT Governance Sync"
+  short_description: "Align roadmap, status, and ops docs with proved repo reality."
+  default_prompt: "Use $goat-governance-sync to update GOAT AI governance docs from landed proof without mixing unfinished work and shipped status."
+
+policy:
+  allow_implicit_invocation: false
