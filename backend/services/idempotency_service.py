@@ -265,6 +265,27 @@ class PostgresIdempotencyStore:
                     "DELETE FROM idempotency_keys WHERE expires_at <= %s",
                     (now_iso,),
                 )
+                inserted = conn.execute(
+                    """
+                    INSERT INTO idempotency_keys
+                        (key, route, scope, request_hash, status, created_at, expires_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT DO NOTHING
+                    RETURNING key
+                    """,
+                    (
+                        key,
+                        route,
+                        scope,
+                        request_hash,
+                        _STATUS_PENDING,
+                        now_iso,
+                        expires_iso,
+                    ),
+                ).fetchone()
+                if inserted is not None:
+                    return ClaimResult(state="claimed")
+
                 row = conn.execute(
                     """
                     SELECT request_hash, status, response_status, response_content_type, response_body, expires_at
@@ -275,11 +296,13 @@ class PostgresIdempotencyStore:
                     (key, route, scope),
                 ).fetchone()
                 if row is None:
-                    conn.execute(
+                    inserted_retry = conn.execute(
                         """
                         INSERT INTO idempotency_keys
                             (key, route, scope, request_hash, status, created_at, expires_at)
                         VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT DO NOTHING
+                        RETURNING key
                         """,
                         (
                             key,
@@ -290,8 +313,22 @@ class PostgresIdempotencyStore:
                             now_iso,
                             expires_iso,
                         ),
-                    )
-                    return ClaimResult(state="claimed")
+                    ).fetchone()
+                    if inserted_retry is not None:
+                        return ClaimResult(state="claimed")
+                    row = conn.execute(
+                        """
+                        SELECT request_hash, status, response_status, response_content_type, response_body, expires_at
+                        FROM idempotency_keys
+                        WHERE key = %s AND route = %s AND scope = %s
+                        FOR UPDATE
+                        """,
+                        (key, route, scope),
+                    ).fetchone()
+                    if row is None:
+                        raise PersistenceWriteError(
+                            "Failed to claim Postgres idempotency key."
+                        )
 
                 stored_hash = str(row["request_hash"])
                 status = str(row["status"])

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+import threading
 import unittest
+from unittest.mock import patch
 
 from __tests__.helpers.postgres_runtime import postgres_runtime_container
 from backend.services.artifact_service import PersistedArtifactRecord
@@ -22,13 +25,42 @@ from backend.services.knowledge_repository import (
     PostgresKnowledgeRepository,
 )
 from backend.services.media_service import MediaUploadRecord, PostgresMediaRepository
-from backend.services.postgres_runtime_support import run_postgres_runtime_migrations
+from backend.services.postgres_runtime_support import (
+    postgres_connect as runtime_postgres_connect,
+    run_postgres_runtime_migrations,
+)
 from backend.services.workbench_runtime import (
     PostgresWorkbenchTaskRepository,
     WorkbenchTaskCreatePayload,
     WorkbenchWorkspaceOutputCreatePayload,
 )
 from goat_ai.shared.clocks import FakeClock
+
+
+class _BarrierPostgresConnection:
+    def __init__(self, dsn: str, barrier: threading.Barrier) -> None:
+        self._conn = runtime_postgres_connect(dsn)
+        self._barrier = barrier
+
+    def __enter__(self) -> _BarrierPostgresConnection:
+        self._conn.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self._conn.__exit__(exc_type, exc, tb)
+
+    def transaction(self):
+        return self._conn.transaction()
+
+    def execute(self, query, params=None):
+        if "INSERT INTO idempotency_keys" in str(query):
+            self._barrier.wait(timeout=5)
+        if params is None:
+            return self._conn.execute(query)
+        return self._conn.execute(query, params)
+
+    def __getattr__(self, name: str):
+        return getattr(self._conn, name)
 
 
 class PostgresRuntimeContractsTests(unittest.TestCase):
@@ -149,6 +181,47 @@ class PostgresRuntimeContractsTests(unittest.TestCase):
                 route="/api/chat",
                 scope="tenant:default",
                 request_hash="hash-2",
+            )
+
+    def test_idempotency_store_first_claim_is_concurrency_safe(self) -> None:
+        with postgres_runtime_container() as dsn:
+            run_postgres_runtime_migrations(dsn)
+            barrier = threading.Barrier(2)
+            stores = [
+                PostgresIdempotencyStore(
+                    dsn=dsn,
+                    ttl_sec=300,
+                    clock=FakeClock("2026-04-13T10:00:00+00:00"),
+                ),
+                PostgresIdempotencyStore(
+                    dsn=dsn,
+                    ttl_sec=300,
+                    clock=FakeClock("2026-04-13T10:00:00+00:00"),
+                ),
+            ]
+
+            def connect_with_barrier(connect_dsn: str) -> _BarrierPostgresConnection:
+                return _BarrierPostgresConnection(connect_dsn, barrier)
+
+            def claim_once(store: PostgresIdempotencyStore):
+                return store.claim(
+                    key="idem-race",
+                    route="/api/chat",
+                    scope="tenant:default",
+                    request_hash="hash-race",
+                )
+
+            with patch(
+                "backend.services.idempotency_service.postgres_connect",
+                side_effect=connect_with_barrier,
+            ):
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    futures = [executor.submit(claim_once, store) for store in stores]
+                    outcomes = [future.result(timeout=10) for future in futures]
+
+            self.assertCountEqual(
+                [outcome.state for outcome in outcomes],
+                ["claimed", "in_progress"],
             )
 
     def test_knowledge_and_media_contract_round_trip(self) -> None:
