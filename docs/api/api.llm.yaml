@@ -149,7 +149,7 @@ schemas:
       available_on_host: boolean
       effective_enabled: boolean
       provider_name: string
-      isolation_level: string
+      isolation_level: container|host
       network_policy_enforced: boolean
       deny_reason: string|null
   CodeSandboxInlineFile:

@@ -1198,6 +1198,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertIn("workbench", feat_body)
         self.assertTrue(feat_body["code_sandbox"]["policy_allowed"])
         self.assertFalse(feat_body["code_sandbox"]["effective_enabled"])
+        self.assertIn(
+            feat_body["code_sandbox"]["isolation_level"], {"container", "host"}
+        )
         self.assertFalse(feat_body["workbench"]["agent_tasks"]["effective_enabled"])
         self.assertFalse(feat_body["workbench"]["plan_mode"]["effective_enabled"])
         self.assertFalse(feat_body["workbench"]["browse"]["effective_enabled"])
@@ -1743,6 +1746,9 @@ class ApiBlackboxContractTests(unittest.TestCase):
         features = self.client.get("/api/system/features")
         self.assertEqual(200, features.status_code)
         self.assertTrue(features.json()["code_sandbox"]["effective_enabled"])
+        self.assertEqual(
+            "container", features.json()["code_sandbox"]["isolation_level"]
+        )
 
         response = self.client.post(
             "/api/code-sandbox/exec",

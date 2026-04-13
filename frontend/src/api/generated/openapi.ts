@@ -1095,8 +1095,9 @@ export interface components {
             /**
              * Isolation Level
              * @description Isolation tier for the active provider: container or host.
+             * @enum {string}
              */
-            isolation_level: string;
+            isolation_level: "container" | "host";
             /**
              * Network Policy Enforced
              * @description Whether the selected provider can actually enforce the declared network policy.
