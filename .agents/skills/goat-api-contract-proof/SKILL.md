@@ -13,6 +13,11 @@ Use this skill for HTTP/API contract work in this repository.
 - [references/contract-surfaces.md](references/contract-surfaces.md)
 - [references/change-checklist.md](references/change-checklist.md)
 - [references/blackbox-tests.md](references/blackbox-tests.md)
+- [references/dry-run-examples.md](references/dry-run-examples.md)
+
+## Dry-Run Examples
+
+- See [references/dry-run-examples.md](references/dry-run-examples.md) for read-only contract-impact prompts before changing generated artifacts.
 
 ## Workflow
 
@@ -37,4 +42,3 @@ Use this skill for HTTP/API contract work in this repository.
 - Run `python -m tools.contracts.check_api_contract_sync`.
 - Run the relevant contract tests from `__tests__/contracts/`.
 - For frontend-exposed contract changes, also run `cd frontend && npm run contract:check`.
-

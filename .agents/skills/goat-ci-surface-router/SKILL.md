@@ -12,6 +12,11 @@ Use this skill when the question is "what do we need to run for this change?"
 - [AGENTS.md](../../../AGENTS.md)
 - [references/ci-routing.md](references/ci-routing.md)
 - [references/local-check-matrix.md](references/local-check-matrix.md)
+- [references/dry-run-examples.md](references/dry-run-examples.md)
+
+## Dry-Run Examples
+
+- See [references/dry-run-examples.md](references/dry-run-examples.md) for changed-file prompts that map to the minimum required validation matrix.
 
 ## Workflow
 
@@ -34,4 +39,3 @@ Use this skill when the question is "what do we need to run for this change?"
 - State the minimum required local validation matrix.
 - Call out optional wider confidence checks separately.
 - Name the workflow or gate each suggested check corresponds to.
-

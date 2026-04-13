@@ -2,6 +2,8 @@
 
 Start from these implementation and contract files:
 
+- [goat_ai/config/feature_gates.py](../../../../goat_ai/config/feature_gates.py)
+- [goat_ai/config/feature_gate_reasons.py](../../../../goat_ai/config/feature_gate_reasons.py)
 - [backend/domain/scope_catalog.py](../../../../backend/domain/scope_catalog.py)
 - [backend/application/workbench.py](../../../../backend/application/workbench.py)
 - [backend/models/system.py](../../../../backend/models/system.py)

@@ -13,6 +13,11 @@ Use this skill when the change touches metrics, observability assets, or runbook
 - [references/observability-surfaces.md](references/observability-surfaces.md)
 - [references/metric-label-policy.md](references/metric-label-policy.md)
 - [references/approved-surfaces.md](references/approved-surfaces.md)
+- [references/dry-run-examples.md](references/dry-run-examples.md)
+
+## Dry-Run Examples
+
+- See [references/dry-run-examples.md](references/dry-run-examples.md) for read-only selector and label-proof prompts before editing exporter or observability assets.
 
 ## Workflow
 

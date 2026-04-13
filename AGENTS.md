@@ -36,6 +36,9 @@ Short index for coding agents. Canonical rules live in the docs below.
   - use `$goat-api-contract-proof` for HTTP schema/docs/frontend contract sync
   - use `$goat-ci-surface-router` to choose the minimum correct validation matrix
   - use `$goat-desktop-release-evidence` when desktop workflows, tools, or proof docs change
+  - use `$goat-workbench-authz-proof` when workbench scopes, source visibility, or `/api/system/features` may widen
+  - use `$goat-observability-contract-proof` when metrics, alerts, dashboards, or observability runbooks change
+  - use `$goat-governance-sync` when proof is already landed and roadmap/status/ops docs may need the owning update
 - Skills are the reusable workflow layer; `AGENTS.md` and [`docs/standards/ENGINEERING_STANDARDS.md`](docs/standards/ENGINEERING_STANDARDS.md) remain the enforcement point for permanent repository policy.
 - Add or update tests for happy path, failure path, and at least one boundary case when you touch core behavior.
 - Do not treat a red local CI-equivalent gate as follow-up work.

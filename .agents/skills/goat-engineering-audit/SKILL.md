@@ -15,6 +15,11 @@ Use this skill when the request is to audit current repository reality rather th
 - [references/truth-sources.md](references/truth-sources.md)
 - [references/severity-rubric.md](references/severity-rubric.md)
 - [references/readiness-report-template.md](references/readiness-report-template.md)
+- [references/dry-run-examples.md](references/dry-run-examples.md)
+
+## Dry-Run Examples
+
+- See [references/dry-run-examples.md](references/dry-run-examples.md) for read-only prompt patterns, expected first moves, and validation shape before editing.
 
 ## Workflow
 
@@ -45,4 +50,3 @@ Use this skill when the request is to audit current repository reality rather th
   - evidence that already supports readiness
   - what is still insufficient
   - external blockers
-

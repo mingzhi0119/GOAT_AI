@@ -12,6 +12,11 @@ Use this skill when the change touches workbench authorization, source visibilit
 - [AGENTS.md](../../../AGENTS.md)
 - [references/authz-truth-sources.md](references/authz-truth-sources.md)
 - [references/caller-scoped-checklist.md](references/caller-scoped-checklist.md)
+- [references/dry-run-examples.md](references/dry-run-examples.md)
+
+## Dry-Run Examples
+
+- See [references/dry-run-examples.md](references/dry-run-examples.md) for read-only caller-scoped authz review patterns before changing scopes or capability payloads.
 
 ## Workflow
 

@@ -13,6 +13,11 @@ Use this skill when the task touches desktop packaging, release evidence, or ins
 - [references/desktop-boundaries.md](references/desktop-boundaries.md)
 - [references/evidence-checklist.md](references/evidence-checklist.md)
 - [references/retention-and-summary.md](references/retention-and-summary.md)
+- [references/dry-run-examples.md](references/dry-run-examples.md)
+
+## Dry-Run Examples
+
+- See [references/dry-run-examples.md](references/dry-run-examples.md) for packaged-vs-installed-vs-drill prompt patterns before you conclude a desktop slice regressed.
 
 ## Workflow
 
