@@ -13,6 +13,11 @@ Use this skill when the repository's documented governance state needs to catch 
 - [references/doc-ownership-map.md](references/doc-ownership-map.md)
 - [references/status-vs-roadmap-rules.md](references/status-vs-roadmap-rules.md)
 - [references/governance-edit-checklist.md](references/governance-edit-checklist.md)
+- [references/dry-run-examples.md](references/dry-run-examples.md)
+
+## Dry-Run Examples
+
+- See [references/dry-run-examples.md](references/dry-run-examples.md) for read-only document-ownership triage before rewriting roadmap, status, or ops text.
 
 ## Workflow
 
@@ -36,4 +41,3 @@ Use this skill when the repository's documented governance state needs to catch 
 - Re-read the touched governance docs after editing them.
 - Run the relevant governance or ops asset tests when doc truth is part of a governed surface.
 - When the update depends on a proof path, compose with the matching repo-native proof skill first.
-

@@ -10,6 +10,11 @@ First moves:
 - read the workflows, implementation files, and tests named in the request before scoring readiness
 - separate in-repo proof from residual risk and external blockers
 
+Expected output:
+- a top-line readiness conclusion
+- severity-ranked findings with evidence and minimal fixes
+- explicit separation between in-repo proof, residual risk, and external blockers
+
 Validate with:
 - rerun only the narrow test suites needed to confirm or clear the findings you report
 
@@ -22,6 +27,11 @@ First moves:
 - read the matching specialized skill references before concluding a slice regressed
 - look for structural proof gaps in workflows, tests, or retained evidence rather than style-only differences
 - confirm any claimed regression against current code and tests instead of roadmap history alone
+
+Expected output:
+- a per-slice decision on still-closed vs reopened
+- the exact workflows, files, and tests that prove each decision
+- any reopened gap grouped by governance, evidence, or external blocker
 
 Validate with:
 - cite the exact workflows, files, and tests that prove the slice is still closed or has reopened

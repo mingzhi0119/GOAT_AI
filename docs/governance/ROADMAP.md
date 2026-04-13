@@ -132,8 +132,8 @@ secret availability.
   - do not create a plugin marketplace or generic IDE macro bundle
   - do not collapse all governance work into one broad "catch-all skill"
 - Remaining work:
-  - forward-test the repo-native skills on live audit, contract, desktop, and observability tasks, then tighten references where usage exposes ambiguity or stale truth sources
-  - add deterministic `scripts/` or `assets/` only where repeated usage shows a real need beyond the current markdown/reference layer
+  - extend forward-tested coverage beyond the current audit, contract, ci-routing, desktop, authz, observability, and governance-sync task set; keep tightening references when new scenarios expose ambiguity or stale truth sources
+  - add deterministic `scripts/` or `assets/` only where repeated usage shows a real need beyond the current shared prompt/output patterns and governance tests
   - extend the governance coverage around `.agents/skills/` as the inventory grows so future additions cannot drift in metadata, links, or directory shape
   - decide when the skill layer is stable enough to promote from roadmap follow-on work into shipped-status documentation
 - Relationship to existing skills:

@@ -21,6 +21,10 @@ This directory contains GOAT AI repo-local Codex skills.
 - [workbench authz dry runs](goat-workbench-authz-proof/references/dry-run-examples.md): caller-scoped capability and widening-prevention prompts.
 - [observability proof dry runs](goat-observability-contract-proof/references/dry-run-examples.md): metric-label and selector-proof prompts.
 
+## Forward-tested patterns
+
+- [shared prompt and output patterns](goat-engineering-audit/references/forward-test-patterns.md): repeated read-only prompt skeletons, output shapes, and real checks exercised during live forward-tests.
+
 ## Execution-layer helpers
 
 - [wsl-linux-build](wsl-linux-build/SKILL.md): run Linux-targeted commands through WSL from Windows.

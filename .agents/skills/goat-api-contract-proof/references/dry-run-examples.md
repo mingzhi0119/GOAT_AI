@@ -10,6 +10,11 @@ First moves:
 - inspect the backend schema and route source before touching generated artifacts
 - decide whether [openapi.json](../../../../docs/api/openapi.json), [api.llm.yaml](../../../../docs/api/api.llm.yaml), [frontend generated types](../../../../frontend/src/api/generated/openapi.ts), and [frontend adapter types](../../../../frontend/src/api/types.ts) should move together
 
+Expected output:
+- whether the external HTTP contract actually changed
+- which docs or generated artifacts must move together if it did
+- the minimum contract-sync and black-box checks required before editing
+
 Validate with:
 - run `python -m tools.contracts.check_api_contract_sync`
 - run the relevant black-box and contract governance tests
@@ -23,6 +28,11 @@ First moves:
 - compare the request/response schema and authz-facing payload with the committed contract artifacts
 - treat caller-scoped capability payloads as public contract, not internal-only implementation
 - leave generated artifacts untouched if the external contract is unchanged
+
+Expected output:
+- a yes-or-no decision on regeneration
+- the specific contract surface that triggered that decision
+- the narrowest proof commands that would confirm the no-op or the required refresh
 
 Validate with:
 - prove either that no generated artifact changed or that all governed artifacts were refreshed together
