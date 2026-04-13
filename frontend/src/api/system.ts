@@ -1,5 +1,6 @@
 import { buildApiHeaders } from './auth'
 import { buildApiErrorMessage } from './errors'
+import { parseSystemFeaturesResponse } from './runtimeSchemas'
 import type {
   DesktopDiagnostics,
   GPUStatus,
@@ -37,7 +38,7 @@ export async function fetchSystemFeatures(): Promise<SystemFeatures> {
     headers: buildApiHeaders(),
   })
   if (!resp.ok) throw new Error(await buildApiErrorMessage(resp, 'System features API'))
-  return (await resp.json()) as SystemFeatures
+  return parseSystemFeaturesResponse(await resp.json())
 }
 
 export async function fetchDesktopDiagnostics(): Promise<DesktopDiagnostics> {

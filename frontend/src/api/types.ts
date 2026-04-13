@@ -1,8 +1,21 @@
 /** Frontend API and UI types.
  * Backend-derived contract types are generated under `src/api/generated/openapi.ts`.
- * Keep this file for UI-only unions and frontend-facing adapters where the OpenAPI
- * contract needs narrower or more ergonomic typing.
+ * Keep this file for UI-only unions and normalized frontend-facing adapters where the
+ * generated OpenAPI contract needs slightly safer runtime defaults.
  */
+
+import type { components } from './generated/openapi'
+
+type ApiSchemas = components['schemas']
+
+export type RuntimeFeatureContract = ApiSchemas['RuntimeFeaturePayload']
+export type CodeSandboxFeatureContract = ApiSchemas['CodeSandboxFeaturePayload']
+export type SystemFeaturesContract = ApiSchemas['SystemFeaturesResponse']
+export type CodeSandboxExecutionContract = ApiSchemas['CodeSandboxExecutionResponse']
+export type CodeSandboxExecutionEventContract =
+  ApiSchemas['CodeSandboxExecutionEventPayload']
+export type CodeSandboxExecutionEventsContract =
+  ApiSchemas['CodeSandboxExecutionEventsResponse']
 
 export type ReasoningLevel = 'low' | 'medium' | 'high'
 export type ThemeStyle = 'classic' | 'urochester' | 'thu'
@@ -127,21 +140,14 @@ export interface InferenceLatency {
   >
 }
 
-export interface CodeSandboxFeature {
-  policy_allowed: boolean
-  allowed_by_config: boolean
-  available_on_host: boolean
-  effective_enabled: boolean
-  provider_name: string
-  isolation_level: 'container' | 'host'
-  network_policy_enforced: boolean
+export type CodeSandboxIsolationLevel = CodeSandboxFeatureContract['isolation_level']
+
+export interface CodeSandboxFeature
+  extends Omit<CodeSandboxFeatureContract, 'deny_reason'> {
   deny_reason: string | null
 }
 
-export interface RuntimeFeature {
-  allowed_by_config: boolean
-  available_on_host: boolean
-  effective_enabled: boolean
+export interface RuntimeFeature extends Omit<RuntimeFeatureContract, 'deny_reason'> {
   deny_reason: string | null
 }
 
@@ -203,26 +209,17 @@ export interface DesktopDiagnostics {
   packaged_shell_log_path: string | null
 }
 
-export type CodeSandboxRuntimePreset = 'shell'
-export type CodeSandboxExecutionStatus =
-  | 'queued'
-  | 'running'
-  | 'completed'
-  | 'failed'
-  | 'denied'
-  | 'cancelled'
-export type CodeSandboxExecutionMode = 'sync' | 'async'
-export type CodeSandboxNetworkPolicy = 'disabled' | 'allowlist' | 'enabled'
+export type CodeSandboxRuntimePreset = CodeSandboxExecutionContract['runtime_preset']
+export type CodeSandboxExecutionStatus = CodeSandboxExecutionContract['status']
+export type CodeSandboxExecutionMode = CodeSandboxExecutionContract['execution_mode']
+export type CodeSandboxNetworkPolicy = CodeSandboxExecutionContract['network_policy']
 
 export interface CodeSandboxInlineFile {
   filename: string
   content: string
 }
 
-export interface CodeSandboxOutputFile {
-  path: string
-  byte_size: number
-}
+export type CodeSandboxOutputFile = ApiSchemas['CodeSandboxOutputFilePayload']
 
 export interface CodeSandboxExecRequest {
   execution_mode?: CodeSandboxExecutionMode
@@ -235,38 +232,27 @@ export interface CodeSandboxExecRequest {
   files?: CodeSandboxInlineFile[]
 }
 
-export interface CodeSandboxExecutionResponse {
-  execution_id: string
-  status: CodeSandboxExecutionStatus
-  execution_mode: CodeSandboxExecutionMode
-  runtime_preset: CodeSandboxRuntimePreset
-  network_policy: CodeSandboxNetworkPolicy
-  created_at: string
-  updated_at: string
+export interface CodeSandboxExecutionResponse
+  extends Omit<
+    CodeSandboxExecutionContract,
+    'started_at' | 'finished_at' | 'exit_code' | 'error_detail' | 'output_files'
+  > {
   started_at: string | null
   finished_at: string | null
-  provider_name: string
-  isolation_level: 'container' | 'host'
-  network_policy_enforced: boolean
   exit_code: number | null
-  stdout: string
-  stderr: string
-  timed_out: boolean
   error_detail: string | null
   output_files: CodeSandboxOutputFile[]
 }
 
-export interface CodeSandboxExecutionEvent {
-  sequence: number
-  event_type: string
-  created_at: string
+export interface CodeSandboxExecutionEvent
+  extends Omit<CodeSandboxExecutionEventContract, 'status' | 'message' | 'metadata'> {
   status: CodeSandboxExecutionStatus | null
   message: string | null
   metadata: Record<string, unknown>
 }
 
-export interface CodeSandboxExecutionEventsResponse {
-  execution_id: string
+export interface CodeSandboxExecutionEventsResponse
+  extends Omit<CodeSandboxExecutionEventsContract, 'events'> {
   events: CodeSandboxExecutionEvent[]
 }
 

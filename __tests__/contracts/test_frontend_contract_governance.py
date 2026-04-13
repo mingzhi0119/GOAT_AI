@@ -61,3 +61,31 @@ def test_frontend_types_docstring_points_to_generated_contract_source() -> None:
     )
 
     assert "generated under `src/api/generated/openapi.ts`" in types_file
+
+
+def test_frontend_runtime_api_parsers_stay_inside_src_api() -> None:
+    package_json = json.loads(
+        (REPO_ROOT / "frontend" / "package.json").read_text(encoding="utf-8")
+    )
+    runtime_schemas = (
+        REPO_ROOT / "frontend" / "src" / "api" / "runtimeSchemas.ts"
+    ).read_text(encoding="utf-8")
+    system_api = (REPO_ROOT / "frontend" / "src" / "api" / "system.ts").read_text(
+        encoding="utf-8"
+    )
+    code_sandbox_api = (
+        REPO_ROOT / "frontend" / "src" / "api" / "codeSandbox.ts"
+    ).read_text(encoding="utf-8")
+
+    assert "zod" in package_json["dependencies"]
+    assert "parseSystemFeaturesResponse" in runtime_schemas
+    assert "parseCodeSandboxExecutionResponse" in runtime_schemas
+    assert "parseCodeSandboxExecutionEventsResponse" in runtime_schemas
+    assert "return parseSystemFeaturesResponse(await resp.json())" in system_api
+    assert (
+        "return parseCodeSandboxExecutionResponse(await resp.json())"
+        in code_sandbox_api
+    )
+    assert "return parseCodeSandboxExecutionEventsResponse(await resp.json())" in (
+        code_sandbox_api
+    )

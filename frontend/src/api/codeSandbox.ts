@@ -1,5 +1,9 @@
 import { buildApiHeaders } from './auth'
 import { buildApiErrorMessage } from './errors'
+import {
+  parseCodeSandboxExecutionEventsResponse,
+  parseCodeSandboxExecutionResponse,
+} from './runtimeSchemas'
 import type {
   CodeSandboxExecRequest,
   CodeSandboxExecutionEventsResponse,
@@ -25,7 +29,7 @@ export async function executeCodeSandbox(
     body: JSON.stringify(request),
   })
   if (!resp.ok) throw new Error(await buildApiErrorMessage(resp, 'Code sandbox API'))
-  return (await resp.json()) as CodeSandboxExecutionResponse
+  return parseCodeSandboxExecutionResponse(await resp.json())
 }
 
 export async function fetchCodeSandboxExecution(
@@ -35,7 +39,7 @@ export async function fetchCodeSandboxExecution(
     headers: buildApiHeaders(),
   })
   if (!resp.ok) throw new Error(await buildApiErrorMessage(resp, 'Code sandbox API'))
-  return (await resp.json()) as CodeSandboxExecutionResponse
+  return parseCodeSandboxExecutionResponse(await resp.json())
 }
 
 export async function fetchCodeSandboxExecutionEvents(
@@ -45,7 +49,7 @@ export async function fetchCodeSandboxExecutionEvents(
     headers: buildApiHeaders(),
   })
   if (!resp.ok) throw new Error(await buildApiErrorMessage(resp, 'Code sandbox API'))
-  return (await resp.json()) as CodeSandboxExecutionEventsResponse
+  return parseCodeSandboxExecutionEventsResponse(await resp.json())
 }
 
 interface CodeSandboxLogStreamOptions {

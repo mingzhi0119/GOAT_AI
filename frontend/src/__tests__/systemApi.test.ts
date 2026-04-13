@@ -143,6 +143,95 @@ describe('system api', () => {
     })
   })
 
+  it('normalizes missing deny reasons in system feature payloads', async () => {
+    const mockedFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code_sandbox: {
+          policy_allowed: true,
+          allowed_by_config: true,
+          available_on_host: true,
+          effective_enabled: true,
+          provider_name: 'docker',
+          isolation_level: 'container',
+          network_policy_enforced: true,
+        },
+        workbench: {
+          agent_tasks: {
+            allowed_by_config: true,
+            available_on_host: true,
+            effective_enabled: true,
+          },
+          plan_mode: {
+            allowed_by_config: true,
+            available_on_host: true,
+            effective_enabled: true,
+          },
+          browse: {
+            allowed_by_config: true,
+            available_on_host: true,
+            effective_enabled: true,
+          },
+          deep_research: {
+            allowed_by_config: true,
+            available_on_host: false,
+            effective_enabled: false,
+          },
+          artifact_workspace: {
+            allowed_by_config: true,
+            available_on_host: true,
+            effective_enabled: true,
+          },
+          artifact_exports: {
+            allowed_by_config: false,
+            available_on_host: true,
+            effective_enabled: false,
+          },
+          project_memory: {
+            allowed_by_config: true,
+            available_on_host: false,
+            effective_enabled: false,
+          },
+          connectors: {
+            allowed_by_config: true,
+            available_on_host: true,
+            effective_enabled: true,
+          },
+        },
+      }),
+    })
+    vi.stubGlobal('fetch', mockedFetch)
+
+    const payload = await fetchSystemFeatures()
+
+    expect(payload.code_sandbox.deny_reason).toBeNull()
+    expect(payload.workbench.deep_research.deny_reason).toBeNull()
+  })
+
+  it('rejects malformed system features payloads', async () => {
+    const mockedFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code_sandbox: {
+          policy_allowed: 'yes',
+          allowed_by_config: true,
+          available_on_host: true,
+          effective_enabled: true,
+          provider_name: 'docker',
+          isolation_level: 'container',
+          network_policy_enforced: true,
+          deny_reason: null,
+        },
+        workbench: {},
+      }),
+    })
+    vi.stubGlobal('fetch', mockedFetch)
+
+    await expect(fetchSystemFeatures()).rejects.toThrow(
+      /System features API returned an invalid response payload/,
+    )
+  })
+
   it('fetches desktop diagnostics payload', async () => {
     localStorage.setItem(API_KEY_STORAGE_KEY, 'secret-123')
     localStorage.setItem(OWNER_ID_STORAGE_KEY, 'alice')
