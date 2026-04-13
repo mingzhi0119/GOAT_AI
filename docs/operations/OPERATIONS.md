@@ -198,7 +198,7 @@ Canonical checked-in operator assets now live under `ops/deploy/`, `ops/systemd/
 Use the canonical `ops/` entrypoints directly; repository-root deploy wrappers are no longer supported.
 The checked-in user-service unit now lives at `ops/systemd/goat-ai.service`.
 The school-only variant lives at `ops/systemd/goat-ai.school-ubuntu.service`.
-The checked-in reverse-proxy starter for `api.goat.com` now lives at `ops/deploy/nginx.api.goat.com.conf`.
+The checked-in reverse-proxy starter for `goat-api.duckdns.org` now lives at `ops/deploy/nginx.goat-api.duckdns.org.conf`.
 
 Linux:
 
@@ -228,7 +228,8 @@ Important behavior:
 - `RELEASE_BUNDLE` + `RELEASE_MANIFEST` switch deploy into artifact-first mode: the shipped bundle is installed before process restart, and the host no longer rebuilds the frontend from source
 - `deploy.sh` keeps the `nohup` + `var/logs/fastapi.pid` fallback path
 - `ops/deploy/deploy.sh` and `ops/deploy/deploy.ps1` now stop the current FastAPI process gracefully first, then force cleanup only if the drain window expires
-- the checked-in Linux-facing service and `nohup` fallback now bind the backend to `127.0.0.1:62606`; publish `80/443` through a reverse proxy such as the checked-in `nginx.api.goat.com.conf`
+- the checked-in Linux-facing service and `nohup` fallback now bind the backend to `127.0.0.1:62606`; publish `80/443` through a reverse proxy such as the checked-in `nginx.goat-api.duckdns.org.conf`
+- for the Duck DNS public hostname, use `server_name goat-api.duckdns.org;` and then issue TLS with `sudo certbot --nginx -d goat-api.duckdns.org`
 - Artifact-first rollback is the preferred path; ref-based rollback remains available for manual recovery. See [ROLLBACK.md](ROLLBACK.md)
 - Windows deploy reuses Ollama on `127.0.0.1:11434` when available unless `OLLAMA_BASE_URL` is explicitly set
 - Linux deploy no longer auto-detects or auto-starts the school `ollama-local` runtime by default; only `GOAT_USE_SCHOOL_OLLAMA_LOCAL=1` or `GOAT_OLLAMA_PROFILE=school-ubuntu` enables the school-specific helper script path
