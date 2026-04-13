@@ -414,11 +414,20 @@ curl -sS -H "X-GOAT-API-Key: $GOAT_API_KEY" http://127.0.0.1:62606/api/system/me
   - `http_request_duration_seconds_count`
 - Counter semantics: `chat_stream_completed_total` counts only successful assistant completions, not safeguard-blocked refusal flows
 - `backend/platform/prometheus_metrics.py::EXPORTED_METRIC_FAMILIES` is the single source of truth for operator-facing metric families.
+- Operator-facing metric families currently shipped from that contract are:
+  - `http_requests_total`
+  - `http_request_duration_seconds`
+  - `chat_stream_completed_total`
+  - `ollama_errors_total`
+  - `sqlite_log_write_failures_total`
+  - `feature_gate_denials_total`
+  - `knowledge_retrieval_requests_total`
+  - `knowledge_query_rewrite_applied_total`
 - Versioned observability assets live under [`ops/observability/`](../../ops/observability/README.md):
   - Prometheus scrape example: [`ops/observability/prometheus/goat-api-scrape.yml`](../../ops/observability/prometheus/goat-api-scrape.yml)
   - Alert rules: [`ops/observability/alerts/goat-api-alerts.yml`](../../ops/observability/alerts/goat-api-alerts.yml)
   - Grafana dashboard: [`ops/observability/grafana/goat-api-dashboard.json`](../../ops/observability/grafana/goat-api-dashboard.json)
-- `backend-heavy` also runs an observability asset contract so alerts, dashboards, and runbooks cannot reference metric families that the API no longer exports.
+- `backend-heavy` also runs an observability asset contract so alerts, dashboards, and runbooks cannot reference metric families that the API no longer exports, and every exported family must remain covered by at least one approved observability surface.
 - Checked-in deploy and verification assets live under:
   - `ops/deploy/deploy.sh`
   - `ops/deploy/deploy.ps1`

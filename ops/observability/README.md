@@ -12,5 +12,6 @@ This directory keeps production-facing observability assets versioned in-repo so
 
 - Keep metric names aligned with `backend/platform/prometheus_metrics.py` and `docs/operations/OPERATIONS.md`.
 - `backend/platform/prometheus_metrics.py::EXPORTED_METRIC_FAMILIES` is the canonical metric-family contract; alerts, dashboards, and runbooks are mechanically verified against it in CI.
+- CI now checks both directions: observability assets cannot reference non-exported metric families, and every exported metric family must appear in at least one approved alert, dashboard, or runbook surface.
 - When adding or renaming an operator-facing metric, update the relevant dashboard and alert rules in the same change.
 - Treat these files as release assets, not ad hoc examples.
