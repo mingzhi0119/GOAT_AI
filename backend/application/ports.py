@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Protocol
 
 from backend.services.chat_capacity_service import (
@@ -14,6 +13,9 @@ from backend.services.chat_runtime import (
     SessionRepository,
     TitleGenerator,
 )  # noqa: F401
+from backend.services.code_sandbox_supervisor import (
+    CodeSandboxExecutionSupervisor,
+)
 from backend.services.idempotency_service import IdempotencyStore  # noqa: F401
 from backend.services.workbench_runtime import WorkbenchTaskRepository  # noqa: F401
 from backend.services.code_sandbox_runtime import (  # noqa: F401
@@ -52,16 +54,6 @@ class CodeSandboxExecutionDispatcher(Protocol):
     def dispatch_execution(
         self, *, execution_id: str, request_id: str = ""
     ) -> None: ...
-
-
-class CodeSandboxExecutionSupervisor(Protocol):
-    """Application-facing boundary for running-state sandbox control."""
-
-    def register_execution(self, *, execution_id: str) -> Callable[[], bool]: ...
-
-    def request_cancel(self, *, execution_id: str) -> None: ...
-
-    def release_execution(self, *, execution_id: str) -> None: ...
 
 
 __all__ = [

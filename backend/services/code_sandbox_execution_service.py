@@ -6,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from backend.application.ports import CodeSandboxExecutionSupervisor
+from backend.services.code_sandbox_supervisor import CodeSandboxExecutionSupervisor
 from backend.services.code_sandbox_provider import (
     SandboxProvider,
     SandboxProviderLogChunk,

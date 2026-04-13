@@ -4,6 +4,20 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
+from typing import Protocol
+
+
+class CodeSandboxExecutionSupervisor(Protocol):
+    """Service-facing boundary for scheduling and canceling sandbox execution."""
+
+    def register_execution(self, *, execution_id: str) -> Callable[[], bool]:
+        """Return a callable that reports whether cancellation was requested."""
+
+    def request_cancel(self, *, execution_id: str) -> None:
+        """Mark an execution for cancellation."""
+
+    def release_execution(self, *, execution_id: str) -> None:
+        """Drop control state after execution reaches terminal state."""
 
 
 class InProcessCodeSandboxSupervisor:
