@@ -943,7 +943,6 @@ endpoints:
     path_params:
       artifact_id: string
     response:
-      200: object
       errors:
         - 401
         - 404

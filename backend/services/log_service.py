@@ -127,6 +127,11 @@ def _chat_artifacts_has_tenant_columns(conn: sqlite3.Connection) -> bool:
     return "tenant_id" in cols and "principal_id" in cols
 
 
+def _chat_artifacts_has_storage_key_column(conn: sqlite3.Connection) -> bool:
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(chat_artifacts)").fetchall()]
+    return "storage_key" in cols
+
+
 def _replace_session_messages(
     conn: sqlite3.Connection,
     *,
@@ -629,6 +634,7 @@ def create_chat_artifact(
     mime_type: str,
     byte_size: int,
     storage_path: str,
+    storage_key: str,
     source_message_index: int,
     created_at: str,
 ) -> None:
@@ -636,26 +642,49 @@ def create_chat_artifact(
     try:
         with sqlite3.connect(db_path) as conn:
             if _chat_artifacts_has_tenant_columns(conn):
-                conn.execute(
-                    """
-                    INSERT INTO chat_artifacts
-                        (id, session_id, owner_id, tenant_id, principal_id, filename, mime_type, byte_size, storage_path, source_message_index, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        artifact_id,
-                        session_id,
-                        owner_id,
-                        tenant_id,
-                        principal_id,
-                        filename,
-                        mime_type,
-                        int(byte_size),
-                        storage_path,
-                        int(source_message_index),
-                        created_at,
-                    ),
-                )
+                if _chat_artifacts_has_storage_key_column(conn):
+                    conn.execute(
+                        """
+                        INSERT INTO chat_artifacts
+                            (id, session_id, owner_id, tenant_id, principal_id, filename, mime_type, byte_size, storage_path, storage_key, source_message_index, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            artifact_id,
+                            session_id,
+                            owner_id,
+                            tenant_id,
+                            principal_id,
+                            filename,
+                            mime_type,
+                            int(byte_size),
+                            storage_path,
+                            storage_key,
+                            int(source_message_index),
+                            created_at,
+                        ),
+                    )
+                else:
+                    conn.execute(
+                        """
+                        INSERT INTO chat_artifacts
+                            (id, session_id, owner_id, tenant_id, principal_id, filename, mime_type, byte_size, storage_path, source_message_index, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            artifact_id,
+                            session_id,
+                            owner_id,
+                            tenant_id,
+                            principal_id,
+                            filename,
+                            mime_type,
+                            int(byte_size),
+                            storage_path,
+                            int(source_message_index),
+                            created_at,
+                        ),
+                    )
             else:
                 conn.execute(
                     """
@@ -689,9 +718,19 @@ def get_chat_artifact(*, db_path: Path, artifact_id: str) -> dict[str, Any] | No
     try:
         with sqlite3.connect(db_path) as conn:
             conn.row_factory = sqlite3.Row
+            select_columns = (
+                "id, session_id, owner_id, tenant_id, principal_id, filename, mime_type, byte_size, storage_path, storage_key, source_message_index, created_at"
+                if _chat_artifacts_has_tenant_columns(conn)
+                and _chat_artifacts_has_storage_key_column(conn)
+                else (
+                    "id, session_id, owner_id, tenant_id, principal_id, filename, mime_type, byte_size, storage_path, source_message_index, created_at"
+                    if _chat_artifacts_has_tenant_columns(conn)
+                    else "id, session_id, owner_id, filename, mime_type, byte_size, storage_path, source_message_index, created_at"
+                )
+            )
             row = conn.execute(
                 f"""
-                SELECT {"id, session_id, owner_id, tenant_id, principal_id, filename, mime_type, byte_size, storage_path, source_message_index, created_at" if _chat_artifacts_has_tenant_columns(conn) else "id, session_id, owner_id, filename, mime_type, byte_size, storage_path, source_message_index, created_at"}
+                SELECT {select_columns}
                 FROM chat_artifacts
                 WHERE id = ?
                 """,

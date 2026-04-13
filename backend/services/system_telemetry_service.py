@@ -24,6 +24,7 @@ from backend.services.authorizer import (
     workbench_read_policy_allowed,
     workbench_write_policy_allowed,
 )
+from backend.services.runtime_persistence import runtime_storage_model_label
 from backend.services.workbench_source_registry import list_workbench_sources
 from backend.types import Settings
 from goat_ai.config.feature_gate_reasons import RUNTIME_NOT_IMPLEMENTED
@@ -220,7 +221,7 @@ def build_runtime_target_response(settings: Settings) -> RuntimeTargetResponse:
             RuntimeTargetItemResponse(**item.__dict__) for item in ordered
         ],
         operational_contract=RuntimeOperationalContractResponse(
-            storage_model="sqlite-first",
+            storage_model=runtime_storage_model_label(settings),
             concurrency_model="single-writer",
             process_local_seams=[
                 "rate_limiting",

@@ -8,7 +8,7 @@ matter for the repository's current security posture.
 - The production deployment uses a shared API key model, not per-user authentication.
 - Do not treat the key as user identity or as a substitute for row-level authorization.
 - Any future authorization work should be explicit and service-layer driven.
-- Phase 16C introduces credential-backed authorization and tenancy boundaries, not end-user identity.
+- The historical authz-focused Phase 16C introduced credential-backed authorization and tenancy boundaries, not end-user identity.
 - Resource-level access decisions should be made by `backend.services.authorizer` helpers (invoked from application use cases and services), using stable principal, tenant, and scope metadata.
 - Sessions, artifacts, knowledge documents, and media uploads now carry explicit tenancy metadata so resource checks do not depend on a raw owner header alone.
 

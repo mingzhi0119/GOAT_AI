@@ -34,8 +34,8 @@ from backend.models.chat import ChatMessage, ChatRequest
 from backend.services.chat_message_merge import merge_request_image_attachments
 from backend.services.idempotency_service import (
     build_request_hash,
-    SQLiteIdempotencyStore,
 )
+from backend.services.runtime_persistence import build_idempotency_store
 from backend.services.media_service import load_images_base64_for_chat
 from backend.services.chat_service import stream_chat_sse
 
@@ -227,10 +227,7 @@ def _build_idempotency_context(
 
 
 def _default_idempotency_store_factory(settings: Settings) -> IdempotencyStore:
-    return SQLiteIdempotencyStore(
-        db_path=settings.log_db_path,
-        ttl_sec=settings.idempotency_ttl_sec,
-    )
+    return build_idempotency_store(settings)
 
 
 def _claim_or_replay_idempotent_stream(

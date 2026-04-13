@@ -21,7 +21,14 @@ router = APIRouter()
 @router.get(
     "/artifacts/{artifact_id}",
     summary="Download one generated chat artifact",
+    response_class=FileResponse,
     responses={
+        200: {
+            "description": "Binary artifact download.",
+            "content": {
+                "application/octet-stream": {},
+            },
+        },
         401: {"model": ErrorResponse},
         404: {"model": ErrorResponse},
         429: {"model": ErrorResponse},

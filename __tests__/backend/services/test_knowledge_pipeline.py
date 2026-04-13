@@ -7,7 +7,9 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from backend.services.knowledge_pipeline import normalize_document
+from backend.services.knowledge_storage import knowledge_original_storage_key
 from goat_ai.config.settings import Settings
+from goat_ai.uploads import build_object_store
 
 
 class KnowledgePipelineNormalizationTests(unittest.TestCase):
@@ -26,6 +28,7 @@ class KnowledgePipelineNormalizationTests(unittest.TestCase):
             logo_svg=root / "logo.svg",
             log_db_path=root / "chat_logs.db",
             data_dir=root / "data",
+            object_store_root=root / "object-store",
             ready_skip_ollama_probe=True,
         )
 
@@ -33,12 +36,10 @@ class KnowledgePipelineNormalizationTests(unittest.TestCase):
         self.tmpdir.cleanup()
 
     def test_normalize_document_reads_pdf_text(self) -> None:
-        source_dir = (
-            self.settings.data_dir / "uploads" / "knowledge" / "doc-pdf" / "original"
+        build_object_store(self.settings).put_bytes(
+            key=knowledge_original_storage_key("doc-pdf", "pdf"),
+            content=b"%PDF-1.4",
         )
-        source_dir.mkdir(parents=True, exist_ok=True)
-        source_path = source_dir / "source.pdf"
-        source_path.write_bytes(b"%PDF-1.4")
 
         fake_reader = SimpleNamespace(
             pages=[
@@ -58,12 +59,10 @@ class KnowledgePipelineNormalizationTests(unittest.TestCase):
         self.assertEqual("Page one\n\nPage two", text)
 
     def test_normalize_document_reads_docx_text(self) -> None:
-        source_dir = (
-            self.settings.data_dir / "uploads" / "knowledge" / "doc-docx" / "original"
+        build_object_store(self.settings).put_bytes(
+            key=knowledge_original_storage_key("doc-docx", "docx"),
+            content=b"docx",
         )
-        source_dir.mkdir(parents=True, exist_ok=True)
-        source_path = source_dir / "source.docx"
-        source_path.write_bytes(b"docx")
 
         fake_document = SimpleNamespace(
             paragraphs=[

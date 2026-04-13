@@ -1,8 +1,9 @@
-import { useState, type CSSProperties, type FC } from 'react'
+import { useState, type CSSProperties, type FC, type MouseEvent as ReactMouseEvent } from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeKatex from 'rehype-katex'
 import remarkMath from 'remark-math'
 import remarkGfm from 'remark-gfm'
+import { downloadFileWithAuth } from '../api/download'
 import type { ChatArtifact, Message } from '../api/types'
 import type { ChatLayoutMode } from '../utils/chatLayout'
 import { buildMathRenderPlan, normalizeDisplayMathMarkdown } from '../utils/mathRendering'
@@ -65,6 +66,7 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode 
   const isError = message.isError === true
   const isNarrow = layoutMode === 'narrow'
   const [copied, setCopied] = useState(false)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
   const artifactByFilename = new Map(
     (message.artifacts ?? []).map(artifact => [artifact.filename, artifact]),
   )
@@ -75,6 +77,19 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode 
       : stripChartBlock(message.content, message.isStreaming ?? false)
   const mathRenderPlan = buildMathRenderPlan(displayContent, message.isStreaming ?? false)
   const markdownContent = normalizeDisplayMathMarkdown(mathRenderPlan.renderedMarkdownPrefix)
+
+  async function handleArtifactDownload(
+    event: ReactMouseEvent<HTMLAnchorElement>,
+    artifact: ChatArtifact,
+  ): Promise<void> {
+    event.preventDefault()
+    setDownloadError(null)
+    try {
+      await downloadFileWithAuth(artifact.download_url, artifact.filename)
+    } catch {
+      setDownloadError('Download failed. Check protected access settings.')
+    }
+  }
 
   const copyControl = (className: string, buttonStyle?: CSSProperties) => (
     <button
@@ -220,7 +235,13 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode 
                           )
                           if (artifact) {
                             return (
-                              <a href={artifact.download_url} download={artifact.filename}>
+                              <a
+                                href={artifact.download_url}
+                                download={artifact.filename}
+                                onClick={event => {
+                                  void handleArtifactDownload(event, artifact)
+                                }}
+                              >
                                 {children}
                               </a>
                             )
@@ -258,6 +279,9 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode 
                 key={artifact.artifact_id}
                 href={artifact.download_url}
                 download={artifact.filename}
+                onClick={event => {
+                  void handleArtifactDownload(event, artifact)
+                }}
                 className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs transition-opacity hover:opacity-85"
                 style={{
                   borderColor: 'var(--border-color)',
@@ -272,6 +296,12 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode 
               </a>
             ))}
           </div>
+        )}
+
+        {downloadError && (
+          <p className="text-xs" style={{ color: 'var(--composer-danger-text)' }}>
+            {downloadError}
+          </p>
         )}
 
         {!message.isStreaming && displayContent && isUser &&

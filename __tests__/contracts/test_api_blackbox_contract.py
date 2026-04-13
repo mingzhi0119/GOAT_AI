@@ -407,6 +407,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
             logo_svg=root / "logo.svg",
             log_db_path=root / "chat_logs.db",
             data_dir=root / "data",
+            object_store_root=root / "object-store",
             ready_skip_ollama_probe=True,
         )
         log_service.init_db(self.settings.log_db_path)
@@ -1037,6 +1038,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
             event for event in events if event.get("type") == "artifact"
         )
         self.assertEqual("brief.md", artifact_event["filename"])
+        self.assertTrue(artifact_event["download_url"].startswith("/api/artifacts/"))
         download = self.client.get(artifact_event["download_url"])
         self.assertEqual(200, download.status_code)
         self.assertEqual(
@@ -2284,6 +2286,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         artifact = export_response.json()
         self.assertTrue(artifact["artifact_id"].startswith("art-"))
         self.assertTrue(artifact["filename"].endswith(".md"))
+        self.assertTrue(artifact["download_url"].startswith("/api/artifacts/"))
 
         exported_output_response = self.client.get(
             f"/api/workbench/workspace-outputs/{output_id}"
@@ -2350,6 +2353,7 @@ class ApiProtectedBlackboxContractTests(unittest.TestCase):
             logo_svg=root / "logo.svg",
             log_db_path=root / "chat_logs.db",
             data_dir=root / "data",
+            object_store_root=root / "object-store",
             api_key="secret-123",
             rate_limit_window_sec=60,
             rate_limit_max_requests=2,

@@ -46,7 +46,7 @@ Run, observe, recover work completed the operational baseline for the shared-hos
 
 ### Phase 14
 
-RAG-first expansion and vision capability were completed. The phase introduced the `/api/knowledge/*` contract family, persistent file storage under `GOAT_DATA_DIR`, normalization and chunking for `csv`, `xlsx`, `txt`, `md`, `pdf`, and `docx`, the local `simple_local_v1` vector index, retrieval-backed chat, image uploads via `/api/media/uploads`, and optional lexical reranking plus conservative query rewriting through `retrieval_profile`.
+RAG-first expansion and vision capability were completed. The phase introduced the `/api/knowledge/*` contract family, persistent file storage under the then-current `GOAT_DATA_DIR` model, normalization and chunking for `csv`, `xlsx`, `txt`, `md`, `pdf`, and `docx`, the local `simple_local_v1` vector index, retrieval-backed chat, image uploads via `/api/media/uploads`, and optional lexical reranking plus conservative query rewriting through `retrieval_profile`.
 
 ### Phase 15
 
@@ -65,6 +65,10 @@ These slices were the last deferred items before Phase 16 planning.
 
 Phase 16 was re-sequenced so credential-backed authorization and tenancy context land before capability gates and storage evolution.
 
+Historical note: the bullets immediately below preserve the labels that were current at
+that point in the roadmap. The later storage-decoupling closeout reused `16C` for the
+object/file-storage slice after the authz and capability work had already shipped.
+
 - 16C: credential-backed authorization context and tenancy envelope.
 - 16A: production-safe capability gates built on the 16C authz context.
 - 16B: storage evolution after authz and resource boundaries are explicit.
@@ -77,6 +81,26 @@ persisted-resource ownership at repository boundaries and brought `knowledge` an
 single-writer deployment model. Any future schema or datastore change now requires a
 new migration/compatibility/rollback decision package instead of extending Phase 16B
 in place.
+
+### Phase 16C storage closeout
+
+The later storage-decoupling slice that reused the `16C` label is now complete. The
+shipped outcome keeps SQLite metadata/runtime persistence in place while moving
+persisted file/blob payloads behind one canonical object-store contract.
+
+Completed in this closeout:
+
+- storage-key-backed object persistence for knowledge source files, normalized text/metadata, vector-index payloads, media uploads, chat artifacts, and workspace-output export artifacts
+- a local object-store default rooted at `GOAT_OBJECT_STORE_ROOT` (defaulting to `GOAT_DATA_DIR`) plus an optional `s3` backend behind the same application contract
+- additive `storage_key` columns for `knowledge_documents`, `chat_artifacts`, and `media_uploads`, with compatibility for local file responses where a filesystem path still exists
+- the canonical application/storage boundary is now documented in `docs/architecture/OBJECT_STORAGE_CONTRACT.md`
+- operator runbooks for mixed local-vs-remote object-store modes, including backup/restore and rollback posture
+- backend and black-box proof for upload, artifact download, media, and ingestion paths against the storage boundary
+
+What stays open after this closeout:
+
+- Phase 16D Postgres-backed runtime persistence
+- hosted migration/compatibility/rollback posture for replacing the SQLite runtime metadata store
 
 ### Engineering quality uplift P2 closeout
 
@@ -120,6 +144,9 @@ What stays open after this closeout:
 - broader workbench runtime work in real `web`, project memory, and connectors
 
 The historical 16C checklist covered:
+
+- credential/authz closeout work that originally used the 16C label before storage
+  evolution was re-sequenced
 
 - credential compatibility for `GOAT_API_KEY`, `GOAT_API_KEY_WRITE`, and `X-GOAT-Owner-Id`
 - typed `PrincipalId`, `TenantId`, `Scope`, `AuthorizationDecision`, and `AuthorizationContext`

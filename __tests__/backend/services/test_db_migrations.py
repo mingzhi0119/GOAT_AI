@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from __tests__.helpers.repo_root import repo_root
 from backend.services.db_migrations import apply_migrations
+from backend.services.runtime_metadata_inventory import RUNTIME_METADATA_TABLES
 
 _REPO_MIGRATIONS = repo_root(Path(__file__)) / "backend" / "migrations"
 
@@ -50,6 +51,7 @@ class DbMigrationsTests(unittest.TestCase):
                         "019_code_sandbox_async_and_logs",
                         "020_workbench_workspace_outputs",
                         "021_workbench_task_cancelled_status",
+                        "022_storage_object_keys",
                     ],
                 )
                 cols = [
@@ -72,6 +74,7 @@ class DbMigrationsTests(unittest.TestCase):
                     ).fetchall()
                 ]
                 self.assertIn("storage_path", knowledge_cols)
+                self.assertIn("storage_key", knowledge_cols)
                 self.assertIn("owner_id", knowledge_cols)
                 self.assertIn("tenant_id", knowledge_cols)
                 self.assertIn("principal_id", knowledge_cols)
@@ -103,12 +106,14 @@ class DbMigrationsTests(unittest.TestCase):
                     ).fetchall()
                 ]
                 self.assertIn("storage_path", artifact_cols)
+                self.assertIn("storage_key", artifact_cols)
                 self.assertIn("tenant_id", artifact_cols)
                 self.assertIn("principal_id", artifact_cols)
                 media_cols = [
                     r[1]
                     for r in conn.execute("PRAGMA table_info(media_uploads)").fetchall()
                 ]
+                self.assertIn("storage_key", media_cols)
                 self.assertIn("tenant_id", media_cols)
                 self.assertIn("principal_id", media_cols)
                 workbench_cols = [
@@ -191,6 +196,13 @@ class DbMigrationsTests(unittest.TestCase):
                 self.assertIn("seq", sandbox_log_cols)
                 self.assertIn("stream_name", sandbox_log_cols)
                 self.assertIn("chunk_text", sandbox_log_cols)
+                table_names = {
+                    str(row[0])
+                    for row in conn.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table'"
+                    ).fetchall()
+                }
+                self.assertTrue(set(RUNTIME_METADATA_TABLES) <= table_names)
             finally:
                 conn.close()
 
@@ -230,7 +242,7 @@ class DbMigrationsTests(unittest.TestCase):
             conn = sqlite3.connect(db_path)
             try:
                 n = conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]
-                self.assertEqual(n, 21)
+                self.assertEqual(n, 22)
                 cols = [
                     r[1]
                     for r in conn.execute("PRAGMA table_info(conversations)").fetchall()
@@ -251,6 +263,7 @@ class DbMigrationsTests(unittest.TestCase):
                     ).fetchall()
                 ]
                 self.assertIn("storage_path", knowledge_cols)
+                self.assertIn("storage_key", knowledge_cols)
                 self.assertIn("owner_id", knowledge_cols)
                 self.assertIn("tenant_id", knowledge_cols)
                 self.assertIn("principal_id", knowledge_cols)
@@ -261,12 +274,14 @@ class DbMigrationsTests(unittest.TestCase):
                     ).fetchall()
                 ]
                 self.assertIn("storage_path", artifact_cols)
+                self.assertIn("storage_key", artifact_cols)
                 self.assertIn("tenant_id", artifact_cols)
                 self.assertIn("principal_id", artifact_cols)
                 media_cols = [
                     r[1]
                     for r in conn.execute("PRAGMA table_info(media_uploads)").fetchall()
                 ]
+                self.assertIn("storage_key", media_cols)
                 self.assertIn("tenant_id", media_cols)
                 self.assertIn("principal_id", media_cols)
                 workbench_cols = [

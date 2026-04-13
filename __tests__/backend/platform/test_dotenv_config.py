@@ -59,6 +59,134 @@ class DotenvConfigTests(unittest.TestCase):
             else:
                 os.environ["GOAT_DEPLOY_TARGET"] = original
 
+    def test_load_settings_rejects_invalid_runtime_metadata_backend(self) -> None:
+        original_env = _capture_env("GOAT_RUNTIME_METADATA_BACKEND")
+        try:
+            _clear_env(*original_env.keys())
+            os.environ["GOAT_RUNTIME_METADATA_BACKEND"] = "mysql"
+            with self.assertRaisesRegex(ValueError, "GOAT_RUNTIME_METADATA_BACKEND"):
+                config.load_settings()
+        finally:
+            _restore_many(original_env)
+
+    def test_load_settings_rejects_postgres_runtime_backend_without_dsn(self) -> None:
+        original_env = _capture_env(
+            "GOAT_RUNTIME_METADATA_BACKEND",
+            "GOAT_RUNTIME_POSTGRES_DSN",
+            "GOAT_DEPLOY_TARGET",
+        )
+        try:
+            _clear_env(*original_env.keys())
+            os.environ["GOAT_RUNTIME_METADATA_BACKEND"] = "postgres"
+            os.environ["GOAT_DEPLOY_TARGET"] = "server"
+            with self.assertRaisesRegex(ValueError, "GOAT_RUNTIME_POSTGRES_DSN"):
+                config.load_settings()
+        finally:
+            _restore_many(original_env)
+
+    def test_load_settings_rejects_postgres_runtime_backend_without_server_target(
+        self,
+    ) -> None:
+        original_env = _capture_env(
+            "GOAT_RUNTIME_METADATA_BACKEND",
+            "GOAT_RUNTIME_POSTGRES_DSN",
+            "GOAT_DEPLOY_TARGET",
+        )
+        try:
+            _clear_env(*original_env.keys())
+            os.environ["GOAT_RUNTIME_METADATA_BACKEND"] = "postgres"
+            os.environ["GOAT_RUNTIME_POSTGRES_DSN"] = (
+                "postgresql://goat:secret@db.example.com:5432/goat"
+            )
+            with self.assertRaisesRegex(ValueError, "GOAT_DEPLOY_TARGET=server"):
+                config.load_settings()
+        finally:
+            _restore_many(original_env)
+
+    def test_load_settings_parses_postgres_runtime_backend_env(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            app_root = Path(tmp)
+            runtime_root = app_root / "var"
+            original_env = _capture_env(
+                "GOAT_RUNTIME_METADATA_BACKEND",
+                "GOAT_RUNTIME_POSTGRES_DSN",
+                "GOAT_DEPLOY_TARGET",
+            )
+            try:
+                _clear_env(*original_env.keys())
+                os.environ["GOAT_RUNTIME_METADATA_BACKEND"] = "postgres"
+                os.environ["GOAT_RUNTIME_POSTGRES_DSN"] = (
+                    "postgresql://goat:secret@db.example.com:5432/goat"
+                )
+                os.environ["GOAT_DEPLOY_TARGET"] = "server"
+                with (
+                    patch.object(config, "APP_ROOT", app_root),
+                    patch.object(config, "DEFAULT_RUNTIME_ROOT", runtime_root),
+                ):
+                    settings = config.load_settings()
+                self.assertEqual("postgres", settings.runtime_metadata_backend)
+                self.assertEqual(
+                    "postgresql://goat:secret@db.example.com:5432/goat",
+                    settings.runtime_postgres_dsn,
+                )
+            finally:
+                _restore_many(original_env)
+
+    def test_load_settings_rejects_s3_backend_without_bucket(self) -> None:
+        original_env = _capture_env(
+            "GOAT_OBJECT_STORE_BACKEND", "GOAT_OBJECT_STORE_BUCKET"
+        )
+        try:
+            _clear_env(*original_env.keys())
+            os.environ["GOAT_OBJECT_STORE_BACKEND"] = "s3"
+            with self.assertRaisesRegex(ValueError, "GOAT_OBJECT_STORE_BUCKET"):
+                config.load_settings()
+        finally:
+            _restore_many(original_env)
+
+    def test_load_settings_parses_s3_object_store_env(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            app_root = Path(tmp)
+            runtime_root = app_root / "var"
+            original_env = _capture_env(
+                "GOAT_OBJECT_STORE_BACKEND",
+                "GOAT_OBJECT_STORE_BUCKET",
+                "GOAT_OBJECT_STORE_PREFIX",
+                "GOAT_OBJECT_STORE_ENDPOINT_URL",
+                "GOAT_OBJECT_STORE_REGION",
+                "GOAT_OBJECT_STORE_ACCESS_KEY_ID",
+                "GOAT_OBJECT_STORE_SECRET_ACCESS_KEY",
+                "GOAT_OBJECT_STORE_S3_ADDRESSING_STYLE",
+            )
+            try:
+                _clear_env(*original_env.keys())
+                os.environ["GOAT_OBJECT_STORE_BACKEND"] = "s3"
+                os.environ["GOAT_OBJECT_STORE_BUCKET"] = "goat-artifacts"
+                os.environ["GOAT_OBJECT_STORE_PREFIX"] = "tenant-a/runtime"
+                os.environ["GOAT_OBJECT_STORE_ENDPOINT_URL"] = "http://127.0.0.1:9000"
+                os.environ["GOAT_OBJECT_STORE_REGION"] = "us-east-1"
+                os.environ["GOAT_OBJECT_STORE_ACCESS_KEY_ID"] = "minio"
+                os.environ["GOAT_OBJECT_STORE_SECRET_ACCESS_KEY"] = "secret"
+                os.environ["GOAT_OBJECT_STORE_S3_ADDRESSING_STYLE"] = "path"
+                with (
+                    patch.object(config, "APP_ROOT", app_root),
+                    patch.object(config, "DEFAULT_RUNTIME_ROOT", runtime_root),
+                ):
+                    settings = config.load_settings()
+                self.assertEqual("s3", settings.object_store_backend)
+                self.assertEqual("goat-artifacts", settings.object_store_bucket)
+                self.assertEqual("tenant-a/runtime", settings.object_store_prefix)
+                self.assertEqual(
+                    "http://127.0.0.1:9000",
+                    settings.object_store_endpoint_url,
+                )
+                self.assertEqual("us-east-1", settings.object_store_region)
+                self.assertEqual("minio", settings.object_store_access_key_id)
+                self.assertEqual("secret", settings.object_store_secret_access_key)
+                self.assertEqual("path", settings.object_store_s3_addressing_style)
+            finally:
+                _restore_many(original_env)
+
     def test_load_settings_defaults_runtime_paths_to_var(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             app_root = Path(tmp)
@@ -80,6 +208,8 @@ class DotenvConfigTests(unittest.TestCase):
                 self.assertEqual(settings.log_dir, runtime_root / "logs")
                 self.assertEqual(settings.log_db_path, runtime_root / "chat_logs.db")
                 self.assertEqual(settings.data_dir, runtime_root / "data")
+                self.assertEqual("sqlite", settings.runtime_metadata_backend)
+                self.assertEqual("", settings.runtime_postgres_dsn)
                 self.assertTrue((runtime_root / "logs").is_dir())
                 self.assertTrue((runtime_root / "data").is_dir())
             finally:

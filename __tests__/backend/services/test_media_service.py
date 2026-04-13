@@ -52,6 +52,7 @@ class MediaServiceTests(unittest.TestCase):
             logo_svg=root / "logo.svg",
             log_db_path=root / "chat_logs.db",
             data_dir=root / "data",
+            object_store_root=root / "object-store",
         )
         log_service.init_db(self.settings.log_db_path)
 
@@ -106,19 +107,21 @@ class MediaServiceTests(unittest.TestCase):
             content=content,
             filename="pixel.png",
             settings=self.settings,
-            auth_context=_auth_context(principal_id="principal-1"),
+            auth_context=_auth_context(owner_id="owner-1", principal_id="principal-1"),
         )
 
         with self.assertRaises(MediaNotFound):
             load_normalized_base64_for_ollama(
                 attachment_id=response.attachment_id,
                 settings=self.settings,
-                auth_context=_auth_context(principal_id="principal-2"),
+                auth_context=_auth_context(
+                    owner_id="owner-2", principal_id="principal-1"
+                ),
             )
 
     def test_media_service_accepts_injected_repository(self) -> None:
         content = base64.b64decode(PNG_1X1_BASE64)
-        root = self.settings.data_dir
+        root = self.settings.object_store_root
 
         class FakeMediaRepository:
             def __init__(self) -> None:

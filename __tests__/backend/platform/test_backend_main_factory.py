@@ -8,6 +8,9 @@ from unittest.mock import patch
 
 from backend import main
 from backend.platform.otel_middleware import OtelTraceContextMiddleware
+from backend.services.runtime_persistence import (
+    UnsupportedRuntimeMetadataBackend,
+)
 from goat_ai.config.settings import Settings
 
 
@@ -36,13 +39,15 @@ class BackendMainFactoryTests(unittest.TestCase):
 
     def test_create_contract_app_skips_runtime_initializers(self) -> None:
         with (
-            patch.object(main.log_service, "init_db") as init_db,
+            patch.object(
+                main, "initialize_runtime_metadata_store"
+            ) as initialize_runtime_metadata_store,
             patch.object(main, "init_latency_metrics") as init_latency_metrics,
             patch.object(main, "init_otel_if_enabled") as init_otel_if_enabled,
         ):
             app = main.create_contract_app(self.settings)
 
-        init_db.assert_not_called()
+        initialize_runtime_metadata_store.assert_not_called()
         init_latency_metrics.assert_not_called()
         init_otel_if_enabled.assert_not_called()
         self.assertIn("/api/health", app.openapi()["paths"])
@@ -51,7 +56,9 @@ class BackendMainFactoryTests(unittest.TestCase):
         with (
             patch.object(main, "get_settings", return_value=self.settings),
             patch.object(main, "configure_logging") as configure_logging,
-            patch.object(main.log_service, "init_db") as init_db,
+            patch.object(
+                main, "initialize_runtime_metadata_store"
+            ) as initialize_runtime_metadata_store,
             patch.object(main, "init_latency_metrics") as init_latency_metrics,
             patch.object(main, "init_otel_if_enabled") as init_otel_if_enabled,
             patch.object(main, "is_otel_enabled", return_value=False),
@@ -59,7 +66,7 @@ class BackendMainFactoryTests(unittest.TestCase):
             app = main.create_app()
 
         configure_logging.assert_called_once_with()
-        init_db.assert_called_once_with(self.settings.log_db_path)
+        initialize_runtime_metadata_store.assert_called_once_with(self.settings)
         init_latency_metrics.assert_called_once_with(
             self.settings.latency_rolling_max_samples
         )
@@ -75,14 +82,16 @@ class BackendMainFactoryTests(unittest.TestCase):
             ),
             patch.object(main, "get_settings", return_value=self.settings),
             patch.object(main, "configure_logging") as configure_logging,
-            patch.object(main.log_service, "init_db") as init_db,
+            patch.object(
+                main, "initialize_runtime_metadata_store"
+            ) as initialize_runtime_metadata_store,
             patch.object(main, "init_latency_metrics") as init_latency_metrics,
             patch.object(main, "init_otel_if_enabled") as init_otel_if_enabled,
         ):
             app = main.create_app()
 
         configure_logging.assert_called_once_with()
-        init_db.assert_called_once_with(self.settings.log_db_path)
+        initialize_runtime_metadata_store.assert_called_once_with(self.settings)
         init_latency_metrics.assert_called_once_with(
             self.settings.latency_rolling_max_samples
         )
@@ -91,3 +100,31 @@ class BackendMainFactoryTests(unittest.TestCase):
             OtelTraceContextMiddleware,
             [entry.cls for entry in app.user_middleware],
         )
+
+    def test_create_app_fails_fast_for_unsupported_runtime_metadata_backend(
+        self,
+    ) -> None:
+        postgres_settings = Settings(
+            **(
+                self.settings.__dict__
+                | {
+                    "runtime_metadata_backend": "postgres",
+                    "runtime_postgres_dsn": (
+                        "postgresql://goat:secret@db.example.com:5432/goat"
+                    ),
+                    "deploy_target": "server",
+                }
+            )
+        )
+
+        with (
+            patch.object(main, "get_settings", return_value=postgres_settings),
+            patch.object(main, "configure_logging") as configure_logging,
+        ):
+            with self.assertRaisesRegex(
+                UnsupportedRuntimeMetadataBackend,
+                "Postgres runtime persistence is not implemented yet",
+            ):
+                main.create_app()
+
+        configure_logging.assert_called_once_with()

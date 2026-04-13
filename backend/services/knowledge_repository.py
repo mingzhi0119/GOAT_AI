@@ -24,6 +24,7 @@ class KnowledgeDocumentRecord:
     created_at: str
     updated_at: str
     deleted_at: str | None
+    storage_key: str = ""
     owner_id: str = ""
     tenant_id: str = "tenant:default"
     principal_id: str = ""
@@ -117,8 +118,8 @@ class SQLiteKnowledgeRepository:
             conn.execute(
                 """
                 INSERT INTO knowledge_documents
-                    (id, source_type, original_filename, mime_type, sha256, storage_path, byte_size, status, created_at, updated_at, deleted_at, owner_id, tenant_id, principal_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (id, source_type, original_filename, mime_type, sha256, storage_path, storage_key, byte_size, status, created_at, updated_at, deleted_at, owner_id, tenant_id, principal_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     record.id,
@@ -127,6 +128,7 @@ class SQLiteKnowledgeRepository:
                     record.mime_type,
                     record.sha256,
                     record.storage_path,
+                    record.storage_key,
                     record.byte_size,
                     record.status,
                     record.created_at,
@@ -143,7 +145,7 @@ class SQLiteKnowledgeRepository:
             conn.row_factory = sqlite3.Row
             row = conn.execute(
                 """
-                SELECT id, source_type, original_filename, mime_type, sha256, storage_path, byte_size, status, created_at, updated_at, deleted_at, owner_id, tenant_id, principal_id
+                SELECT id, source_type, original_filename, mime_type, sha256, storage_path, storage_key, byte_size, status, created_at, updated_at, deleted_at, owner_id, tenant_id, principal_id
                 FROM knowledge_documents
                 WHERE id = ? AND deleted_at IS NULL
                 """,
@@ -161,7 +163,7 @@ class SQLiteKnowledgeRepository:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 f"""
-                SELECT id, source_type, original_filename, mime_type, sha256, storage_path, byte_size, status, created_at, updated_at, deleted_at, owner_id, tenant_id, principal_id
+                SELECT id, source_type, original_filename, mime_type, sha256, storage_path, storage_key, byte_size, status, created_at, updated_at, deleted_at, owner_id, tenant_id, principal_id
                 FROM knowledge_documents
                 WHERE deleted_at IS NULL AND id IN ({placeholders})
                 ORDER BY created_at ASC
@@ -177,7 +179,7 @@ class SQLiteKnowledgeRepository:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 """
-                SELECT id, source_type, original_filename, mime_type, sha256, storage_path, byte_size, status, created_at, updated_at, deleted_at, owner_id, tenant_id, principal_id
+                SELECT id, source_type, original_filename, mime_type, sha256, storage_path, storage_key, byte_size, status, created_at, updated_at, deleted_at, owner_id, tenant_id, principal_id
                 FROM knowledge_documents
                 WHERE deleted_at IS NULL AND tenant_id = ?
                 ORDER BY created_at ASC

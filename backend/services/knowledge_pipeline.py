@@ -13,10 +13,14 @@ from docx import Document as DocxDocument
 from pypdf import PdfReader
 
 from backend.services.knowledge_storage import (
-    knowledge_document_dir,
-    knowledge_vector_dir,
+    knowledge_original_storage_key,
+    knowledge_normalized_metadata_storage_key,
+    knowledge_normalized_text_storage_key,
+    knowledge_vector_storage_key,
+    write_text_object,
 )
 from goat_ai.config.settings import Settings
+from goat_ai.uploads import build_object_store, knowledge_vector_index_prefix
 
 _TOKEN_RE = re.compile(r"[A-Za-z0-9_]+")
 _VECTOR_DIMS = 128
@@ -39,35 +43,49 @@ class KnowledgeSearchHit:
     score: float
 
 
-def normalize_document(*, settings: Settings, document_id: str, filename: str) -> str:
-    source_path = _source_path(
-        settings=settings, document_id=document_id, filename=filename
+def normalize_document(
+    *,
+    settings: Settings,
+    document_id: str,
+    filename: str,
+    storage_key: str | None = None,
+    storage_path: str | None = None,
+) -> str:
+    source_bytes = _load_source_bytes(
+        settings=settings,
+        document_id=document_id,
+        filename=filename,
+        storage_key=storage_key,
+        storage_path=storage_path,
     )
-    ext = source_path.suffix.lower()
+    ext = f".{filename.rsplit('.', 1)[-1].lower()}" if "." in filename else ""
     if ext == ".csv":
-        dataframe = pd.read_csv(source_path)
+        dataframe = pd.read_csv(io.BytesIO(source_bytes))
         return _dataframe_to_text(dataframe)
     if ext == ".xlsx":
-        dataframe = pd.read_excel(source_path)
+        dataframe = pd.read_excel(io.BytesIO(source_bytes))
         return _dataframe_to_text(dataframe)
     if ext == ".pdf":
-        return _pdf_to_text(source_path)
+        return _pdf_to_text(source_bytes)
     if ext == ".docx":
-        return _docx_to_text(source_path)
-    return source_path.read_text(encoding="utf-8")
+        return _docx_to_text(source_bytes)
+    return source_bytes.decode("utf-8")
 
 
-def persist_normalized_text(*, settings: Settings, document_id: str, text: str) -> Path:
-    normalized_dir = knowledge_document_dir(settings, document_id) / "normalized"
-    normalized_dir.mkdir(parents=True, exist_ok=True)
-    output_path = normalized_dir / "extracted.txt"
-    output_path.write_text(text, encoding="utf-8")
-    metadata_path = normalized_dir / "metadata.json"
-    metadata_path.write_text(
-        json.dumps({"char_length": len(text)}, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
+def persist_normalized_text(*, settings: Settings, document_id: str, text: str) -> str:
+    write_text_object(
+        settings=settings,
+        storage_key=knowledge_normalized_text_storage_key(document_id),
+        text=text,
     )
-    return output_path
+    metadata_key = knowledge_normalized_metadata_storage_key(document_id)
+    write_text_object(
+        settings=settings,
+        storage_key=metadata_key,
+        text=json.dumps({"char_length": len(text)}, ensure_ascii=False, indent=2)
+        + "\n",
+    )
+    return metadata_key
 
 
 def chunk_text(text: str, *, max_chars: int = 800) -> list[KnowledgeChunk]:
@@ -118,9 +136,7 @@ def persist_vector_index(
     chunks: list[KnowledgeChunk],
     backend_name: str,
 ) -> str:
-    vector_dir = knowledge_vector_dir(settings, backend_name)
-    vector_dir.mkdir(parents=True, exist_ok=True)
-    output_path = vector_dir / f"{document_id}.json"
+    output_key = knowledge_vector_storage_key(document_id, backend_name)
     payload = {
         "document_id": document_id,
         "filename": filename,
@@ -134,10 +150,12 @@ def persist_vector_index(
             for chunk in chunks
         ],
     }
-    output_path.write_text(
-        json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8"
+    write_text_object(
+        settings=settings,
+        storage_key=output_key,
+        text=json.dumps(payload, ensure_ascii=False) + "\n",
     )
-    return str(output_path)
+    return output_key
 
 
 def search_vector_index(
@@ -147,14 +165,10 @@ def search_vector_index(
     query: str,
     document_filters: list[str],
 ) -> list[KnowledgeSearchHit]:
-    vector_dir = knowledge_vector_dir(settings, backend_name)
-    if not vector_dir.is_dir():
-        return []
-
     query_vector = _embed_text(query)
     hits: list[KnowledgeSearchHit] = []
-    for path in vector_dir.glob("*.json"):
-        payload = json.loads(path.read_text(encoding="utf-8"))
+    payloads = _iter_vector_payloads(settings=settings, backend_name=backend_name)
+    for payload in payloads:
         document_id = str(payload["document_id"])
         if document_filters and document_id not in document_filters:
             continue
@@ -178,9 +192,38 @@ def search_vector_index(
     return hits
 
 
-def _source_path(*, settings: Settings, document_id: str, filename: str) -> Path:
+def _load_source_bytes(
+    *,
+    settings: Settings,
+    document_id: str,
+    filename: str,
+    storage_key: str | None,
+    storage_path: str | None,
+) -> bytes:
+    if storage_key:
+        return build_object_store(settings).read_bytes(storage_key)
+    if document_id and "." in filename:
+        inferred_key = knowledge_original_storage_key(
+            document_id,
+            filename.rsplit(".", 1)[-1].lower(),
+        )
+        store = build_object_store(settings)
+        if store.exists(inferred_key):
+            return store.read_bytes(inferred_key)
+    if storage_path:
+        path = Path(storage_path)
+        if path.is_file():
+            return path.read_bytes()
     ext = filename.rsplit(".", 1)[-1].lower()
-    return knowledge_document_dir(settings, document_id) / "original" / f"source.{ext}"
+    legacy_path = (
+        settings.data_dir
+        / "uploads"
+        / "knowledge"
+        / document_id
+        / "original"
+        / f"source.{ext}"
+    )
+    return legacy_path.read_bytes()
 
 
 def _dataframe_to_text(dataframe: pd.DataFrame) -> str:
@@ -190,8 +233,26 @@ def _dataframe_to_text(dataframe: pd.DataFrame) -> str:
     return f"Columns: {columns}\n\n{csv_buffer.getvalue().strip()}"
 
 
-def _pdf_to_text(source_path: Path) -> str:
-    reader = PdfReader(str(source_path))
+def _iter_vector_payloads(
+    *, settings: Settings, backend_name: str
+) -> list[dict[str, object]]:
+    prefix = knowledge_vector_index_prefix(backend_name=backend_name)
+    payloads: list[dict[str, object]] = []
+    store = build_object_store(settings)
+    for storage_key in store.list_keys(prefix=prefix):
+        payloads.append(json.loads(store.read_text(storage_key)))
+    legacy_vector_dir = settings.data_dir / "vector_index" / backend_name
+    if (
+        settings.object_store_backend != "local"
+        or settings.object_store_root.resolve() != settings.data_dir.resolve()
+    ) and legacy_vector_dir.is_dir():
+        for path in legacy_vector_dir.glob("*.json"):
+            payloads.append(json.loads(path.read_text(encoding="utf-8")))
+    return payloads
+
+
+def _pdf_to_text(source_bytes: bytes) -> str:
+    reader = PdfReader(io.BytesIO(source_bytes))
     pages = [(page.extract_text() or "").strip() for page in reader.pages]
     text = "\n\n".join(page for page in pages if page)
     if not text.strip():
@@ -199,8 +260,8 @@ def _pdf_to_text(source_path: Path) -> str:
     return text
 
 
-def _docx_to_text(source_path: Path) -> str:
-    document = DocxDocument(str(source_path))
+def _docx_to_text(source_bytes: bytes) -> str:
+    document = DocxDocument(io.BytesIO(source_bytes))
     paragraphs = [
         paragraph.text.strip()
         for paragraph in document.paragraphs

@@ -54,13 +54,16 @@ def integration_env(
     base = tmp_path_factory.mktemp("goat_integration")
     log_db = base / "chat_logs.db"
     data_dir = base / "data"
+    object_store_dir = base / "object-store"
     data_dir.mkdir(parents=True, exist_ok=True)
+    object_store_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("GOAT_API_KEY", "")
     monkeypatch.setenv("GOAT_API_KEY_WRITE", "")
     monkeypatch.setenv("GOAT_API_CREDENTIALS_JSON", "")
     monkeypatch.setenv("GOAT_REQUIRE_SESSION_OWNER", "false")
     monkeypatch.setenv("GOAT_LOG_PATH", str(log_db))
     monkeypatch.setenv("GOAT_DATA_DIR", str(data_dir))
+    monkeypatch.setenv("GOAT_OBJECT_STORE_ROOT", str(object_store_dir))
     monkeypatch.setenv("GOAT_READY_SKIP_OLLAMA_PROBE", "true")
     _clear_imported_settings_caches()
     yield

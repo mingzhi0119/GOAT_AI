@@ -129,6 +129,9 @@ def test_release_docs_and_status_match_current_truth() -> None:
     release_doc = (
         REPO_ROOT / "docs" / "operations" / "RELEASE_GOVERNANCE.md"
     ).read_text(encoding="utf-8")
+    backup_restore_doc = (
+        REPO_ROOT / "docs" / "operations" / "BACKUP_RESTORE.md"
+    ).read_text(encoding="utf-8")
     rollback_doc = (REPO_ROOT / "docs" / "operations" / "ROLLBACK.md").read_text(
         encoding="utf-8"
     )
@@ -144,9 +147,15 @@ def test_release_docs_and_status_match_current_truth() -> None:
     project_status = (
         REPO_ROOT / "docs" / "governance" / "PROJECT_STATUS.md"
     ).read_text(encoding="utf-8")
+    roadmap_archive = (
+        REPO_ROOT / "docs" / "governance" / "ROADMAP_ARCHIVE.md"
+    ).read_text(encoding="utf-8")
     security_doc = (REPO_ROOT / "docs" / "governance" / "SECURITY.md").read_text(
         encoding="utf-8"
     )
+    object_storage_contract = (
+        REPO_ROOT / "docs" / "architecture" / "OBJECT_STORAGE_CONTRACT.md"
+    ).read_text(encoding="utf-8")
 
     assert "`STAGING_BASE_URL`" in release_doc
     assert "`PRODUCTION_BASE_URL`" in release_doc
@@ -166,6 +175,10 @@ def test_release_docs_and_status_match_current_truth() -> None:
         "python -m tools.desktop.installed_windows_desktop_fault_smoke"
         in operations_doc
     )
+    assert "`GOAT_OBJECT_STORE_BACKEND`" in operations_doc
+    assert "`GOAT_OBJECT_STORE_ROOT`" in operations_doc
+    assert "`GOAT_OBJECT_STORE_BUCKET`" in operations_doc
+    assert "matching object-store snapshot as one recovery unit" in operations_doc
     assert "desktop-windows-fault-smoke" in operations_doc
     assert "artifact should contain at least" in operations_doc
     assert "installed Windows evidence now writes" in operations_doc
@@ -197,8 +210,51 @@ def test_release_docs_and_status_match_current_truth() -> None:
     assert "`ops/systemd/goat-ai.school-ubuntu.service`" in operations_doc
     assert "Simon school Ubuntu server profile" in operations_doc
     assert "<app_log_dir>/desktop-shell.log" in operations_doc
+    assert "GOAT_OBJECT_STORE_ROOT" in backup_restore_doc
+    assert "bucket/prefix snapshot" in backup_restore_doc
+    assert "paired SQLite + object-store" in rollback_doc
     assert "P0, P1, and P2 are complete" not in project_status
     assert "artifact-first staged release governance workflow" in project_status
     assert "backend-fast -> backend-heavy -> backend" in project_status
     assert "desktop-package-windows" in project_status
     assert "installed Windows evidence" in project_status
+    assert "OBJECT_STORAGE_CONTRACT.md" in project_status
+    assert "Phase 16C storage closeout" in roadmap_archive
+    assert "GOAT_OBJECT_STORE_ROOT" in roadmap_archive
+    assert "stable `/api/artifacts/{artifact_id}` contract" in project_status
+    assert "stable `/api/artifacts/{artifact_id}` contract" in object_storage_contract
+
+
+def test_phase16_object_store_docs_match_runtime_contract() -> None:
+    operations_doc = (REPO_ROOT / "docs" / "operations" / "OPERATIONS.md").read_text(
+        encoding="utf-8"
+    )
+    backup_doc = (REPO_ROOT / "docs" / "operations" / "BACKUP_RESTORE.md").read_text(
+        encoding="utf-8"
+    )
+    rollback_doc = (REPO_ROOT / "docs" / "operations" / "ROLLBACK.md").read_text(
+        encoding="utf-8"
+    )
+    api_reference = (REPO_ROOT / "docs" / "api" / "API_REFERENCE.md").read_text(
+        encoding="utf-8"
+    )
+
+    for snippet in (
+        "GOAT_OBJECT_STORE_BACKEND",
+        "GOAT_OBJECT_STORE_ROOT",
+        "GOAT_OBJECT_STORE_BUCKET",
+        "GOAT_OBJECT_STORE_PREFIX",
+        "object payloads must be captured from `GOAT_OBJECT_STORE_ROOT` or the configured bucket/prefix",
+        "matched SQLite + object-store restore set",
+        "knowledge upload/ingestion/search on a small test document",
+        "persisted through the configured object store using a canonical `storage_key`",
+        "persists through the configured object store for the lifetime of the attachment id",
+        "Resolves the payload by persisted `storage_key`",
+    ):
+        assert snippet in (operations_doc + backup_doc + rollback_doc + api_reference)
+
+    assert "GOAT_DATA_DIR/uploads/knowledge" not in api_reference
+    assert (
+        "persists under `GOAT_DATA_DIR` for the lifetime of the attachment id"
+        not in (api_reference)
+    )

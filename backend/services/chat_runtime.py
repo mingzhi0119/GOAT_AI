@@ -239,6 +239,7 @@ class SQLiteSessionRepository:
             mime_type=record.mime_type,
             byte_size=record.byte_size,
             storage_path=record.storage_path,
+            storage_key=record.storage_key,
             source_message_index=record.source_message_index,
             created_at=record.created_at,
         )
@@ -259,6 +260,7 @@ class SQLiteSessionRepository:
             mime_type=str(row["mime_type"]),
             byte_size=int(row["byte_size"]),
             storage_path=str(row["storage_path"]),
+            storage_key=str(row.get("storage_key", "")),
             source_message_index=int(row.get("source_message_index", 0)),
             created_at=str(row["created_at"]),
         )

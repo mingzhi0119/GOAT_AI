@@ -43,6 +43,7 @@ Short index for coding agents. Canonical rules live in the docs below.
 - Add or update tests for happy path, failure path, and at least one boundary case when you touch core behavior.
 - Do not treat a red local CI-equivalent gate as follow-up work.
 - Do not run manual visual verification unless the user asks.
+- Maintain Codex change logs via [`docs/governance/CODEX_LOGS.md`](docs/governance/CODEX_LOGS.md). Read-only review work is exempt; every code-changing task must record a log entry. Long-running work logs once per commit, and small tasks log once per conversation round-trip.
 
 ## Quick pointers
 

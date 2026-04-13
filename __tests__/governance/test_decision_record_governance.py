@@ -23,6 +23,7 @@ def test_decision_record_entrypoint_indexes_templates_and_examples() -> None:
         "templates/decision-package.md",
         "../architecture/WORKBENCH_TERMINOLOGY_DECISION.md",
         "../architecture/STORAGE_EVOLUTION_DECISION_PACKAGE.md",
+        "../architecture/EXTERNAL_OBJECT_STORAGE_DECISION_PACKAGE.md",
         "AGENTS.md",
         "ENGINEERING_STANDARDS.md",
     ):
@@ -62,3 +63,50 @@ def test_decision_package_template_has_required_sections() -> None:
         "## Related artifacts",
     ):
         assert snippet in text
+
+
+def test_external_object_storage_package_is_indexed_and_uses_required_sections() -> (
+    None
+):
+    package_path = (
+        REPO_ROOT
+        / "docs"
+        / "architecture"
+        / "EXTERNAL_OBJECT_STORAGE_DECISION_PACKAGE.md"
+    )
+    text = package_path.read_text(encoding="utf-8")
+
+    for snippet in (
+        "# External Object Storage Decision Package",
+        "## Purpose",
+        "## Context",
+        "## Fixed constraints",
+        "## Decision",
+        "## Options considered",
+        "## Compatibility strategy",
+        "## Migration or rollout sequence",
+        "## Rollback strategy",
+        "## Validation and proof",
+        "## Open questions",
+        "## Related artifacts",
+        "GOAT_OBJECT_STORE_BACKEND",
+        "storage_key",
+    ):
+        assert snippet in text
+
+
+def test_phase16_storage_docs_align_across_live_and_archive_views() -> None:
+    roadmap = (REPO_ROOT / "docs" / "governance" / "ROADMAP.md").read_text(
+        encoding="utf-8"
+    )
+    status = (REPO_ROOT / "docs" / "governance" / "PROJECT_STATUS.md").read_text(
+        encoding="utf-8"
+    )
+    archive = (REPO_ROOT / "docs" / "governance" / "ROADMAP_ARCHIVE.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "Phase 16C external object/file storage is now shipped." in roadmap
+    assert "**16B/16C storage evolution:** complete" in status
+    assert "### Phase 16C storage closeout" in archive
+    assert "The historical 16C checklist covered:" in archive

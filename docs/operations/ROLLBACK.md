@@ -7,15 +7,20 @@ This runbook covers rollback on the shared-host deployment path.
 - Preferred rollback target: previous known-good release bundle + manifest
 - Fallback rollback target: previous known-good ref when an artifact is unavailable
 - Deploy scripts: canonical files under `ops/deploy/`
-- Database rollback companion: [BACKUP_RESTORE.md](BACKUP_RESTORE.md)
+- Data rollback companion: [BACKUP_RESTORE.md](BACKUP_RESTORE.md)
+- Phase 16C note: if uploads, media, knowledge payloads, or generated artifacts were
+  written after the rollback target, rollback is a paired SQLite + object-store
+  operation, not a code-only change
 
 ## 1) Pick a known-good rollback target
 
-Prefer the most recent retained release artifact that passed the post-deploy contract check.
+Prefer the most recent retained release artifact that passed the post-deploy contract
+check.
 
 Use these sources in order:
 
-1. The release workflow artifacts for the known-good run (`release-bundle.tar.gz`, `release-manifest.json`).
+1. The release workflow artifacts for the known-good run (`release-bundle.tar.gz`,
+   `release-manifest.json`).
 2. The currently deployed host metadata:
    - `<project>/release-manifest.previous.json`
    - `<project>/release-manifest.json`
@@ -23,7 +28,8 @@ Use these sources in order:
 
 ## 2) Stop the current deployment gracefully
 
-Use the deploy script stop path first. It waits for a graceful drain before forcing cleanup.
+Use the deploy script stop path first. It waits for a graceful drain before forcing
+cleanup.
 
 Linux:
 
@@ -37,7 +43,8 @@ Windows:
 Stop-Process -Id (Get-Content .\var\logs\fastapi.pid)
 ```
 
-If the process does not exit within the configured wait window, the deploy scripts fall back to forced cleanup.
+If the process does not exit within the configured wait window, the deploy scripts
+fall back to forced cleanup.
 
 ## 3) Prefer artifact-first rollback
 
@@ -57,11 +64,13 @@ Windows:
 .\ops\deploy\deploy.ps1 -ProjectDir C:\GOAT_AI -ReleaseBundle C:\temp\release-bundle.tar.gz -ReleaseManifest C:\temp\release-manifest.json -ExpectedGitSha <known-good-sha>
 ```
 
-This path reinstalls the retained bundle and does not rebuild the frontend on the host.
+This path reinstalls the retained bundle and does not rebuild the frontend on the
+host.
 
 ## 4) Use explicit ref rollback only as a fallback
 
-If no retained artifact exists, use an explicit ref instead of `main` so the deploy script stays on the rollback target.
+If no retained artifact exists, use an explicit ref instead of `main` so the deploy
+script stays on the rollback target.
 
 Linux:
 
@@ -75,7 +84,8 @@ Windows:
 .\ops\deploy\deploy.ps1 -GitRef <known-good-ref>
 ```
 
-If the rollback target is a tag or detached commit, keep `SYNC_GIT=0` and do not reset to `origin/main`.
+If the rollback target is a tag or detached commit, keep `SYNC_GIT=0` and do not
+reset to `origin/main`.
 
 ## 5) Reuse the existing virtualenv when possible
 
@@ -95,13 +105,15 @@ Run the same post-deploy contract check that production uses:
 python -m tools.ops.post_deploy_check --base-url http://127.0.0.1:62606
 ```
 
-For data-bearing rollbacks, rehearse the SQLite side separately before the maintenance window:
+For data-bearing rollbacks, rehearse the SQLite side separately before the
+maintenance window:
 
 ```bash
 python -m tools.ops.exercise_recovery_drill --src /path/to/chat_logs.db --backup-dir /path/to/backups --required-table sessions --required-table session_messages
 ```
 
-For code artifact rollback rehearsal, exercise the bundle flow against a scratch project tree:
+For code artifact rollback rehearsal, exercise the bundle flow against a scratch
+project tree:
 
 ```bash
 python -m tools.release.exercise_release_rollback_drill \
@@ -116,16 +128,32 @@ Confirm at least:
 
 - `GET /api/health`
 - `GET /api/system/runtime-target`
-- `POST /api/chat` streams SSE again with at least one `token` or `thinking` frame (same rule as `tools/ops/post_deploy_check.py`)
+- `POST /api/chat` streams SSE again with at least one `token` or `thinking` frame
+  (same rule as `tools/ops/post_deploy_check.py`)
+
+If the incident touched Phase 16C object-bearing paths, also validate at least one of:
+
+- artifact download from `GET /api/artifacts/{artifact_id}`
+- knowledge upload/ingestion/search on a small test document
+- media upload plus a follow-up read path
 
 ## 7) If data was affected
 
-If the rollback is caused by a database change, restore the latest safe backup after the code rollback succeeds.
+If the rollback is caused by a database change, knowledge/media/blob corruption, or a
+storage-backend cutover, restore the latest safe SQLite backup and the matching
+object-store snapshot after the code rollback succeeds.
 
-Follow [BACKUP_RESTORE.md](BACKUP_RESTORE.md) for the backup and restore drill.
+The SQLite backup and object-store snapshot must come from the same capture window.
+For `GOAT_OBJECT_STORE_BACKEND=local`, that means restoring `GOAT_OBJECT_STORE_ROOT`.
+For `GOAT_OBJECT_STORE_BACKEND=s3`, that means restoring the matching bucket/prefix
+snapshot or version set.
+A ref or bundle rollback does not restore remote objects by itself.
+
+Follow [BACKUP_RESTORE.md](BACKUP_RESTORE.md) for the paired backup and restore drill.
 
 ## 8) If rollback fails
 
 - Return to the last working artifact or ref
-- Inspect `var/logs/fastapi.log`, deploy output, and the desktop/runtime promotion evidence
+- Inspect `var/logs/fastapi.log`, deploy output, and the desktop/runtime promotion
+  evidence
 - Re-run the post-deploy contract check before trying another rollback target

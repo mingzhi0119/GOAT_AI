@@ -29,6 +29,7 @@ class ArtifactServiceTests(unittest.TestCase):
             logo_svg=root / "logo.svg",
             log_db_path=root / "chat_logs.db",
             data_dir=root / "data",
+            object_store_root=root / "object-store",
         )
 
     def tearDown(self) -> None:
@@ -56,7 +57,7 @@ class ArtifactServiceTests(unittest.TestCase):
                 register_artifact=_raise_persistence_error,
             )
 
-        artifacts_root = self.settings.data_dir / "uploads" / "artifacts"
+        artifacts_root = self.settings.object_store_root / "artifacts"
         if artifacts_root.exists():
             self.assertEqual([], list(artifacts_root.rglob("*")))
 
