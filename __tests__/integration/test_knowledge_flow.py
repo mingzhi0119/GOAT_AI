@@ -12,6 +12,50 @@ import pytest
 
 pytestmark = pytest.mark.integration
 
+
+class _KnowledgeAnswerFakeLLM:
+    def __init__(self) -> None:
+        self.last_prompt = ""
+
+    def list_model_names(self) -> list[str]:
+        return ["test-model"]
+
+    def describe_model_for_api(self, model: str) -> tuple[list[str], int | None]:
+        return ["completion"], None
+
+    def get_model_capabilities(self, model: str) -> list[str]:
+        return self.describe_model_for_api(model)[0]
+
+    def get_model_context_length(self, model: str) -> int | None:
+        return self.describe_model_for_api(model)[1]
+
+    def supports_tool_calling(self, model: str) -> bool:
+        return False
+
+    def stream_tokens(self, *args: object, **kwargs: object):
+        if False:
+            yield ""
+
+    def stream_tokens_with_tools(self, *args: object, **kwargs: object):
+        if False:
+            yield ""
+
+    def plan_tool_call(self, *args: object, **kwargs: object):
+        return None
+
+    def stream_tool_followup(self, *args: object, **kwargs: object):
+        if False:
+            yield ""
+
+    def generate_completion(self, model: str, prompt: str, **_: object) -> str:
+        self.last_prompt = prompt
+        if "Retrieved knowledge context:" in prompt:
+            return "Risk management reduces operational uncertainty."
+        return (
+            "I could not find evidence in the indexed knowledge base for that question."
+        )
+
+
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 _SAMPLE_TEXT = b"The quick brown fox jumps over the lazy dog."
@@ -149,31 +193,32 @@ def test_search_empty_index_returns_empty_hits(app_client: object) -> None:
 # ── /api/knowledge/answers semantic contract ──────────────────────────────────
 
 
-def test_answers_returns_raw_snippet_dump_without_llm(app_client: object) -> None:
-    """Document the semantic contract: /api/knowledge/answers returns retrieved
-    snippets as the 'answer' field, NOT an LLM-generated response.
-    This differs from /api/chat where an LLM synthesizes the answer.
-    """
+def test_answers_returns_synthesized_answer_with_citations(app_client: object) -> None:
     from fastapi.testclient import TestClient
+    from backend.platform.dependencies import get_llm_client
 
     assert isinstance(app_client, TestClient)
+    fake_llm = _KnowledgeAnswerFakeLLM()
+    app_client.app.dependency_overrides[get_llm_client] = lambda: fake_llm
     upload = _upload(app_client, b"Risk management reduces operational uncertainty.")
     doc_id = upload["document_id"]
     _ingest(app_client, doc_id)
+    try:
+        resp = app_client.post(
+            "/api/knowledge/answers",
+            json={
+                "query": "risk management",
+                "document_ids": [doc_id],
+                "top_k": 3,
+            },
+        )
+    finally:
+        app_client.app.dependency_overrides.clear()
 
-    resp = app_client.post(
-        "/api/knowledge/answers",
-        json={
-            "query": "risk management",
-            "document_ids": [doc_id],
-            "top_k": 3,
-        },
-    )
     assert resp.status_code == 200
     body = resp.json()
-    # Contract: response must carry an 'answer' field and 'citations' list
-    assert "answer" in body
-    assert "citations" in body
-    # The answer is a raw snippet aggregation — it is NOT a conversational LLM reply
-    assert isinstance(body["answer"], str)
+    assert body["answer"] == "Risk management reduces operational uncertainty."
     assert isinstance(body["citations"], list)
+    assert len(body["citations"]) >= 1
+    assert not body["answer"].startswith("Relevant retrieved context:")
+    assert "synthesize rather than dumping snippets" in fake_llm.last_prompt

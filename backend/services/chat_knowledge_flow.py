@@ -19,6 +19,7 @@ from backend.services.knowledge_service import (
     build_chat_knowledge_context,
     resolve_knowledge_documents,
 )
+from backend.services.knowledge_answer_prompting import compose_knowledge_instruction
 from backend.services.safeguard_service import SafeguardService
 from backend.services.session_service import last_user_message
 from backend.services.sse import sse_done_event, sse_error_event
@@ -36,30 +37,6 @@ def build_chat_stream_identity(
     )
     principal_id = auth_context.principal_id.value if auth_context is not None else ""
     return tenant_id, principal_id
-
-
-def compose_knowledge_instruction(
-    *,
-    base_instruction: str,
-    context_block: str,
-    has_hits: bool,
-) -> str:
-    parts: list[str] = []
-    if base_instruction.strip():
-        parts.append(base_instruction.strip())
-    if has_hits:
-        parts.append(
-            "Use the retrieved knowledge context below as your primary evidence. "
-            "Answer naturally, synthesize rather than dumping snippets, and say when the context is insufficient.\n\n"
-            "Retrieved knowledge context:\n"
-            f"{context_block}"
-        )
-    else:
-        parts.append(
-            "No relevant retrieved context was found in the attached knowledge documents. "
-            "Explain that briefly and suggest how the user can refine the question."
-        )
-    return "\n\n".join(parts)
 
 
 def stream_knowledge_chat_sse(

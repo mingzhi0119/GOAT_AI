@@ -744,7 +744,8 @@ Retrieval-backed answer endpoint outside the chat session contract.
 Current behavior:
 
 - Returns a retrieval-backed answer plus citation payloads
-- Defines explicit no-hit behavior: `No relevant context found in the indexed knowledge base.`
+- Synthesizes the answer text from the same retrieved context pattern used by chat with `knowledge_document_ids`, while preserving the `answer` plus `citations` shape
+- When retrieval finds no evidence, returns a brief synthesized insufficiency answer with an empty citation list
 - When `document_ids` are provided and lexical retrieval misses, the first indexed chunks from those attached documents are used as a bounded fallback scope
 
 ## `POST /api/media/uploads`

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from backend.domain.authz_types import AuthorizationContext
-from backend.application.ports import Settings
+from backend.application.ports import LLMClient, Settings
 from backend.models.knowledge import (
     KnowledgeAnswerRequest,
     KnowledgeAnswerResponse,
@@ -103,12 +103,14 @@ def search(
 def answer(
     *,
     request: KnowledgeAnswerRequest,
+    llm: LLMClient,
     settings: Settings,
     auth_context: AuthorizationContext,
     request_id: str = "",
 ) -> KnowledgeAnswerResponse:
     return answer_with_knowledge(
         request=request,
+        llm=llm,
         settings=settings,
         auth_context=auth_context,
         request_id=request_id,

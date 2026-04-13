@@ -1124,8 +1124,8 @@
         "tags": [
           "knowledge"
         ],
-        "summary": "Generate a retrieval-backed answer",
-        "description": "Return a retrieval-backed answer with citations.",
+        "summary": "Generate a synthesized retrieval-backed answer",
+        "description": "Return a synthesized retrieval-backed answer with citations.",
         "operationId": "post_knowledge_answer_api_knowledge_answers_post",
         "requestBody": {
           "content": {
@@ -1160,6 +1160,16 @@
           },
           "429": {
             "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -4431,14 +4441,16 @@
         "properties": {
           "answer": {
             "type": "string",
-            "title": "Answer"
+            "title": "Answer",
+            "description": "Synthesized answer grounded in the retrieved knowledge context."
           },
           "citations": {
             "items": {
               "$ref": "#/components/schemas/KnowledgeCitation"
             },
             "type": "array",
-            "title": "Citations"
+            "title": "Citations",
+            "description": "Retrieved citations used as evidence for the synthesized answer."
           }
         },
         "type": "object",

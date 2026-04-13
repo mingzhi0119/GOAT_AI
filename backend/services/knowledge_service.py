@@ -42,6 +42,10 @@ from backend.services.knowledge_pipeline import (
     persist_vector_index,
     search_vector_index,
 )
+from backend.services.knowledge_answer_prompting import (
+    compose_knowledge_answer_prompt,
+    resolve_knowledge_answer_model,
+)
 from goat_ai.telemetry.telemetry_counters import (
     inc_knowledge_query_rewrite_applied,
     inc_knowledge_retrieval,
@@ -58,7 +62,7 @@ from backend.services.knowledge_storage import (
     KnowledgeValidationError as StorageValidationError,
     persist_knowledge_bytes,
 )
-from backend.types import AsyncUploadReader, Settings
+from backend.types import AsyncUploadReader, LLMClient, Settings
 from goat_ai.uploads import build_object_store
 
 _VECTOR_BACKEND = "simple_local_v1"
@@ -440,46 +444,33 @@ def search_knowledge(
 def answer_with_knowledge(
     *,
     request: KnowledgeAnswerRequest,
+    llm: LLMClient,
     settings: Settings,
     auth_context: AuthorizationContext,
     request_id: str = "",
     repository: KnowledgeRepository | None = None,
 ) -> KnowledgeAnswerResponse:
-    """Return a deterministic retrieval-backed answer with citations."""
-    search_response = search_knowledge(
-        request=KnowledgeSearchRequest(
-            query=request.query,
-            document_ids=request.document_ids,
-            top_k=request.top_k,
-            retrieval_profile="default",
-        ),
+    """Return a synthesized retrieval-backed answer with citations."""
+    context = build_chat_knowledge_context(
+        query=request.query,
+        document_ids=request.document_ids,
+        top_k=request.top_k,
         settings=settings,
         auth_context=auth_context,
         request_id=request_id,
         repository=repository,
     )
-    if not search_response.hits and request.document_ids:
-        search_response = _fallback_answer_scope(
-            document_ids=request.document_ids,
+    answer = llm.generate_completion(
+        resolve_knowledge_answer_model(llm),
+        compose_knowledge_answer_prompt(
             query=request.query,
-            top_k=request.top_k,
-            settings=settings,
-            auth_context=auth_context,
-            request_id=request_id,
-            repository=repository,
-        )
-    if not search_response.hits:
-        return KnowledgeAnswerResponse(
-            answer="No relevant context found in the indexed knowledge base.",
-            citations=[],
-        )
-
-    bullets = [
-        f"- {citation.filename}: {citation.snippet[:220].strip()}"
-        for citation in search_response.hits
-    ]
-    answer = "Relevant retrieved context:\n" + "\n".join(bullets)
-    return KnowledgeAnswerResponse(answer=answer, citations=search_response.hits)
+            context_block=context.context_block,
+            has_hits=bool(context.citations),
+        ),
+    ).strip()
+    if not answer:
+        answer = "I could not synthesize a retrieval-backed answer from the available context."
+    return KnowledgeAnswerResponse(answer=answer, citations=context.citations)
 
 
 def build_chat_knowledge_context(

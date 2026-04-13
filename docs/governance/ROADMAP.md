@@ -25,8 +25,6 @@ Completed phases, landed slices, and historical closeout notes live in:
      and Rust supervisor parity remain open
 2. **Desktop public release blockers**
    - Linux packaged build/provenance and readiness docs are landed, but public macOS signing/notarization and updater enablement remain open
-3. **`/api/knowledge/answers` semantic alignment**
-   - the snippet-versus-synthesis contract decision still blocks final API alignment
 
 ### Repository-native Skills and Agent Automation
 
@@ -163,13 +161,3 @@ These items should remain roadmap-only in the frontend until the corresponding b
 - Shared runtime foundations now build on the shipped object-store boundary plus the hosted/server Postgres runtime metadata posture in [POSTGRES_RUNTIME_PERSISTENCE_DECISION_PACKAGE.md](../architecture/POSTGRES_RUNTIME_PERSISTENCE_DECISION_PACKAGE.md), while local and desktop continue to default to SQLite.
 
 ---
-
-## Decision pending
-
-### `/api/knowledge/answers` semantic alignment
-
-The product still needs a decision on whether `/api/knowledge/answers` should keep returning a raw retrieved snippet summary or move to the same LLM-synthesis behavior used by chat with `knowledge_document_ids`.
-
-- Current state: chat synthesizes retrieved context; `/api/knowledge/answers` returns a snippet-style response
-- Decision needed: keep the divergence and document it, or unify the answer semantics
-- Impact: user expectations, API documentation, and the long-term retrieval UX

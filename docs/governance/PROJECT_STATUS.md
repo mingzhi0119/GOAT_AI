@@ -22,6 +22,7 @@ Last updated: 2026-04-13
 - persisted upload and ingestion pipeline for `csv`, `xlsx`, `txt`, `md`, `pdf`, and `docx`
 - knowledge source files, normalized text/metadata, and vector-index payloads now persist through a storage-key/object-store boundary instead of direct path assumptions
 - retrieval-backed chat and `/api/knowledge/*` contract family
+- `/api/knowledge/answers` now aligns with chat-style synthesis while keeping the stable `answer + citations` response shape
 - local `simple_local_v1` vector index with optional lexical rerank and conservative query rewrite
 - image uploads for vision-capable chat via `POST /api/media/uploads`
 - RAG quality regression runner in CI via `python -m tools.quality.run_rag_eval`

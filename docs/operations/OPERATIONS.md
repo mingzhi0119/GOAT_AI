@@ -546,7 +546,7 @@ exercises the retrieval-quality golden set and matches the backend CI proof surf
 | `retrieval_profile` | `POST /api/knowledge/search` body | `default` - uses `GOAT_RAG_RERANK_MODE`; `rag3_lexical` / `rag3_quality` - always lexical rerank; `rag3_quality` also enables conservative whitespace query rewrite before search. |
 | Vector similarity | Implementation | Scores are backend-specific; there is **no** global numeric score threshold in config-triage uses **hit vs miss** (see metrics) and eval cases. |
 
-**No-hit behavior:** search returns zero citations when nothing ranks above the empty list; `POST /api/knowledge/answers` returns the documented fixed sentence when no hits (after optional attached-document fallback).
+**No-hit behavior:** search returns zero citations when nothing ranks above the empty list; `POST /api/knowledge/answers` now returns a brief synthesized insufficiency answer plus an empty citation list when no hits remain after the optional attached-document fallback.
 
 **Observability (`GET /api/system/metrics`):**
 

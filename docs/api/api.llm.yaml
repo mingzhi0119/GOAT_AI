@@ -921,6 +921,7 @@ endpoints:
         - 401
         - 422
         - 429
+        - 503
   - op: post_media_upload
     method: POST
     path: /media/uploads

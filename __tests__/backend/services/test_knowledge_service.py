@@ -51,6 +51,24 @@ def _auth_context(owner_id: str = "owner-1") -> AuthorizationContext:
     )
 
 
+class _KnowledgeAnswerFakeLLM:
+    def __init__(self) -> None:
+        self.last_model = ""
+        self.last_prompt = ""
+
+    def list_model_names(self) -> list[str]:
+        return ["knowledge-answer-model"]
+
+    def generate_completion(self, model: str, prompt: str, **_: object) -> str:
+        self.last_model = model
+        self.last_prompt = prompt
+        if "Retrieved knowledge context:" in prompt:
+            return "Synthesized answer grounded in the retrieved strategy note."
+        return (
+            "I could not find evidence in the indexed knowledge base for that question."
+        )
+
+
 class KnowledgeServiceTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmpdir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
@@ -323,6 +341,77 @@ class KnowledgeServiceTests(unittest.TestCase):
 
         self.assertLessEqual(len(context.context_block), 5200)
         self.assertLess(len(context.citations), len(oversized_hits))
+
+    def test_answer_with_knowledge_returns_synthesized_answer_and_citations(
+        self,
+    ) -> None:
+        fake_llm = _KnowledgeAnswerFakeLLM()
+        citations = [
+            KnowledgeCitation(
+                document_id="doc-1",
+                chunk_id="chunk-1",
+                filename="strategy.md",
+                snippet="Competitive pressure stays high when buyer power increases.",
+                score=0.91,
+            )
+        ]
+
+        with patch(
+            "backend.services.knowledge_service.build_chat_knowledge_context",
+            return_value=knowledge_service.KnowledgeChatContext(
+                context_block="[Source 1] filename=strategy.md score=0.910\nCompetitive pressure stays high when buyer power increases.",
+                citations=citations,
+            ),
+        ):
+            response = knowledge_service.answer_with_knowledge(
+                request=knowledge_service.KnowledgeAnswerRequest(
+                    query="Summarize the strategy note",
+                    document_ids=["doc-1"],
+                    top_k=3,
+                ),
+                llm=fake_llm,
+                settings=self.settings,
+                auth_context=_auth_context(),
+            )
+
+        self.assertEqual(
+            "Synthesized answer grounded in the retrieved strategy note.",
+            response.answer,
+        )
+        self.assertEqual(citations, response.citations)
+        self.assertEqual("knowledge-answer-model", fake_llm.last_model)
+        self.assertIn("synthesize rather than dumping snippets", fake_llm.last_prompt)
+        self.assertIn(
+            "User question:\nSummarize the strategy note", fake_llm.last_prompt
+        )
+
+    def test_answer_with_knowledge_synthesizes_no_hit_response(self) -> None:
+        fake_llm = _KnowledgeAnswerFakeLLM()
+
+        with patch(
+            "backend.services.knowledge_service.build_chat_knowledge_context",
+            return_value=knowledge_service.KnowledgeChatContext(
+                context_block="",
+                citations=[],
+            ),
+        ):
+            response = knowledge_service.answer_with_knowledge(
+                request=knowledge_service.KnowledgeAnswerRequest(
+                    query="What does the missing note say?",
+                    document_ids=[],
+                    top_k=3,
+                ),
+                llm=fake_llm,
+                settings=self.settings,
+                auth_context=_auth_context(),
+            )
+
+        self.assertEqual([], response.citations)
+        self.assertEqual(
+            "I could not find evidence in the indexed knowledge base for that question.",
+            response.answer,
+        )
+        self.assertIn("No relevant retrieved context was found", fake_llm.last_prompt)
 
     def test_start_knowledge_ingestion_marks_failure_when_normalization_fails(
         self,

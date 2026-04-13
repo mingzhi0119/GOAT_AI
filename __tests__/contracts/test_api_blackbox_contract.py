@@ -320,6 +320,13 @@ class ContractFakeLLM:
         *,
         ollama_options: dict[str, float | int] | None = None,
     ) -> str:
+        if (
+            "You are answering a user question with retrieved knowledge context."
+            in prompt
+        ):
+            if "competitive pressure" in prompt:
+                return "Porter Five Forces explains competitive pressure."
+            return "I could not find evidence in the indexed knowledge base for that question."
         return (
             "## Goal\n"
             "- Produce a concise plan\n\n"
@@ -1004,6 +1011,8 @@ class ApiBlackboxContractTests(unittest.TestCase):
         answer_body = answer.json()
         self.assertTrue(answer_body["answer"])
         self.assertGreaterEqual(len(answer_body["citations"]), 1)
+        self.assertNotIn("Relevant retrieved context:", answer_body["answer"])
+        self.assertIn("competitive pressure", answer_body["answer"])
 
         no_hit = self.client.post(
             "/api/knowledge/answers",
@@ -1012,9 +1021,22 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(200, no_hit.status_code)
         self.assertEqual([], no_hit.json()["citations"])
         self.assertEqual(
-            "No relevant context found in the indexed knowledge base.",
+            "I could not find evidence in the indexed knowledge base for that question.",
             no_hit.json()["answer"],
         )
+
+        self.client.app.dependency_overrides[get_llm_client] = lambda: UnavailableLLM()
+        try:
+            unavailable = self.client.post(
+                "/api/knowledge/answers",
+                json={"query": "Porter competitive pressure summary", "top_k": 3},
+            )
+        finally:
+            self.client.app.dependency_overrides[get_llm_client] = lambda: (
+                ContractFakeLLM()
+            )
+        self.assertEqual(503, unavailable.status_code)
+        self.assertEqual("AI backend unavailable", unavailable.json()["detail"])
 
         rag_chat = self.client.post(
             "/api/chat",

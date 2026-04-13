@@ -271,8 +271,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Generate a retrieval-backed answer
-         * @description Return a retrieval-backed answer with citations.
+         * Generate a synthesized retrieval-backed answer
+         * @description Return a synthesized retrieval-backed answer with citations.
          */
         post: operations["post_knowledge_answer_api_knowledge_answers_post"];
         delete?: never;
@@ -1404,9 +1404,15 @@ export interface components {
          * @description Retrieval-backed answer contract.
          */
         KnowledgeAnswerResponse: {
-            /** Answer */
+            /**
+             * Answer
+             * @description Synthesized answer grounded in the retrieved knowledge context.
+             */
             answer: string;
-            /** Citations */
+            /**
+             * Citations
+             * @description Retrieved citations used as evidence for the synthesized answer.
+             */
             citations?: components["schemas"]["KnowledgeCitation"][];
         };
         /**
@@ -3123,6 +3129,15 @@ export interface operations {
             };
             /** @description Too Many Requests */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
