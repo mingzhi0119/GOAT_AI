@@ -178,10 +178,10 @@ class NoopWorkbenchTaskDispatcher:
 
 class ContractFakeLLM:
     def list_model_names(self) -> list[str]:
-        return ["blackbox-model", "viz-model"]
+        return ["qwen3:4b", "gemma4:26b"]
 
     def describe_model_for_api(self, model: str) -> tuple[list[str], int | None]:
-        if model == "viz-model":
+        if model == "gemma4:26b":
             return ["completion", "tools", "vision"], None
         return ["completion"], None
 
@@ -484,23 +484,21 @@ class ApiBlackboxContractTests(unittest.TestCase):
     def test_models_endpoints_contract_and_backend_unavailable_boundary(self) -> None:
         list_response = self.client.get("/api/models")
         self.assertEqual(200, list_response.status_code)
-        self.assertEqual(
-            ["blackbox-model", "viz-model"], list_response.json()["models"]
-        )
+        self.assertEqual(["qwen3:4b", "gemma4:26b"], list_response.json()["models"])
 
         caps_response = self.client.get(
-            "/api/models/capabilities", params={"model": "viz-model"}
+            "/api/models/capabilities", params={"model": "gemma4:26B"}
         )
         self.assertEqual(200, caps_response.status_code)
         caps_body = caps_response.json()
-        self.assertEqual("viz-model", caps_body["model"])
+        self.assertEqual("gemma4:26b", caps_body["model"])
         self.assertEqual(["completion", "tools", "vision"], caps_body["capabilities"])
         self.assertTrue(caps_body["supports_tool_calling"])
         self.assertTrue(caps_body["supports_chart_tools"])
         self.assertTrue(caps_body["supports_vision"])
 
         caps_bb = self.client.get(
-            "/api/models/capabilities", params={"model": "blackbox-model"}
+            "/api/models/capabilities", params={"model": "qwen3:4b"}
         )
         self.assertFalse(caps_bb.json()["supports_vision"])
 
@@ -509,7 +507,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
             unavailable_list = self.client.get("/api/models")
             unavailable_caps = self.client.get(
                 "/api/models/capabilities",
-                params={"model": "blackbox-model"},
+                params={"model": "qwen3:4b"},
             )
         finally:
             self.client.app.dependency_overrides[get_llm_client] = lambda: (
@@ -536,13 +534,13 @@ class ApiBlackboxContractTests(unittest.TestCase):
             )
 
         self.assertEqual(200, fallback_list.status_code)
-        self.assertEqual(["gemma4:26b"], fallback_list.json()["models"])
+        self.assertEqual([], fallback_list.json()["models"])
 
     def test_chat_endpoint_streams_typed_events_and_persists_session(self) -> None:
         response = self.client.post(
             "/api/chat",
             json={
-                "model": "blackbox-model",
+                "model": "qwen3:4b",
                 "session_id": "chat-1",
                 "messages": [{"role": "user", "content": "Hello there"}],
             },
@@ -590,7 +588,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
 
         invalid = self.client.post(
             "/api/chat",
-            json={"model": "blackbox-model", "messages": []},
+            json={"model": "qwen3:4b", "messages": []},
         )
         self.assertEqual(422, invalid.status_code)
 
@@ -599,7 +597,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
             unavailable = self.client.post(
                 "/api/chat",
                 json={
-                    "model": "blackbox-model",
+                    "model": "qwen3:4b",
                     "session_id": "chat-unavailable",
                     "messages": [{"role": "user", "content": "Hello there"}],
                 },
@@ -624,7 +622,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         response = self.client.post(
             "/api/chat",
             json={
-                "model": "blackbox-model",
+                "model": "qwen3:4b",
                 "session_id": "blocked-input",
                 "messages": [
                     {
@@ -653,7 +651,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
             response = self.client.post(
                 "/api/chat",
                 json={
-                    "model": "blackbox-model",
+                    "model": "qwen3:4b",
                     "session_id": "blocked-output",
                     "messages": [
                         {"role": "user", "content": "Give me a romance example."}
@@ -680,7 +678,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
             response = self.client.post(
                 "/api/chat",
                 json={
-                    "model": "blackbox-model",
+                    "model": "qwen3:4b",
                     "session_id": "chat-persist-fail",
                     "messages": [{"role": "user", "content": "Hello there"}],
                 },
@@ -702,7 +700,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
             response = self.client.post(
                 "/api/chat",
                 json={
-                    "model": "blackbox-model",
+                    "model": "qwen3:4b",
                     "session_id": "chat-stream-interrupted",
                     "messages": [{"role": "user", "content": "Hello there"}],
                 },
@@ -730,7 +728,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
             response = self.client.post(
                 "/api/chat",
                 json={
-                    "model": "blackbox-model",
+                    "model": "qwen3:4b",
                     "session_id": "blocked-input-persist-fail",
                     "messages": [
                         {
@@ -762,7 +760,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
                 response = self.client.post(
                     "/api/chat",
                     json={
-                        "model": "blackbox-model",
+                        "model": "qwen3:4b",
                         "session_id": "blocked-output-persist-fail",
                         "messages": [
                             {
@@ -795,7 +793,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         response = self.client.post(
             "/api/chat",
             json={
-                "model": "viz-model",
+                "model": "gemma4:26b",
                 "session_id": "chart-1",
                 "messages": [
                     {"role": "user", "content": file_context_prompt},
@@ -825,7 +823,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         response = self.client.post(
             "/api/chat",
             json={
-                "model": "viz-model",
+                "model": "gemma4:26b",
                 "session_id": "chart-no-upload",
                 "messages": [
                     {"role": "user", "content": "Generate a typical pie chart."},
@@ -848,7 +846,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         response = self.client.post(
             "/api/chat",
             json={
-                "model": "blackbox-model",
+                "model": "qwen3:4b",
                 "session_id": "chart-no-tools",
                 "messages": [
                     {"role": "user", "content": "Generate a typical pie chart."}
@@ -1041,7 +1039,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         rag_chat = self.client.post(
             "/api/chat",
             json={
-                "model": "blackbox-model",
+                "model": "qwen3:4b",
                 "session_id": "rag-chat-1",
                 "knowledge_document_ids": [document_id],
                 "messages": [
@@ -1079,7 +1077,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         response = self.client.post(
             "/api/chat",
             json={
-                "model": "blackbox-model",
+                "model": "qwen3:4b",
                 "session_id": "artifact-1",
                 "messages": [
                     {
@@ -1137,7 +1135,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
             self.client.post(
                 "/api/chat",
                 json={
-                    "model": "blackbox-model",
+                    "model": "qwen3:4b",
                     "session_id": session_id,
                     "messages": [{"role": "user", "content": f"Hello {session_id}"}],
                 },
@@ -1161,7 +1159,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
     ) -> None:
         headers = {"Idempotency-Key": "chat-key-1"}
         payload = {
-            "model": "blackbox-model",
+            "model": "qwen3:4b",
             "session_id": "idem-chat-1",
             "messages": [{"role": "user", "content": "Hello idempotent chat"}],
         }
@@ -1204,7 +1202,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.client.post(
             "/api/chat",
             json={
-                "model": "blackbox-model",
+                "model": "qwen3:4b",
                 "session_id": "sys-1",
                 "messages": [{"role": "user", "content": "Warm up inference metrics"}],
             },
@@ -1302,7 +1300,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         chat = self.client.post(
             "/api/chat",
             json={
-                "model": "viz-model",
+                "model": "gemma4:26b",
                 "messages": [{"role": "user", "content": "What is this?"}],
                 "image_attachment_ids": [aid],
             },
@@ -1326,7 +1324,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         resp = self.client.post(
             "/api/chat",
             json={
-                "model": "blackbox-model",
+                "model": "qwen3:4b",
                 "messages": [{"role": "user", "content": "Hi"}],
                 "image_attachment_ids": [aid],
             },
@@ -1339,7 +1337,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         resp = self.client.post(
             "/api/chat",
             json={
-                "model": "viz-model",
+                "model": "gemma4:26b",
                 "messages": [{"role": "user", "content": "Hi"}],
                 "image_attachment_ids": ["att-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
             },
@@ -1351,7 +1349,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         resp = self.client.post(
             "/api/chat",
             json={
-                "model": "viz-model",
+                "model": "gemma4:26b",
                 "messages": [{"role": "user", "content": "Hi"}],
                 "knowledge_document_ids": ["doc-1"],
                 "image_attachment_ids": ["att-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
@@ -2378,7 +2376,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         session_seed = self.client.post(
             "/api/chat",
             json={
-                "model": "blackbox-model",
+                "model": "qwen3:4b",
                 "session_id": "canvas-session-1",
                 "messages": [{"role": "user", "content": "Seed session"}],
             },
@@ -2536,13 +2534,13 @@ class ApiProtectedBlackboxContractTests(unittest.TestCase):
 
         protected_requests: list[tuple[str, str, dict[str, object]]] = [
             ("GET", "/api/models", {}),
-            ("GET", "/api/models/capabilities?model=blackbox-model", {}),
+            ("GET", "/api/models/capabilities?model=qwen3:4b", {}),
             (
                 "POST",
                 "/api/chat",
                 {
                     "json": {
-                        "model": "blackbox-model",
+                        "model": "qwen3:4b",
                         "messages": [{"role": "user", "content": "hello"}],
                     }
                 },

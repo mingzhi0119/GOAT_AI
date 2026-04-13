@@ -95,7 +95,7 @@ class ApplicationChatTests(unittest.TestCase):
 
     def test_prepare_chat_request_merges_images_and_builds_ollama_options(self) -> None:
         req = ChatRequest(
-            model="vision-model",
+            model="gemma4:26B",
             messages=[
                 ChatMessage(role="assistant", content="Ack"),
                 ChatMessage(role="user", content="Describe this image"),
@@ -140,7 +140,7 @@ class ApplicationChatTests(unittest.TestCase):
         self,
     ) -> None:
         req = ChatRequest(
-            model="test-model",
+            model="qwen3:4b",
             messages=[ChatMessage(role="user", content="Hello")],
             knowledge_document_ids=["doc-1"],
             image_attachment_ids=["att-1"],
@@ -156,7 +156,7 @@ class ApplicationChatTests(unittest.TestCase):
 
     def test_prepare_chat_request_requires_owner_when_enabled(self) -> None:
         req = ChatRequest(
-            model="test-model",
+            model="qwen3:4b",
             messages=[ChatMessage(role="user", content="Hello")],
         )
 
@@ -170,7 +170,7 @@ class ApplicationChatTests(unittest.TestCase):
 
     def test_prepare_chat_request_rejects_non_vision_model(self) -> None:
         req = ChatRequest(
-            model="text-only-model",
+            model="qwen3:4b",
             messages=[ChatMessage(role="user", content="Describe this image")],
             image_attachment_ids=["att-1"],
         )
@@ -189,7 +189,7 @@ class ApplicationChatTests(unittest.TestCase):
 
     def test_capture_idempotent_stream_stores_completed_body_for_replay(self) -> None:
         req = ChatRequest(
-            model="test-model",
+            model="qwen3:4b",
             messages=[ChatMessage(role="user", content="Hello")],
             session_id="sess-1",
         )
@@ -233,7 +233,7 @@ class ApplicationChatTests(unittest.TestCase):
 
     def test_build_idempotency_context_uses_injected_store_factory(self) -> None:
         req = ChatRequest(
-            model="test-model",
+            model="qwen3:4b",
             messages=[ChatMessage(role="user", content="Hello")],
             session_id="sess-2",
         )
@@ -250,6 +250,22 @@ class ApplicationChatTests(unittest.TestCase):
         self.assertIsNotNone(context)
         assert context is not None
         self.assertIs(context.store, fake_store)
+
+    def test_prepare_chat_request_rejects_disallowed_model(self) -> None:
+        req = ChatRequest(
+            model="rogue-model",
+            messages=[ChatMessage(role="user", content="Hello")],
+        )
+
+        with self.assertRaisesRegex(
+            Exception, "Selected model is not enabled on this deployment"
+        ):
+            prepare_chat_request(
+                req=req,
+                settings=self.settings,
+                llm=_FakeLLM(),
+                auth_context=_auth_context(),
+            )
 
 
 if __name__ == "__main__":
