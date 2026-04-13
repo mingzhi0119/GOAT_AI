@@ -291,7 +291,7 @@ class ApplicationWorkbenchTests(unittest.TestCase):
         from unittest.mock import patch
 
         with patch(
-            "backend.application.workbench.resolve_requested_sources",
+            "backend.application.workbench_task_lifecycle.resolve_requested_sources",
             return_value=[
                 WorkbenchSourceDescriptor(
                     source_id="web",
@@ -328,7 +328,7 @@ class ApplicationWorkbenchTests(unittest.TestCase):
         from unittest.mock import patch
 
         with patch(
-            "backend.application.workbench.resolve_requested_sources",
+            "backend.application.workbench_task_lifecycle.resolve_requested_sources",
             return_value=[
                 WorkbenchSourceDescriptor(
                     source_id="web",
@@ -367,7 +367,7 @@ class ApplicationWorkbenchTests(unittest.TestCase):
         from unittest.mock import patch
 
         with patch(
-            "backend.application.workbench.resolve_requested_sources",
+            "backend.application.workbench_task_lifecycle.resolve_requested_sources",
             return_value=[
                 WorkbenchSourceDescriptor(
                     source_id="web",
@@ -406,7 +406,7 @@ class ApplicationWorkbenchTests(unittest.TestCase):
         from unittest.mock import patch
 
         with patch(
-            "backend.application.workbench.resolve_requested_sources",
+            "backend.application.workbench_task_lifecycle.resolve_requested_sources",
             return_value=[
                 WorkbenchSourceDescriptor(
                     source_id="knowledge",
@@ -445,7 +445,7 @@ class ApplicationWorkbenchTests(unittest.TestCase):
         from unittest.mock import patch
 
         with patch(
-            "backend.application.workbench.authorize_workbench_task_read",
+            "backend.application.workbench_shared.authorize_workbench_task_read",
             return_value=AuthorizationDecision(
                 allowed=False,
                 reason_code="owner_mismatch",
@@ -497,7 +497,7 @@ class ApplicationWorkbenchTests(unittest.TestCase):
         from unittest.mock import patch
 
         with patch(
-            "backend.application.workbench.authorize_workbench_task_read",
+            "backend.application.workbench_shared.authorize_workbench_task_read",
             return_value=AuthorizationDecision(
                 allowed=True,
                 reason_code="allowed",
@@ -558,7 +558,7 @@ class ApplicationWorkbenchTests(unittest.TestCase):
         from unittest.mock import patch
 
         with patch(
-            "backend.application.workbench.authorize_workbench_task_read",
+            "backend.application.workbench_shared.authorize_workbench_task_read",
             return_value=AuthorizationDecision(
                 allowed=True,
                 reason_code="allowed",
@@ -675,7 +675,7 @@ class ApplicationWorkbenchTests(unittest.TestCase):
         from unittest.mock import patch
 
         with patch(
-            "backend.application.workbench.resolve_requested_sources",
+            "backend.application.workbench_task_lifecycle.resolve_requested_sources",
             return_value=[
                 WorkbenchSourceDescriptor(
                     source_id="web",
@@ -803,7 +803,7 @@ class ApplicationWorkbenchTests(unittest.TestCase):
         from unittest.mock import patch
 
         with patch(
-            "backend.application.workbench.resolve_requested_sources",
+            "backend.application.workbench_task_lifecycle.resolve_requested_sources",
             return_value=[
                 WorkbenchSourceDescriptor(
                     source_id="web",
@@ -865,7 +865,7 @@ class ApplicationWorkbenchTests(unittest.TestCase):
         from unittest.mock import patch
 
         with patch(
-            "backend.application.workbench.resolve_requested_sources",
+            "backend.application.workbench_task_lifecycle.resolve_requested_sources",
             return_value=[project_memory_source],
         ):
             with self.assertRaisesRegex(

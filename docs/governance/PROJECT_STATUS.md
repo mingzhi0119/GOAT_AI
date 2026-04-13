@@ -96,6 +96,10 @@ Last updated: 2026-04-13
 - `desktop-package-windows` now has desktop-change trigger boundaries, merge-blocking packaged-shell fault smoke, retained build/smoke diagnostics, and governance tests so missing-sidecar, early-exit, and pre-ready-timeout regressions stay auditable for desktop-related changes
 - `.github/workflows/desktop-provenance.yml` and `.github/workflows/fault-injection.yml` now always retain structured MSI/NSIS install -> healthy launch -> pre-ready fault -> uninstall evidence, plus workflow metadata and step summaries for failure diagnosis
 - caller-scoped workbench feature semantics and observability asset coverage are now mechanically pinned by contract tests, workflow tests, and docs/runbook truth instead of roadmap watchpoints
+- the original atomicity/composition brownfield hotspots are now split into
+  narrower workbench execution helpers, workbench application modules,
+  knowledge-chat flow helpers, and chat-session controller hooks while keeping
+  the published behavior stable
 
 ## Current known boundaries
 
@@ -125,6 +129,12 @@ Last updated: 2026-04-13
   supervisor seam, fail-closed restart recovery for abandoned runs, durable
   execution/event storage, workspace manifest/runtime metadata hints, and
   replayable sandbox logs
+- **atomicity and composition follow-ons:** complete for the initial four
+  brownfield targets; `backend/services/workbench_execution_service.py`,
+  `backend/application/workbench.py`, `backend/services/chat_service.py`, and
+  `frontend/src/hooks/useChatSession.ts` now act as composition roots over
+  narrower helper modules instead of continuing to accumulate orchestration
+  logic
 - **19 desktop maturity:** the shipped baseline includes signed Windows
   packaging, Linux packaged-desktop CI/release scaffolding with retained
   provenance, macOS blocker-report workflow scaffolding, packaged-readiness
