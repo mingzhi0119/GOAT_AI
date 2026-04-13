@@ -21,7 +21,7 @@ Keep these artifacts **current** as release-quality work lands. They become your
 | **Dated snapshots of constraints** | Example: shared host, no `sudo`, reverse proxy + single port, sub-path deployment-proves the design fits **real** constraints, not only a greenfield stack. |
 | **Phase / release exit criteria -> evidence** | Each completed phase or release slice should map to a **PR, doc section, or runbook command** - not "we improved logging" in the abstract. |
 | **Before/after bullets** | Short list: what was true *before* Wave A (e.g. text logs only, no `/ready`, silent persistence failures) vs *after*. |
-| **Trade-off log** | Link to [ROADMAP.md](ROADMAP.md) Decision Log; add 1-2 sentences per major choice (Postgres deferred, error model before big split, policies before directory migration). |
+| **Trade-off log** | Link to [decision records](../decisions/README.md); add 1-2 sentences per major choice (Postgres deferred, error model before big split, policies before directory migration). |
 | **Quantified quality** | Test counts, black-box coverage areas, CI gates (`lint-imports`, contract sync), latency percentiles you actually expose - **numbers you can defend**. |
 | **Runbook pointers** | Where to read: deploy, rollback, backup, metrics scrape, readiness check - even if some sections are "TODO until Wave A lands."|
 
@@ -70,7 +70,7 @@ Use this arc on a homepage or case-study page. Dates and scores are **yours to f
 
 ## 4. Key engineering decisions (senior-visible)
 
-These are worth a **"Trade-offs"** subsection on a homepage. Align wording with [ROADMAP.md](ROADMAP.md) Decision Log.
+These are worth a **"Trade-offs"** subsection on a homepage. Align wording with the repo-native [decision record entrypoint](../decisions/README.md).
 
 | Decision | Rough story |
 |----------|-------------|
@@ -130,7 +130,7 @@ Treat the project as **homepage-worthy** when **most** of the following are true
 - [ ] Clear **README** + **architecture overview** (diagram or layered description).
 - [ ] **Demo** (short video or screenshots) showing chat + upload + chart path -product, not only infra.
 - [ ] A **before ->after** engineering section (this file or a linked case study) with **dated** milestones.
-- [ ] A **trade-offs / decisions** page or section (can be this doc + ROADMAP Decision Log).
+- [ ] A **trade-offs / decisions** page or section (can be this doc + [decision records](../decisions/README.md)).
 - [ ] **Quantified** testing and CI story (what gates exist, what they protect).
 - [ ] **Operational evidence**: how logs and metrics are consumed; how readiness and rollback are run; how migrations are validated.
 - [ ] **Honest constraint paragraph**: shared host, no root, SQLite-first -and why that is **reasonable**, not accidental.
@@ -180,5 +180,4 @@ An honest homepage summary at this point is not "I built an AGI product." It is:
 ---
 
 *Last updated: 2026-04-10 - aligned with **v1.2.0** and the landed Phase 17 runtime slices so the portfolio narrative stays tied to shipped engineering outcomes, not version marketing.*
-
 

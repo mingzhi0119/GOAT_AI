@@ -39,7 +39,7 @@ Treat the repository structure as an engineering contract, not as a convenience 
   - `goat_ai/`: shared runtime packages that must not import `backend/`
   - `tools/`: canonical Python CLIs grouped by `contracts/`, `desktop/`, `ops/`, `quality/`, and `release/`
   - `ops/`: checked-in operator assets grouped by `deploy/`, `observability/`, `systemd/`, and `verification/`
-  - `docs/`: canonical documentation grouped by `api/`, `architecture/`, `governance/`, `operations/`, and `standards/`
+- `docs/`: canonical documentation grouped by `api/`, `architecture/`, `decisions/`, `governance/`, `operations/`, and `standards/`
   - `__tests__/`: automated checks grouped by `backend/`, `contracts/`, `desktop/`, `governance/`, `helpers/`, `integration/`, and `ops/`
   - `scripts/`: shell or PowerShell entrypoints only; canonical Python CLIs belong under `tools/`
 - Root files should stay limited to entrypoints, manifests, and repo-governance files such as `README.md`, `AGENTS.md`, `CLAUDE.md`, `server.py`, `pyproject.toml`, `requirements*.txt`, and `.env.example`.
@@ -193,6 +193,7 @@ Every change should preserve or improve the ten industrial-score dimensions belo
 - Reject changes that leave touched layers with red `lint`, `test`, `build`, `contract`, or security gates.
 - Treat user-visible garbled text, encoding regressions, or broken diagnostics as correctness issues, not cosmetic follow-ups.
 - Flag growing hotspot files early; if a touched mixed-concern file is already oversized, prefer extraction over further inline expansion.
+- Architecture-sensitive, compatibility-sensitive, or rollback-sensitive changes should link a decision record or decision package under `docs/decisions/` from the PR, or state `N/A` explicitly.
 - Keep `.github/CODEOWNERS` as the source of truth for default directory ownership.
 - Keep `.github/workflows/release-governance.yml` and the GitHub Environment approval rules aligned with the documented release process in `docs/operations/RELEASE_GOVERNANCE.md`.
 - Keep `.github/workflows/quality-trends.yml`, `tools/quality/quality_snapshot.py`, and `docs/governance/QUALITY_TRENDS.md` aligned when quality-trend inputs change.
@@ -235,6 +236,7 @@ Every change should preserve or improve the ten industrial-score dimensions belo
 - Keep docs UTF-8 without BOM.
 - Update related docs when user-visible semantics change.
 - Update roadmap, operations, or project-status docs when release gates, runbooks, or score-protection policies materially change.
+- Add or update a decision record or decision package under `docs/decisions/` when a change materially affects architecture, compatibility, rollback posture, or repo-governance tradeoffs.
 - Update `docs/governance/SECURITY_RESPONSE.md` when vulnerability response targets, dependency-refresh cadence, or credential-rotation expectations change.
 - When changing operator-facing metrics, update the versioned observability assets under `ops/observability/` and any affected incident runbooks in the same change.
 - When changing performance budgets or smoke-test semantics, update `tools/quality/load_chat_smoke.py`, the scheduled workflow, and `docs/operations/OPERATIONS.md` together.

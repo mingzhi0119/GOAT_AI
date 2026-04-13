@@ -274,6 +274,7 @@ P1 governance assets now live in-repo too:
 
 - [AGENTS.md](AGENTS.md): short index for agents; **canonical rules:** [docs/standards/ENGINEERING_STANDARDS.md](docs/standards/ENGINEERING_STANDARDS.md)
 - [docs/operations/WSL_DEVELOPMENT.md](docs/operations/WSL_DEVELOPMENT.md): selective WSL workflows for Linux-targeted validation on Windows
+- [docs/decisions/README.md](docs/decisions/README.md): decision records, decision packages, and templates for architecture-sensitive changes
 - [docs/governance/PROJECT_STATUS.md](docs/governance/PROJECT_STATUS.md): current shipped state
 - [docs/standards/APPEARANCE.md](docs/standards/APPEARANCE.md): appearance/theme architecture, controls, and extension rules
 - [docs/api/API_REFERENCE.md](docs/api/API_REFERENCE.md): endpoint contract

@@ -67,6 +67,7 @@ __tests__/ops/** @mingzhi0119
 # Docs / Assets
 docs/api/** @mingzhi0119
 docs/architecture/** @mingzhi0119
+docs/decisions/** @mingzhi0119
 docs/governance/** @mingzhi0119
 docs/operations/** @mingzhi0119
 docs/standards/** @mingzhi0119
