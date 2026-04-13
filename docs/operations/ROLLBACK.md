@@ -11,6 +11,8 @@ This runbook covers rollback on the shared-host deployment path.
 - Phase 16C note: if uploads, media, knowledge payloads, or generated artifacts were
   written after the rollback target, rollback is a paired SQLite + object-store
   operation, not a code-only change
+- Phase 16D note: hosted/server Postgres runtime metadata is restored from the
+  matching SQLite snapshot and parity-checked before it becomes the new write target
 
 ## 1) Pick a known-good rollback target
 
@@ -150,6 +152,17 @@ snapshot or version set.
 A ref or bundle rollback does not restore remote objects by itself.
 
 Follow [BACKUP_RESTORE.md](BACKUP_RESTORE.md) for the paired backup and restore drill.
+For hosted/server Postgres cutover rollback or rehearse-forward:
+
+```bash
+python -m tools.ops.upgrade_runtime_postgres_schema --dsn postgresql://goat:secret@db.example.com:5432/goat
+python -m tools.ops.import_runtime_metadata_snapshot --snapshot /path/to/backups/runtime_metadata_YYYYMMDD_HHMMSS.json --dsn postgresql://goat:secret@db.example.com:5432/goat
+python -m tools.ops.check_runtime_metadata_parity --snapshot /path/to/backups/runtime_metadata_YYYYMMDD_HHMMSS.json --dsn postgresql://goat:secret@db.example.com:5432/goat
+```
+
+Do not treat a code-only rollback as sufficient after a hosted/server Postgres
+cutover. The SQLite backup, object-store snapshot or version set, and imported
+runtime metadata snapshot must stay from the same capture window.
 
 ## 8) If rollback fails
 

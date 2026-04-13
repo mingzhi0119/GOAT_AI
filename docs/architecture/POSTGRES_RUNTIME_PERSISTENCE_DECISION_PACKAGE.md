@@ -4,19 +4,14 @@ Last updated: 2026-04-13
 
 ## Purpose
 
-Define the Phase 16D boundary for moving hosted/server runtime metadata off the
-current `SQLite-first` single-writer shape without weakening API, authorization,
-recovery, or rollback semantics.
+This document records the landed **Phase 16D** posture for hosted/server runtime
+metadata. The shipped implementation moves the governed runtime-metadata family to an
+opt-in Postgres backend for server deployments while preserving the existing
+HTTP/API, caller-scoped authz, recovery, and object-store semantics.
 
-## Context
+## Governed runtime-metadata family
 
-Phase 16C is now complete: uploads, media, generated artifacts, normalized knowledge
-payloads, vector-index payloads, and workspace-export blobs sit behind the shared
-object-store contract. The remaining storage-evolution work is the runtime metadata
-plane.
-
-That metadata still lives in SQLite today and covers more than chat history. The
-current persistence surface includes:
+Phase 16D treats the runtime metadata plane as one governed family:
 
 - `conversations`
 - `sessions`
@@ -35,135 +30,111 @@ current persistence surface includes:
 - `code_sandbox_execution_logs`
 - `schema_migrations`
 
-A lightweight decision record is not enough here because Phase 16D changes deployment
-shape, migration ordering, rollback posture, and operator-visible recovery behavior.
+`conversations` remains part of the hosted compatibility surface. It is included in
+the Postgres schema, repository adapters, snapshot import/parity tooling, and
+rollback proof.
 
-## Fixed constraints
+## Landed posture
 
-- Preserve the current HTTP/API contract, caller-scoped authz behavior, and recovery
-  semantics.
-- Keep object/blob payloads on the Phase 16C object-store boundary; Phase 16D changes
-  runtime metadata only.
-- Keep local development and desktop on SQLite until hosted/server Postgres behavior
-  is mechanically proven.
-- Land additively first; avoid irreversible backfill or in-place SQLite mutation
-  before compatibility proof exists.
-
-## Decision
-
-Phase 16D should target a hosted/server-only Postgres runtime metadata backend first,
-while SQLite remains the authoritative local/desktop backend.
-
-Implementation must follow these rules:
-
-- preserve one repository/service contract so storage-engine choice stays behind the
-  current backend boundaries
-- move the runtime metadata surfaces as one governed family rather than through
-  unrelated table-by-table cutovers that would break event ordering or recovery
-  assumptions
-- keep `storage_key` as the durable link from metadata rows to the Phase 16C
+- `GOAT_RUNTIME_METADATA_BACKEND=sqlite` remains the default runtime metadata mode
+- `GOAT_RUNTIME_METADATA_BACKEND=postgres` is a hosted/server-only mode and requires
+  `GOAT_DEPLOY_TARGET=server` plus `GOAT_RUNTIME_POSTGRES_DSN`
+- local development and desktop installs stay on SQLite
+- Alembic under `backend/alembic/` owns hosted/server Postgres schema truth
+- runtime adapters stay on explicit SQL/query boundaries rather than introducing an
+  ORM rewrite
+- repository and service callers still bind through the existing runtime-persistence
+  factory seam in `backend/services/runtime_persistence.py`
+- `storage_key` remains the durable link from runtime metadata rows to Phase 16C
   object-store payloads
-- prefer explicit export/import plus parity validation over long-lived dual-write for
-  hosted cutover, because idempotency, queued-task ordering, and replayable log/event
-  guarantees are harder to prove under mixed primaries
 
-## Options considered
+## Landed implementation surface
 
-- Keep SQLite for every deployment:
-  - rejected because it preserves the current single-writer hosting ceiling
-- Replace SQLite everywhere in one cutover:
-  - rejected because it needlessly breaks desktop/local expectations and creates a
-    large rollback blast radius
-- Hosted/server Postgres first, SQLite retained for local/desktop:
-  - chosen because it isolates hosted needs without forcing an immediate local-runtime
-    rewrite
+- backend selection and initialization:
+  - `goat_ai/config/settings.py`
+  - `backend/services/runtime_persistence.py`
+  - `backend/services/postgres_runtime_support.py`
+- governed inventory and snapshot logic:
+  - `backend/services/runtime_metadata_inventory.py`
+  - `backend/services/runtime_metadata_snapshot.py`
+- hosted/server Postgres repository adapters:
+  - `backend/services/chat_runtime.py`
+  - `backend/services/idempotency_service.py`
+  - `backend/services/knowledge_repository.py`
+  - `backend/services/media_service.py`
+  - `backend/services/workbench_runtime.py`
+  - `backend/services/code_sandbox_runtime.py`
+- operator-facing cutover tooling:
+  - `python -m tools.ops.upgrade_runtime_postgres_schema`
+  - `python -m tools.ops.export_runtime_metadata_snapshot`
+  - `python -m tools.ops.import_runtime_metadata_snapshot`
+  - `python -m tools.ops.check_runtime_metadata_parity`
 
-## Compatibility strategy
+## Cutover and rollback posture
 
-- SQLite remains the default backend until a separate hosted rollout is explicitly
-  enabled.
-- Postgres schema rollout must be additive and mirror the current repository-facing
-  invariants before any hosted write-path cutover.
-- Hosted cutover should use a deterministic SQLite snapshot export/import path plus
-  parity validation rather than assuming cross-engine live dual-write.
-- Downgrade/rollback after hosted cutover requires restoring the last known-good
-  SQLite snapshot and the matching Phase 16C object-store snapshot from the same
-  capture window.
-- Desktop/local binaries must not depend on Postgres-only behavior while SQLite
-  remains the shipped local backend.
+The first shipped hosted/server posture is additive-first and does not rely on
+dual-write.
 
-## Migration or rollout sequence
+Cutover sequence:
 
-1. Approve this package as the only valid Phase 16D implementation posture.
-2. Add backend-selection/config truth for runtime metadata, keeping SQLite default and
-   desktop/local behavior unchanged.
-3. Introduce Postgres schema/migration assets that preserve the current repository
-   invariants and tenancy fields.
-4. Build deterministic SQLite export/import tooling and parity checks for the full
-   runtime metadata surface.
-5. Add repository-adapter tests that prove SQLite and Postgres implementations obey
-   the same contracts.
-6. Enable hosted/server Postgres writes only after compatibility, rollback, and
-   failure-path coverage are green.
-7. Revisit desktop/local storage-engine expectations only in a later, separate slice
-   if keeping SQLite there becomes a real cost.
+1. Capture one maintenance window: SQLite backup plus object-store snapshot or version
+   set.
+2. Export a deterministic SQLite runtime metadata snapshot with
+   `python -m tools.ops.export_runtime_metadata_snapshot`.
+3. Provision an empty Postgres target and apply Alembic head with
+   `python -m tools.ops.upgrade_runtime_postgres_schema`.
+4. Import the runtime metadata snapshot with
+   `python -m tools.ops.import_runtime_metadata_snapshot`.
+5. Run live parity against the Postgres target with
+   `python -m tools.ops.check_runtime_metadata_parity`.
+6. Only after parity succeeds, switch the hosted/server deployment to
+   `GOAT_RUNTIME_METADATA_BACKEND=postgres`.
 
-## Rollback strategy
+Rollback posture:
 
-- Do not mutate or drop SQLite tables as part of the initial hosted Postgres rollout.
-- If hosted Postgres cutover fails, return to the last known-good SQLite snapshot and
-  restore the matching object-store snapshot/version set from the same capture window.
-- Avoid any design that requires old binaries to read partially migrated Postgres
-  state.
-- Treat workbench tasks/events, sandbox executions/logs, and idempotency rows as
-  rollback-critical data because they encode recovery ordering rather than just user
-  content.
+- do not mutate or drop SQLite tables as part of the initial hosted Postgres rollout
+- keep the SQLite backup, runtime metadata snapshot, and object-store snapshot or
+  version set from the same capture window
+- if hosted Postgres cutover fails, restore the matched SQLite plus object-store set
+  and rebuild or re-import the Postgres target from that same capture window
+- treat workbench tasks/events, sandbox executions/logs, idempotency rows, and
+  `conversations` as rollback-critical because they encode ordering and audit history,
+  not just user content
 
 ## Validation and proof
 
-- Tests:
-  - repository contract tests for SQLite and Postgres implementations
-  - migration/export/import parity tests across the full runtime metadata surface
-  - black-box authz and artifact/knowledge/media/workbench regression tests against
-    the selected backend
-  - failure-path coverage for rollback and recovery ordering
-- Contracts or generated artifacts:
-  - `docs/api/API_REFERENCE.md`
-  - `docs/architecture/STORAGE_EVOLUTION_DECISION_PACKAGE.md`
-  - `docs/architecture/EXTERNAL_OBJECT_STORAGE_DECISION_PACKAGE.md`
-- Workflow or runbook links:
+Required proof for the shipped Phase 16D posture:
+
+- repository contract tests for SQLite and Postgres implementations
+- Alembic upgrade-to-head proof, including idempotent rerun on an already-upgraded
+  target
+- SQLite snapshot export plus Postgres import/parity proof across the full governed
+  table family
+- failure-path coverage for backend selection, empty-target import requirements,
+  parity mismatches, recovery ordering, and append-only `conversations` behavior
+- synced runbooks and governance artifacts:
   - `docs/operations/OPERATIONS.md`
   - `docs/operations/BACKUP_RESTORE.md`
   - `docs/operations/ROLLBACK.md`
-  - `python -m tools.ops.export_runtime_metadata_snapshot`
+  - `docs/architecture/STORAGE_EVOLUTION_DECISION_PACKAGE.md`
+  - `docs/governance/PROJECT_STATUS.md`
+  - `docs/governance/ROADMAP.md`
+  - `docs/governance/ROADMAP_ARCHIVE.md`
 
-Current landed groundwork for this package:
+## Residual boundaries
 
-- runtime backend selection and fail-fast seams now live in
-  `goat_ai/config/settings.py` plus `backend/services/runtime_persistence.py`
-- the governed runtime metadata family now has one canonical inventory in
-  `backend/services/runtime_metadata_inventory.py`
-- deterministic SQLite export proof now starts with
-  `python -m tools.ops.export_runtime_metadata_snapshot`
-
-## Open questions
-
-- Which migration/tooling stack should own Postgres schema truth for this repo
-  (`sqlite3`-style SQL files, Alembic, or another additive-only path)?
-- Which runtime tables, if any, need Postgres-specific sequence/partition strategy for
-  workbench events or sandbox logs at hosted scale?
-- Does the legacy `conversations` table remain part of the hosted compatibility
-  surface, or can it eventually become SQLite-only historical baggage after separate
-  proof?
+- hosted/server Postgres is opt-in; it is not the default local or desktop runtime
+- future local/desktop storage-engine changes remain a separate follow-on if keeping
+  SQLite there becomes a real cost
+- this slice does not change frontend-visible contracts or widen authz capability
+  promises
 
 ## Related artifacts
 
-- Roadmap item: `docs/governance/ROADMAP.md` Phase 16D
-- Status or operations docs:
-  - `docs/governance/PROJECT_STATUS.md`
-  - `docs/operations/OPERATIONS.md`
-  - `docs/operations/BACKUP_RESTORE.md`
-  - `docs/operations/ROLLBACK.md`
-- Related PRs or follow-ups:
-  - `docs/architecture/STORAGE_EVOLUTION_DECISION_PACKAGE.md`
-  - `docs/architecture/EXTERNAL_OBJECT_STORAGE_DECISION_PACKAGE.md`
+- [STORAGE_EVOLUTION_DECISION_PACKAGE.md](STORAGE_EVOLUTION_DECISION_PACKAGE.md)
+- [OBJECT_STORAGE_CONTRACT.md](OBJECT_STORAGE_CONTRACT.md)
+- [OPERATIONS.md](../operations/OPERATIONS.md)
+- [BACKUP_RESTORE.md](../operations/BACKUP_RESTORE.md)
+- [ROLLBACK.md](../operations/ROLLBACK.md)
+- [PROJECT_STATUS.md](../governance/PROJECT_STATUS.md)
+- [ROADMAP_ARCHIVE.md](../governance/ROADMAP_ARCHIVE.md)

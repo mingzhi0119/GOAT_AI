@@ -212,7 +212,11 @@ def test_release_docs_and_status_match_current_truth() -> None:
     assert "<app_log_dir>/desktop-shell.log" in operations_doc
     assert "GOAT_OBJECT_STORE_ROOT" in backup_restore_doc
     assert "bucket/prefix snapshot" in backup_restore_doc
+    assert "python -m tools.ops.upgrade_runtime_postgres_schema" in backup_restore_doc
+    assert "python -m tools.ops.import_runtime_metadata_snapshot" in backup_restore_doc
+    assert "python -m tools.ops.check_runtime_metadata_parity" in backup_restore_doc
     assert "paired SQLite + object-store" in rollback_doc
+    assert "python -m tools.ops.upgrade_runtime_postgres_schema" in rollback_doc
     assert "P0, P1, and P2 are complete" not in project_status
     assert "artifact-first staged release governance workflow" in project_status
     assert "backend-fast -> backend-heavy -> backend" in project_status

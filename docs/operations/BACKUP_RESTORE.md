@@ -1,8 +1,8 @@
 # GOAT AI Runtime Backup and Restore
 
-This runbook covers safe backup and restore for the SQLite runtime metadata store and
-the paired object-store payloads that Phase 16C moved behind the shared storage
-boundary.
+This runbook covers safe backup and restore for the SQLite runtime metadata capture
+set, the paired object-store payloads that Phase 16C moved behind the shared storage
+boundary, and the hosted/server Postgres cutover target introduced by Phase 16D.
 
 ## Scope
 
@@ -14,9 +14,13 @@ boundary.
     (defaulting to `GOAT_DATA_DIR`)
   - `GOAT_OBJECT_STORE_BACKEND=s3`: files live in
     `GOAT_OBJECT_STORE_BUCKET` plus optional `GOAT_OBJECT_STORE_PREFIX`
-- The checked-in tooling (`python -m tools.ops.backup_chat_db` and
-  `python -m tools.ops.exercise_recovery_drill`) currently proves the SQLite side
-  only. Object-payload capture is still operator-owned.
+- The checked-in tooling now covers both halves of the cutover proof:
+  `python -m tools.ops.backup_chat_db` plus
+  `python -m tools.ops.export_runtime_metadata_snapshot` for the SQLite capture, and
+  `python -m tools.ops.upgrade_runtime_postgres_schema` plus
+  `python -m tools.ops.import_runtime_metadata_snapshot` plus
+  `python -m tools.ops.check_runtime_metadata_parity` for the hosted/server Postgres
+  restore target. Object-payload capture is still operator-owned.
 
 ## 1) Create a paired backup window
 
@@ -45,6 +49,15 @@ python -m tools.ops.export_runtime_metadata_snapshot --out /path/to/backups/runt
 
 5. Record the SQLite backup filename, the runtime metadata snapshot filename, and the object-store snapshot identifier
    together. They are one restore set.
+6. If the restore target is hosted/server Postgres, provision an empty runtime DB,
+   apply the Alembic schema, import the snapshot, and run parity before opening
+   writes:
+
+```bash
+python -m tools.ops.upgrade_runtime_postgres_schema --dsn postgresql://goat:secret@db.example.com:5432/goat
+python -m tools.ops.import_runtime_metadata_snapshot --snapshot /path/to/backups/runtime_metadata_YYYYMMDD_HHMMSS.json --dsn postgresql://goat:secret@db.example.com:5432/goat
+python -m tools.ops.check_runtime_metadata_parity --snapshot /path/to/backups/runtime_metadata_YYYYMMDD_HHMMSS.json --dsn postgresql://goat:secret@db.example.com:5432/goat
+```
 
 ## 2) Verify backup integrity
 
@@ -73,6 +86,10 @@ Runtime metadata snapshot verification:
 - the exported JSON should include the full governed table family, including
   sessions, artifacts, knowledge/media metadata, workbench tasks/events/outputs,
   sandbox executions/events/logs, idempotency rows, and `schema_migrations`
+- the hosted/server Postgres target should remain empty until
+  `python -m tools.ops.import_runtime_metadata_snapshot` runs
+- `python -m tools.ops.check_runtime_metadata_parity` must report no mismatches
+  before the Postgres target is treated as cutover-ready
 
 Object-payload verification:
 
@@ -117,7 +134,14 @@ before re-opening writes.
 
 - SQLite backup is online-safe via `sqlite3.Connection.backup()` in
   `tools/ops/backup_chat_db.py`.
-- `python -m tools.ops.export_runtime_metadata_snapshot` is the deterministic runtime metadata snapshot path for current Phase 16D parity work; keep it paired with the raw SQLite backup rather than treating it as a replacement.
+- `python -m tools.ops.export_runtime_metadata_snapshot` is the deterministic runtime metadata snapshot path for hosted/server cutover and rollback proof; keep it paired with the raw SQLite backup rather than treating it as a replacement.
+- `python -m tools.ops.upgrade_runtime_postgres_schema` is the canonical checked-in entrypoint for applying Alembic head to an empty hosted/server Postgres target before import.
+- `python -m tools.ops.import_runtime_metadata_snapshot` restores the governed
+  SQLite snapshot into an empty hosted/server Postgres target after Alembic schema
+  upgrade.
+- `python -m tools.ops.check_runtime_metadata_parity` is the required live proof
+  that the Postgres target matches the captured SQLite snapshot before write-path
+  cutover.
 - `python -m tools.ops.exercise_recovery_drill` remains the preferred non-production
   rehearsal path for SQLite because it verifies backup integrity, restore bytes, and
   rollback bytes together instead of relying on a handwritten copy sequence.

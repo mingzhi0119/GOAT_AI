@@ -5,11 +5,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from __tests__.helpers.postgres_runtime import postgres_runtime_container
 from backend.services.db_migrations import apply_migrations
+from backend.services.postgres_runtime_support import run_postgres_runtime_migrations
 from backend.services.runtime_metadata_inventory import RUNTIME_METADATA_TABLES
 from backend.services.runtime_metadata_snapshot import (
     SNAPSHOT_FORMAT_VERSION,
+    compare_runtime_metadata_snapshot_to_postgres,
     export_sqlite_runtime_metadata_snapshot,
+    import_runtime_metadata_snapshot_to_postgres,
     write_sqlite_runtime_metadata_snapshot,
 )
 
@@ -122,6 +126,44 @@ class RuntimeMetadataSnapshotTests(unittest.TestCase):
 
             with self.assertRaisesRegex(RuntimeError, "missing tables"):
                 export_sqlite_runtime_metadata_snapshot(db_path)
+
+    def test_import_and_parity_round_trip_against_postgres(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            db_path = Path(tmp) / "runtime.db"
+            apply_migrations(db_path)
+
+            import sqlite3
+
+            with sqlite3.connect(db_path) as conn:
+                conn.execute(
+                    """
+                    INSERT INTO sessions
+                        (id, title, model, schema_version, created_at, updated_at, messages, owner_id, tenant_id, principal_id)
+                    VALUES
+                        ('session-1', 'Session', 'llama3', 4, '2026-04-13T10:00:00Z', '2026-04-13T10:00:01Z', '{"version":4,"messages":[{"role":"user","content":"hello"}]}', 'owner-1', 'tenant-1', 'principal-1')
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO conversations
+                        (created_at, ip, model, turn_count, user_message, assistant_response, response_ms, user_name, session_id)
+                    VALUES
+                        ('2026-04-13T10:00:02Z', '127.0.0.1', 'llama3', 1, 'hello', 'world', 15, 'user', 'session-1')
+                    """
+                )
+                conn.commit()
+
+            snapshot = export_sqlite_runtime_metadata_snapshot(db_path)
+
+            with postgres_runtime_container() as dsn:
+                run_postgres_runtime_migrations(dsn)
+                import_runtime_metadata_snapshot_to_postgres(snapshot=snapshot, dsn=dsn)
+                mismatches = compare_runtime_metadata_snapshot_to_postgres(
+                    snapshot=snapshot,
+                    dsn=dsn,
+                )
+
+            self.assertEqual([], mismatches)
 
 
 if __name__ == "__main__":
