@@ -154,9 +154,11 @@ Notes:
 
 - `code_sandbox.policy_allowed` remains caller-specific and separate from runtime readiness
 - `code_sandbox.provider_name`, `isolation_level`, and `network_policy_enforced` describe the currently selected backend contract; `localhost` is a weaker trusted-dev fallback than Docker
-- `workbench.*` is reported per capability; workbench can be enabled overall while specific surfaces still remain unavailable
+- `workbench.*` is reported per capability and per caller; the same deployment may return different `allowed_by_config`, `effective_enabled`, and `deny_reason` values for different credentials
+- `workbench.agent_tasks`, `browse`, `deep_research`, and `connectors` are write-scoped capability views; `artifact_workspace` and `project_memory` are read-scoped capability views, so this endpoint must not be treated as a pure operator-global mirror
 - `workbench.browse` / `workbench.deep_research` report capability-level readiness, not source-specific readiness; use `GET /api/workbench/sources` to decide whether the global `web` source itself is runnable
 - `workbench.artifact_workspace` now reflects the shipped baseline for durable workspace outputs plus export-to-artifact linkage
+- `workbench.project_memory` remains a caller-visible placeholder for future widening and should stay `deny_reason = "not_implemented"` until a real runtime exists
 - frontend UI should use this endpoint to hide or disable unavailable surfaces instead of assuming that a visible button implies runtime support
 
 ## `GET /api/models`
@@ -915,7 +917,7 @@ Returns machine-readable flags for optional high-risk features (see `docs/standa
 }
 ```
 
-`policy_allowed` is evaluated per caller from the current request's authorization context; for `code_sandbox`, the scope is `sandbox:execute`. `deny_reason` when the **runtime** gate is closed is one of: `disabled_by_operator`, `docker_unavailable`, or `localhost_unavailable` (controlled enum; not raw exception text).
+`policy_allowed` is evaluated per caller from the current request's authorization context; for `code_sandbox`, the scope is `sandbox:execute`. For `workbench`, each entry is also a caller-scoped capability view rather than a deployment-global mirror: read-scoped callers can still see `artifact_workspace` as enabled while `agent_tasks`, `browse`, or `deep_research` remain denied. `deny_reason` when the **runtime** gate is closed is one of: `disabled_by_operator`, `docker_unavailable`, `localhost_unavailable`, or `not_implemented` (controlled enum; not raw exception text).
 
 ## `GET /api/system/desktop`
 

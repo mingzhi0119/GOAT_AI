@@ -367,6 +367,31 @@ class UnsafeOutputLLM(ContractFakeLLM):
 
 @unittest.skipUnless(TestClient is not None, "fastapi not installed")
 class ApiBlackboxContractTests(unittest.TestCase):
+    def assert_workbench_feature_state(
+        self,
+        workbench: dict[str, object],
+        feature_name: str,
+        *,
+        allowed_by_config: bool,
+        available_on_host: bool,
+        effective_enabled: bool,
+        deny_reason: str | None,
+    ) -> None:
+        self.assertEqual(
+            {
+                "allowed_by_config": allowed_by_config,
+                "available_on_host": available_on_host,
+                "effective_enabled": effective_enabled,
+                "deny_reason": deny_reason,
+            },
+            {
+                "allowed_by_config": workbench[feature_name]["allowed_by_config"],
+                "available_on_host": workbench[feature_name]["available_on_host"],
+                "effective_enabled": workbench[feature_name]["effective_enabled"],
+                "deny_reason": workbench[feature_name]["deny_reason"],
+            },
+        )
+
     def setUp(self) -> None:
         self.tmpdir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         root = Path(self.tmpdir.name)
@@ -1371,6 +1396,157 @@ class ApiBlackboxContractTests(unittest.TestCase):
         missing = self.client.get("/api/workbench/tasks/wb-missing")
         self.assertEqual(404, missing.status_code)
         self.assertEqual("Workbench task not found", missing.json()["detail"])
+
+    def test_system_features_workbench_entries_are_caller_scoped_capability_view(
+        self,
+    ) -> None:
+        self.settings = replace(
+            self.settings,
+            feature_agent_workbench_enabled=True,
+            api_key="bootstrap-auth-enabled",
+            api_key_write="",
+            api_credentials_json="""
+            [
+              {
+                "credential_id": "cred-workbench-reader",
+                "secret": "workbench-reader",
+                "principal_id": "principal:reader",
+                "tenant_id": "tenant:default",
+                "status": "active",
+                "scopes": ["history:read", "workbench:read"]
+              },
+              {
+                "credential_id": "cred-workbench-writer",
+                "secret": "workbench-writer",
+                "principal_id": "principal:writer",
+                "tenant_id": "tenant:default",
+                "status": "active",
+                "scopes": ["history:read", "workbench:read", "workbench:write"]
+              }
+            ]
+            """,
+        )
+        self.client.app.dependency_overrides[get_settings] = lambda: self.settings
+
+        reader_features = self.client.get(
+            "/api/system/features",
+            headers={"X-GOAT-API-Key": "workbench-reader"},
+        )
+        writer_features = self.client.get(
+            "/api/system/features",
+            headers={"X-GOAT-API-Key": "workbench-writer"},
+        )
+        self.assertEqual(200, reader_features.status_code)
+        self.assertEqual(200, writer_features.status_code)
+        reader_workbench = reader_features.json()["workbench"]
+        writer_workbench = writer_features.json()["workbench"]
+
+        self.assert_workbench_feature_state(
+            reader_workbench,
+            "agent_tasks",
+            allowed_by_config=False,
+            available_on_host=True,
+            effective_enabled=False,
+            deny_reason="permission_denied",
+        )
+        self.assert_workbench_feature_state(
+            reader_workbench,
+            "browse",
+            allowed_by_config=False,
+            available_on_host=True,
+            effective_enabled=False,
+            deny_reason="permission_denied",
+        )
+        self.assert_workbench_feature_state(
+            reader_workbench,
+            "deep_research",
+            allowed_by_config=False,
+            available_on_host=True,
+            effective_enabled=False,
+            deny_reason="permission_denied",
+        )
+        self.assert_workbench_feature_state(
+            reader_workbench,
+            "artifact_workspace",
+            allowed_by_config=True,
+            available_on_host=True,
+            effective_enabled=True,
+            deny_reason=None,
+        )
+        self.assert_workbench_feature_state(
+            reader_workbench,
+            "project_memory",
+            allowed_by_config=True,
+            available_on_host=False,
+            effective_enabled=False,
+            deny_reason="not_implemented",
+        )
+        self.assert_workbench_feature_state(
+            reader_workbench,
+            "connectors",
+            allowed_by_config=False,
+            available_on_host=False,
+            effective_enabled=False,
+            deny_reason="permission_denied",
+        )
+
+        self.assert_workbench_feature_state(
+            writer_workbench,
+            "agent_tasks",
+            allowed_by_config=True,
+            available_on_host=True,
+            effective_enabled=True,
+            deny_reason=None,
+        )
+        self.assert_workbench_feature_state(
+            writer_workbench,
+            "browse",
+            allowed_by_config=True,
+            available_on_host=True,
+            effective_enabled=True,
+            deny_reason=None,
+        )
+        self.assert_workbench_feature_state(
+            writer_workbench,
+            "deep_research",
+            allowed_by_config=True,
+            available_on_host=True,
+            effective_enabled=True,
+            deny_reason=None,
+        )
+        self.assert_workbench_feature_state(
+            writer_workbench,
+            "artifact_workspace",
+            allowed_by_config=True,
+            available_on_host=True,
+            effective_enabled=True,
+            deny_reason=None,
+        )
+        self.assert_workbench_feature_state(
+            writer_workbench,
+            "project_memory",
+            allowed_by_config=True,
+            available_on_host=False,
+            effective_enabled=False,
+            deny_reason="not_implemented",
+        )
+        self.assert_workbench_feature_state(
+            writer_workbench,
+            "connectors",
+            allowed_by_config=True,
+            available_on_host=False,
+            effective_enabled=False,
+            deny_reason="not_implemented",
+        )
+
+        self.assertNotEqual(
+            reader_workbench["agent_tasks"],
+            writer_workbench["agent_tasks"],
+        )
+        self.assertNotEqual(
+            reader_workbench["browse"],
+            writer_workbench["browse"],
+        )
 
     def test_workbench_rejects_incompatible_source_for_task_kind(self) -> None:
         self.settings = replace(self.settings, feature_agent_workbench_enabled=True)

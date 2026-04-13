@@ -74,6 +74,31 @@ class AuthzNoopWorkbenchTaskDispatcher:
 
 @unittest.skipUnless(TestClient is not None, "fastapi not installed")
 class ApiAuthzTests(unittest.TestCase):
+    def assert_workbench_feature_state(
+        self,
+        workbench: dict[str, object],
+        feature_name: str,
+        *,
+        allowed_by_config: bool,
+        available_on_host: bool,
+        effective_enabled: bool,
+        deny_reason: str | None,
+    ) -> None:
+        self.assertEqual(
+            {
+                "allowed_by_config": allowed_by_config,
+                "available_on_host": available_on_host,
+                "effective_enabled": effective_enabled,
+                "deny_reason": deny_reason,
+            },
+            {
+                "allowed_by_config": workbench[feature_name]["allowed_by_config"],
+                "available_on_host": workbench[feature_name]["available_on_host"],
+                "effective_enabled": workbench[feature_name]["effective_enabled"],
+                "deny_reason": workbench[feature_name]["deny_reason"],
+            },
+        )
+
     def setUp(self) -> None:
         self.tmpdir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         root = Path(self.tmpdir.name)
@@ -366,11 +391,54 @@ class ApiAuthzTests(unittest.TestCase):
         )
         self.assertEqual(200, features.status_code)
         workbench = features.json()["workbench"]
-        self.assertFalse(workbench["agent_tasks"]["effective_enabled"])
-        self.assertFalse(workbench["browse"]["effective_enabled"])
-        self.assertFalse(workbench["deep_research"]["effective_enabled"])
-        self.assertTrue(workbench["artifact_workspace"]["effective_enabled"])
-        self.assertFalse(workbench["connectors"]["effective_enabled"])
+        self.assert_workbench_feature_state(
+            workbench,
+            "agent_tasks",
+            allowed_by_config=False,
+            available_on_host=True,
+            effective_enabled=False,
+            deny_reason="permission_denied",
+        )
+        self.assert_workbench_feature_state(
+            workbench,
+            "browse",
+            allowed_by_config=False,
+            available_on_host=True,
+            effective_enabled=False,
+            deny_reason="permission_denied",
+        )
+        self.assert_workbench_feature_state(
+            workbench,
+            "deep_research",
+            allowed_by_config=False,
+            available_on_host=True,
+            effective_enabled=False,
+            deny_reason="permission_denied",
+        )
+        self.assert_workbench_feature_state(
+            workbench,
+            "artifact_workspace",
+            allowed_by_config=True,
+            available_on_host=True,
+            effective_enabled=True,
+            deny_reason=None,
+        )
+        self.assert_workbench_feature_state(
+            workbench,
+            "project_memory",
+            allowed_by_config=True,
+            available_on_host=False,
+            effective_enabled=False,
+            deny_reason="not_implemented",
+        )
+        self.assert_workbench_feature_state(
+            workbench,
+            "connectors",
+            allowed_by_config=False,
+            available_on_host=False,
+            effective_enabled=False,
+            deny_reason="permission_denied",
+        )
 
         desktop = self.client.get(
             "/api/system/desktop",
