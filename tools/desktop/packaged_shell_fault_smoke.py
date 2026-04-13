@@ -8,12 +8,19 @@ import subprocess
 import time
 from contextlib import contextmanager, nullcontext
 from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 SCENARIO_EXPECTED_STAGE = {
     "missing_sidecar": "backend_spawn_failed",
     "exit_before_ready": "backend_terminated_before_ready",
     "hang_before_ready": "health_wait_timeout",
+}
+
+SCENARIO_EQUIVALENT_LOG_MARKERS = {
+    "exit_before_ready": (
+        "GOAT desktop backend sidecar terminated before startup completed",
+    ),
 }
 
 INTERNAL_TEST_FLAG = "GOAT_DESKTOP_INTERNAL_TEST"
@@ -28,11 +35,26 @@ DEFAULT_WINDOWS_APP_IDENTIFIER = "com.simonbb.goatai"
 @dataclass(frozen=True)
 class PackagedShellFaultResult:
     scenario: str
-    exit_code: int
-    failure_stage: str
-    log_path: str
     stdout_path: str
     stderr_path: str
+    exit_code: int | None = None
+    failure_stage: str | None = None
+    log_path: str | None = None
+    status: str = "passed"
+    error: str | None = None
+    started_at_utc: str | None = None
+    completed_at_utc: str | None = None
+
+
+class PackagedShellFaultScenarioError(SystemExit):
+    def __init__(
+        self,
+        message: str,
+        *,
+        result: PackagedShellFaultResult,
+    ) -> None:
+        super().__init__(message)
+        self.result = result
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -61,6 +83,10 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def utc_now() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def _reserve_local_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))
@@ -75,6 +101,7 @@ def build_fault_smoke_environment(
     restart_limit: int,
     backoff_ms: int,
     hang_sec: float,
+    app_identifier: str = DEFAULT_WINDOWS_APP_IDENTIFIER,
 ) -> dict[str, str]:
     runtime_root = base_dir / "runtime-env"
     local_appdata = runtime_root / "LocalAppData"
@@ -87,6 +114,14 @@ def build_fault_smoke_environment(
     env["APPDATA"] = str(roaming_appdata)
     env["GOAT_DESKTOP_BACKEND_HOST"] = "127.0.0.1"
     env["GOAT_DESKTOP_BACKEND_PORT"] = str(_reserve_local_port())
+    env["GOAT_DESKTOP_APP_DATA_DIR"] = str(local_appdata / app_identifier)
+    env["GOAT_RUNTIME_ROOT"] = env["GOAT_DESKTOP_APP_DATA_DIR"]
+    env["GOAT_LOG_DIR"] = str(local_appdata / app_identifier / "logs")
+    env["GOAT_LOG_PATH"] = str(local_appdata / app_identifier / "chat_logs.db")
+    env["GOAT_DATA_DIR"] = str(local_appdata / app_identifier / "data")
+    env["GOAT_DESKTOP_SHELL_LOG_PATH"] = str(
+        local_appdata / app_identifier / "logs" / "desktop-shell.log"
+    )
     env[INTERNAL_TEST_FLAG] = "1"
     env[INTERNAL_TEST_SCENARIO] = "" if scenario == "missing_sidecar" else scenario
     env[INTERNAL_TEST_HEALTH_TIMEOUT_SEC] = str(health_timeout_sec)
@@ -103,8 +138,16 @@ def discover_desktop_log(root: Path) -> Path:
     return max(matches, key=lambda path: path.stat().st_mtime_ns)
 
 
-def fallback_desktop_log_path(app_identifier: str) -> Path:
-    local_appdata = Path(os.environ.get("LOCALAPPDATA", "")).expanduser()
+def fallback_desktop_log_path(
+    app_identifier: str,
+    *,
+    local_appdata: Path | None = None,
+) -> Path:
+    local_appdata = (
+        local_appdata
+        if local_appdata is not None
+        else Path(os.environ.get("LOCALAPPDATA", "")).expanduser()
+    )
     if not str(local_appdata).strip():
         raise SystemExit(
             "LOCALAPPDATA was not available for packaged-shell fault smoke."
@@ -125,7 +168,10 @@ def validate_fault_smoke_log(*, scenario: str, exit_code: int, log_text: str) ->
             f"Scenario {scenario} unexpectedly exited cleanly; expected fail-closed behavior."
         )
     expected_stage = SCENARIO_EXPECTED_STAGE[scenario]
-    if expected_stage not in log_text:
+    equivalent_markers = SCENARIO_EQUIVALENT_LOG_MARKERS.get(scenario, ())
+    if expected_stage not in log_text and not any(
+        marker in log_text for marker in equivalent_markers
+    ):
         raise SystemExit(
             f"Scenario {scenario} did not record expected failure stage {expected_stage!r}."
         )
@@ -171,6 +217,47 @@ def _launch_desktop(
     return int(returncode)
 
 
+def _write_json(path: Path, payload: dict[str, object]) -> None:
+    path.write_text(
+        json.dumps(payload, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_scenario_result(
+    *,
+    scenario_dir: Path,
+    result: PackagedShellFaultResult,
+) -> None:
+    _write_json(scenario_dir / "result.json", asdict(result))
+
+
+def _build_failed_result(
+    *,
+    scenario: str,
+    scenario_dir: Path,
+    stdout_path: Path,
+    stderr_path: Path,
+    started_at_utc: str,
+    error: str,
+    log_path: Path | None = None,
+    exit_code: int | None = None,
+    failure_stage: str | None = None,
+) -> PackagedShellFaultResult:
+    return PackagedShellFaultResult(
+        scenario=scenario,
+        stdout_path=str(stdout_path),
+        stderr_path=str(stderr_path),
+        exit_code=exit_code,
+        failure_stage=failure_stage,
+        log_path=str(log_path) if log_path is not None else None,
+        status="failed",
+        error=error,
+        started_at_utc=started_at_utc,
+        completed_at_utc=utc_now(),
+    )
+
+
 @contextmanager
 def _temporarily_move_sidecar(sidecar_path: Path, scenario_dir: Path):
     if not sidecar_path.is_file():
@@ -201,6 +288,7 @@ def run_fault_scenario(
     scenario_dir.mkdir(parents=True, exist_ok=True)
     stdout_path = scenario_dir / "desktop.stdout.log"
     stderr_path = scenario_dir / "desktop.stderr.log"
+    started_at_utc = utc_now()
     env = build_fault_smoke_environment(
         base_dir=scenario_dir,
         scenario=scenario,
@@ -208,8 +296,12 @@ def run_fault_scenario(
         restart_limit=restart_limit,
         backoff_ms=backoff_ms,
         hang_sec=hang_sec,
+        app_identifier=app_identifier,
     )
-    fallback_log = fallback_desktop_log_path(app_identifier)
+    fallback_log = fallback_desktop_log_path(
+        app_identifier,
+        local_appdata=Path(env["LOCALAPPDATA"]),
+    )
     baseline_log = fallback_log.read_bytes() if fallback_log.is_file() else b""
     sidecar_context = (
         _temporarily_move_sidecar(sidecar_path, scenario_dir)
@@ -217,46 +309,105 @@ def run_fault_scenario(
         else nullcontext()
     )
 
-    with sidecar_context:
-        exit_code = _launch_desktop(
-            desktop_exe=desktop_exe,
-            env=env,
+    try:
+        with sidecar_context:
+            exit_code = _launch_desktop(
+                desktop_exe=desktop_exe,
+                env=env,
+                stdout_path=stdout_path,
+                stderr_path=stderr_path,
+                timeout_sec=startup_timeout_sec,
+            )
+
+        time.sleep(0.5)
+        if any(path.is_file() for path in scenario_dir.rglob("desktop-shell.log")):
+            source_log_path = discover_desktop_log(scenario_dir)
+            copied_log_path = source_log_path
+            log_text = source_log_path.read_text(encoding="utf-8")
+        elif fallback_log.is_file():
+            copied_log_path = scenario_dir / "desktop-shell.log"
+            copied_log_path.write_bytes(extract_log_delta(fallback_log, baseline_log))
+            log_text = copied_log_path.read_text(encoding="utf-8", errors="replace")
+        else:
+            raise SystemExit(
+                f"Could not find desktop-shell.log under {scenario_dir} or at {fallback_log}."
+            )
+        failure_stage = validate_fault_smoke_log(
+            scenario=scenario,
+            exit_code=exit_code,
+            log_text=log_text,
+        )
+        result = PackagedShellFaultResult(
+            scenario=scenario,
+            stdout_path=str(stdout_path),
+            stderr_path=str(stderr_path),
+            exit_code=exit_code,
+            failure_stage=failure_stage,
+            log_path=str(copied_log_path),
+            started_at_utc=started_at_utc,
+            completed_at_utc=utc_now(),
+        )
+        _write_scenario_result(scenario_dir=scenario_dir, result=result)
+        return result
+    except SystemExit as exc:
+        failed_result = _build_failed_result(
+            scenario=scenario,
+            scenario_dir=scenario_dir,
             stdout_path=stdout_path,
             stderr_path=stderr_path,
-            timeout_sec=startup_timeout_sec,
+            started_at_utc=started_at_utc,
+            error=str(exc),
+            log_path=(
+                scenario_dir / "desktop-shell.log"
+                if (scenario_dir / "desktop-shell.log").is_file()
+                else None
+            ),
         )
+        _write_scenario_result(scenario_dir=scenario_dir, result=failed_result)
+        raise PackagedShellFaultScenarioError(
+            str(exc),
+            result=failed_result,
+        ) from exc
 
-    time.sleep(0.5)
-    if any(path.is_file() for path in scenario_dir.rglob("desktop-shell.log")):
-        source_log_path = discover_desktop_log(scenario_dir)
-        copied_log_path = source_log_path
-        log_text = source_log_path.read_text(encoding="utf-8")
-    elif fallback_log.is_file():
-        copied_log_path = scenario_dir / "desktop-shell.log"
-        copied_log_path.write_bytes(extract_log_delta(fallback_log, baseline_log))
-        log_text = copied_log_path.read_text(encoding="utf-8", errors="replace")
-    else:
-        raise SystemExit(
-            f"Could not find desktop-shell.log under {scenario_dir} or at {fallback_log}."
-        )
-    failure_stage = validate_fault_smoke_log(
-        scenario=scenario,
-        exit_code=exit_code,
-        log_text=log_text,
-    )
-    result = PackagedShellFaultResult(
-        scenario=scenario,
-        exit_code=exit_code,
-        failure_stage=failure_stage,
-        log_path=str(copied_log_path),
-        stdout_path=str(stdout_path),
-        stderr_path=str(stderr_path),
-    )
-    (scenario_dir / "result.json").write_text(
-        json.dumps(asdict(result), indent=2),
-        encoding="utf-8",
-    )
-    return result
+
+def _build_summary_payload(
+    *,
+    status: str,
+    phase: str,
+    error: str | None,
+    desktop_exe: Path,
+    sidecar_path: Path,
+    artifact_dir: Path,
+    scenarios: list[str],
+    startup_timeout_sec: float,
+    health_timeout_sec: int,
+    restart_limit: int,
+    backoff_ms: int,
+    hang_sec: float,
+    app_identifier: str,
+    results: list[PackagedShellFaultResult],
+    started_at_utc: str,
+) -> dict[str, object]:
+    return {
+        "status": status,
+        "phase": phase,
+        "error": error,
+        "started_at_utc": started_at_utc,
+        "completed_at_utc": utc_now(),
+        "artifact_dir": str(artifact_dir),
+        "desktop_exe": str(desktop_exe),
+        "sidecar_path": str(sidecar_path),
+        "config": {
+            "scenarios": scenarios,
+            "startup_timeout_sec": startup_timeout_sec,
+            "health_timeout_sec": health_timeout_sec,
+            "restart_limit": restart_limit,
+            "backoff_ms": backoff_ms,
+            "hang_sec": hang_sec,
+            "app_identifier": app_identifier,
+        },
+        "results": [asdict(result) for result in results],
+    }
 
 
 def main() -> None:
@@ -266,29 +417,55 @@ def main() -> None:
     artifact_dir = args.artifact_dir.resolve()
     artifact_dir.mkdir(parents=True, exist_ok=True)
     scenarios = args.scenarios or list(SCENARIO_EXPECTED_STAGE)
-    results = [
-        run_fault_scenario(
-            desktop_exe=desktop_exe,
-            sidecar_path=sidecar_path,
-            artifact_dir=artifact_dir,
-            scenario=scenario,
-            startup_timeout_sec=args.startup_timeout_sec,
-            health_timeout_sec=args.health_timeout_sec,
-            restart_limit=args.restart_limit,
-            backoff_ms=args.backoff_ms,
-            hang_sec=args.hang_sec,
-            app_identifier=args.app_identifier,
-        )
-        for scenario in scenarios
-    ]
-    summary = {
-        "results": [asdict(result) for result in results],
-    }
-    (artifact_dir / "summary.json").write_text(
-        json.dumps(summary, indent=2),
-        encoding="utf-8",
+    started_at_utc = utc_now()
+    results: list[PackagedShellFaultResult] = []
+    status = "passed"
+    phase = "completed"
+    error: str | None = None
+
+    for scenario in scenarios:
+        try:
+            result = run_fault_scenario(
+                desktop_exe=desktop_exe,
+                sidecar_path=sidecar_path,
+                artifact_dir=artifact_dir,
+                scenario=scenario,
+                startup_timeout_sec=args.startup_timeout_sec,
+                health_timeout_sec=args.health_timeout_sec,
+                restart_limit=args.restart_limit,
+                backoff_ms=args.backoff_ms,
+                hang_sec=args.hang_sec,
+                app_identifier=args.app_identifier,
+            )
+            results.append(result)
+        except PackagedShellFaultScenarioError as exc:
+            status = "failed"
+            phase = f"scenario:{scenario}"
+            error = str(exc)
+            results.append(exc.result)
+            break
+
+    summary = _build_summary_payload(
+        status=status,
+        phase=phase,
+        error=error,
+        desktop_exe=desktop_exe,
+        sidecar_path=sidecar_path,
+        artifact_dir=artifact_dir,
+        scenarios=scenarios,
+        startup_timeout_sec=args.startup_timeout_sec,
+        health_timeout_sec=args.health_timeout_sec,
+        restart_limit=args.restart_limit,
+        backoff_ms=args.backoff_ms,
+        hang_sec=args.hang_sec,
+        app_identifier=args.app_identifier,
+        results=results,
+        started_at_utc=started_at_utc,
     )
+    _write_json(artifact_dir / "summary.json", summary)
     print(json.dumps(summary, ensure_ascii=False))
+    if status != "passed":
+        raise SystemExit(error)
 
 
 if __name__ == "__main__":

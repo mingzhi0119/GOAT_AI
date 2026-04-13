@@ -5,7 +5,7 @@ import remarkMath from 'remark-math'
 import remarkGfm from 'remark-gfm'
 import type { ChatArtifact, Message } from '../api/types'
 import type { ChatLayoutMode } from '../utils/chatLayout'
-import { normalizeDisplayMathMarkdown, shouldRenderMathMarkdown } from '../utils/mathRendering'
+import { buildMathRenderPlan, normalizeDisplayMathMarkdown } from '../utils/mathRendering'
 import { ChevronRightIcon, CopiedIcon, CopyIcon } from './uiIcons'
 
 interface Props {
@@ -73,10 +73,8 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode 
     isUser || !hasFileContext
       ? message.content
       : stripChartBlock(message.content, message.isStreaming ?? false)
-  const renderMath = shouldRenderMathMarkdown(displayContent, message.isStreaming ?? false)
-  const markdownContent = renderMath
-    ? normalizeDisplayMathMarkdown(displayContent)
-    : displayContent
+  const mathRenderPlan = buildMathRenderPlan(displayContent, message.isStreaming ?? false)
+  const markdownContent = normalizeDisplayMathMarkdown(mathRenderPlan.renderedMarkdownPrefix)
 
   const copyControl = (className: string, buttonStyle?: CSSProperties) => (
     <button
@@ -208,28 +206,39 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode 
                 .filter(Boolean)
                 .join(' ')}
             >
-              <ReactMarkdown
-                remarkPlugins={renderMath ? [remarkGfm, remarkMath] : [remarkGfm]}
-                rehypePlugins={renderMath ? [rehypeKatex] : []}
-                components={{
-                  a: ({ href, children }) => {
-                    const artifact = resolveArtifactLink(
-                      typeof href === 'string' ? href : '',
-                      artifactByFilename,
-                    )
-                    if (artifact) {
-                      return (
-                        <a href={artifact.download_url} download={artifact.filename}>
-                          {children}
-                        </a>
-                      )
-                    }
-                    return <a href={href}>{children}</a>
-                  },
-                }}
-              >
-                {markdownContent || ' '}
-              </ReactMarkdown>
+              {(markdownContent || mathRenderPlan.trailingPlainText) && (
+                <>
+                  {markdownContent && (
+                    <ReactMarkdown
+                      remarkPlugins={mathRenderPlan.enableMath ? [remarkGfm, remarkMath] : [remarkGfm]}
+                      rehypePlugins={mathRenderPlan.enableMath ? [rehypeKatex] : []}
+                      components={{
+                        a: ({ href, children }) => {
+                          const artifact = resolveArtifactLink(
+                            typeof href === 'string' ? href : '',
+                            artifactByFilename,
+                          )
+                          if (artifact) {
+                            return (
+                              <a href={artifact.download_url} download={artifact.filename}>
+                                {children}
+                              </a>
+                            )
+                          }
+                          return <a href={href}>{children}</a>
+                        },
+                      }}
+                    >
+                      {markdownContent}
+                    </ReactMarkdown>
+                  )}
+                  {mathRenderPlan.trailingPlainText && (
+                    <span className="whitespace-pre-wrap break-words">
+                      {mathRenderPlan.trailingPlainText}
+                    </span>
+                  )}
+                </>
+              )}
             </div>
 
             {!message.isStreaming && displayContent && (

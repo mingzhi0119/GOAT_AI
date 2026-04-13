@@ -197,14 +197,40 @@ jobs:
           python -m tools.desktop.installed_windows_desktop_fault_smoke `
             --installer "${{ steps.windows_artifacts.outputs.msi_path }}" `
             --installer-kind msi `
-            --artifact-dir "desktop-installed-smoke/msi"
+            --artifact-dir "desktop-installed-smoke/msi" `
+            --workflow-role release_evidence `
+            --release-ref "${{ inputs.release_ref || github.ref_name }}" `
+            --resolved-sha "${{ github.sha }}" `
+            --distribution-channel "${{ steps.distribution.outputs.channel }}"
       - name: Run installed NSIS desktop smoke
         shell: pwsh
         run: |
           python -m tools.desktop.installed_windows_desktop_fault_smoke `
             --installer "${{ steps.windows_artifacts.outputs.nsis_path }}" `
             --installer-kind nsis `
-            --artifact-dir "desktop-installed-smoke/nsis"
+            --artifact-dir "desktop-installed-smoke/nsis" `
+            --workflow-role release_evidence `
+            --release-ref "${{ inputs.release_ref || github.ref_name }}" `
+            --resolved-sha "${{ github.sha }}" `
+            --distribution-channel "${{ steps.distribution.outputs.channel }}"
+      - name: Summarize installed Windows evidence
+        if: ${{ always() }}
+        shell: pwsh
+        run: |
+          Add-Content $env:GITHUB_STEP_SUMMARY "## Installed Windows evidence"
+          $summaries = Get-ChildItem -Path "desktop-installed-smoke/*/summary.json" -File -ErrorAction SilentlyContinue
+          if ($null -eq $summaries -or $summaries.Count -eq 0) {
+            Add-Content $env:GITHUB_STEP_SUMMARY ""
+            Add-Content $env:GITHUB_STEP_SUMMARY "No installed Windows summary.json artifact was produced."
+            exit 0
+          }
+          foreach ($summaryPath in $summaries) {
+            $payload = Get-Content $summaryPath.FullName -Raw | ConvertFrom-Json
+            $healthyLaunch = $payload.healthy_launch
+            $readyStatus = if ($null -eq $healthyLaunch) { "<none>" } else { $healthyLaunch.ready_status }
+            $healthyStatus = if ($null -eq $healthyLaunch) { "<none>" } else { $healthyLaunch.status }
+            Add-Content $env:GITHUB_STEP_SUMMARY ""
+            Add-Content $env:GITHUB_STEP_SUMMARY "* $($payload.installer_kind): status=$($payload.status), phase=$($payload.phase), healthy_launch=$healthyStatus, ready_status=$readyStatus, summary=$($summaryPath.FullName)"
       - name: Upload Windows desktop release assets
         uses: actions/upload-artifact@v4
         with:
@@ -214,6 +240,7 @@ jobs:
             frontend/src-tauri/target/release/bundle/nsis/*-setup.exe
             desktop-windows-provenance.json
       - name: Upload installed Windows smoke evidence
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: desktop-windows-installed-smoke

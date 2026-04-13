@@ -111,6 +111,8 @@ def test_main_builds_and_installs_sidecar(
         assert "--add-data" in command
         add_data_index = command.index("--add-data")
         assert command[add_data_index + 1] == f"{migrations_dir};backend/migrations"
+        hidden_import_index = command.index("--hidden-import")
+        assert command[hidden_import_index + 1] == "backend.main"
         assert command[-1] == str(entrypoint)
         dist_dir = build_root / "dist"
         dist_dir.mkdir(parents=True, exist_ok=True)

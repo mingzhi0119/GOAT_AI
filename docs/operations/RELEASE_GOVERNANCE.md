@@ -99,13 +99,31 @@ Desktop release steps:
 6. Write `desktop-windows-provenance.json` with artifact digests and signature status.
 7. Upload the installers plus provenance assets and installed-smoke evidence, then emit installer attestations when supported.
 
+The installed Windows evidence bundle should retain `desktop-installed-smoke/*/summary.json`
+even when install, startup, or uninstall fails. That summary is the audit entrypoint
+for installer kind, installer digest, install root, resolved SHA, distribution channel,
+healthy launch status, partial scenario results, and uninstall outcome.
+
+The installed evidence order is fixed: install, healthy launch, health/ready proof,
+controlled shutdown, pre-ready fault scenarios, then uninstall. The healthy launch
+step runs with isolated appdata, a reserved localhost backend port, preserved shell
+logs, and `GOAT_READY_SKIP_OLLAMA_PROBE=1` so release evidence proves the installed
+desktop can reach the backend-ready baseline without making local Ollama availability
+part of the gate.
+
 Signed Windows installer provenance and Linux sidecar provenance are necessary release evidence, but they are not sufficient proof that pre-ready desktop startup still fails closed. Desktop-related changes must also keep the merge-blocking `desktop-package-windows` packaged-shell fault smoke green for missing-sidecar, early-exit-before-ready, and health-timeout paths.
 
 The workflow boundaries stay distinct:
 
 - `desktop-package-windows`: merge-blocking packaged-binary smoke for CI-built desktop executables
-- `.github/workflows/desktop-provenance.yml`: signed installer provenance plus installed Windows startup evidence for release artifacts
-- `.github/workflows/fault-injection.yml`: recurring installed Windows drill to catch regression drift between releases
+- `.github/workflows/desktop-provenance.yml`: signed installer provenance plus installed Windows startup evidence, including healthy/fault evidence for release artifacts
+- `.github/workflows/fault-injection.yml`: recurring installed Windows drill to catch regression drift between releases; it replays the same installed-desktop proof without owning release signing
+
+For PR packaged diagnostics, `desktop-package-windows` should retain a
+`desktop-windows-fault-smoke` artifact containing at least the packaged-build
+log, packaged-shell smoke log, top-level `summary.json`, and per-scenario result
+files. That artifact proves packaged CI-binary startup evidence only; it is not
+release-installed MSI/NSIS evidence.
 
 Required desktop signing secrets:
 

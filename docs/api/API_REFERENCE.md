@@ -154,9 +154,11 @@ Notes:
 
 - `code_sandbox.policy_allowed` remains caller-specific and separate from runtime readiness
 - `code_sandbox.provider_name`, `isolation_level`, and `network_policy_enforced` describe the currently selected backend contract; `localhost` is a weaker trusted-dev fallback than Docker
-- `workbench.*` is reported per capability; workbench can be enabled overall while specific surfaces still remain unavailable
+- `workbench.*` is reported per capability and per caller; the same deployment may return different `allowed_by_config`, `effective_enabled`, and `deny_reason` values for different credentials
+- `workbench.agent_tasks`, `browse`, `deep_research`, and `connectors` are write-scoped capability views; `artifact_workspace` and `project_memory` are read-scoped capability views, so this endpoint must not be treated as a pure operator-global mirror
 - `workbench.browse` / `workbench.deep_research` report capability-level readiness, not source-specific readiness; use `GET /api/workbench/sources` to decide whether the global `web` source itself is runnable
 - `workbench.artifact_workspace` now reflects the shipped baseline for durable workspace outputs plus export-to-artifact linkage
+- `workbench.project_memory` remains a caller-visible placeholder for future widening and should stay `deny_reason = "not_implemented"` until a real runtime exists
 - frontend UI should use this endpoint to hide or disable unavailable surfaces instead of assuming that a visible button implies runtime support
 
 ## `GET /api/models`
@@ -379,6 +381,7 @@ Notes:
 - legacy `connector_ids` is still accepted as a deprecated alias for `source_ids`
 - when `knowledge_document_ids` are attached, the task implicitly includes the `knowledge` source even if the caller omitted it from `source_ids`
 - when `browse` or `deep_research` omits both `source_ids` and `knowledge_document_ids`, the task defaults to the global `web` source
+- every resolved source must explicitly advertise the requested `task_kind`; mixed source sets that include an incompatible source now fail fast with `422`
 - `browse` and `deep_research` now fail fast with `422` when no runtime-ready retrieval source is available to the caller
 - request shape is intentionally forward-compatible for future task execution and output linkage
 - current task-kind behavior:
@@ -592,6 +595,7 @@ Current behavior:
 
 - queued and running tasks return `result = null`
 - failed and cancelled tasks return `result = null` plus a stable `error_detail`
+- `workspace_outputs` is filtered per output using the same visibility rules as the history/output listing surfaces; a visible task can still return an empty `workspace_outputs` list when some linked outputs are caller-hidden
 - missing workbench read scope returns `403`
 - missing or caller-invisible task ids return `404`
 - the same runtime gate still applies: if workbench is disabled for the deployment, the route returns `503` with `FEATURE_UNAVAILABLE`
@@ -606,6 +610,7 @@ Current behavior:
 - only `queued` tasks can be cancelled
 - success returns `200` with the normal task status payload and `status = cancelled`
 - cancelled tasks return `result = null` and `error_detail = "Task cancelled before execution."`
+- the response applies the same per-output visibility filter as `GET /api/workbench/tasks/{task_id}`
 - missing workbench write scope returns `403`
 - running or terminal tasks return `409` with `code = RESOURCE_CONFLICT`
 - missing or caller-invisible task ids return `404`
@@ -622,6 +627,7 @@ Current behavior:
 - the new task reuses the original `task_kind`, `prompt`, `session_id`, `project_id`, `knowledge_document_ids`, and connector/source request shape, but it re-resolves sources and stores the current caller auth snapshot
 - success returns `202 Accepted` with the same accepted-task payload shape as `POST /api/workbench/tasks`
 - missing workbench write scope or source-read scope returns `403`
+- retry now fails with `422` if the re-resolved source set no longer supports the original task kind, even when the source ids are still visible
 - queued or running tasks return `409` with `code = RESOURCE_CONFLICT`
 - missing or caller-invisible task ids return `404`
 
@@ -911,7 +917,7 @@ Returns machine-readable flags for optional high-risk features (see `docs/standa
 }
 ```
 
-`policy_allowed` is evaluated per caller from the current request's authorization context; for `code_sandbox`, the scope is `sandbox:execute`. `deny_reason` when the **runtime** gate is closed is one of: `disabled_by_operator`, `docker_unavailable`, or `localhost_unavailable` (controlled enum; not raw exception text).
+`policy_allowed` is evaluated per caller from the current request's authorization context; for `code_sandbox`, the scope is `sandbox:execute`. For `workbench`, each entry is also a caller-scoped capability view rather than a deployment-global mirror: read-scoped callers can still see `artifact_workspace` as enabled while `agent_tasks`, `browse`, or `deep_research` remain denied. `deny_reason` when the **runtime** gate is closed is one of: `disabled_by_operator`, `docker_unavailable`, `localhost_unavailable`, or `not_implemented` (controlled enum; not raw exception text).
 
 ## `GET /api/system/desktop`
 

@@ -45,6 +45,13 @@ from goat_ai.shared.types import ChatTurn
 
 logger = logging.getLogger(__name__)
 
+_MATH_LATEX_PROTOCOL = (
+    "When you present mathematical notation, use explicit LaTeX delimiters so the UI "
+    "can render formulas while streaming. Use `$...$` for inline math and `$$...$$` "
+    "for display math. Close each formula before continuing the surrounding prose, and "
+    "do not emit bare mathematical expressions that rely on the client to guess math formatting."
+)
+
 _CHART_INTENT_RE = re.compile(
     r"(\b(chart|plot|graph|visuali[sz]e|visualization|trend|compare|comparison|pie)\b|图表|图形|可视化|趋势|对比|饼图)",
     re.IGNORECASE,
@@ -59,7 +66,7 @@ def _compose_system_prompt(
     plan_mode: bool = False,
 ) -> str:
     """Merge base GOAT prompt, optional planning prompt, name, and user instructions."""
-    parts: list[str] = [base_prompt]
+    parts: list[str] = [base_prompt, _MATH_LATEX_PROTOCOL]
     if plan_mode:
         parts.append(
             "Plan mode is enabled. Think through the task in a few concise internal "

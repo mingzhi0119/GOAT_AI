@@ -169,6 +169,21 @@ def _to_source_payload(source: WorkbenchSourceDescriptor) -> WorkbenchSourcePayl
     )
 
 
+def _ensure_sources_support_task_kind(
+    *,
+    task_kind: str,
+    sources: list[WorkbenchSourceDescriptor],
+) -> None:
+    incompatible = sorted(
+        source.source_id for source in sources if task_kind not in source.task_kinds
+    )
+    if incompatible:
+        joined = ", ".join(incompatible)
+        raise WorkbenchSourceValidationError(
+            f"Requested workbench sources do not support task kind {task_kind!r}: {joined}."
+        )
+
+
 def _build_task_create_payload(
     *,
     task_id: str,
@@ -273,6 +288,10 @@ def create_workbench_task(
         raise WorkbenchPermissionDeniedError(str(exc)) from exc
     except ValueError as exc:
         raise WorkbenchSourceValidationError(str(exc)) from exc
+    _ensure_sources_support_task_kind(
+        task_kind=request.task_kind,
+        sources=resolved_sources,
+    )
     if request.task_kind in {"browse", "deep_research"} and not any(
         source.runtime_ready for source in resolved_sources
     ):
@@ -337,10 +356,11 @@ def get_workbench_task(
         auth_context=auth_context,
     )
     response = _to_status_response(task)
-    response.workspace_outputs = [
-        _to_workspace_output_payload(output)
-        for output in repository.list_workspace_outputs(task.id)
-    ]
+    response.workspace_outputs = _filter_visible_workspace_outputs(
+        outputs=repository.list_workspace_outputs(task.id),
+        settings=settings,
+        auth_context=auth_context,
+    )
     return response
 
 
@@ -372,10 +392,11 @@ def cancel_workbench_task(
     if updated is None:
         raise RuntimeError("Workbench task disappeared after cancellation.")
     response = _to_status_response(updated)
-    response.workspace_outputs = [
-        _to_workspace_output_payload(output)
-        for output in repository.list_workspace_outputs(updated.id)
-    ]
+    response.workspace_outputs = _filter_visible_workspace_outputs(
+        outputs=repository.list_workspace_outputs(updated.id),
+        settings=settings,
+        auth_context=auth_context,
+    )
     return response
 
 
@@ -411,6 +432,10 @@ def retry_workbench_task(
         raise WorkbenchPermissionDeniedError(str(exc)) from exc
     except ValueError as exc:
         raise WorkbenchSourceValidationError(str(exc)) from exc
+    _ensure_sources_support_task_kind(
+        task_kind=task.task_kind,
+        sources=resolved_sources,
+    )
     now = _utc_now()
     retried = repository.create_task(
         _build_task_create_payload(

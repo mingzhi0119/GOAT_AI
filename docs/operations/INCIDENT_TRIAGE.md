@@ -14,7 +14,11 @@ Use this runbook when staging or production health regresses and you need a fast
 2. After `backend-fast` is green, inspect `backend-heavy` for `python -m tools.contracts.check_api_contract_sync`, OTel enabled-path tests, the observability asset contract, `pytest`, `pip-audit`, `python -m tools.quality.run_rag_eval`, `lint-imports`, and the PR latency gate.
 3. Only after backend is green should triage move to `desktop-package-windows` and `desktop-supply-chain`.
 4. Treat `desktop-package-windows` as the source of truth for packaged pre-ready startup resilience because it now carries the packaged-shell fault smoke for missing-sidecar, early-exit, and health-timeout paths.
-5. Treat `.github/workflows/desktop-provenance.yml` as the source of truth for installed Windows release evidence and `.github/workflows/fault-injection.yml` as the recurring installed-desktop drill; do not mix those failures into the PR packaged gate.
+5. Expect `desktop-package-windows` for desktop build inputs, not just `frontend/src-tauri/**`: frontend build inputs such as `frontend/src/**`, `frontend/public/**`, `frontend/index.html`, Vite/Tailwind/PostCSS/TS config, desktop scripts, desktop tools, and desktop governance tests/workflows are in scope for that PR gate.
+6. Do not expect `desktop-package-windows` for non-desktop-only backend or documentation changes when the packaged Windows build surface is untouched.
+7. Treat `.github/workflows/desktop-provenance.yml` as the source of truth for installed Windows release evidence and `.github/workflows/fault-injection.yml` as the recurring installed-desktop drill; do not mix those failures into the PR packaged gate.
+8. When `desktop-package-windows` fails, check `desktop-fault-smoke/summary.json` first, then `desktop-fault-smoke/build.log` and `desktop-fault-smoke/packaged-shell-fault-smoke.log`; those retained artifacts are the expected packaged PR evidence bundle.
+9. For installed Windows failures, expect `desktop-installed-smoke/*/summary.json` even when install, startup, or uninstall fails; use that summary as the source of truth for installer kind, install root, log paths, resolved SHA, healthy launch evidence, and uninstall outcome before reading raw logs.
 
 ## What to look at first
 
@@ -47,7 +51,11 @@ Use this runbook when staging or production health regresses and you need a fast
 - Repeated SQLite write failures: stop new persistence work and prepare backup / restore checks.
 - Repeated readiness failures after deploy: use `ROLLBACK.md` rather than iterating hotfixes blindly on the host.
 - Observability asset drift or OTel enabled-path failures: fix `backend-heavy` first so alerts, dashboards, runbooks, and `traceparent` propagation are back in sync before debugging higher-level symptoms.
+- When observability drift is suspected, check the shipped metric-family contract first: `http_requests_total`, `http_request_duration_seconds`, `chat_stream_completed_total`, `ollama_errors_total`, `sqlite_log_write_failures_total`, `feature_gate_denials_total`, `knowledge_retrieval_requests_total`, and `knowledge_query_rewrite_applied_total`.
 - Repeated desktop startup failures: capture sidecar logs, Tauri shell logs, the packaged app version, the logged restart attempt counts, the recorded failure stage, the installer kind (`msi` vs `nsis`), the install root, the uninstall result, and whether the failure came from `desktop-package-windows`, release installed evidence, or the scheduled installed drill before retrying. Call out the exact fault-smoke scenario when known: `missing_sidecar`, `exit_before_ready`, or `hang_before_ready`.
+- For packaged PR-gate failures, include `desktop-fault-smoke/summary.json`, `desktop-fault-smoke/build.log`, and `desktop-fault-smoke/packaged-shell-fault-smoke.log` in the first-pass diagnosis before retrying the workflow.
+- For installed Windows release or drill failures, include `desktop-installed-smoke/*/summary.json` plus the referenced install, healthy-launch shell, shutdown, and uninstall logs in the first-pass diagnosis before retrying the workflow.
+- If `healthy_launch` is the failing phase, confirm the summary shows the isolated localhost port, `GOAT_READY_SKIP_OLLAMA_PROBE=1`, and the copied `desktop-shell.log` path before treating the issue as a packaged pre-ready regression.
 
 ## Required follow-up
 

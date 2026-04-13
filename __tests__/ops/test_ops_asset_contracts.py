@@ -166,6 +166,16 @@ def test_release_docs_and_status_match_current_truth() -> None:
         "python -m tools.desktop.installed_windows_desktop_fault_smoke"
         in operations_doc
     )
+    assert "desktop-windows-fault-smoke" in operations_doc
+    assert "artifact should contain at least" in operations_doc
+    assert "installed Windows evidence now writes" in operations_doc
+    assert "install -> healthy launch -> fault scenarios -> uninstall" in operations_doc
+    assert "GOAT_READY_SKIP_OLLAMA_PROBE=1" in operations_doc
+    assert "desktop-installed-smoke/*/summary.json" in operations_doc
+    assert "desktop-fault-smoke/summary.json" in incident_triage
+    assert "desktop-fault-smoke/build.log" in incident_triage
+    assert "healthy_launch" in incident_triage
+    assert "desktop-installed-smoke/*/summary.json" in incident_triage
     assert "Linux sidecar/provenance/cargo-audit gate" in operations_doc
     assert "does not own the Windows pre-ready retry semantics" in operations_doc
     assert "`desktop-package-windows`" in incident_triage

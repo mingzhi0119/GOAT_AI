@@ -80,6 +80,30 @@ def test_install_desktop_artifact_builds_nsis_silent_install(
     assert installation.uninstall_command.endswith("uninstall.exe")
 
 
+def test_build_healthy_launch_environment_uses_isolated_runtime_and_ready_skip(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv(packaged_smoke.INTERNAL_TEST_FLAG, "1")
+    monkeypatch.setenv(packaged_smoke.INTERNAL_TEST_SCENARIO, "hang_before_ready")
+
+    env, metadata = subject._build_healthy_launch_environment(
+        base_dir=tmp_path / "healthy-launch",
+        app_identifier=packaged_smoke.DEFAULT_WINDOWS_APP_IDENTIFIER,
+    )
+
+    assert env["GOAT_DESKTOP_BACKEND_HOST"] == "127.0.0.1"
+    assert env[subject.READY_SKIP_OLLAMA_PROBE_ENV] == "1"
+    assert env["GOAT_DESKTOP_APP_DATA_DIR"].endswith("com.simonbb.goatai")
+    log_dir = Path(env["GOAT_LOG_DIR"])
+    assert log_dir.name == "logs"
+    assert log_dir.parent.name == "com.simonbb.goatai"
+    assert packaged_smoke.INTERNAL_TEST_FLAG not in env
+    assert packaged_smoke.INTERNAL_TEST_SCENARIO not in env
+    assert Path(env["LOCALAPPDATA"]).is_dir()
+    assert Path(env["APPDATA"]).is_dir()
+    assert str(metadata["expected_shell_log_path"]).endswith("desktop-shell.log")
+
+
 def test_msi_uninstall_args_extract_product_code() -> None:
     uninstall_log = Path("uninstall.msiexec.log")
 
@@ -128,25 +152,42 @@ def test_main_writes_summary_json(
             restart_limit=1,
             backoff_ms=100,
             hang_sec=5.0,
+            healthy_startup_timeout_sec=45.0,
+            healthy_shutdown_timeout_sec=20.0,
             install_timeout_sec=30.0,
             uninstall_timeout_sec=30.0,
             app_identifier=packaged_smoke.DEFAULT_WINDOWS_APP_IDENTIFIER,
+            workflow_role="release_evidence",
+            release_ref="refs/tags/v1.2.0",
+            resolved_sha="abc123",
+            distribution_channel="public",
         ),
     )
     monkeypatch.setattr(subject, "install_desktop_artifact", lambda **_: installation)
+    order: list[str] = []
+    monkeypatch.setattr(
+        subject,
+        "run_installed_healthy_launch",
+        lambda **_: (
+            order.append("healthy_launch") or _healthy_launch_result(tmp_path=tmp_path)
+        ),
+    )
     monkeypatch.setattr(
         subject,
         "run_installed_fault_smoke",
-        lambda **_: [
-            packaged_smoke.PackagedShellFaultResult(
-                scenario="missing_sidecar",
-                exit_code=1,
-                failure_stage="backend_spawn_failed",
-                log_path="desktop-shell.log",
-                stdout_path="stdout.log",
-                stderr_path="stderr.log",
-            )
-        ],
+        lambda **_: (
+            order.append("fault_smoke")
+            or [
+                packaged_smoke.PackagedShellFaultResult(
+                    scenario="missing_sidecar",
+                    exit_code=1,
+                    failure_stage="backend_spawn_failed",
+                    log_path="desktop-shell.log",
+                    stdout_path="stdout.log",
+                    stderr_path="stderr.log",
+                )
+            ]
+        ),
     )
     monkeypatch.setattr(
         subject,
@@ -166,9 +207,158 @@ def test_main_writes_summary_json(
     subject.main()
 
     summary = json.loads((artifact_dir / "summary.json").read_text(encoding="utf-8"))
+    assert order == ["healthy_launch", "fault_smoke"]
+    assert summary["status"] == "passed"
+    assert summary["phase"] == "completed"
+    assert summary["config"]["healthy_startup_timeout_sec"] == 45.0
     assert summary["installation"]["installer_kind"] == "nsis"
+    assert summary["installer_kind"] == "nsis"
+    assert summary["workflow_context"]["workflow_role"] == "release_evidence"
+    assert summary["workflow_context"]["resolved_sha"] == "abc123"
+    assert summary["healthy_launch"]["status"] == "passed"
+    assert summary["healthy_launch"]["ready_skip_ollama_probe"] is True
+    assert summary["healthy_launch"]["ready_status"] == 200
     assert summary["results"][0]["failure_stage"] == "backend_spawn_failed"
     assert summary["uninstall"]["succeeded"] is True
+
+
+def test_main_writes_failed_summary_json_when_healthy_launch_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    artifact_dir = tmp_path / "artifacts"
+    installer = tmp_path / "setup.exe"
+    installer.write_text("", encoding="utf-8")
+    installation = subject.DesktopInstallation(
+        installer_kind="msi",
+        installer_path=str(installer),
+        install_root=str(tmp_path / "install-root"),
+        desktop_exe=str(tmp_path / "install-root" / "goat-ai-desktop.exe"),
+        sidecar_path=str(tmp_path / "install-root" / "goat-backend.exe"),
+        uninstall_command="MsiExec.exe /X{ABC}",
+        install_log_path="install.msiexec.log",
+        install_stdout_path="install.stdout.log",
+        install_stderr_path="install.stderr.log",
+    )
+    monkeypatch.setattr(
+        subject,
+        "_build_parser",
+        lambda: _parser_with_namespace(
+            installer=installer,
+            installer_kind="msi",
+            artifact_dir=artifact_dir,
+            scenarios=["missing_sidecar"],
+            startup_timeout_sec=15.0,
+            health_timeout_sec=2,
+            restart_limit=1,
+            backoff_ms=100,
+            hang_sec=5.0,
+            healthy_startup_timeout_sec=45.0,
+            healthy_shutdown_timeout_sec=20.0,
+            install_timeout_sec=30.0,
+            uninstall_timeout_sec=30.0,
+            app_identifier=packaged_smoke.DEFAULT_WINDOWS_APP_IDENTIFIER,
+            workflow_role="release_evidence",
+            release_ref="refs/tags/v1.2.0",
+            resolved_sha="abc123",
+            distribution_channel="public",
+        ),
+    )
+    monkeypatch.setattr(subject, "install_desktop_artifact", lambda **_: installation)
+    monkeypatch.setattr(
+        subject,
+        "run_installed_healthy_launch",
+        lambda **_: (_ for _ in ()).throw(
+            subject.InstalledWindowsHealthyLaunchError(
+                "Installed desktop reached /api/health but did not report readiness.",
+                phase="healthy_launch:ready",
+                result=_healthy_launch_result(
+                    tmp_path=tmp_path,
+                    status="failed",
+                    phase="ready",
+                    error="Installed desktop reached /api/health but did not report readiness.",
+                    ready_status=503,
+                ),
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        subject,
+        "uninstall_desktop_artifact",
+        lambda **_: subject.UninstallResult(
+            succeeded=True,
+            exit_code=0,
+            command="MsiExec.exe /X{ABC}",
+            stdout_path="uninstall.stdout.log",
+            stderr_path="uninstall.stderr.log",
+            log_path="uninstall.msiexec.log",
+            install_root_removed=True,
+        ),
+    )
+    monkeypatch.setattr(subject.os, "name", "nt", raising=False)
+
+    with pytest.raises(SystemExit, match="did not report readiness"):
+        subject.main()
+
+    summary = json.loads((artifact_dir / "summary.json").read_text(encoding="utf-8"))
+    assert summary["status"] == "failed"
+    assert summary["phase"] == "healthy_launch:ready"
+    assert summary["healthy_launch"]["status"] == "failed"
+    assert summary["healthy_launch"]["phase"] == "ready"
+    assert summary["healthy_launch"]["ready_status"] == 503
+    assert summary["results"] == []
+    assert summary["uninstall"]["succeeded"] is True
+
+
+def test_main_writes_failed_summary_json_when_install_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    artifact_dir = tmp_path / "artifacts"
+    installer = tmp_path / "setup.exe"
+    installer.write_text("installer", encoding="utf-8")
+    monkeypatch.setattr(
+        subject,
+        "_build_parser",
+        lambda: _parser_with_namespace(
+            installer=installer,
+            installer_kind="nsis",
+            artifact_dir=artifact_dir,
+            scenarios=["missing_sidecar"],
+            startup_timeout_sec=15.0,
+            health_timeout_sec=2,
+            restart_limit=1,
+            backoff_ms=100,
+            hang_sec=5.0,
+            healthy_startup_timeout_sec=45.0,
+            healthy_shutdown_timeout_sec=20.0,
+            install_timeout_sec=30.0,
+            uninstall_timeout_sec=30.0,
+            app_identifier=packaged_smoke.DEFAULT_WINDOWS_APP_IDENTIFIER,
+            workflow_role="fault_injection_drill",
+            release_ref="main",
+            resolved_sha="def456",
+            distribution_channel="internal_test",
+        ),
+    )
+    monkeypatch.setattr(
+        subject,
+        "install_desktop_artifact",
+        lambda **_: (_ for _ in ()).throw(
+            SystemExit("NSIS install failed with exit code 1.")
+        ),
+    )
+    monkeypatch.setattr(subject.os, "name", "nt", raising=False)
+
+    with pytest.raises(SystemExit, match="NSIS install failed"):
+        subject.main()
+
+    summary = json.loads((artifact_dir / "summary.json").read_text(encoding="utf-8"))
+    assert summary["status"] == "failed"
+    assert summary["phase"] == "install"
+    assert summary["error"] == "NSIS install failed with exit code 1."
+    assert summary["results"] == []
+    assert summary["healthy_launch"] is None
+    assert summary["uninstall"] is None
+    assert summary["installer_sha256"]
 
 
 def test_main_rejects_non_windows_hosts(
@@ -190,9 +380,15 @@ def test_main_rejects_non_windows_hosts(
             restart_limit=1,
             backoff_ms=100,
             hang_sec=5.0,
+            healthy_startup_timeout_sec=45.0,
+            healthy_shutdown_timeout_sec=20.0,
             install_timeout_sec=30.0,
             uninstall_timeout_sec=30.0,
             app_identifier=packaged_smoke.DEFAULT_WINDOWS_APP_IDENTIFIER,
+            workflow_role="release_evidence",
+            release_ref="refs/tags/v1.2.0",
+            resolved_sha="abc123",
+            distribution_channel="public",
         ),
     )
     monkeypatch.setattr(subject.os, "name", "posix", raising=False)
@@ -206,3 +402,45 @@ def _parser_with_namespace(**kwargs: object):
     namespace = type("Args", (), kwargs)()
     parser.parse_args = lambda: namespace  # type: ignore[method-assign]
     return parser
+
+
+def _healthy_launch_result(
+    *,
+    tmp_path: Path,
+    status: str = "passed",
+    phase: str = "completed",
+    error: str | None = None,
+    ready_status: int = 200,
+) -> subject.HealthyLaunchResult:
+    healthy_dir = tmp_path / "healthy-launch"
+    return subject.HealthyLaunchResult(
+        stdout_path=str(healthy_dir / "desktop.stdout.log"),
+        stderr_path=str(healthy_dir / "desktop.stderr.log"),
+        shutdown_stdout_path=str(healthy_dir / "shutdown.stdout.log"),
+        shutdown_stderr_path=str(healthy_dir / "shutdown.stderr.log"),
+        runtime_root=str(healthy_dir / "runtime-env"),
+        app_local_data_dir=str(healthy_dir / "runtime-env" / "LocalAppData"),
+        app_roaming_data_dir=str(healthy_dir / "runtime-env" / "RoamingAppData"),
+        backend_host="127.0.0.1",
+        backend_port=62606,
+        health_url="http://127.0.0.1:62606/api/health",
+        ready_url="http://127.0.0.1:62606/api/ready",
+        runtime_target_url="http://127.0.0.1:62606/api/system/runtime-target",
+        expected_shell_log_path=str(healthy_dir / "desktop-shell.log"),
+        health_ready=True,
+        ready_status=ready_status,
+        ready_payload={"ready": ready_status == 200},
+        runtime_target_status=200,
+        runtime_target={"target": "local"},
+        shell_log_path=str(healthy_dir / "desktop-shell.log"),
+        shell_log_source_path=str(
+            healthy_dir / "runtime-env" / "LocalAppData" / "desktop-shell.log"
+        ),
+        shutdown_method="taskkill_tree_force",
+        shutdown_exit_code=0,
+        status=status,
+        phase=phase,
+        error=error,
+        started_at_utc="2026-04-12T00:00:00Z",
+        completed_at_utc="2026-04-12T00:00:01Z",
+    )

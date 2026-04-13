@@ -315,6 +315,46 @@ class ApplicationWorkbenchTests(unittest.TestCase):
                     auth_context=_auth_context(),
                 )
 
+    def test_create_workbench_task_rejects_sources_without_task_kind_support(
+        self,
+    ) -> None:
+        repository = _FakeRepository()
+        request = WorkbenchTaskRequest(
+            task_kind="plan",
+            prompt="Plan the migration",
+            source_ids=["web"],
+        )
+
+        from unittest.mock import patch
+
+        with patch(
+            "backend.application.workbench.resolve_requested_sources",
+            return_value=[
+                WorkbenchSourceDescriptor(
+                    source_id="web",
+                    display_name="Public Web",
+                    kind="builtin",
+                    scope_kind="global",
+                    capabilities=("search",),
+                    task_kinds=("browse",),
+                    read_only=True,
+                    runtime_ready=True,
+                    deny_reason=None,
+                    description="web",
+                )
+            ],
+        ):
+            with self.assertRaisesRegex(
+                WorkbenchSourceValidationError,
+                "do not support task kind 'plan': web",
+            ):
+                create_workbench_task(
+                    request=request,
+                    repository=repository,
+                    settings=_settings(),
+                    auth_context=_auth_context(),
+                )
+
     def test_create_deep_research_defaults_to_web_when_no_sources_are_provided(
         self,
     ) -> None:
@@ -448,6 +488,9 @@ class ApplicationWorkbenchTests(unittest.TestCase):
                 created_at="2026-04-11T00:00:01+00:00",
                 updated_at="2026-04-11T00:00:02+00:00",
                 metadata={"editable": True},
+                owner_id="owner-1",
+                tenant_id="tenant-1",
+                principal_id="principal-1",
             )
         ]
 
@@ -473,6 +516,66 @@ class ApplicationWorkbenchTests(unittest.TestCase):
         self.assertEqual("wbo-1", response.workspace_outputs[0].output_id)
         self.assertEqual("canvas_document", response.workspace_outputs[0].output_kind)
 
+    def test_get_workbench_task_filters_hidden_workspace_outputs(self) -> None:
+        repository = _FakeRepository()
+        _seed_task(
+            repository,
+            task_id="wb-2",
+            task_kind="canvas",
+            status="completed",
+            prompt="Draft",
+            session_id="session-1",
+        )
+        repository.workspace_outputs = [
+            WorkbenchWorkspaceOutputRecord(
+                id="wbo-visible",
+                task_id="wb-2",
+                output_kind="canvas_document",
+                title="Draft",
+                content_format="markdown",
+                content_text="# Draft\n\nVisible",
+                created_at="2026-04-11T00:00:01+00:00",
+                updated_at="2026-04-11T00:00:02+00:00",
+                owner_id="owner-1",
+                tenant_id="tenant-1",
+                principal_id="principal-1",
+            ),
+            WorkbenchWorkspaceOutputRecord(
+                id="wbo-hidden",
+                task_id="wb-2",
+                output_kind="canvas_document",
+                title="Hidden",
+                content_format="markdown",
+                content_text="# Hidden",
+                created_at="2026-04-11T00:00:03+00:00",
+                updated_at="2026-04-11T00:00:04+00:00",
+                owner_id="other-owner",
+                tenant_id="tenant-1",
+                principal_id="principal-1",
+            ),
+        ]
+
+        from unittest.mock import patch
+
+        with patch(
+            "backend.application.workbench.authorize_workbench_task_read",
+            return_value=AuthorizationDecision(
+                allowed=True,
+                reason_code="allowed",
+                conceal_existence=False,
+            ),
+        ):
+            response = get_workbench_task(
+                task_id="wb-2",
+                repository=repository,
+                settings=_settings(),
+                auth_context=_auth_context(),
+            )
+
+        self.assertEqual(
+            ["wbo-visible"], [item.output_id for item in response.workspace_outputs]
+        )
+
     def test_cancel_workbench_task_marks_queued_task_cancelled(self) -> None:
         repository = _FakeRepository()
         _seed_task(repository, status="queued")
@@ -487,6 +590,51 @@ class ApplicationWorkbenchTests(unittest.TestCase):
         self.assertEqual("cancelled", response.status)
         self.assertEqual("Task cancelled before execution.", response.error_detail)
         self.assertEqual("task.cancelled", repository.appended_events[-1]["event_type"])
+
+    def test_cancel_workbench_task_filters_hidden_workspace_outputs(self) -> None:
+        repository = _FakeRepository()
+        _seed_task(
+            repository, task_id="wb-visible", status="queued", session_id="session-1"
+        )
+        repository.workspace_outputs = [
+            WorkbenchWorkspaceOutputRecord(
+                id="wbo-visible",
+                task_id="wb-visible",
+                output_kind="canvas_document",
+                title="Visible",
+                content_format="markdown",
+                content_text="# Visible",
+                created_at="2026-04-11T00:00:01+00:00",
+                updated_at="2026-04-11T00:00:02+00:00",
+                owner_id="owner-1",
+                tenant_id="tenant-1",
+                principal_id="principal-1",
+            ),
+            WorkbenchWorkspaceOutputRecord(
+                id="wbo-hidden",
+                task_id="wb-visible",
+                output_kind="canvas_document",
+                title="Hidden",
+                content_format="markdown",
+                content_text="# Hidden",
+                created_at="2026-04-11T00:00:03+00:00",
+                updated_at="2026-04-11T00:00:04+00:00",
+                owner_id="other-owner",
+                tenant_id="tenant-1",
+                principal_id="principal-1",
+            ),
+        ]
+
+        response = cancel_workbench_task(
+            task_id="wb-visible",
+            repository=repository,
+            settings=_settings(),
+            auth_context=_auth_context(),
+        )
+
+        self.assertEqual(
+            ["wbo-visible"], [item.output_id for item in response.workspace_outputs]
+        )
 
     def test_cancel_workbench_task_rejects_non_queued_state(self) -> None:
         repository = _FakeRepository()
@@ -641,6 +789,47 @@ class ApplicationWorkbenchTests(unittest.TestCase):
                     auth_mode="api_key",
                 ),
             )
+
+    def test_retry_workbench_task_rejects_source_capability_regressions(self) -> None:
+        repository = _FakeRepository()
+        _seed_task(
+            repository,
+            task_id="wb-original",
+            status="completed",
+            task_kind="browse",
+            source_ids=["web"],
+        )
+
+        from unittest.mock import patch
+
+        with patch(
+            "backend.application.workbench.resolve_requested_sources",
+            return_value=[
+                WorkbenchSourceDescriptor(
+                    source_id="web",
+                    display_name="Public Web",
+                    kind="builtin",
+                    scope_kind="global",
+                    capabilities=("search",),
+                    task_kinds=("deep_research",),
+                    read_only=True,
+                    runtime_ready=True,
+                    deny_reason=None,
+                    description="web",
+                )
+            ],
+        ):
+            with self.assertRaisesRegex(
+                WorkbenchSourceValidationError,
+                "do not support task kind 'browse': web",
+            ):
+                retry_workbench_task(
+                    task_id="wb-original",
+                    repository=repository,
+                    dispatcher=_FakeDispatcher(),
+                    settings=_settings(),
+                    auth_context=_auth_context(),
+                )
 
     def test_retry_workbench_task_rejects_non_terminal_state(self) -> None:
         repository = _FakeRepository()

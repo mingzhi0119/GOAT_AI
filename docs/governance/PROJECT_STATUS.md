@@ -69,7 +69,9 @@ Last updated: 2026-04-12
 - backup, restore, rollback, and recovery-drill coverage
 - documented vulnerability response, dependency-refresh cadence, and credential-rotation policy
 - CI gates for lint, tests, build, contract sync, dependency audit, secret scan, and desktop supply chain
-- `desktop-package-windows` now also carries packaged-shell fault smoke so missing-sidecar, early-exit, and pre-ready-timeout startup regressions stay merge-blocking for desktop-related changes
+- `desktop-package-windows` now has desktop-change trigger boundaries, merge-blocking packaged-shell fault smoke, retained build/smoke diagnostics, and governance tests so missing-sidecar, early-exit, and pre-ready-timeout regressions stay auditable for desktop-related changes
+- `.github/workflows/desktop-provenance.yml` and `.github/workflows/fault-injection.yml` now always retain structured MSI/NSIS install -> healthy launch -> pre-ready fault -> uninstall evidence, plus workflow metadata and step summaries for failure diagnosis
+- caller-scoped workbench feature semantics and observability asset coverage are now mechanically pinned by contract tests, workflow tests, and docs/runbook truth instead of roadmap watchpoints
 
 ## Current known boundaries
 
@@ -78,8 +80,9 @@ Last updated: 2026-04-12
 - storage remains SQLite-first and single-writer by design
 - future storage-shape changes require a new migration/compatibility/rollback decision log
 - Windows desktop packaging, signing, and provenance are ahead of macOS/Linux public packaged validation
-- pre-ready desktop restart/backoff is shipped, but the packaged-shell fault smoke in `desktop-package-windows` is now the critical evidence path because Rust unit tests alone were not enough to guard fail-closed startup behavior
-- installed Windows startup evidence is now split across release and scheduled workflows: signed installer validation lives in `.github/workflows/desktop-provenance.yml`, while recurring installer drift detection lives in `.github/workflows/fault-injection.yml`
+- pre-ready desktop restart/backoff is shipped, and the packaged-shell fault smoke in `desktop-package-windows` is now path-scoped, merge-blocking, and retention-backed for desktop-related changes
+- installed Windows startup evidence now stays auditable across release and scheduled workflows: signed installer validation lives in `.github/workflows/desktop-provenance.yml`, recurring installer drift detection lives in `.github/workflows/fault-injection.yml`, and both retain structured failure artifacts even when the drill fails
+- GitHub-side branch protection wiring, signing-secret availability, and hosted Windows runner behavior remain external conditions outside repo-only proof
 
 ## Status by active roadmap area
 
@@ -87,7 +90,7 @@ Last updated: 2026-04-12
 - **17 runtime platform:** partial workbench runtime is landed; canvas, typed workspace outputs, session restoration, direct output reopen, output-to-artifact export linkage, and experimental DDGS-backed public-web retrieval are now in place, while deeper multi-step research behavior, project memory, and connectors remain open
 - **18 sandbox follow-ons:** MVP is landed; richer async control, egress policy, and Rust supervisor work remain open
 - **19 desktop maturity:** signed Windows packaging and packaged validation are landed; macOS/Linux public packaged validation, updater readiness, and deeper native runtime operations remain open
-- **engineering quality uplift:** audit remediation through P2 is complete, the current industrial-score floor no longer depends on any open P2 blocker, and remaining follow-on work is now capability/runtime roadmap scope plus P3 governance watchpoints in [ROADMAP.md](ROADMAP.md)
+- **engineering quality uplift:** audit remediation through the 2026-04-12 P3 governance-maintenance closeout is complete inside the repository; the current industrial-score floor is now backed by mechanical gates, workflow evidence, and contract tests, while remaining residual risk is limited to the external GitHub/release conditions named in [ROADMAP.md](ROADMAP.md)
 
 ## Recommended live references
 

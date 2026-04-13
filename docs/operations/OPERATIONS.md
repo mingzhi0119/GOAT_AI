@@ -124,9 +124,17 @@ Important notes:
 - merge-blocking CI now also builds real Windows packaged desktop installers and records provenance through `python -m tools.desktop.write_desktop_release_provenance`
 - `desktop-package-windows` also runs `python -m tools.desktop.packaged_shell_fault_smoke` so packaged startup stays fail-closed for missing-sidecar, early-exit-before-ready, and health-timeout paths
 - `desktop-package-windows` is still the PR packaged-binary gate only; it does not install MSI/NSIS artifacts
+- `desktop-package-windows` should trigger for desktop build inputs, not just Rust shell files: `frontend/src/**`, `frontend/public/**`, `frontend/index.html`, Vite/Tailwind/PostCSS/TS config, desktop scripts, desktop tooling, and desktop governance tests/workflows are part of the packaged-build truth set
+- non-desktop-only backend or documentation changes should not burn the Windows packaged PR gate when they do not affect the packaged desktop build surface
+- the `desktop-windows-fault-smoke` artifact should contain at least `build.log`, `packaged-shell-fault-smoke.log`, top-level `summary.json`, and per-scenario logs/result JSON so packaged PR failures stay diagnosable without rerunning the workflow
+- when the Windows package build succeeds, CI should still retain packaged installers plus `desktop-windows-ci-provenance.json` even if the packaged fault smoke fails later in the same job
 - `desktop-supply-chain` remains the Linux sidecar/provenance/cargo-audit gate; it does not own the Windows pre-ready retry semantics
 - `.github/workflows/desktop-provenance.yml` now runs `python -m tools.desktop.installed_windows_desktop_fault_smoke` against both the built `.msi` and NSIS installers before release assets are uploaded
 - `.github/workflows/fault-injection.yml` reruns the same installed Windows drill on a schedule so installer regressions do not hide behind release-only evidence
+- installed Windows evidence now writes `summary.json` even on install or scenario failure, including installer kind/path/digest, install root, log paths, partial scenario results, uninstall outcome, and workflow metadata such as release ref, resolved SHA, and distribution channel
+- installed Windows evidence now follows a fixed order: `install -> healthy launch -> fault scenarios -> uninstall`; the retained `healthy_launch` payload is the positive proof that the installed desktop reached `/api/health` and `/api/ready` before the pre-ready fault scenarios begin
+- the healthy installed-launch probe uses isolated appdata, a reserved localhost backend port, preserved shell logs, and `GOAT_READY_SKIP_OLLAMA_PROBE=1` so the evidence proves installed desktop startup baseline, not local Ollama availability
+- installed Windows evidence upload should use `if: always()` in both release and scheduled workflows so `desktop-installed-smoke/*/summary.json` survives the exact failures it is meant to diagnose
 - PyInstaller is **not** a cross-compiler; build each platform's sidecar on that platform (or an equivalent CI runner / VM)
 - on Windows developer machines, Linux-targeted desktop validation should still run from WSL when you need Linux parity; Windows-native packaging remains a Windows flow
 - packaged desktop builds move app-owned writable state out of the repository and into the platform app-local-data directory
@@ -159,8 +167,8 @@ Public Windows desktop release path:
 
 - `.github/workflows/desktop-provenance.yml` is the public signed installer workflow
 - `desktop-package-windows` proves fail-closed startup for packaged CI binaries before merge; it is not installer-installed evidence
-- `.github/workflows/desktop-provenance.yml` is the installed Windows evidence gate for signed MSI and NSIS artifacts
-- `.github/workflows/fault-injection.yml` is the recurring installed Windows drill; it is neither a PR gate nor a signing workflow
+- `.github/workflows/desktop-provenance.yml` is the installed Windows evidence gate for signed MSI and NSIS artifacts, including healthy launch proof plus pre-ready fault scenarios
+- `.github/workflows/fault-injection.yml` is the recurring installed Windows drill; it is neither a PR gate nor a signing workflow, and its job is drift detection rather than release signing
 - local `npm run desktop:build` output remains internal/test-only unless it is rebuilt and signed through the workflow
 - signed public Windows installers require `GOAT_DESKTOP_SIGNING_CERT_BASE64` and `GOAT_DESKTOP_SIGNING_CERT_PASSWORD`
 
@@ -406,11 +414,20 @@ curl -sS -H "X-GOAT-API-Key: $GOAT_API_KEY" http://127.0.0.1:62606/api/system/me
   - `http_request_duration_seconds_count`
 - Counter semantics: `chat_stream_completed_total` counts only successful assistant completions, not safeguard-blocked refusal flows
 - `backend/platform/prometheus_metrics.py::EXPORTED_METRIC_FAMILIES` is the single source of truth for operator-facing metric families.
+- Operator-facing metric families currently shipped from that contract are:
+  - `http_requests_total`
+  - `http_request_duration_seconds`
+  - `chat_stream_completed_total`
+  - `ollama_errors_total`
+  - `sqlite_log_write_failures_total`
+  - `feature_gate_denials_total`
+  - `knowledge_retrieval_requests_total`
+  - `knowledge_query_rewrite_applied_total`
 - Versioned observability assets live under [`ops/observability/`](../../ops/observability/README.md):
   - Prometheus scrape example: [`ops/observability/prometheus/goat-api-scrape.yml`](../../ops/observability/prometheus/goat-api-scrape.yml)
   - Alert rules: [`ops/observability/alerts/goat-api-alerts.yml`](../../ops/observability/alerts/goat-api-alerts.yml)
   - Grafana dashboard: [`ops/observability/grafana/goat-api-dashboard.json`](../../ops/observability/grafana/goat-api-dashboard.json)
-- `backend-heavy` also runs an observability asset contract so alerts, dashboards, and runbooks cannot reference metric families that the API no longer exports.
+- `backend-heavy` also runs an observability asset contract so alerts, dashboards, and runbooks cannot reference metric families that the API no longer exports, and every exported family must remain covered by at least one approved observability surface.
 - Checked-in deploy and verification assets live under:
   - `ops/deploy/deploy.sh`
   - `ops/deploy/deploy.ps1`

@@ -87,18 +87,25 @@ gaps:
 - Windows desktop evidence now covers installed MSI/NSIS startup behavior in the
   release workflow plus a recurring installed-desktop drill
 
-No open `P2` engineering-score items remain after the 2026-04-12 closeout. The
-current quality watchpoints are `P3` governance-maintenance items, not blockers
-ahead of feature expansion:
+No open `P2` engineering-score items remain after the 2026-04-12 closeout.
 
-- keep `desktop-package-windows` packaged-binary smoke green for desktop-related
-  changes, because the merge-blocking packaged-shell fault smoke is still the
-  first guardrail for desktop PRs
-- keep `.github/workflows/desktop-provenance.yml` installed Windows evidence and
-  `.github/workflows/fault-injection.yml` installed-desktop drills green as the
-  desktop distribution surface expands
-- preserve the new workbench/authz and observability contracts when future
-  runtime features widen the supported surface
+The same 2026-04-12 governance-maintenance pass also closed the prior `P3`
+watchpoints:
+
+- `desktop-package-windows` now has path-truth gating, merge-blocking packaged-shell fault smoke, retained failure logs/summaries, and governance tests that pin the packaged-desktop PR workflow shape
+- `.github/workflows/desktop-provenance.yml` and
+  `.github/workflows/fault-injection.yml` now retain structured installed
+  Windows evidence for both MSI and NSIS across install -> healthy launch ->
+  pre-ready fault scenarios -> uninstall, with release-vs-drill ownership
+  boundaries documented in ops runbooks
+- workbench/authz and observability widening risk is now mechanically guarded
+  through caller-scoped `/api/system/features` contract tests, workbench
+  compatibility/visibility tests, and bidirectional metric-asset contracts
+
+No open `P3` governance-maintenance watchpoints remain inside the repository.
+Remaining audit-adjacent risk now sits in external GitHub/release conditions
+such as branch-protection wiring, hosted Windows runner execution, and signing
+secret availability.
 
 ### Active priorities
 
@@ -115,7 +122,7 @@ ahead of feature expansion:
    - signed Windows release and packaged CI validation are landed
    - macOS/Linux public packaging, updater readiness, and deeper native runtime operations are still open
    - current governance order is: clear `backend-fast` first, then inspect `backend-heavy`, and only then move to `desktop-package-windows` / `desktop-supply-chain`
-   - pre-ready restart/backoff is shipped, and current residual governance work is keeping both the PR packaged-binary smoke and the installed-desktop release/scheduled evidence green as platform scope expands
+   - pre-ready restart/backoff is shipped, and the PR packaged-binary smoke plus release/scheduled installed-desktop evidence are now fixed governance mechanisms rather than ad hoc watchpoints
 
 ### Runtime platform
 
@@ -217,7 +224,7 @@ Desktop shell scaffolding and packaged backend sidecar are already landed and ar
   - restart/backoff and clearer first-run failure reporting
   - desktop-safe local data and path handling
 - Current governance focus:
-  - the runtime behavior is landed; the remaining governance work is to keep the PR packaged-binary smoke plus the release/scheduled installed-desktop evidence green on desktop-related changes because Rust unit tests and local builds alone are not enough proof for pre-ready retry behavior
+  - the runtime behavior and its evidence gates are landed; remaining work in this phase is product/runtime breadth rather than keeping packaged-binary and installed-evidence guardrails alive by convention
 - Non-goals:
   - no SPA rewrite into Rust
   - no backend business-logic rewrite solely for desktop packaging
