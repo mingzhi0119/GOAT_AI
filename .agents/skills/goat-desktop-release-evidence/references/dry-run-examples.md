@@ -35,3 +35,21 @@ Expected output:
 
 Validate with:
 - report which desktop proof chain actually regressed and which ones remain mechanically proven
+
+## Example 3
+
+User asks:
+- "I changed a desktop workflow plus release docs; which desktop proof chain is in scope, and which governance docs actually own the wording update?"
+
+First moves:
+- separate packaged PR validation, release installed evidence, and recurring drill ownership before reasoning about docs
+- compose with `goat-ci-surface-router` to keep the required validation matrix honest
+- compose with `goat-governance-sync` before editing any runbook or roadmap text
+
+Expected output:
+- the in-scope desktop proof chain for the diff
+- whether `RELEASE_GOVERNANCE.md`, `OPERATIONS.md`, `INCIDENT_TRIAGE.md`, or none of them should move
+- the narrowest test pair that proves both workflow truth and doc ownership
+
+Validate with:
+- run `python -m pytest __tests__/desktop/test_desktop_release_governance.py __tests__/ops/test_ops_asset_contracts.py -q`

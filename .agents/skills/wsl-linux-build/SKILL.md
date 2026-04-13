@@ -19,6 +19,7 @@ Use this skill whenever a task targets Linux from a Windows-hosted checkout.
 3. Keep commands repo-root relative so paths resolve the same way across contributors and CI.
 4. Mirror Ubuntu dependency setup from [`.github/workflows/ci.yml`](../../../.github/workflows/ci.yml) before diagnosing build failures that may come from missing Linux packages.
 5. Report the exact WSL command and distro used when you summarize results.
+6. For CI-style Python checks that need repo dependencies under WSL, prefer [run_python_ci.sh](scripts/run_python_ci.sh) over ad hoc `pip install --break-system-packages`.
 
 ## Guardrails
 
@@ -35,3 +36,9 @@ powershell -ExecutionPolicy Bypass -File .agents/skills/wsl-linux-build/scripts/
 ```
 
 Set `-Distro Ubuntu` to pin a specific distro when needed.
+
+For Linux-parity Python checks that need `requirements-ci.txt`, compose the generic helper with [run_python_ci.sh](scripts/run_python_ci.sh):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .agents/skills/wsl-linux-build/scripts/invoke-wsl-command.ps1 -Command "bash ./.agents/skills/wsl-linux-build/scripts/run_python_ci.sh -- python -m pytest __tests__/ops/test_observability_asset_contract.py -q"
+```

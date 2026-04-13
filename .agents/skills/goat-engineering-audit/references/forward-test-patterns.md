@@ -10,6 +10,7 @@ These patterns come from live repo tasks exercised against the current skill set
 - `goat-desktop-release-evidence`: installed MSI/NSIS release proof review in [desktop-provenance.yml](../../../../.github/workflows/desktop-provenance.yml) plus desktop governance tests
 - `goat-workbench-authz-proof`: caller-scoped workbench capability and gate-reason review across [feature_gates.py](../../../../goat_ai/config/feature_gates.py), [feature_gate_reasons.py](../../../../goat_ai/config/feature_gate_reasons.py), and `/api/system/features`
 - `goat-observability-contract-proof`: label/query-shape review across [prometheus_metrics.py](../../../../backend/platform/prometheus_metrics.py), [approved-surfaces.md](../../goat-observability-contract-proof/references/approved-surfaces.md), and the observability asset contract
+- `goat-observability-contract-proof` + `goat-ci-surface-router` + `wsl-linux-build`: Linux-parity backend-heavy review across OTel enabled-path tests, observability asset proof, and WSL Python bootstrap behavior
 - `goat-governance-sync`: roadmap follow-on update after the live forward-test pass
 
 ## Checks exercised
@@ -23,6 +24,7 @@ These patterns come from live repo tasks exercised against the current skill set
 - `python -m pytest __tests__/desktop/test_desktop_release_governance.py __tests__/ops/test_ops_asset_contracts.py -q`
 - `cd frontend && npm run contract:check`
 - `python -m pytest __tests__/contracts/test_frontend_contract_governance.py __tests__/contracts/test_generate_llm_api_yaml.py -q`
+- `powershell -ExecutionPolicy Bypass -File .agents/skills/wsl-linux-build/scripts/invoke-wsl-command.ps1 -Command "bash ./.agents/skills/wsl-linux-build/scripts/run_python_ci.sh -- python -m pytest __tests__/backend/platform/test_otel_tracing.py __tests__/backend/platform/test_backend_main_factory.py __tests__/ops/test_observability_asset_contract.py -q"`
 
 ## Composed skill chains
 
@@ -35,6 +37,10 @@ These patterns come from live repo tasks exercised against the current skill set
 - Frontend-exposed contract change:
   - `$goat-api-contract-proof` keeps backend, docs, and frontend contract artifacts aligned
   - frontend contract checks prove the generated and hand-maintained frontend surfaces still match the backend contract
+- Windows-hosted observability proof:
+  - `$goat-observability-contract-proof` identifies the backend-heavy OTel and asset-contract path
+  - `$goat-ci-surface-router` narrows the required Linux-parity checks
+  - `$wsl-linux-build` runs [run_python_ci.sh](../../wsl-linux-build/scripts/run_python_ci.sh) so WSL can use a repo-specific virtualenv instead of the externally managed system Python
 
 ## Repeated prompt pattern
 
@@ -55,4 +61,4 @@ Across the live tasks above, the most reusable output shape was:
 
 ## Script decision
 
-No shared script landed in this pass. The live forward-tests still showed more repetition in prompt framing, output shape, and skill-composition decisions than in command synthesis. The existing WSL helper already covered the one repeatable wrapper command well enough, so examples and governance tests stayed the better investment.
+One minimal script landed in this pass: [run_python_ci.sh](../../wsl-linux-build/scripts/run_python_ci.sh). The Linux-parity observability forward-test exposed a real recurring friction point on WSL: the system Python is externally managed, but `backend-heavy` OTel and observability checks still need repo dependencies such as `ddgs`. The new helper creates a dedicated WSL virtualenv, installs `requirements-ci.txt` when needed, and then runs the requested Python command without asking future callers to rediscover the PEP 668 workaround.
