@@ -19,6 +19,22 @@ These patterns come from live repo tasks exercised against the current skill set
 - `python -m pytest __tests__/desktop/test_desktop_release_governance.py -q`
 - `python -m pytest __tests__/ops/test_observability_asset_contract.py -q`
 - `python -m pytest __tests__/governance/test_repo_local_skills.py __tests__/governance/test_structure_path_truth.py -q`
+- `powershell -ExecutionPolicy Bypass -File .agents/skills/wsl-linux-build/scripts/invoke-wsl-command.ps1 -Command "uname -a && bash -n ./ops/verification/phase0_check.sh && bash -n ./ops/verification/healthcheck.sh && bash -n ./ops/verification/watchdog.sh"`
+- `python -m pytest __tests__/desktop/test_desktop_release_governance.py __tests__/ops/test_ops_asset_contracts.py -q`
+- `cd frontend && npm run contract:check`
+- `python -m pytest __tests__/contracts/test_frontend_contract_governance.py __tests__/contracts/test_generate_llm_api_yaml.py -q`
+
+## Composed skill chains
+
+- Linux parity from a Windows host:
+  - `$goat-ci-surface-router` decides the diff really needs Linux parity
+  - `$wsl-linux-ops-checks` or `$wsl-linux-build` executes the narrow WSL command
+- Release workflow to runbook ownership:
+  - `$goat-desktop-release-evidence` decides which desktop proof chain changed
+  - `$goat-governance-sync` decides whether `RELEASE_GOVERNANCE.md`, `OPERATIONS.md`, or `INCIDENT_TRIAGE.md` owns the wording update
+- Frontend-exposed contract change:
+  - `$goat-api-contract-proof` keeps backend, docs, and frontend contract artifacts aligned
+  - frontend contract checks prove the generated and hand-maintained frontend surfaces still match the backend contract
 
 ## Repeated prompt pattern
 
@@ -39,4 +55,4 @@ Across the live tasks above, the most reusable output shape was:
 
 ## Script decision
 
-No shared script landed in this pass. The live forward-tests showed repeated friction in prompt framing and output structure, not in deterministic command synthesis. Keep strengthening shared examples and governance tests until a command sequence is rewritten often enough to justify a script.
+No shared script landed in this pass. The live forward-tests still showed more repetition in prompt framing, output shape, and skill-composition decisions than in command synthesis. The existing WSL helper already covered the one repeatable wrapper command well enough, so examples and governance tests stayed the better investment.

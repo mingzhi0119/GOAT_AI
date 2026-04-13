@@ -36,3 +36,23 @@ Expected output:
 
 Validate with:
 - prove either that no generated artifact changed or that all governed artifacts were refreshed together
+
+## Example 3
+
+User asks:
+- "I changed a frontend-exposed API payload; what has to move on both the backend and frontend sides?"
+
+First moves:
+- treat frontend-generated types and frontend adapter types as governed contract surfaces, not downstream conveniences
+- compare the backend schema, `openapi.json`, `api.llm.yaml`, generated frontend types, and any hand-maintained adapter types
+- keep the frontend-facing proof path in scope instead of stopping at Python-side sync
+
+Expected output:
+- which backend, docs, and frontend artifacts move together
+- whether the frontend adapter layer needs edits in addition to generated types
+- the minimum cross-layer checks that prove the contract stayed aligned
+
+Validate with:
+- run `python -m tools.contracts.check_api_contract_sync`
+- run `cd frontend && npm run contract:check`
+- run `python -m pytest __tests__/contracts/test_frontend_contract_governance.py __tests__/contracts/test_generate_llm_api_yaml.py -q`

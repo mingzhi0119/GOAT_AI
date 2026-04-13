@@ -35,3 +35,21 @@ Expected output:
 
 Validate with:
 - explain why each suggested check is required, optional, or out of scope for the current diff
+
+## Example 3
+
+User asks:
+- "I changed `ops/verification/phase0_check.sh` on a Windows host; what Linux-parity proof do I need and how should I run it?"
+
+First moves:
+- route the diff before choosing a command, because the question is partly about scope and partly about execution environment
+- identify that the touched files are Ubuntu-facing shell scripts rather than Windows-only automation
+- compose with the WSL helper skill instead of claiming parity from PowerShell alone
+
+Expected output:
+- a clear decision that Linux parity is required
+- the narrowest WSL command that proves bash/shebang/path semantics without over-claiming full runtime health
+- any wider runtime checks that remain optional or environment-dependent
+
+Validate with:
+- run `powershell -ExecutionPolicy Bypass -File .agents/skills/wsl-linux-build/scripts/invoke-wsl-command.ps1 -Command "uname -a && bash -n ./ops/verification/phase0_check.sh && bash -n ./ops/verification/healthcheck.sh && bash -n ./ops/verification/watchdog.sh"`

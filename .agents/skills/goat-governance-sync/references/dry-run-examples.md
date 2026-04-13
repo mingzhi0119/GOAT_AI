@@ -35,3 +35,21 @@ Expected output:
 
 Validate with:
 - re-read the touched governance docs and keep their roles consistent with `AGENTS.md`
+
+## Example 3
+
+User asks:
+- "A desktop release workflow changed; which runbook or governance docs own the wording update, and which tests prove it?"
+
+First moves:
+- confirm whether the change affects release governance, ops procedure, incident triage, or only a workflow-local detail
+- treat desktop workflow truth, release runbook text, and desktop governance tests as one linked proof path
+- avoid editing `PROJECT_STATUS.md` unless the change closes or reopens a shipped-status claim
+
+Expected output:
+- identify whether [RELEASE_GOVERNANCE.md](../../../../docs/operations/RELEASE_GOVERNANCE.md), [OPERATIONS.md](../../../../docs/operations/OPERATIONS.md), [INCIDENT_TRIAGE.md](../../../../docs/operations/INCIDENT_TRIAGE.md), or none of them should move
+- name the workflow and test files that justify that ownership decision
+- separate repo-landed wording updates from external blockers such as signing secrets or GitHub environment policy
+
+Validate with:
+- run `python -m pytest __tests__/desktop/test_desktop_release_governance.py __tests__/ops/test_ops_asset_contracts.py -q`
