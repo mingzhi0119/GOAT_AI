@@ -2,27 +2,17 @@
 
 from __future__ import annotations
 
-from typing import NoReturn
-
 from goat_ai.shared.clocks import Clock
 
 from backend.types import Settings
-
-_POSTGRES_NOT_IMPLEMENTED_MESSAGE = (
-    "Phase 16D Postgres runtime persistence is not implemented yet. "
-    "Keep GOAT_RUNTIME_METADATA_BACKEND=sqlite (default) until the Postgres "
-    "repository adapters and migration tooling land."
-)
 
 
 class UnsupportedRuntimeMetadataBackend(RuntimeError):
     """Raised when the configured runtime-metadata backend cannot be served."""
 
 
-def _raise_unsupported_backend(settings: Settings) -> NoReturn:
+def _raise_unsupported_backend(settings: Settings) -> None:
     backend = settings.runtime_metadata_backend
-    if backend == "postgres":
-        raise UnsupportedRuntimeMetadataBackend(_POSTGRES_NOT_IMPLEMENTED_MESSAGE)
     raise UnsupportedRuntimeMetadataBackend(
         f"Unsupported runtime metadata backend: {backend!r}"
     )
@@ -30,7 +20,7 @@ def _raise_unsupported_backend(settings: Settings) -> NoReturn:
 
 def ensure_supported_runtime_metadata_backend(settings: Settings) -> None:
     """Fail fast when runtime metadata is configured for an unsupported backend."""
-    if settings.runtime_metadata_backend == "sqlite":
+    if settings.runtime_metadata_backend in {"sqlite", "postgres"}:
         return
     _raise_unsupported_backend(settings)
 
@@ -42,6 +32,13 @@ def initialize_runtime_metadata_store(settings: Settings) -> None:
 
         log_service.init_db(settings.log_db_path)
         return
+    if settings.runtime_metadata_backend == "postgres":
+        from backend.services.postgres_runtime_support import (
+            run_postgres_runtime_migrations,
+        )
+
+        run_postgres_runtime_migrations(settings.runtime_postgres_dsn)
+        return
     _raise_unsupported_backend(settings)
 
 
@@ -51,6 +48,10 @@ def build_conversation_logger(settings: Settings):
         from backend.services.chat_runtime import SQLiteConversationLogger
 
         return SQLiteConversationLogger(settings.log_db_path)
+    if settings.runtime_metadata_backend == "postgres":
+        from backend.services.chat_runtime import PostgresConversationLogger
+
+        return PostgresConversationLogger(settings.runtime_postgres_dsn)
     _raise_unsupported_backend(settings)
 
 
@@ -60,6 +61,10 @@ def build_session_repository(settings: Settings):
         from backend.services.chat_runtime import SQLiteSessionRepository
 
         return SQLiteSessionRepository(settings.log_db_path)
+    if settings.runtime_metadata_backend == "postgres":
+        from backend.services.chat_runtime import PostgresSessionRepository
+
+        return PostgresSessionRepository(settings.runtime_postgres_dsn)
     _raise_unsupported_backend(settings)
 
 
@@ -69,6 +74,10 @@ def build_workbench_task_repository(settings: Settings):
         from backend.services.workbench_runtime import SQLiteWorkbenchTaskRepository
 
         return SQLiteWorkbenchTaskRepository(settings.log_db_path)
+    if settings.runtime_metadata_backend == "postgres":
+        from backend.services.workbench_runtime import PostgresWorkbenchTaskRepository
+
+        return PostgresWorkbenchTaskRepository(settings.runtime_postgres_dsn)
     _raise_unsupported_backend(settings)
 
 
@@ -80,6 +89,12 @@ def build_code_sandbox_execution_repository(settings: Settings):
         )
 
         return SQLiteCodeSandboxExecutionRepository(settings.log_db_path)
+    if settings.runtime_metadata_backend == "postgres":
+        from backend.services.code_sandbox_runtime import (
+            PostgresCodeSandboxExecutionRepository,
+        )
+
+        return PostgresCodeSandboxExecutionRepository(settings.runtime_postgres_dsn)
     _raise_unsupported_backend(settings)
 
 
@@ -89,6 +104,10 @@ def build_knowledge_repository(settings: Settings):
         from backend.services.knowledge_repository import SQLiteKnowledgeRepository
 
         return SQLiteKnowledgeRepository(settings.log_db_path)
+    if settings.runtime_metadata_backend == "postgres":
+        from backend.services.knowledge_repository import PostgresKnowledgeRepository
+
+        return PostgresKnowledgeRepository(settings.runtime_postgres_dsn)
     _raise_unsupported_backend(settings)
 
 
@@ -98,6 +117,10 @@ def build_media_repository(settings: Settings):
         from backend.services.media_service import SQLiteMediaRepository
 
         return SQLiteMediaRepository(settings.log_db_path)
+    if settings.runtime_metadata_backend == "postgres":
+        from backend.services.media_service import PostgresMediaRepository
+
+        return PostgresMediaRepository(settings.runtime_postgres_dsn)
     _raise_unsupported_backend(settings)
 
 
@@ -111,6 +134,14 @@ def build_idempotency_store(settings: Settings, *, clock: Clock | None = None):
             ttl_sec=settings.idempotency_ttl_sec,
             clock=clock,
         )
+    if settings.runtime_metadata_backend == "postgres":
+        from backend.services.idempotency_service import PostgresIdempotencyStore
+
+        return PostgresIdempotencyStore(
+            dsn=settings.runtime_postgres_dsn,
+            ttl_sec=settings.idempotency_ttl_sec,
+            clock=clock,
+        )
     _raise_unsupported_backend(settings)
 
 
@@ -118,4 +149,6 @@ def runtime_storage_model_label(settings: Settings) -> str:
     """Describe the configured runtime-metadata posture for telemetry."""
     if settings.runtime_metadata_backend == "sqlite":
         return "sqlite-first"
-    return "postgres-server-preview"
+    if settings.runtime_metadata_backend == "postgres":
+        return "postgres-hosted"
+    return str(settings.runtime_metadata_backend)

@@ -25,6 +25,8 @@ from backend.domain.authorization import ResourceRef
 from backend.models.media import MediaUploadResponse
 from backend.services.exceptions import MediaNotFound, MediaValidationError
 from backend.services.authz_audit import emit_authorization_audit
+from backend.services.exceptions import PersistenceReadError, PersistenceWriteError
+from backend.services.postgres_runtime_support import postgres_connect
 from backend.services.runtime_persistence import build_media_repository
 from backend.types import Settings
 from goat_ai.uploads import (
@@ -105,6 +107,53 @@ class SQLiteMediaRepository:
                 """,
                 (attachment_id,),
             ).fetchone()
+        return MediaUploadRecord(**dict(row)) if row is not None else None
+
+
+class PostgresMediaRepository:
+    def __init__(self, dsn: str) -> None:
+        self._dsn = dsn
+
+    def create_media_upload(self, record: MediaUploadRecord) -> None:
+        try:
+            with postgres_connect(self._dsn) as conn:
+                conn.execute(
+                    """
+                    INSERT INTO media_uploads
+                        (id, owner_id, tenant_id, principal_id, filename, mime_type, byte_size, storage_path, storage_key, width_px, height_px, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        record.id,
+                        record.owner_id,
+                        record.tenant_id,
+                        record.principal_id,
+                        record.filename,
+                        record.mime_type,
+                        record.byte_size,
+                        record.storage_path,
+                        record.storage_key,
+                        record.width_px,
+                        record.height_px,
+                        record.created_at,
+                    ),
+                )
+        except Exception as exc:
+            raise PersistenceWriteError("Failed to media upload create.") from exc
+
+    def get_media_upload(self, attachment_id: str) -> MediaUploadRecord | None:
+        try:
+            with postgres_connect(self._dsn) as conn:
+                row = conn.execute(
+                    """
+                    SELECT id, owner_id, tenant_id, principal_id, filename, mime_type, byte_size, storage_path, storage_key, width_px, height_px, created_at
+                    FROM media_uploads
+                    WHERE id = %s
+                    """,
+                    (attachment_id,),
+                ).fetchone()
+        except Exception as exc:
+            raise PersistenceReadError("Failed to media upload get.") from exc
         return MediaUploadRecord(**dict(row)) if row is not None else None
 
 

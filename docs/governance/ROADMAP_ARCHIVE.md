@@ -102,6 +102,26 @@ What stays open after this closeout:
 - Phase 16D Postgres-backed runtime persistence
 - hosted migration/compatibility/rollback posture for replacing the SQLite runtime metadata store
 
+### Phase 16D runtime persistence closeout
+
+Phase 16D is now fully out of the active roadmap. The shipped hosted/server posture
+keeps local and desktop on SQLite while enabling Postgres-backed runtime metadata for
+server deployments behind the existing repository boundaries.
+
+Completed in this closeout:
+
+- Alembic-owned Postgres runtime schema under `backend/alembic/`
+- hosted/server repository adapters for sessions, `conversations`, artifacts,
+  idempotency, knowledge, media, workbench, and sandbox runtime metadata
+- deterministic SQLite snapshot export plus Postgres import and live parity tooling
+- rollback and backup runbooks for the SQLite snapshot + object-store snapshot +
+  hosted/server Postgres cutover path
+
+What stays open after this closeout:
+
+- shared runtime follow-ons under Phase 17
+- future local or desktop storage-engine changes only if SQLite there becomes a real cost
+
 ### Engineering quality uplift P2 closeout
 
 The industrial operating-model track is now fully archived. P0 and P1 had already

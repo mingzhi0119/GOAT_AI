@@ -271,8 +271,8 @@ live in the configured bucket/prefix while SQLite metadata remains local.
 | `GOAT_SYSTEM_PROMPT` | Override system prompt | built-in default |
 | `GOAT_SYSTEM_PROMPT_FILE` | Path to UTF-8 prompt file | empty |
 | `GOAT_LOG_PATH` | SQLite path | `<project>/var/chat_logs.db` |
-| `GOAT_RUNTIME_METADATA_BACKEND` | Runtime metadata backend: `sqlite` or `postgres`; the Postgres path is a server-only Phase 16D preview seam and currently fails fast until repository adapters land | `sqlite` |
-| `GOAT_RUNTIME_POSTGRES_DSN` | Required only when `GOAT_RUNTIME_METADATA_BACKEND=postgres`; reserved for the future hosted/server Postgres adapter path | empty |
+| `GOAT_RUNTIME_METADATA_BACKEND` | Runtime metadata backend: `sqlite` or `postgres`; `postgres` is a hosted/server-only Phase 16D path while local and desktop remain SQLite by default | `sqlite` |
+| `GOAT_RUNTIME_POSTGRES_DSN` | Required only when `GOAT_RUNTIME_METADATA_BACKEND=postgres`; used by Alembic startup schema upgrade plus hosted/server Postgres repositories | empty |
 | `GOAT_DATA_DIR` | Local runtime data root; also the default local object-store root when `GOAT_OBJECT_STORE_ROOT` is unset | `<project>/var/data` (gitignored by default; do not commit) |
 | `GOAT_OBJECT_STORE_BACKEND` | Blob/object-store backend for uploads, media, artifacts, normalized knowledge payloads, and workspace export files: `local` or `s3` | `local` |
 | `GOAT_OBJECT_STORE_ROOT` | Local object-store root when backend=`local`; defaults to `GOAT_DATA_DIR` | `<project>/var/data` |
@@ -329,15 +329,15 @@ live in the configured bucket/prefix while SQLite metadata remains local.
 | `GOAT_CODE_SANDBOX_CPU_LIMIT` | Docker CPU quota for each sandbox container | `0.5` |
 | `GOAT_CODE_SANDBOX_MEMORY_MB` | Docker memory limit (MB) for each sandbox container | `256` |
 
-### Object storage modes (Phase 16C)
+### Object storage modes (Phase 16C) and hosted runtime metadata (Phase 16D)
 
-- Runtime metadata remains in SQLite at `GOAT_LOG_PATH`; Phase 16C only externalizes binary/object payloads.
-- `GOAT_RUNTIME_METADATA_BACKEND=sqlite` remains the only fully supported runtime metadata mode in the shipped app.
-- `GOAT_RUNTIME_METADATA_BACKEND=postgres` is currently a server-only Phase 16D preview seam. It requires `GOAT_DEPLOY_TARGET=server` plus `GOAT_RUNTIME_POSTGRES_DSN`, and startup fails fast until the Postgres repository adapters and migration tooling land.
+- Runtime metadata stays at `GOAT_LOG_PATH` for local and desktop by default; hosted/server deployments may opt into Postgres while Phase 16C continues to own only the binary/object payload boundary.
+- `GOAT_RUNTIME_METADATA_BACKEND=sqlite` remains the default runtime metadata mode, and local or desktop binaries stay on SQLite in the shipped app.
+- `GOAT_RUNTIME_METADATA_BACKEND=postgres` is a server-only hosted runtime mode. It requires `GOAT_DEPLOY_TARGET=server` plus `GOAT_RUNTIME_POSTGRES_DSN`, applies Alembic schema upgrades at startup through the same path exposed by `python -m tools.ops.upgrade_runtime_postgres_schema`, and is intended to be cut over only after `python -m tools.ops.export_runtime_metadata_snapshot`, `python -m tools.ops.import_runtime_metadata_snapshot`, and `python -m tools.ops.check_runtime_metadata_parity` succeed against the same restore set.
 - `GOAT_OBJECT_STORE_BACKEND=local` keeps knowledge uploads, normalized payloads, vector payload JSON, media attachments, generated artifacts, and workspace-export files on the host filesystem under `GOAT_OBJECT_STORE_ROOT`.
 - `GOAT_OBJECT_STORE_BACKEND=s3` moves the same payload families behind an S3-compatible object-store contract. The backend environment must include `boto3` for this mode.
 - Read compatibility is preserved for older local files under `GOAT_DATA_DIR/uploads/*` and `GOAT_DATA_DIR/vector_index/*` while SQLite rows still reference legacy paths.
-- Backup, restore, and rollback should treat the SQLite snapshot plus the matching object-store snapshot as one recovery unit.
+- Backup, restore, and rollback should treat the SQLite snapshot plus the matching object-store snapshot as one recovery unit; hosted/server Postgres cutover additionally requires the imported runtime metadata snapshot and a clean parity pass from the same capture window.
 - The canonical application/storage contract lives in [OBJECT_STORAGE_CONTRACT.md](../architecture/OBJECT_STORAGE_CONTRACT.md).
 
 ### Code sandbox operations (Phase 18)
