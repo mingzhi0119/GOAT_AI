@@ -2,7 +2,7 @@
 
 Strategic Intelligence assistant for Simon Business School, University of Rochester.
 
-- Example public deployment: <https://goat-dev.vercel.app> (frontend) with the public backend currently published at <https://goat-api.duckdns.org>; the public browser path now uses one shared site password plus a browser-scoped signed session cookie
+- Example public deployment: <https://goat-dev.vercel.app> (frontend) with the public backend currently published at <https://goat-api.duckdns.org>; this is the `GOAT_DEPLOY_MODE=2` remote shape
 - Repo: <https://github.com/mingzhi0119/GOAT_AI>
 - Current snapshot: [docs/governance/PROJECT_STATUS.md](docs/governance/PROJECT_STATUS.md)
 - API contract: [docs/api/API_REFERENCE.md](docs/api/API_REFERENCE.md)
@@ -12,6 +12,7 @@ Strategic Intelligence assistant for Simon Business School, University of Roches
 
 - **Portable by design:** the same repo is meant to run on **Windows, macOS, and Linux** for development, and on **various Linux (or container) server layouts** for production, not tied to a single school-owned Ubuntu image. Paths, ports, GPU selection, and secrets are **environment-driven** (see `.env.example` and [docs/operations/OPERATIONS.md](docs/operations/OPERATIONS.md)); avoid hardcoding host-specific assumptions in code.
 - **Reference vs local:** the example public deployment listed above is a **reference deployment**, not a constraint on where you may install or develop.
+- **Deployment modes:** the checked-in deploy surface is now explicitly split into `0=local`, `1=school_server`, and `2=remote`.
 
 ### Windows development
 
@@ -201,6 +202,32 @@ Windows PowerShell:
 ```
 
 Canonical checked-in operator assets live under `ops/deploy/`, `ops/systemd/`, and `ops/verification/`. Use those paths directly.
+
+### One-command project builds
+
+Local Linux build:
+
+```bash
+bash ops/build/build_local.sh
+```
+
+Local Windows build:
+
+```powershell
+.\ops\build\build_local.ps1
+```
+
+School server build:
+
+```bash
+bash ops/build/build_school_server.sh
+```
+
+Notes:
+
+- the build entrypoints install Python dependencies, run `npm ci`, build `frontend/dist`, and validate the selected `GOAT_DEPLOY_MODE`
+- `ops/build/build_school_server.sh` requires `.env.school-ubuntu` and validates the school profile as `GOAT_DEPLOY_MODE=1`
+- add `QUICK=1` to the bash build scripts or `-Quick` to the PowerShell build script when you want to reuse an existing `.venv`
 
 ### Simon school Ubuntu server profile
 

@@ -70,7 +70,7 @@ def _settings(*, backend: str = "sqlite") -> Settings:
         kwargs["runtime_postgres_dsn"] = (
             "postgresql://goat:secret@db.example.com:5432/goat"
         )
-        kwargs["deploy_target"] = "server"
+        kwargs["deploy_mode"] = 2
     return Settings(**kwargs)
 
 

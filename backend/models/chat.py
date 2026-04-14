@@ -25,7 +25,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     """Body for POST /api/chat."""
 
-    model: str = Field("gemma4:26b", min_length=1)
+    model: str = Field("qwen3:4b", min_length=1)
     messages: list[ChatMessage] = Field(..., min_length=1)
     knowledge_document_ids: list[str] = Field(
         default_factory=list,

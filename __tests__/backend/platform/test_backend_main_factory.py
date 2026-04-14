@@ -26,7 +26,7 @@ class BackendMainFactoryTests(unittest.TestCase):
             app_root=root,
             logo_svg=root / "logo.svg",
             log_db_path=root / "chat_logs.db",
-            deploy_target="auto",
+            deploy_mode=0,
             server_port=62606,
             local_port=62606,
         )
@@ -109,7 +109,7 @@ class BackendMainFactoryTests(unittest.TestCase):
                     "runtime_postgres_dsn": (
                         "postgresql://goat:secret@db.example.com:5432/goat"
                     ),
-                    "deploy_target": "server",
+                    "deploy_mode": 2,
                 }
             )
         )

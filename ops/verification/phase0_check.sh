@@ -64,7 +64,7 @@ else
 fi
 
 info "Step 7: Start FastAPI on port $PORT and hit /api/health"
-python3 -m uvicorn server:create_app --factory --host 0.0.0.0 --port "$PORT" --log-level warning &
+GOAT_DEPLOY_MODE=0 python3 -m uvicorn server:create_app --factory --host 0.0.0.0 --port "$PORT" --log-level warning &
 SERVER_PID=$!
 sleep 2
 
@@ -105,5 +105,5 @@ ok "Phase 0 complete; all checks passed"
 echo ""
 echo "Next:"
 echo "  mkdir -p var/logs"
-echo "  GOAT_RUNTIME_ROOT=\$PWD/var GOAT_LOG_DIR=\$PWD/var/logs nohup python3 -m uvicorn server:create_app --factory --host 0.0.0.0 --port $PORT > var/logs/fastapi.log 2>&1 &"
+echo "  GOAT_DEPLOY_MODE=0 GOAT_RUNTIME_ROOT=\$PWD/var GOAT_LOG_DIR=\$PWD/var/logs nohup python3 -m uvicorn server:create_app --factory --host 0.0.0.0 --port $PORT > var/logs/fastapi.log 2>&1 &"
 echo "  echo \$! > var/logs/fastapi.pid"

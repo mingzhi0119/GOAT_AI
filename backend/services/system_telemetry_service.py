@@ -149,7 +149,8 @@ def build_runtime_target_response(settings: Settings) -> RuntimeTargetResponse:
     )
     ordered = ordered_runtime_targets(settings)
     return RuntimeTargetResponse(
-        deploy_target=settings.deploy_target,
+        deploy_mode=settings.deploy_mode,
+        deploy_mode_name=settings.deploy_mode_name,
         current=RuntimeTargetItemResponse(**current.__dict__),
         ordered_targets=[
             RuntimeTargetItemResponse(**item.__dict__) for item in ordered

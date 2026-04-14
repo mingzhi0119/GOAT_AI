@@ -20,14 +20,54 @@ def test_root_entrypoints_are_not_part_of_the_supported_ops_surface() -> None:
     assert not (REPO_ROOT / "phase0_check.sh").exists()
 
 
+def test_build_entrypoints_exist_for_local_and_school_modes() -> None:
+    build_local = (REPO_ROOT / "ops" / "build" / "build_local.sh").read_text(
+        encoding="utf-8"
+    )
+    build_school = (
+        REPO_ROOT / "ops" / "build" / "build_school_server.sh"
+    ).read_text(encoding="utf-8")
+    build_lib = (
+        REPO_ROOT / "ops" / "build" / "lib" / "project_build.sh"
+    ).read_text(encoding="utf-8")
+    build_ps1 = (REPO_ROOT / "ops" / "build" / "build_local.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'source "${SCRIPT_DIR}/lib/project_build.sh"' in build_local
+    assert 'GOAT_DEPLOY_MODE="${GOAT_DEPLOY_MODE:-0}"' in build_local
+    assert 'source "${SCRIPT_DIR}/lib/project_build.sh"' in build_school
+    assert 'GOAT_DEPLOY_MODE="${GOAT_DEPLOY_MODE:-1}"' in build_school
+    assert 'REQUIRE_SECONDARY_DOTENV=1' in build_school
+    assert 'SECONDARY_DOTENV_PATH="${PROJECT_DIR}/.env.school-ubuntu"' in build_school
+    assert 'GOAT_DEPLOY_MODE must be set by the build wrapper.' in build_lib
+    assert 'npm run build' in build_lib
+    assert 'load_settings' in build_lib
+    assert '$env:GOAT_DEPLOY_MODE = "0"' in build_ps1
+    assert 'npm run build' in build_ps1
+    assert 'load_settings' in build_ps1
+
+
 def test_canonical_deploy_scripts_use_factory_entrypoint() -> None:
     deploy_sh = (REPO_ROOT / "ops" / "deploy" / "deploy.sh").read_text(encoding="utf-8")
+    deploy_school = (
+        REPO_ROOT / "ops" / "deploy" / "deploy_school_server.sh"
+    ).read_text(encoding="utf-8")
+    deploy_remote = (
+        REPO_ROOT / "ops" / "deploy" / "deploy_remote_server.sh"
+    ).read_text(encoding="utf-8")
+    deploy_lib = (
+        REPO_ROOT / "ops" / "deploy" / "lib" / "backend_server_deploy.sh"
+    ).read_text(encoding="utf-8")
     deploy_ps1 = (REPO_ROOT / "ops" / "deploy" / "deploy.ps1").read_text(
         encoding="utf-8"
     )
 
-    assert "server:create_app" in deploy_sh
-    assert "--factory" in deploy_sh
+    assert 'source "${SCRIPT_DIR}/lib/backend_server_deploy.sh"' in deploy_sh
+    assert 'source "${SCRIPT_DIR}/lib/backend_server_deploy.sh"' in deploy_school
+    assert 'source "${SCRIPT_DIR}/lib/backend_server_deploy.sh"' in deploy_remote
+    assert "server:create_app" in deploy_lib
+    assert "--factory" in deploy_lib
     assert '"server:create_app"' in deploy_ps1
     assert '"--factory"' in deploy_ps1
 
@@ -41,6 +81,7 @@ def test_goat_service_uses_supported_logs_and_factory_entrypoint() -> None:
         "ExecStartPre=/usr/bin/mkdir -p %h/GOAT_AI/var/logs %h/GOAT_AI/var/data"
         in service
     )
+    assert "Environment=GOAT_DEPLOY_MODE=2" in service
     assert "Environment=GOAT_RUNTIME_ROOT=%h/GOAT_AI/var" in service
     assert "Environment=GOAT_LOG_DIR=%h/GOAT_AI/var/logs" in service
     assert "server:create_app" in service
@@ -53,6 +94,12 @@ def test_watchdog_phase0_and_school_ollama_assets_align_with_supported_ops_contr
     None
 ):
     deploy_sh = (REPO_ROOT / "ops" / "deploy" / "deploy.sh").read_text(encoding="utf-8")
+    deploy_school = (
+        REPO_ROOT / "ops" / "deploy" / "deploy_school_server.sh"
+    ).read_text(encoding="utf-8")
+    deploy_remote = (
+        REPO_ROOT / "ops" / "deploy" / "deploy_remote_server.sh"
+    ).read_text(encoding="utf-8")
     healthcheck = (REPO_ROOT / "ops" / "verification" / "healthcheck.sh").read_text(
         encoding="utf-8"
     )
@@ -74,46 +121,46 @@ def test_watchdog_phase0_and_school_ollama_assets_align_with_supported_ops_contr
     assert 'GOAT_LOG_DIR="${GOAT_LOG_DIR:-$GOAT_RUNTIME_ROOT/logs}"' in watchdog
     assert 'LOG="${GOAT_WATCHDOG_LOG:-$GOAT_LOG_DIR/watchdog.log}"' in watchdog
     assert 'mkdir -p "$(dirname "$LOG")"' in watchdog
-    assert "bash ops/deploy/deploy.sh" in watchdog
+    assert (
+        'DEPLOY_SCRIPT="${GOAT_WATCHDOG_DEPLOY_SCRIPT:-ops/deploy/deploy_remote_server.sh}"'
+        in watchdog
+    )
+    assert 'bash "${DEPLOY_SCRIPT}"' in watchdog
 
     assert "Need Node 24.x" in phase0
     assert "npm ci --silent" in phase0
-    assert "server:create_app --factory" in phase0
+    assert "GOAT_DEPLOY_MODE=0 python3 -m uvicorn server:create_app --factory" in phase0
     assert "var/logs/fastapi.log" in phase0
     assert "var/logs/fastapi.pid" in phase0
 
+    assert 'GOAT_DEPLOY_MODE="${GOAT_DEPLOY_MODE:-0}"' in deploy_sh
+    assert 'GOAT_SYSTEMD_UNIT=""' in deploy_sh
+    assert "GOAT_USE_SCHOOL_OLLAMA_LOCAL" not in deploy_sh
+    assert 'GOAT_DEPLOY_MODE="${GOAT_DEPLOY_MODE:-2}"' in deploy_remote
+    assert 'GOAT_SYSTEMD_UNIT="${GOAT_SYSTEMD_UNIT:-goat-ai}"' in deploy_remote
+    assert 'PRIMARY_DOTENV_PATH="${PROJECT_DIR}/.env"' in deploy_school
+    assert 'SCHOOL_DOTENV_PATH="${PROJECT_DIR}/.env.school-ubuntu"' in deploy_school
+    assert 'GOAT_DEPLOY_MODE="${GOAT_DEPLOY_MODE:-1}"' in deploy_school
     assert (
-        'GOAT_USE_SCHOOL_OLLAMA_LOCAL="${GOAT_USE_SCHOOL_OLLAMA_LOCAL:-0}"' in deploy_sh
+        'GOAT_SYSTEMD_UNIT="${GOAT_SYSTEMD_UNIT:-goat-ai.school-ubuntu}"'
+        in deploy_school
     )
-    assert 'GOAT_OLLAMA_PROFILE="${GOAT_OLLAMA_PROFILE:-}"' in deploy_sh
-    assert 'PRIMARY_DOTENV_PATH="${PROJECT_DIR}/.env"' in deploy_sh
-    assert 'SCHOOL_DOTENV_PATH="${PROJECT_DIR}/.env.school-ubuntu"' in deploy_sh
-    assert "read_first_dotenv_value() {" in deploy_sh
-    assert "school_ollama_local_enabled() {" in deploy_sh
-    assert "School Ubuntu Ollama profile enabled" in deploy_sh
-    assert '[ ! -f "${PROJECT_DIR}/scripts/ollama/start_ollama_local.sh" ]' in deploy_sh
-    assert 'bash "${PROJECT_DIR}/scripts/ollama/start_ollama_local.sh"' in deploy_sh
+    assert "School Ubuntu Ollama profile enabled" in deploy_school
+    assert 'bash "${PROJECT_DIR}/scripts/ollama/start_ollama_local.sh"' in deploy_school
     assert (
-        '_dotenv_school_switch="$(read_first_dotenv_value "GOAT_USE_SCHOOL_OLLAMA_LOCAL" "${SCHOOL_DOTENV_PATH}" "${PRIMARY_DOTENV_PATH}")"'
-        in deploy_sh
+        'read_first_dotenv_value "GOAT_USE_SCHOOL_OLLAMA_LOCAL" "${SCHOOL_DOTENV_PATH}" "${PRIMARY_DOTENV_PATH}"'
+        in deploy_school
     )
     assert (
-        '_dotenv_ollama_profile="$(read_first_dotenv_value "GOAT_OLLAMA_PROFILE" "${SCHOOL_DOTENV_PATH}" "${PRIMARY_DOTENV_PATH}")"'
-        in deploy_sh
+        'read_first_dotenv_value "GOAT_OLLAMA_PROFILE" "${SCHOOL_DOTENV_PATH}" "${PRIMARY_DOTENV_PATH}"'
+        in deploy_school
     )
-    assert "_goat_systemd_restart goat-ai.school-ubuntu" in deploy_sh
-    assert 'SELECTED_SYSTEMD_UNIT="goat-ai.school-ubuntu"' in deploy_sh
-    assert 'systemctl --user stop "${SELECTED_SYSTEMD_UNIT}"' in deploy_sh
-    assert (
-        'GOAT_USE_SCHOOL_OLLAMA_LOCAL="${GOAT_USE_SCHOOL_OLLAMA_LOCAL}" \\' in deploy_sh
-    )
-    assert 'GOAT_OLLAMA_PROFILE="${GOAT_OLLAMA_PROFILE}" \\' in deploy_sh
-    assert '[ "${EFFECTIVE_OLLAMA_URL}" = "${LOCAL_OLLAMA_URL}" ]' not in deploy_sh
 
     assert (
         "ExecStartPre=/usr/bin/bash %h/GOAT_AI/scripts/ollama/start_ollama_local.sh"
         in school_service
     )
+    assert "Environment=GOAT_DEPLOY_MODE=1" in school_service
     assert "Environment=GOAT_USE_SCHOOL_OLLAMA_LOCAL=1" in school_service
     assert "EnvironmentFile=-%h/GOAT_AI/.env.school-ubuntu" in school_service
 
@@ -123,6 +170,11 @@ def test_watchdog_phase0_and_school_ollama_assets_align_with_supported_ops_contr
     )
     assert 'OLLAMA_HOST="${OLLAMA_BASE_URL_VALUE}"' in start_ollama
     assert "scripts/ollama/ollama_local.sh" in start_ollama
+
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    assert "bash ops/build/build_local.sh" in readme
+    assert ".\\ops\\build\\build_local.ps1" in readme
+    assert "bash ops/build/build_school_server.sh" in readme
 
 
 def test_release_docs_and_status_match_current_truth() -> None:

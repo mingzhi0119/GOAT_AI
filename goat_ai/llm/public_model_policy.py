@@ -9,7 +9,6 @@ _DEFAULT_PUBLIC_MODEL_ALLOWLIST: Final[tuple[str, ...]] = (
     "llama3.2:3b",
     "gemma3:4b",
     "qwen2.5-coder:3b",
-    "gemma4:26b",
 )
 
 

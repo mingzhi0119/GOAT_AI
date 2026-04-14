@@ -873,7 +873,7 @@ fn spawn_release_backend<R: tauri::Runtime>(
         .env(DESKTOP_SHELL_LOG_PATH_ENV, desktop_log.as_os_str())
         .env("GOAT_SERVER_PORT", &backend_port)
         .env("GOAT_LOCAL_PORT", &backend_port)
-        .env("GOAT_DEPLOY_TARGET", "local");
+        .env("GOAT_DEPLOY_MODE", "0");
 
     let (mut rx, child) = sidecar
         .spawn()

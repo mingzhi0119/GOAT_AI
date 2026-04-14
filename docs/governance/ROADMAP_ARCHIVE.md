@@ -37,7 +37,7 @@ current GOAT AI stack.
 
 - Frontend hosting now runs on Vercel at `https://goat-dev.vercel.app`, with root-relative `/api/*` calls rewritten to the public backend.
 - The backend is now published through `https://goat-api.duckdns.org` with `nginx` terminating TLS in front of a loopback-only `127.0.0.1:62606` FastAPI/Uvicorn process.
-- Public Ollama access is constrained by a server-side allowlist so deployment callers only see the intended `qwen3:4b`, `llama3.2:3b`, `gemma3:4b`, `qwen2.5-coder:3b`, and `gemma4:26b` model surfaces.
+- Public Ollama access is constrained by a server-side allowlist so deployment callers only see the intended `qwen3:4b`, `llama3.2:3b`, `gemma3:4b`, and `qwen2.5-coder:3b` model surfaces.
 - Chat export behavior now explicitly teaches the model how to trigger downloadable Markdown and other text-first artifacts through a single inline filename link.
 
 ## Shipped v1.2.0

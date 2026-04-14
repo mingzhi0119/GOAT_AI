@@ -550,12 +550,14 @@ schemas:
   RuntimeTargetResponse:
     type: object
     required:
-      - deploy_target
+      - deploy_mode
+      - deploy_mode_name
       - current
       - ordered_targets
       - operational_contract
     properties:
-      deploy_target: string
+      deploy_mode: integer
+      deploy_mode_name: string
       current: RuntimeTargetItemResponse
       ordered_targets: RuntimeTargetItemResponse[]
       operational_contract: RuntimeOperationalContractResponse

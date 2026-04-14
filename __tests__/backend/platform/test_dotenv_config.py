@@ -48,17 +48,40 @@ class DotenvConfigTests(unittest.TestCase):
                     else:
                         os.environ[key] = value
 
-    def test_load_settings_rejects_invalid_deploy_target(self) -> None:
-        original = os.environ.get("GOAT_DEPLOY_TARGET")
+    def test_load_settings_rejects_missing_deploy_mode(self) -> None:
+        original = os.environ.get("GOAT_DEPLOY_MODE")
         try:
-            os.environ["GOAT_DEPLOY_TARGET"] = "invalid"
-            with self.assertRaises(ValueError):
+            os.environ.pop("GOAT_DEPLOY_MODE", None)
+            with self.assertRaisesRegex(ValueError, "GOAT_DEPLOY_MODE is required"):
                 config.load_settings()
         finally:
             if original is None:
-                os.environ.pop("GOAT_DEPLOY_TARGET", None)
+                os.environ.pop("GOAT_DEPLOY_MODE", None)
             else:
-                os.environ["GOAT_DEPLOY_TARGET"] = original
+                os.environ["GOAT_DEPLOY_MODE"] = original
+
+    def test_load_settings_rejects_invalid_deploy_mode(self) -> None:
+        original = os.environ.get("GOAT_DEPLOY_MODE")
+        try:
+            os.environ["GOAT_DEPLOY_MODE"] = "99"
+            with self.assertRaisesRegex(ValueError, "GOAT_DEPLOY_MODE"):
+                config.load_settings()
+        finally:
+            if original is None:
+                os.environ.pop("GOAT_DEPLOY_MODE", None)
+            else:
+                os.environ["GOAT_DEPLOY_MODE"] = original
+
+    def test_load_settings_rejects_legacy_deploy_target_env(self) -> None:
+        original_env = _capture_env("GOAT_DEPLOY_MODE", "GOAT_DEPLOY_TARGET")
+        try:
+            _clear_env(*original_env.keys())
+            os.environ["GOAT_DEPLOY_MODE"] = "0"
+            os.environ["GOAT_DEPLOY_TARGET"] = "local"
+            with self.assertRaisesRegex(ValueError, "GOAT_DEPLOY_TARGET"):
+                config.load_settings()
+        finally:
+            _restore_many(original_env)
 
     def test_load_settings_rejects_invalid_runtime_metadata_backend(self) -> None:
         original_env = _capture_env("GOAT_RUNTIME_METADATA_BACKEND")
@@ -74,12 +97,12 @@ class DotenvConfigTests(unittest.TestCase):
         original_env = _capture_env(
             "GOAT_RUNTIME_METADATA_BACKEND",
             "GOAT_RUNTIME_POSTGRES_DSN",
-            "GOAT_DEPLOY_TARGET",
+            "GOAT_DEPLOY_MODE",
         )
         try:
             _clear_env(*original_env.keys())
+            os.environ["GOAT_DEPLOY_MODE"] = "2"
             os.environ["GOAT_RUNTIME_METADATA_BACKEND"] = "postgres"
-            os.environ["GOAT_DEPLOY_TARGET"] = "server"
             with self.assertRaisesRegex(ValueError, "GOAT_RUNTIME_POSTGRES_DSN"):
                 config.load_settings()
         finally:
@@ -91,15 +114,16 @@ class DotenvConfigTests(unittest.TestCase):
         original_env = _capture_env(
             "GOAT_RUNTIME_METADATA_BACKEND",
             "GOAT_RUNTIME_POSTGRES_DSN",
-            "GOAT_DEPLOY_TARGET",
+            "GOAT_DEPLOY_MODE",
         )
         try:
             _clear_env(*original_env.keys())
+            os.environ["GOAT_DEPLOY_MODE"] = "0"
             os.environ["GOAT_RUNTIME_METADATA_BACKEND"] = "postgres"
             os.environ["GOAT_RUNTIME_POSTGRES_DSN"] = (
                 "postgresql://goat:secret@db.example.com:5432/goat"
             )
-            with self.assertRaisesRegex(ValueError, "GOAT_DEPLOY_TARGET=server"):
+            with self.assertRaisesRegex(ValueError, "GOAT_DEPLOY_MODE=2"):
                 config.load_settings()
         finally:
             _restore_many(original_env)
@@ -111,15 +135,15 @@ class DotenvConfigTests(unittest.TestCase):
             original_env = _capture_env(
                 "GOAT_RUNTIME_METADATA_BACKEND",
                 "GOAT_RUNTIME_POSTGRES_DSN",
-                "GOAT_DEPLOY_TARGET",
+                "GOAT_DEPLOY_MODE",
             )
             try:
                 _clear_env(*original_env.keys())
+                os.environ["GOAT_DEPLOY_MODE"] = "2"
                 os.environ["GOAT_RUNTIME_METADATA_BACKEND"] = "postgres"
                 os.environ["GOAT_RUNTIME_POSTGRES_DSN"] = (
                     "postgresql://goat:secret@db.example.com:5432/goat"
                 )
-                os.environ["GOAT_DEPLOY_TARGET"] = "server"
                 with (
                     patch.object(config, "APP_ROOT", app_root),
                     patch.object(config, "DEFAULT_RUNTIME_ROOT", runtime_root),
@@ -130,6 +154,7 @@ class DotenvConfigTests(unittest.TestCase):
                     "postgresql://goat:secret@db.example.com:5432/goat",
                     settings.runtime_postgres_dsn,
                 )
+                self.assertEqual(2, settings.deploy_mode)
             finally:
                 _restore_many(original_env)
 
@@ -400,17 +425,96 @@ class DotenvConfigTests(unittest.TestCase):
             finally:
                 _restore_many(original_env)
 
+    def test_load_settings_rejects_api_key_auth_in_local_mode(self) -> None:
+        original_env = _capture_env("GOAT_DEPLOY_MODE", "GOAT_API_KEY")
+        try:
+            _clear_env(*original_env.keys())
+            os.environ["GOAT_DEPLOY_MODE"] = "0"
+            os.environ["GOAT_API_KEY"] = "local-secret"
+            with self.assertRaisesRegex(ValueError, "GOAT_DEPLOY_MODE=2"):
+                config.load_settings()
+        finally:
+            _restore_many(original_env)
+
+    def test_load_settings_rejects_browser_auth_in_school_mode(self) -> None:
+        original_env = _capture_env(
+            "GOAT_DEPLOY_MODE",
+            "GOAT_SHARED_ACCESS_PASSWORD_HASH",
+            "GOAT_SHARED_ACCESS_SESSION_SECRET",
+        )
+        try:
+            _clear_env(*original_env.keys())
+            os.environ["GOAT_DEPLOY_MODE"] = "1"
+            os.environ["GOAT_SHARED_ACCESS_PASSWORD_HASH"] = (
+                hash_shared_access_password("school-secret")
+            )
+            os.environ["GOAT_SHARED_ACCESS_SESSION_SECRET"] = "school-session"
+            with self.assertRaisesRegex(ValueError, "GOAT_DEPLOY_MODE=2"):
+                config.load_settings()
+        finally:
+            _restore_many(original_env)
+
+    def test_load_settings_allows_api_key_auth_in_remote_mode(self) -> None:
+        original_env = _capture_env("GOAT_DEPLOY_MODE", "GOAT_API_KEY")
+        try:
+            _clear_env(*original_env.keys())
+            os.environ["GOAT_DEPLOY_MODE"] = "2"
+            os.environ["GOAT_API_KEY"] = "remote-secret"
+
+            settings = config.load_settings()
+
+            self.assertEqual("remote-secret", settings.api_key)
+            self.assertEqual(2, settings.deploy_mode)
+        finally:
+            _restore_many(original_env)
+
+    def test_load_settings_uses_remote_rate_limit_defaults(self) -> None:
+        original_env = _capture_env(
+            "GOAT_DEPLOY_MODE",
+            "GOAT_RATE_LIMIT_WINDOW_SEC",
+            "GOAT_RATE_LIMIT_MAX_REQUESTS",
+            "GOAT_OLLAMA_MAX_CONCURRENT_REQUESTS",
+        )
+        try:
+            _clear_env(*original_env.keys())
+            os.environ["GOAT_DEPLOY_MODE"] = "2"
+
+            settings = config.load_settings()
+
+            self.assertEqual(60, settings.rate_limit_window_sec)
+            self.assertEqual(20, settings.rate_limit_max_requests)
+            self.assertEqual(2, settings.ollama_max_concurrent_requests)
+        finally:
+            _restore_many(original_env)
+
+    def test_load_settings_rejects_non_positive_ollama_concurrency(self) -> None:
+        original_env = _capture_env(
+            "GOAT_DEPLOY_MODE", "GOAT_OLLAMA_MAX_CONCURRENT_REQUESTS"
+        )
+        try:
+            _clear_env(*original_env.keys())
+            os.environ["GOAT_DEPLOY_MODE"] = "2"
+            os.environ["GOAT_OLLAMA_MAX_CONCURRENT_REQUESTS"] = "0"
+            with self.assertRaisesRegex(
+                ValueError, "GOAT_OLLAMA_MAX_CONCURRENT_REQUESTS"
+            ):
+                config.load_settings()
+        finally:
+            _restore_many(original_env)
+
     def test_load_settings_parses_shared_access_env(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             app_root = Path(tmp)
             runtime_root = app_root / "var"
             original_env = _capture_env(
+                "GOAT_DEPLOY_MODE",
                 "GOAT_SHARED_ACCESS_PASSWORD_HASH",
                 "GOAT_SHARED_ACCESS_SESSION_SECRET",
                 "GOAT_SHARED_ACCESS_SESSION_TTL_SEC",
             )
             try:
                 _clear_env(*original_env.keys())
+                os.environ["GOAT_DEPLOY_MODE"] = "2"
                 os.environ["GOAT_SHARED_ACCESS_PASSWORD_HASH"] = (
                     hash_shared_access_password("goat-shared")
                 )
@@ -435,12 +539,14 @@ class DotenvConfigTests(unittest.TestCase):
         self,
     ) -> None:
         original_env = _capture_env(
+            "GOAT_DEPLOY_MODE",
             "GOAT_SHARED_ACCESS_PASSWORD",
             "GOAT_SHARED_ACCESS_PASSWORD_HASH",
             "GOAT_SHARED_ACCESS_SESSION_SECRET",
         )
         try:
             _clear_env(*original_env.keys())
+            os.environ["GOAT_DEPLOY_MODE"] = "2"
             os.environ["GOAT_SHARED_ACCESS_PASSWORD"] = "goat-shared"
             os.environ["GOAT_SHARED_ACCESS_SESSION_SECRET"] = "session-secret"
 
@@ -456,12 +562,14 @@ class DotenvConfigTests(unittest.TestCase):
         self,
     ) -> None:
         original_env = _capture_env(
+            "GOAT_DEPLOY_MODE",
             "GOAT_SHARED_ACCESS_PASSWORD",
             "GOAT_SHARED_ACCESS_PASSWORD_HASH",
             "GOAT_SHARED_ACCESS_SESSION_SECRET",
         )
         try:
             _clear_env(*original_env.keys())
+            os.environ["GOAT_DEPLOY_MODE"] = "2"
             os.environ["GOAT_SHARED_ACCESS_PASSWORD"] = "goat-shared"
             with self.assertRaisesRegex(
                 ValueError, "GOAT_SHARED_ACCESS_SESSION_SECRET"
@@ -472,6 +580,7 @@ class DotenvConfigTests(unittest.TestCase):
 
     def test_load_settings_rejects_non_positive_shared_access_ttl(self) -> None:
         original_env = _capture_env(
+            "GOAT_DEPLOY_MODE",
             "GOAT_SHARED_ACCESS_PASSWORD",
             "GOAT_SHARED_ACCESS_PASSWORD_HASH",
             "GOAT_SHARED_ACCESS_SESSION_SECRET",
@@ -479,6 +588,7 @@ class DotenvConfigTests(unittest.TestCase):
         )
         try:
             _clear_env(*original_env.keys())
+            os.environ["GOAT_DEPLOY_MODE"] = "2"
             os.environ["GOAT_SHARED_ACCESS_PASSWORD"] = "goat-shared"
             os.environ["GOAT_SHARED_ACCESS_SESSION_SECRET"] = "session-secret"
             os.environ["GOAT_SHARED_ACCESS_SESSION_TTL_SEC"] = "0"
@@ -491,11 +601,13 @@ class DotenvConfigTests(unittest.TestCase):
 
     def test_load_settings_rejects_invalid_shared_access_password_hash(self) -> None:
         original_env = _capture_env(
+            "GOAT_DEPLOY_MODE",
             "GOAT_SHARED_ACCESS_PASSWORD_HASH",
             "GOAT_SHARED_ACCESS_SESSION_SECRET",
         )
         try:
             _clear_env(*original_env.keys())
+            os.environ["GOAT_DEPLOY_MODE"] = "2"
             os.environ["GOAT_SHARED_ACCESS_PASSWORD_HASH"] = "definitely-not-a-hash"
             os.environ["GOAT_SHARED_ACCESS_SESSION_SECRET"] = "session-secret"
             with self.assertRaisesRegex(ValueError, "GOAT_SHARED_ACCESS_PASSWORD_HASH"):
@@ -508,6 +620,7 @@ class DotenvConfigTests(unittest.TestCase):
             app_root = Path(tmp)
             runtime_root = app_root / "var"
             original_env = _capture_env(
+                "GOAT_DEPLOY_MODE",
                 "GOAT_ACCOUNT_AUTH_ENABLED",
                 "GOAT_BROWSER_SESSION_SECRET",
                 "GOAT_ACCOUNT_SESSION_TTL_SEC",
@@ -517,6 +630,7 @@ class DotenvConfigTests(unittest.TestCase):
             )
             try:
                 _clear_env(*original_env.keys())
+                os.environ["GOAT_DEPLOY_MODE"] = "2"
                 os.environ["GOAT_ACCOUNT_AUTH_ENABLED"] = "1"
                 os.environ["GOAT_BROWSER_SESSION_SECRET"] = "browser-secret"
                 os.environ["GOAT_ACCOUNT_SESSION_TTL_SEC"] = "7200"
@@ -540,11 +654,13 @@ class DotenvConfigTests(unittest.TestCase):
         self,
     ) -> None:
         original_env = _capture_env(
+            "GOAT_DEPLOY_MODE",
             "GOAT_ACCOUNT_AUTH_ENABLED",
             "GOAT_BROWSER_SESSION_SECRET",
         )
         try:
             _clear_env(*original_env.keys())
+            os.environ["GOAT_DEPLOY_MODE"] = "2"
             os.environ["GOAT_ACCOUNT_AUTH_ENABLED"] = "1"
             with self.assertRaisesRegex(ValueError, "GOAT_BROWSER_SESSION_SECRET"):
                 config.load_settings()
@@ -553,6 +669,7 @@ class DotenvConfigTests(unittest.TestCase):
 
     def test_load_settings_rejects_partial_google_oauth_env(self) -> None:
         original_env = _capture_env(
+            "GOAT_DEPLOY_MODE",
             "GOAT_ACCOUNT_AUTH_ENABLED",
             "GOAT_BROWSER_SESSION_SECRET",
             "GOOGLE_CLIENT_ID",
@@ -561,6 +678,7 @@ class DotenvConfigTests(unittest.TestCase):
         )
         try:
             _clear_env(*original_env.keys())
+            os.environ["GOAT_DEPLOY_MODE"] = "2"
             os.environ["GOAT_ACCOUNT_AUTH_ENABLED"] = "1"
             os.environ["GOAT_BROWSER_SESSION_SECRET"] = "browser-secret"
             os.environ["GOOGLE_CLIENT_ID"] = "client-id"
@@ -578,6 +696,8 @@ def _capture_env(*names: str) -> dict[str, str | None]:
 def _clear_env(*names: str) -> None:
     for name in names:
         os.environ.pop(name, None)
+    if "GOAT_DEPLOY_MODE" not in names and "GOAT_DEPLOY_TARGET" not in names:
+        os.environ.setdefault("GOAT_DEPLOY_MODE", "0")
 
 
 def _restore_many(values: dict[str, str | None]) -> None:

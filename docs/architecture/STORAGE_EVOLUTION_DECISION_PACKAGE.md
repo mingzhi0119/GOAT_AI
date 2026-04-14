@@ -44,7 +44,7 @@ Phase 16C completed the file/blob storage decoupling work:
 Phase 16D is now complete for the hosted/server opt-in posture:
 
 - runtime metadata can now use `GOAT_RUNTIME_METADATA_BACKEND=postgres` together with
-  `GOAT_RUNTIME_POSTGRES_DSN` when `GOAT_DEPLOY_TARGET=server`
+  `GOAT_RUNTIME_POSTGRES_DSN` when `GOAT_DEPLOY_MODE=2`
 - local development and desktop installs remain on SQLite by default
 - Alembic under `backend/alembic/` owns hosted/server Postgres schema truth
 - the governed runtime-metadata family moves as one unit, including

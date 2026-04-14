@@ -18,7 +18,7 @@ def test_configure_desktop_environment_seeds_runtime_paths(
     monkeypatch.delenv("GOAT_LOG_DIR", raising=False)
     monkeypatch.delenv("GOAT_SERVER_PORT", raising=False)
     monkeypatch.delenv("GOAT_LOCAL_PORT", raising=False)
-    monkeypatch.delenv("GOAT_DEPLOY_TARGET", raising=False)
+    monkeypatch.delenv("GOAT_DEPLOY_MODE", raising=False)
     monkeypatch.delenv("GOAT_DESKTOP_APP_DATA_DIR", raising=False)
 
     resolved = subject.configure_desktop_environment(tmp_path / "desktop-data", 62606)
@@ -33,7 +33,7 @@ def test_configure_desktop_environment_seeds_runtime_paths(
     assert os.environ["GOAT_DATA_DIR"] == str(resolved / "data")
     assert os.environ["GOAT_SERVER_PORT"] == "62606"
     assert os.environ["GOAT_LOCAL_PORT"] == "62606"
-    assert os.environ["GOAT_DEPLOY_TARGET"] == "local"
+    assert os.environ["GOAT_DEPLOY_MODE"] == "0"
 
 
 def test_configure_desktop_environment_overrides_inherited_runtime_paths(
@@ -46,7 +46,7 @@ def test_configure_desktop_environment_overrides_inherited_runtime_paths(
     monkeypatch.setenv("GOAT_DATA_DIR", "C:/stale/data")
     monkeypatch.setenv("GOAT_SERVER_PORT", "9999")
     monkeypatch.setenv("GOAT_LOCAL_PORT", "9999")
-    monkeypatch.setenv("GOAT_DEPLOY_TARGET", "remote")
+    monkeypatch.setenv("GOAT_DEPLOY_MODE", "2")
 
     resolved = subject.configure_desktop_environment(tmp_path / "desktop-data", 62616)
 
@@ -57,7 +57,7 @@ def test_configure_desktop_environment_overrides_inherited_runtime_paths(
     assert os.environ["GOAT_DATA_DIR"] == str(resolved / "data")
     assert os.environ["GOAT_SERVER_PORT"] == "62616"
     assert os.environ["GOAT_LOCAL_PORT"] == "62616"
-    assert os.environ["GOAT_DEPLOY_TARGET"] == "local"
+    assert os.environ["GOAT_DEPLOY_MODE"] == "0"
 
 
 def test_default_desktop_data_root_prefers_platform_specific_locations(

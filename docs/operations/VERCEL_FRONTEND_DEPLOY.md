@@ -27,9 +27,6 @@ CORS complexity to chat, uploads, downloads, or SSE.
 
 ## Vercel project setup
 
-Create a **new** Vercel project for this frontend. Do not reuse unrelated
-projects.
-
 Recommended project settings:
 
 - Team: `mingzhi0119's projects`
@@ -39,6 +36,17 @@ Recommended project settings:
 - Build Command: `npm run build`
 - Output Directory: `dist`
 - Production Branch: `main`
+
+Current linked project truth:
+
+- Project id: `prj_9nxlqv85gJ2WcRn4K2tN9sxpiocj`
+- Team id: `team_JQbuOYqV6eUzhLDpwtLbbpAf`
+- The live project must keep `Root Directory=frontend`; if Vercel drifts back to
+  repo-root entrypoint `.` the deployment can show `READY` while both `/` and
+  `/api/health` return `404 NOT_FOUND`.
+- Repo-root [`.vercelignore`](/E:/simonbb/GOAT_AI/.vercelignore) must exclude
+  `frontend/src-tauri/target` and related desktop artifacts, otherwise a repo-root
+  production deploy can fail before build upload completes.
 
 For one-off local preview deployments from the `frontend/` directory, prefer:
 
@@ -68,6 +76,12 @@ Point the backend hostname to the Linux host or its reverse proxy:
 
 Keep FastAPI/Uvicorn on the existing Linux host at `127.0.0.1:62606`, then place
 Nginx in front of it for `goat-api.duckdns.org`.
+
+Deploy the backend in this shape with:
+
+```bash
+bash ops/deploy/deploy_remote_server.sh
+```
 
 Recommended backend auth env vars for the public site:
 
@@ -164,6 +178,8 @@ Public deployment:
 9. History load, upload, artifact download, and `/api/system/features` all work
    through `goat-dev.vercel.app` after login.
 10. Preview deployments still proxy `/api/*` to `goat-api.duckdns.org` as intended.
+11. Vercel build logs show the frontend root directory rather than repo-root
+    entrypoint `.`.
 
 ## Rollback
 

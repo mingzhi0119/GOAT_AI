@@ -16,18 +16,16 @@ def test_public_model_allowlist_defaults_to_public_deploy_set() -> None:
             "llama3.2:3b",
             "gemma3:4b",
             "qwen2.5-coder:3b",
-            "gemma4:26b",
         )
 
 
-def test_public_model_policy_accepts_case_insensitive_gemma_alias() -> None:
+def test_public_model_policy_rejects_removed_gemma_alias() -> None:
     with patch.dict("os.environ", {}, clear=True):
-        assert resolve_public_model_name("gemma4:26B") == "gemma4:26b"
+        assert resolve_public_model_name("gemma4:26B") is None
 
 
 def test_public_model_policy_filters_installed_models_in_public_order() -> None:
     with patch.dict("os.environ", {}, clear=True):
         assert filter_public_model_names(["gemma4:26b", "rogue-model", "qwen3:4b"]) == [
             "qwen3:4b",
-            "gemma4:26b",
         ]

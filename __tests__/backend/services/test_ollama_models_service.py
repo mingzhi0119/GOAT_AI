@@ -23,9 +23,9 @@ class OllamaModelsServiceTests(unittest.TestCase):
 
     def test_list_models_returns_models_response(self) -> None:
         llm = MagicMock()
-        llm.list_model_names.return_value = ["qwen3:4b", "rogue-model", "gemma4:26b"]
+        llm.list_model_names.return_value = ["qwen3:4b", "rogue-model", "gemma3:4b"]
         out = list_models_for_api(llm)
-        self.assertEqual(out.models, ["qwen3:4b", "gemma4:26b"])
+        self.assertEqual(out.models, ["qwen3:4b", "gemma3:4b"])
 
     def test_capabilities_maps_ollama_down_to_domain_error(self) -> None:
         llm = MagicMock()
@@ -46,15 +46,15 @@ class OllamaModelsServiceTests(unittest.TestCase):
     def test_capabilities_sets_vision_flag(self) -> None:
         llm = MagicMock()
         llm.describe_model_for_api.return_value = (["completion", "vision"], None)
-        out = model_capabilities_for_api(llm, "gemma4:26b")
+        out = model_capabilities_for_api(llm, "gemma3:4b")
         self.assertTrue(out.supports_vision)
 
     def test_capabilities_sets_thinking_flag(self) -> None:
         llm = MagicMock()
         llm.describe_model_for_api.return_value = (["completion", "thinking"], None)
-        out = model_capabilities_for_api(llm, "gemma4:26B")
+        out = model_capabilities_for_api(llm, "gemma3:4B")
         self.assertTrue(out.supports_thinking)
-        self.assertEqual("gemma4:26b", out.model)
+        self.assertEqual("gemma3:4b", out.model)
 
     def test_capabilities_passes_context_length(self) -> None:
         llm = MagicMock()

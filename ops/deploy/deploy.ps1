@@ -506,8 +506,10 @@ $previousGoatRuntimeRoot = $env:GOAT_RUNTIME_ROOT
 $previousGoatLogDir = $env:GOAT_LOG_DIR
 $previousGoatLogPath = $env:GOAT_LOG_PATH
 $previousGoatDataDir = $env:GOAT_DATA_DIR
+$previousGoatDeployMode = $env:GOAT_DEPLOY_MODE
 $previousOllamaBaseUrl = $env:OLLAMA_BASE_URL
 try {
+    $env:GOAT_DEPLOY_MODE = "0"
     $env:GOAT_SERVER_PORT = $ServerPort.ToString()
     $env:GOAT_LOCAL_PORT = $ServerPort.ToString()
     $env:GOAT_RUNTIME_ROOT = $RuntimeRoot
@@ -517,6 +519,7 @@ try {
     $env:OLLAMA_BASE_URL = $ResolvedOllamaBaseUrl
     $process = Start-Process @startInfo
 } finally {
+    $env:GOAT_DEPLOY_MODE = $previousGoatDeployMode
     $env:GOAT_SERVER_PORT = $previousGoatServerPort
     $env:GOAT_LOCAL_PORT = $previousGoatLocalPort
     $env:GOAT_RUNTIME_ROOT = $previousGoatRuntimeRoot
@@ -536,6 +539,7 @@ if (-not (Test-DeploymentContract -Port $ServerPort)) {
 Write-Step "Running post-deploy contract checks"
 Push-Location -LiteralPath $ProjectDir
 try {
+    $env:GOAT_DEPLOY_MODE = "0"
     $env:GOAT_RUNTIME_ROOT = $RuntimeRoot
     $env:GOAT_LOG_DIR = $LogsDir
     $env:GOAT_LOG_PATH = $LogDbPath
@@ -543,6 +547,7 @@ try {
     & $VenvPython -m tools.ops.post_deploy_check --base-url "http://127.0.0.1:$ServerPort"
 } finally {
     Pop-Location
+    $env:GOAT_DEPLOY_MODE = $previousGoatDeployMode
     $env:GOAT_RUNTIME_ROOT = $previousGoatRuntimeRoot
     $env:GOAT_LOG_DIR = $previousGoatLogDir
     $env:GOAT_LOG_PATH = $previousGoatLogPath

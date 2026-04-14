@@ -42,7 +42,7 @@ def configure_desktop_environment(data_root: Path, port: int) -> Path:
     os.environ["GOAT_DATA_DIR"] = str(resolved_root / "data")
     os.environ["GOAT_SERVER_PORT"] = str(port)
     os.environ["GOAT_LOCAL_PORT"] = str(port)
-    os.environ["GOAT_DEPLOY_TARGET"] = "local"
+    os.environ["GOAT_DEPLOY_MODE"] = "0"
 
     return resolved_root
 

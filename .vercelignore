@@ -1,0 +1,11 @@
+# Remote Vercel deploys build from the repo root with `frontend` as the root
+# directory, so exclude local desktop packaging artifacts from the upload set.
+frontend/src-tauri/target
+frontend/src-tauri/binaries
+frontend/src-tauri/.desktop-sidecar-build
+
+# Frontend build/test outputs should be rebuilt on Vercel instead of uploaded.
+frontend/dist
+frontend/test-results
+frontend/playwright-report
+frontend/coverage

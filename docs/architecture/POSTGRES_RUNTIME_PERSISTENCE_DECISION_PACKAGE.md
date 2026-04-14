@@ -38,7 +38,7 @@ rollback proof.
 
 - `GOAT_RUNTIME_METADATA_BACKEND=sqlite` remains the default runtime metadata mode
 - `GOAT_RUNTIME_METADATA_BACKEND=postgres` is a hosted/server-only mode and requires
-  `GOAT_DEPLOY_TARGET=server` plus `GOAT_RUNTIME_POSTGRES_DSN`
+  `GOAT_DEPLOY_MODE=2` plus `GOAT_RUNTIME_POSTGRES_DSN`
 - local development and desktop installs stay on SQLite
 - Alembic under `backend/alembic/` owns hosted/server Postgres schema truth
 - runtime adapters stay on explicit SQL/query boundaries rather than introducing an

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
 from dataclasses import replace
@@ -125,6 +126,8 @@ class ApiAuthzTests(unittest.TestCase):
         )
 
     def setUp(self) -> None:
+        self._original_deploy_mode = os.environ.get("GOAT_DEPLOY_MODE")
+        os.environ["GOAT_DEPLOY_MODE"] = "2"
         self.tmpdir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         root = Path(self.tmpdir.name)
         self.settings = Settings(
@@ -140,6 +143,7 @@ class ApiAuthzTests(unittest.TestCase):
             log_db_path=root / "chat_logs.db",
             data_dir=root / "data",
             object_store_root=root / "object-store",
+            deploy_mode=2,
             api_key="read-key",
             api_key_write="write-key",
             rate_limit_window_sec=60,
@@ -155,6 +159,10 @@ class ApiAuthzTests(unittest.TestCase):
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
+        if self._original_deploy_mode is None:
+            os.environ.pop("GOAT_DEPLOY_MODE", None)
+        else:
+            os.environ["GOAT_DEPLOY_MODE"] = self._original_deploy_mode
         self.tmpdir.cleanup()
 
     def test_read_key_forbidden_on_post_chat(self) -> None:
@@ -806,6 +814,8 @@ class ApiAuthzTests(unittest.TestCase):
 @unittest.skipUnless(TestClient is not None, "fastapi not installed")
 class SharedAccessApiAuthzTests(unittest.TestCase):
     def setUp(self) -> None:
+        self._original_deploy_mode = os.environ.get("GOAT_DEPLOY_MODE")
+        os.environ["GOAT_DEPLOY_MODE"] = "2"
         self.tmpdir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         root = Path(self.tmpdir.name)
         self.settings = Settings(
@@ -821,6 +831,7 @@ class SharedAccessApiAuthzTests(unittest.TestCase):
             log_db_path=root / "chat_logs.db",
             data_dir=root / "data",
             object_store_root=root / "object-store",
+            deploy_mode=2,
             shared_access_password_hash=hash_shared_access_password("goat-shared"),
             shared_access_session_secret="shared-secret",
             ready_skip_ollama_probe=True,
@@ -835,6 +846,10 @@ class SharedAccessApiAuthzTests(unittest.TestCase):
         self.other_client = TestClient(app, base_url="https://testserver")
 
     def tearDown(self) -> None:
+        if self._original_deploy_mode is None:
+            os.environ.pop("GOAT_DEPLOY_MODE", None)
+        else:
+            os.environ["GOAT_DEPLOY_MODE"] = self._original_deploy_mode
         self.client.close()
         self.other_client.close()
         self.tmpdir.cleanup()
@@ -964,6 +979,8 @@ class SharedAccessApiAuthzTests(unittest.TestCase):
 @unittest.skipUnless(TestClient is not None, "fastapi not installed")
 class AccountBrowserAuthApiAuthzTests(unittest.TestCase):
     def setUp(self) -> None:
+        self._original_deploy_mode = os.environ.get("GOAT_DEPLOY_MODE")
+        os.environ["GOAT_DEPLOY_MODE"] = "2"
         self.tmpdir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         root = Path(self.tmpdir.name)
         self.settings = Settings(
@@ -979,6 +996,7 @@ class AccountBrowserAuthApiAuthzTests(unittest.TestCase):
             log_db_path=root / "chat_logs.db",
             data_dir=root / "data",
             object_store_root=root / "object-store",
+            deploy_mode=2,
             account_auth_enabled=True,
             browser_session_secret="browser-secret",
             google_client_id="google-client-id",
@@ -996,6 +1014,10 @@ class AccountBrowserAuthApiAuthzTests(unittest.TestCase):
         self.other_client = TestClient(app, base_url="https://testserver")
 
     def tearDown(self) -> None:
+        if self._original_deploy_mode is None:
+            os.environ.pop("GOAT_DEPLOY_MODE", None)
+        else:
+            os.environ["GOAT_DEPLOY_MODE"] = self._original_deploy_mode
         self.client.close()
         self.other_client.close()
         self.tmpdir.cleanup()

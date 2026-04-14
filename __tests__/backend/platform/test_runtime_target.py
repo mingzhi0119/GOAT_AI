@@ -25,7 +25,7 @@ def make_settings(**overrides: object) -> Settings:
         "api_key": "",
         "rate_limit_window_sec": 60,
         "rate_limit_max_requests": 60,
-        "deploy_target": "auto",
+        "deploy_mode": 0,
         "server_port": 62606,
         "local_port": 62606,
         "gpu_target_uuid": "",
@@ -60,22 +60,22 @@ class RuntimeTargetTests(unittest.TestCase):
         self.assertEqual(targets[0].mode, "server62606")
         self.assertIn("address already in use", targets[0].reason)
 
-    def test_explicit_server_mode_returns_only_server_port(self) -> None:
-        settings = make_settings(deploy_target="server")
+    def test_remote_mode_returns_only_server_port(self) -> None:
+        settings = make_settings(deploy_mode=2)
 
         targets = ordered_runtime_targets(settings)
 
         self.assertEqual([item.port for item in targets], [62606])
         self.assertEqual(targets[0].mode, "server62606")
 
-    def test_explicit_local_mode_is_deprecated_and_returns_server_port(self) -> None:
-        settings = make_settings(deploy_target="local")
+    def test_school_mode_keeps_server_port_policy(self) -> None:
+        settings = make_settings(deploy_mode=1)
 
         targets = ordered_runtime_targets(settings)
 
         self.assertEqual([item.port for item in targets], [62606])
         self.assertEqual(targets[0].mode, "server62606")
-        self.assertIn("deprecated", targets[0].reason)
+        self.assertIn("school_server", targets[0].reason)
 
     def test_current_runtime_target_describes_server_port(self) -> None:
         settings = make_settings()

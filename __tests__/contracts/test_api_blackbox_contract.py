@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import tempfile
 import time
@@ -178,10 +179,10 @@ class NoopWorkbenchTaskDispatcher:
 
 class ContractFakeLLM:
     def list_model_names(self) -> list[str]:
-        return ["qwen3:4b", "gemma4:26b"]
+        return ["qwen3:4b", "gemma3:4b"]
 
     def describe_model_for_api(self, model: str) -> tuple[list[str], int | None]:
-        if model == "gemma4:26b":
+        if model == "gemma3:4b":
             return ["completion", "tools", "vision"], None
         return ["completion"], None
 
@@ -436,6 +437,8 @@ class ApiBlackboxContractTests(unittest.TestCase):
         )
 
     def setUp(self) -> None:
+        self._original_deploy_mode = os.environ.get("GOAT_DEPLOY_MODE")
+        os.environ["GOAT_DEPLOY_MODE"] = "0"
         self.tmpdir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         root = Path(self.tmpdir.name)
         self.settings = Settings(
@@ -462,6 +465,10 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
+        if self._original_deploy_mode is None:
+            os.environ.pop("GOAT_DEPLOY_MODE", None)
+        else:
+            os.environ["GOAT_DEPLOY_MODE"] = self._original_deploy_mode
         self.tmpdir.cleanup()
 
     def test_health_endpoint_contract(self) -> None:
@@ -484,14 +491,14 @@ class ApiBlackboxContractTests(unittest.TestCase):
     def test_models_endpoints_contract_and_backend_unavailable_boundary(self) -> None:
         list_response = self.client.get("/api/models")
         self.assertEqual(200, list_response.status_code)
-        self.assertEqual(["qwen3:4b", "gemma4:26b"], list_response.json()["models"])
+        self.assertEqual(["qwen3:4b", "gemma3:4b"], list_response.json()["models"])
 
         caps_response = self.client.get(
-            "/api/models/capabilities", params={"model": "gemma4:26B"}
+            "/api/models/capabilities", params={"model": "gemma3:4B"}
         )
         self.assertEqual(200, caps_response.status_code)
         caps_body = caps_response.json()
-        self.assertEqual("gemma4:26b", caps_body["model"])
+        self.assertEqual("gemma3:4b", caps_body["model"])
         self.assertEqual(["completion", "tools", "vision"], caps_body["capabilities"])
         self.assertTrue(caps_body["supports_tool_calling"])
         self.assertTrue(caps_body["supports_chart_tools"])
@@ -862,7 +869,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         response = self.client.post(
             "/api/chat",
             json={
-                "model": "gemma4:26b",
+                "model": "gemma3:4b",
                 "session_id": "chart-1",
                 "messages": [
                     {"role": "user", "content": file_context_prompt},
@@ -892,7 +899,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         response = self.client.post(
             "/api/chat",
             json={
-                "model": "gemma4:26b",
+                "model": "gemma3:4b",
                 "session_id": "chart-no-upload",
                 "messages": [
                     {"role": "user", "content": "Generate a typical pie chart."},
@@ -1313,7 +1320,8 @@ class ApiBlackboxContractTests(unittest.TestCase):
         runtime = self.client.get("/api/system/runtime-target")
         self.assertEqual(200, runtime.status_code)
         runtime_body = runtime.json()
-        self.assertIn("deploy_target", runtime_body)
+        self.assertIn("deploy_mode", runtime_body)
+        self.assertIn("deploy_mode_name", runtime_body)
         self.assertIn("current", runtime_body)
         self.assertIn("ordered_targets", runtime_body)
         self.assertGreaterEqual(len(runtime_body["ordered_targets"]), 1)
@@ -1369,7 +1377,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         chat = self.client.post(
             "/api/chat",
             json={
-                "model": "gemma4:26b",
+                "model": "gemma3:4b",
                 "messages": [{"role": "user", "content": "What is this?"}],
                 "image_attachment_ids": [aid],
             },
@@ -1406,7 +1414,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         resp = self.client.post(
             "/api/chat",
             json={
-                "model": "gemma4:26b",
+                "model": "gemma3:4b",
                 "messages": [{"role": "user", "content": "Hi"}],
                 "image_attachment_ids": ["att-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
             },
@@ -1418,7 +1426,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         resp = self.client.post(
             "/api/chat",
             json={
-                "model": "gemma4:26b",
+                "model": "gemma3:4b",
                 "messages": [{"role": "user", "content": "Hi"}],
                 "knowledge_document_ids": ["doc-1"],
                 "image_attachment_ids": ["att-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
@@ -2560,6 +2568,8 @@ class ApiBlackboxContractTests(unittest.TestCase):
 @unittest.skipUnless(TestClient is not None, "fastapi not installed")
 class ApiProtectedBlackboxContractTests(unittest.TestCase):
     def setUp(self) -> None:
+        self._original_deploy_mode = os.environ.get("GOAT_DEPLOY_MODE")
+        os.environ["GOAT_DEPLOY_MODE"] = "0"
         self.tmpdir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         root = Path(self.tmpdir.name)
         self.settings = Settings(
@@ -2589,6 +2599,10 @@ class ApiProtectedBlackboxContractTests(unittest.TestCase):
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
+        if self._original_deploy_mode is None:
+            os.environ.pop("GOAT_DEPLOY_MODE", None)
+        else:
+            os.environ["GOAT_DEPLOY_MODE"] = self._original_deploy_mode
         self.tmpdir.cleanup()
 
     def test_health_stays_public_and_other_apis_require_api_key(self) -> None:

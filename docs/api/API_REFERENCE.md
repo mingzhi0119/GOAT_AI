@@ -321,7 +321,7 @@ Returns:
 
 ```json
 {
-  "models": ["qwen3:4b", "gemma4:26b"]
+  "models": ["qwen3:4b", "gemma3:4b"]
 }
 ```
 
@@ -365,7 +365,7 @@ Request body:
 
 ```json
 {
-  "model": "gemma4:26b",
+  "model": "qwen3:4b",
   "messages": [
     { "role": "user", "content": "Summarize Porter's Five Forces." }
   ],
@@ -930,7 +930,7 @@ Returns session metadata list:
     {
       "id": "session-123",
       "title": "Porter analysis",
-      "model": "gemma4:26b",
+      "model": "qwen3:4b",
       "schema_version": 4,
       "created_at": "2026-04-07T14:00:00+00:00",
       "updated_at": "2026-04-07T14:01:30+00:00"
@@ -953,7 +953,7 @@ Returns one normalized stored session:
 {
   "id": "session-123",
   "title": "Porter analysis",
-  "model": "gemma4:26b",
+  "model": "qwen3:4b",
   "schema_version": 4,
   "created_at": "2026-04-07T14:00:00+00:00",
   "updated_at": "2026-04-07T14:01:30+00:00",
@@ -1047,7 +1047,7 @@ Returns:
   "first_token_p50_ms": 190.2,
   "first_token_p95_ms": 320.1,
   "model_buckets": {
-    "gemma4:26b": {
+    "qwen3:4b": {
       "chat_avg_ms": 910.2,
       "chat_p50_ms": 870.0,
       "chat_p95_ms": 1410.3,
@@ -1067,7 +1067,8 @@ Returns deploy target resolution information:
 
 ```json
 {
-  "deploy_target": "auto",
+  "deploy_mode": 2,
+  "deploy_mode_name": "remote",
   "current": {
     "mode": "server62606",
     "host": "127.0.0.1",
@@ -1081,7 +1082,7 @@ Returns deploy target resolution information:
       "host": "127.0.0.1",
       "port": 62606,
       "base_url": "http://127.0.0.1:62606",
-      "reason": "server port is bindable"
+      "reason": "GOAT_DEPLOY_MODE=2 (remote) using the server port policy"
     }
   ]
 }

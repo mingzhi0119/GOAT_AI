@@ -7,6 +7,7 @@ Type=simple
 WorkingDirectory=%h/GOAT_AI
 ExecStartPre=/usr/bin/mkdir -p %h/GOAT_AI/var/logs %h/GOAT_AI/var/data
 Environment=GOAT_HOST=127.0.0.1
+Environment=GOAT_DEPLOY_MODE=2
 Environment=GOAT_SERVER_PORT=62606
 ExecStart=%h/GOAT_AI/.venv/bin/python -m uvicorn server:create_app \
     --factory \

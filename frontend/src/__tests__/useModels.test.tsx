@@ -19,9 +19,9 @@ describe('useModels', () => {
   })
 
   it('prefers the repo default model and loads capabilities', async () => {
-    vi.mocked(fetchModels).mockResolvedValue(['llama3:8b', 'gemma4:26b'])
+    vi.mocked(fetchModels).mockResolvedValue(['llama3:8b', 'qwen3:4b'])
     vi.mocked(fetchModelCapabilities).mockResolvedValue({
-      model: 'gemma4:26b',
+      model: 'qwen3:4b',
       capabilities: ['completion', 'thinking'],
       supports_tool_calling: false,
       supports_chart_tools: false,
@@ -33,17 +33,17 @@ describe('useModels', () => {
     const { result } = renderHook(() => useModels())
 
     await waitFor(() => {
-      expect(result.current.selectedModel).toBe('gemma4:26b')
+      expect(result.current.selectedModel).toBe('qwen3:4b')
     })
-    expect(result.current.models).toEqual(['llama3:8b', 'gemma4:26b'])
-    expect(fetchModelCapabilities).toHaveBeenCalledWith('gemma4:26b')
+    expect(result.current.models).toEqual(['llama3:8b', 'qwen3:4b'])
+    expect(fetchModelCapabilities).toHaveBeenCalledWith('qwen3:4b')
     expect(result.current.capabilities?.supports_thinking).toBe(true)
   })
 
   it('preserves an explicit model selection across refreshes', async () => {
-    vi.mocked(fetchModels).mockResolvedValue(['gemma4:26b', 'backup-model'])
+    vi.mocked(fetchModels).mockResolvedValue(['qwen3:4b', 'backup-model'])
     vi.mocked(fetchModelCapabilities).mockResolvedValue({
-      model: 'gemma4:26b',
+      model: 'qwen3:4b',
       capabilities: ['completion'],
       supports_tool_calling: false,
       supports_chart_tools: false,
@@ -53,7 +53,7 @@ describe('useModels', () => {
     })
 
     const { result } = renderHook(() => useModels())
-    await waitFor(() => expect(result.current.selectedModel).toBe('gemma4:26b'))
+    await waitFor(() => expect(result.current.selectedModel).toBe('qwen3:4b'))
 
     vi.mocked(fetchModelCapabilities).mockResolvedValue({
       model: 'backup-model',

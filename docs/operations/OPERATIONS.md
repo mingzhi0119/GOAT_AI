@@ -165,7 +165,7 @@ Packaged desktop runtime diagnostics should first check:
 - `GET /api/system/desktop`
 - `<app_log_dir>/desktop-shell.log`
 - `GOAT_RUNTIME_ROOT`, `GOAT_LOG_DIR`, `GOAT_LOG_PATH`, `GOAT_DATA_DIR`
-- `GOAT_SERVER_PORT`, `GOAT_LOCAL_PORT`, `GOAT_DEPLOY_TARGET=local`
+- `GOAT_SERVER_PORT`, `GOAT_LOCAL_PORT`, `GOAT_DEPLOY_MODE=0`
 - `GOAT_DESKTOP_SHELL_LOG_PATH`
 
 Cross-platform release prerequisites, updater gates, and macOS blockers live in
@@ -202,6 +202,9 @@ Public Windows desktop release path:
 
 Canonical checked-in operator assets now live under `ops/deploy/`, `ops/systemd/`, and `ops/verification/`.
 Use the canonical `ops/` entrypoints directly; repository-root deploy wrappers are no longer supported.
+Build-only entrypoints now live under `ops/build/` so you can install dependencies,
+produce `frontend/dist`, and validate the selected deployment mode without starting
+or restarting the backend process.
 The checked-in user-service unit now lives at `ops/systemd/goat-ai.service`.
 The school-only variant lives at `ops/systemd/goat-ai.school-ubuntu.service`.
 The checked-in reverse-proxy starter for `goat-api.duckdns.org` now lives at `ops/deploy/nginx.goat-api.duckdns.org.conf`.
@@ -209,16 +212,30 @@ The checked-in reverse-proxy starter for `goat-api.duckdns.org` now lives at `op
 Linux:
 
 ```bash
+# local Linux build
+bash ops/build/build_local.sh
+
+# school Ubuntu server build
+bash ops/build/build_school_server.sh
+
+# local Linux
 bash ops/deploy/deploy.sh
 QUICK=1 bash ops/deploy/deploy.sh
 SKIP_BUILD=1 bash ops/deploy/deploy.sh
 SYNC_GIT=1 bash ops/deploy/deploy.sh
 RELEASE_BUNDLE=/tmp/release-bundle.tar.gz RELEASE_MANIFEST=/tmp/release-manifest.json bash ops/deploy/deploy.sh
+
+# school Ubuntu server
+bash ops/deploy/deploy_school_server.sh
+
+# remote backend for the public Vercel + DuckDNS deployment
+bash ops/deploy/deploy_remote_server.sh
 ```
 
 Windows PowerShell:
 
 ```powershell
+.\ops\build\build_local.ps1
 .\ops\deploy\deploy.ps1
 .\ops\deploy\deploy.ps1 -Quick
 .\ops\deploy\deploy.ps1 -SkipBuild
@@ -232,14 +249,21 @@ Important behavior:
 - `GIT_REF` is authoritative: branch refs sync to `origin/$GIT_REF`, while tag/commit refs deploy in detached mode without drifting back to `main`
 - `EXPECTED_GIT_SHA` may be supplied by release automation to hard-fail if the host resolves any SHA other than the requested release commit
 - `RELEASE_BUNDLE` + `RELEASE_MANIFEST` switch deploy into artifact-first mode: the shipped bundle is installed before process restart, and the host no longer rebuilds the frontend from source
-- `deploy.sh` keeps the `nohup` + `var/logs/fastapi.pid` fallback path
-- `ops/deploy/deploy.sh` and `ops/deploy/deploy.ps1` now stop the current FastAPI process gracefully first, then force cleanup only if the drain window expires
+- `ops/build/build_local.sh` and `ops/build/build_local.ps1` are the one-command local build entrypoints (`GOAT_DEPLOY_MODE=0`)
+- `ops/build/build_school_server.sh` is the one-command school-server build entrypoint, requires `.env.school-ubuntu`, and validates `GOAT_DEPLOY_MODE=1`
+- `ops/deploy/deploy.sh` is the local Linux entrypoint (`GOAT_DEPLOY_MODE=0`)
+- `ops/deploy/deploy_school_server.sh` is the school Ubuntu entrypoint (`GOAT_DEPLOY_MODE=1`) and owns the school Ollama helper path
+- `ops/deploy/deploy_remote_server.sh` is the public backend entrypoint (`GOAT_DEPLOY_MODE=2`) and pairs with the Vercel frontend at `goat-dev.vercel.app`
+- the Linux wrappers and `ops/deploy/deploy.ps1` stop the current FastAPI process gracefully first, then force cleanup only if the drain window expires
+- the Linux wrappers keep the `nohup` + `var/logs/fastapi.pid` fallback path
 - the checked-in Linux-facing service and `nohup` fallback now bind the backend to `127.0.0.1:62606`; publish `80/443` through a reverse proxy such as the checked-in `nginx.goat-api.duckdns.org.conf`
 - for the Duck DNS public hostname, use `server_name goat-api.duckdns.org;` and then issue TLS with `sudo certbot --nginx -d goat-api.duckdns.org`
 - Artifact-first rollback is the preferred path; ref-based rollback remains available for manual recovery. See [ROLLBACK.md](ROLLBACK.md)
 - Windows deploy reuses Ollama on `127.0.0.1:11434` when available unless `OLLAMA_BASE_URL` is explicitly set
-- Linux deploy no longer auto-detects or auto-starts the school `ollama-local` runtime by default; only `GOAT_USE_SCHOOL_OLLAMA_LOCAL=1` or `GOAT_OLLAMA_PROFILE=school-ubuntu` enables the school-specific helper script path
-- When the school profile is enabled, `ops/deploy/deploy.sh` now prefers `.env.school-ubuntu` for `GOAT_USE_SCHOOL_OLLAMA_LOCAL`, `GOAT_OLLAMA_PROFILE`, and `OLLAMA_BASE_URL`, tries `goat-ai.school-ubuntu` before the generic `goat-ai` unit, and passes the resolved Ollama env vars through the `nohup` fallback too
+- school deploy prefers `.env.school-ubuntu` for `GOAT_USE_SCHOOL_OLLAMA_LOCAL`, `GOAT_OLLAMA_PROFILE`, and `OLLAMA_BASE_URL`, uses `ops/systemd/goat-ai.school-ubuntu.service`, and starts the local Ollama helper before the backend process comes up
+- remote deployments are the only supported shape for browser/login auth or API-key auth; local and school deployments fail fast if any auth env vars are configured
+- remote deployments default to public/no-auth unless you explicitly set remote Auth env vars; use the built-in per-minute rate limit and FIFO Ollama queue as the default protection posture
+- `ops/verification/watchdog.sh` now restarts through `ops/deploy/deploy_remote_server.sh` by default and may be redirected with `GOAT_WATCHDOG_DEPLOY_SCRIPT`
 - Deploy now includes a post-deploy contract check (`tools/ops/post_deploy_check.py`) before success is reported: it exercises `GET /api/health`, `GET /api/ready`, `GET /api/system/runtime-target`, and a short `POST /api/chat` stream. The chat step passes when the SSE body includes **at least one** `token` or **`thinking`** frame (so thinking-first models still validate), and fails on HTTP errors, empty SSE, or a first-frame `error`
 
 Windows PowerShell deploy remains fully supported. Use WSL only when you specifically need Linux-targeted deploy-script parity or shell semantics.
@@ -250,8 +274,9 @@ When the frontend is hosted on Vercel and FastAPI remains on a Linux host, use
 [VERCEL_FRONTEND_DEPLOY.md](VERCEL_FRONTEND_DEPLOY.md) as the canonical runbook.
 That path keeps browser requests same-origin at `goat-dev.vercel.app/api/*` and lets
 Vercel rewrite `/api/*` to `https://goat-api.duckdns.org/api/*`.
-For the public site, enable browser login on the backend instead of
-publishing `X-GOAT-Owner-Id` controls in the browser UI.
+For the public site, use `ops/deploy/deploy_remote_server.sh` on the backend and
+enable browser login there instead of publishing `X-GOAT-Owner-Id` controls in
+the browser UI.
 
 ## Deployment profiles
 
@@ -294,7 +319,8 @@ live in the configured bucket/prefix while SQLite metadata remains local.
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `OLLAMA_BASE_URL` | Ollama HTTP base URL | `http://127.0.0.1:11434` |
-| `GOAT_PUBLIC_MODEL_ALLOWLIST` | Optional comma-separated override for the deployment model allowlist; default public policy is `qwen3:4b,llama3.2:3b,gemma3:4b,qwen2.5-coder:3b,gemma4:26b` | default fixed list |
+| `GOAT_PUBLIC_MODEL_ALLOWLIST` | Optional comma-separated override for the deployment model allowlist; default public policy is `qwen3:4b,llama3.2:3b,gemma3:4b,qwen2.5-coder:3b` | default fixed list |
+| `GOAT_OLLAMA_MAX_CONCURRENT_REQUESTS` | Max concurrent Ollama inference requests per process; overflow waits in FIFO order | `2` |
 | `GOAT_USE_SCHOOL_OLLAMA_LOCAL` | Explicitly opt into the school Ubuntu `ollama-local` helper/runtime path | `0` |
 | `GOAT_OLLAMA_PROFILE` | Optional named profile alias; `school-ubuntu` enables the same school-only path | empty |
 | `OLLAMA_GENERATE_TIMEOUT` | LLM request timeout seconds | `120` |
@@ -316,24 +342,24 @@ live in the configured bucket/prefix while SQLite metadata remains local.
 | `GOAT_OBJECT_STORE_ACCESS_KEY_ID` | Optional access key id for the `s3` backend | empty |
 | `GOAT_OBJECT_STORE_SECRET_ACCESS_KEY` | Optional secret access key for the `s3` backend | empty |
 | `GOAT_OBJECT_STORE_S3_ADDRESSING_STYLE` | S3 addressing mode: `auto`, `path`, or `virtual` | `auto` |
-| `GOAT_API_KEY` | Protect non-health APIs via `X-GOAT-API-Key` | empty |
-| `GOAT_API_KEY_WRITE` | Optional second key: `GET`/`HEAD`/`OPTIONS` may use read key (`GOAT_API_KEY`); other methods require this write key when set | empty |
-| `GOAT_API_CREDENTIALS_JSON` | Optional JSON credential registry; each entry may provide `secret` or `secret_sha256`, and when empty the app derives default read/write credentials from `GOAT_API_KEY` and `GOAT_API_KEY_WRITE` | empty |
+| `GOAT_API_KEY` | Protect non-health APIs via `X-GOAT-API-Key`; supported only when `GOAT_DEPLOY_MODE=2` | empty |
+| `GOAT_API_KEY_WRITE` | Optional second key: `GET`/`HEAD`/`OPTIONS` may use read key (`GOAT_API_KEY`); other methods require this write key when set; supported only when `GOAT_DEPLOY_MODE=2` | empty |
+| `GOAT_API_CREDENTIALS_JSON` | Optional JSON credential registry; each entry may provide `secret` or `secret_sha256`, and when empty the app derives default read/write credentials from `GOAT_API_KEY` and `GOAT_API_KEY_WRITE`; supported only when `GOAT_DEPLOY_MODE=2` | empty |
 | `GOAT_SHARED_ACCESS_PASSWORD_HASH` | Preferred `pwdlib` hash for the shared site password on public browser deployments | empty |
 | `GOAT_SHARED_ACCESS_PASSWORD` | Legacy plaintext fallback for the shared site password; avoid in production when `GOAT_SHARED_ACCESS_PASSWORD_HASH` can be used instead | empty |
 | `GOAT_SHARED_ACCESS_SESSION_SECRET` | Required signing secret for `goat_access_session` cookies when shared browser access is enabled | empty |
 | `GOAT_SHARED_ACCESS_SESSION_TTL_SEC` | Browser-session cookie TTL in seconds for shared browser access | `2592000` |
-| `GOAT_ACCOUNT_AUTH_ENABLED` | Enables browser account login alongside or instead of the shared password flow | `false` |
+| `GOAT_ACCOUNT_AUTH_ENABLED` | Enables browser account login alongside or instead of the shared password flow; supported only when `GOAT_DEPLOY_MODE=2` | `false` |
 | `GOAT_BROWSER_SESSION_SECRET` | Required signing secret for `goat_account_session` and Google OAuth state cookies when account browser auth is enabled | empty |
 | `GOAT_ACCOUNT_SESSION_TTL_SEC` | Browser-session cookie TTL in seconds for account login | `2592000` |
 | `GOOGLE_CLIENT_ID` | Google OAuth client id for browser account login | empty |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret for browser account login | empty |
 | `GOOGLE_REDIRECT_URI` | Frontend callback URI that receives the Google OAuth authorization code | empty |
 | `GOAT_GOOGLE_OAUTH_STATE_TTL_SEC` | Google OAuth state-cookie TTL in seconds | `600` |
-| `GOAT_REQUIRE_SESSION_OWNER` | When `true`/`1`, chat and history routes require `X-GOAT-Owner-Id` (session scoping) | `false` |
+| `GOAT_REQUIRE_SESSION_OWNER` | When `true`/`1`, chat and history routes require `X-GOAT-Owner-Id` (session scoping); supported only when `GOAT_DEPLOY_MODE=2` | `false` |
 | `GOAT_RATE_LIMIT_WINDOW_SEC` | Rate limit window | `60` |
 | `GOAT_RATE_LIMIT_MAX_REQUESTS` | Max requests per window | `60` |
-| `GOAT_DEPLOY_TARGET` | `auto`, `server`, or `local` | `auto` |
+| `GOAT_DEPLOY_MODE` | `0=local`, `1=school_server`, `2=remote` | required |
 | `GOAT_SERVER_PORT` | Preferred server port | `62606` |
 | `GOAT_LOCAL_PORT` | Deprecated alias (single-port policy uses `GOAT_SERVER_PORT`) | `62606` |
 | `GIT_REF` | Explicit branch/tag/commit checkout target for rollback deploys | `main` |
@@ -375,9 +401,9 @@ live in the configured bucket/prefix while SQLite metadata remains local.
 
 ### Object storage modes (Phase 16C) and hosted runtime metadata (Phase 16D)
 
-- Runtime metadata stays at `GOAT_LOG_PATH` for local and desktop by default; hosted/server deployments may opt into Postgres while Phase 16C continues to own only the binary/object payload boundary.
+- Runtime metadata stays at `GOAT_LOG_PATH` for local, school, and desktop by default; remote deployments may opt into Postgres while Phase 16C continues to own only the binary/object payload boundary.
 - `GOAT_RUNTIME_METADATA_BACKEND=sqlite` remains the default runtime metadata mode, and local or desktop binaries stay on SQLite in the shipped app.
-- `GOAT_RUNTIME_METADATA_BACKEND=postgres` is a server-only hosted runtime mode. It requires `GOAT_DEPLOY_TARGET=server` plus `GOAT_RUNTIME_POSTGRES_DSN`, applies Alembic schema upgrades at startup through the same path exposed by `python -m tools.ops.upgrade_runtime_postgres_schema`, and is intended to be cut over only after `python -m tools.ops.export_runtime_metadata_snapshot`, `python -m tools.ops.import_runtime_metadata_snapshot`, and `python -m tools.ops.check_runtime_metadata_parity` succeed against the same restore set.
+- `GOAT_RUNTIME_METADATA_BACKEND=postgres` is a remote-only hosted runtime mode. It requires `GOAT_DEPLOY_MODE=2` plus `GOAT_RUNTIME_POSTGRES_DSN`, applies Alembic schema upgrades at startup through the same path exposed by `python -m tools.ops.upgrade_runtime_postgres_schema`, and is intended to be cut over only after `python -m tools.ops.export_runtime_metadata_snapshot`, `python -m tools.ops.import_runtime_metadata_snapshot`, and `python -m tools.ops.check_runtime_metadata_parity` succeed against the same restore set.
 - Runtime metadata snapshots now include `auth_users` and `auth_user_identities` when account login is enabled; treat every snapshot/backup that contains these tables as sensitive because it carries password hashes and external identity bindings.
 - `GOAT_OBJECT_STORE_BACKEND=local` keeps knowledge uploads, normalized payloads, vector payload JSON, media attachments, generated artifacts, and workspace-export files on the host filesystem under `GOAT_OBJECT_STORE_ROOT`.
 - `GOAT_OBJECT_STORE_BACKEND=s3` moves the same payload families behind an S3-compatible object-store contract. The backend environment must include `boto3` for this mode.
@@ -601,6 +627,7 @@ curl -sS -H "X-GOAT-API-Key: $GOAT_API_KEY" http://127.0.0.1:62606/api/system/me
 - Scope: only idempotent metadata reads (`GET /api/tags`, `POST /api/show`)
 - Retries: exponential backoff + jitter using `GOAT_OLLAMA_READ_RETRY_*`
 - Circuit breaker: `closed -> open -> half_open` using `GOAT_OLLAMA_CIRCUIT_BREAKER_*`
+- Inference concurrency: `GOAT_OLLAMA_MAX_CONCURRENT_REQUESTS` limits expensive Ollama generate/chat calls per process and queues overflow requests in request order
 - Timeouts remain unchanged (`timeout=5` for tags/show probes)
 - Streamed chat uses `OLLAMA_CHAT_FIRST_EVENT_TIMEOUT` for the first response chunk, while non-stream generation keeps `OLLAMA_GENERATE_TIMEOUT`
 - Retryability registry source remains `backend/api_errors.py`; this policy does not change API error envelope semantics
@@ -685,7 +712,7 @@ SLO starter table:
 Load smoke command:
 
 ```bash
-python -m tools.quality.load_chat_smoke --base-url http://127.0.0.1:62606 --model gemma4:26b --runs 20 --show-system-inference
+python -m tools.quality.load_chat_smoke --base-url http://127.0.0.1:62606 --model qwen3:4b --runs 20 --show-system-inference
 ```
 
 When API protection is enabled, pass `--api-key "$GOAT_API_KEY"`.

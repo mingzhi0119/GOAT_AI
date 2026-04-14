@@ -58,7 +58,8 @@ class RuntimeOperationalContractResponse(BaseModel):
 class RuntimeTargetResponse(BaseModel):
     """Resolved runtime target metadata used by deploy/ops tooling."""
 
-    deploy_target: str
+    deploy_mode: int
+    deploy_mode_name: str
     current: RuntimeTargetItemResponse
     ordered_targets: list[RuntimeTargetItemResponse]
     operational_contract: RuntimeOperationalContractResponse

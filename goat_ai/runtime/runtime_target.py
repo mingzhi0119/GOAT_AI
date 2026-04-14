@@ -52,16 +52,17 @@ def ordered_runtime_targets(
     """Return deployment targets in preference order (single-port policy)."""
     bind_probe = probe or can_bind_runtime_target
     can_bind_server, reason = bind_probe(host, settings.server_port)
-    if settings.deploy_target == "local":
+    if can_bind_server:
         target_reason = (
-            "GOAT_DEPLOY_TARGET=local is deprecated; enforcing server port policy"
+            f"GOAT_DEPLOY_MODE={settings.deploy_mode} "
+            f"({settings.deploy_mode_name}) using the server port policy"
         )
-    elif settings.deploy_target == "server":
-        target_reason = "GOAT_DEPLOY_TARGET explicitly set to server"
-    elif can_bind_server:
-        target_reason = "server port is bindable"
     else:
-        target_reason = f"server port unavailable: {reason}"
+        target_reason = (
+            f"GOAT_DEPLOY_MODE={settings.deploy_mode} "
+            f"({settings.deploy_mode_name}) kept the server port policy because "
+            f"the configured port is unavailable: {reason}"
+        )
 
     return [
         make_runtime_target("server62606", host, settings.server_port, target_reason)

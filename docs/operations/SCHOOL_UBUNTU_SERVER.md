@@ -18,8 +18,9 @@ OLLAMA_BASE_URL=http://127.0.0.1:11435
 ```
 
 Prefer `.env.school-ubuntu` (or another dedicated `EnvironmentFile`) for the school
-server-specific values. `ops/deploy/deploy.sh` now checks that file before the generic
-`.env` when the school profile is enabled. The application config layer no longer
+server-specific values. `ops/deploy/deploy_school_server.sh` uses that file as the
+school-server source of truth before the generic `.env`, and the school systemd unit
+keeps the same dedicated `EnvironmentFile`. The application config layer no longer
 auto-detects `../ollama-local` or changes ports based on sibling directories.
 
 ## Systemd units
@@ -59,9 +60,8 @@ bash scripts/ollama/ollama_local.sh pull <model>
 
 ## Deploy behavior
 
-`ops/deploy/deploy.sh` will only call `start_ollama_local.sh` when the school profile is
-explicitly enabled. In that mode it prefers `.env.school-ubuntu`, tries the
-`goat-ai.school-ubuntu` user service before the generic unit, and also forwards the
-resolved `OLLAMA_BASE_URL` into the `nohup` fallback path. Otherwise deploy stays on the
-standard Ollama default `http://127.0.0.1:11434` and never touches the school-only
-helper scripts.
+`ops/deploy/deploy_school_server.sh` is the only supported school-server deploy entrypoint.
+It runs as `GOAT_DEPLOY_MODE=1`, prefers `.env.school-ubuntu`, starts
+`start_ollama_local.sh` before the backend process, and uses the
+`goat-ai.school-ubuntu` user service when available. The generic local Linux and remote
+deploy wrappers never touch the school-only helper scripts.

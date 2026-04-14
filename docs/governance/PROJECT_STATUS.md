@@ -50,7 +50,7 @@ Last updated: 2026-04-13
 - caller-scoped `project_memory` retrieval plus operator-provisioned read-only connector bindings are now part of the shipped source registry and bounded browse/deep-research runtime foundation
 - shared runtime foundations now include a pure source catalog, caller-visible source facts for capability discovery, and a LangGraph source-executor registry under the existing workbench wrappers
 - frontend workbench affordances now treat `/api/system/features` as the single truth for plan-mode readiness, disabling local-only toggles whenever backend capability discovery is absent or denied
-- public backend model discovery and chat entrypoints now enforce a server-side allowlist for the deployed `qwen3:4b`, `llama3.2:3b`, `gemma3:4b`, `qwen2.5-coder:3b`, and `gemma4:26b` surfaces
+- public backend model discovery and chat entrypoints now enforce a server-side allowlist for the deployed `qwen3:4b`, `llama3.2:3b`, `gemma3:4b`, and `qwen2.5-coder:3b` surfaces
 - durable code sandbox execution with persisted events and replayable logs
 - queued plus running sandbox cancellation now flows through an in-process
   supervisor seam, and startup recovery fails abandoned `running` executions

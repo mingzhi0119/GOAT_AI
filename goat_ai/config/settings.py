@@ -23,6 +23,37 @@ WorkbenchWebProviderId = Literal["disabled", "duckduckgo"]
 ObjectStoreBackendId = Literal["local", "s3"]
 ObjectStoreS3AddressingStyle = Literal["auto", "path", "virtual"]
 RuntimeMetadataBackendId = Literal["sqlite", "postgres"]
+DeployMode = Literal[0, 1, 2]
+DeployModeName = Literal["local", "school_server", "remote"]
+
+LOCAL_DEPLOY_MODE = 0
+SCHOOL_SERVER_DEPLOY_MODE = 1
+REMOTE_DEPLOY_MODE = 2
+
+_DEPLOY_MODE_NAMES: Final[dict[int, DeployModeName]] = {
+    LOCAL_DEPLOY_MODE: "local",
+    SCHOOL_SERVER_DEPLOY_MODE: "school_server",
+    REMOTE_DEPLOY_MODE: "remote",
+}
+_AUTH_CONFIG_ENV_NAMES: Final[tuple[str, ...]] = (
+    "GOAT_API_KEY",
+    "GOAT_API_KEY_WRITE",
+    "GOAT_API_CREDENTIALS_JSON",
+    "GOAT_SHARED_ACCESS_PASSWORD",
+    "GOAT_SHARED_ACCESS_PASSWORD_HASH",
+    "GOAT_SHARED_ACCESS_SESSION_SECRET",
+    "GOAT_SHARED_ACCESS_SESSION_TTL_SEC",
+    "GOAT_ACCOUNT_AUTH_ENABLED",
+    "GOAT_BROWSER_SESSION_SECRET",
+    "GOAT_ACCOUNT_SESSION_TTL_SEC",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "GOOGLE_REDIRECT_URI",
+    "GOAT_GOOGLE_OAUTH_STATE_TTL_SEC",
+    "GOAT_REQUIRE_SESSION_OWNER",
+)
+_DEFAULT_REMOTE_RATE_LIMIT_MAX_REQUESTS: Final[int] = 20
+_DEFAULT_NON_REMOTE_RATE_LIMIT_MAX_REQUESTS: Final[int] = 60
 
 _DEFAULT_SYSTEM_PROMPTS: Final[dict[ThemeStyleId, str]] = {
     "classic": """You are GOAT AI, a helpful general-purpose assistant.
@@ -86,6 +117,13 @@ def _read_system_prompt() -> str:
         if p.is_file():
             text = p.read_text(encoding="utf-8").strip()
     return text
+
+
+def deploy_mode_name(value: int) -> DeployModeName:
+    try:
+        return _DEPLOY_MODE_NAMES[value]
+    except KeyError as exc:  # pragma: no cover - load_settings validates first
+        raise ValueError("GOAT_DEPLOY_MODE must be one of: 0, 1, 2") from exc
 
 
 def default_system_prompt_for_theme(theme_style: ThemeStyleId) -> str:
@@ -261,7 +299,8 @@ class Settings:
     require_session_owner: bool = False
     rate_limit_window_sec: int = 60
     rate_limit_max_requests: int = 60
-    deploy_target: str = "auto"
+    ollama_max_concurrent_requests: int = 2
+    deploy_mode: DeployMode = LOCAL_DEPLOY_MODE
     server_port: int = 62606
     local_port: int = 62606
     gpu_target_uuid: str = ""
@@ -334,6 +373,14 @@ class Settings:
     def browser_auth_required(self) -> bool:
         return self.shared_access_enabled or self.account_auth_enabled
 
+    @property
+    def deploy_mode_name(self) -> DeployModeName:
+        return deploy_mode_name(self.deploy_mode)
+
+    @property
+    def is_remote_deploy(self) -> bool:
+        return self.deploy_mode == REMOTE_DEPLOY_MODE
+
 
 def resolve_localhost_sandbox_shell(settings: Settings) -> str | None:
     configured = settings.code_sandbox_localhost_shell.strip()
@@ -357,9 +404,33 @@ def load_settings() -> Settings:
     _default_log_db = runtime_root / "chat_logs.db"
     _default_data_dir = runtime_root / "data"
     _default_log_dir = runtime_root / "logs"
+    _legacy_deploy_target = os.environ.get("GOAT_DEPLOY_TARGET", "").strip()
+    if _legacy_deploy_target:
+        raise ValueError(
+            "GOAT_DEPLOY_TARGET is no longer supported; use GOAT_DEPLOY_MODE=0|1|2."
+        )
+    _deploy_mode_raw = os.environ.get("GOAT_DEPLOY_MODE", "").strip()
+    if not _deploy_mode_raw:
+        raise ValueError("GOAT_DEPLOY_MODE is required and must be one of: 0, 1, 2")
+    try:
+        _deploy_mode = int(_deploy_mode_raw)
+    except ValueError as exc:
+        raise ValueError("GOAT_DEPLOY_MODE must be one of: 0, 1, 2") from exc
+    deploy_mode_name(_deploy_mode)
+    _default_rate_limit_max_requests = (
+        _DEFAULT_REMOTE_RATE_LIMIT_MAX_REQUESTS
+        if _deploy_mode == REMOTE_DEPLOY_MODE
+        else _DEFAULT_NON_REMOTE_RATE_LIMIT_MAX_REQUESTS
+    )
     _rate_limit_window_sec = int(os.environ.get("GOAT_RATE_LIMIT_WINDOW_SEC", "60"))
-    _rate_limit_max_requests = int(os.environ.get("GOAT_RATE_LIMIT_MAX_REQUESTS", "60"))
-    _deploy_target = os.environ.get("GOAT_DEPLOY_TARGET", "auto").strip().lower()
+    _rate_limit_max_requests = int(
+        os.environ.get(
+            "GOAT_RATE_LIMIT_MAX_REQUESTS", str(_default_rate_limit_max_requests)
+        )
+    )
+    _ollama_max_concurrent_requests = int(
+        os.environ.get("GOAT_OLLAMA_MAX_CONCURRENT_REQUESTS", "2")
+    )
     _server_port = int(os.environ.get("GOAT_SERVER_PORT", "62606"))
     _local_port = int(os.environ.get("GOAT_LOCAL_PORT", str(_server_port)))
     _lat_n = int(os.environ.get("GOAT_LATENCY_ROLLING_MAX_SAMPLES", "20"))
@@ -381,12 +452,12 @@ def load_settings() -> Settings:
     _chat_first_event_timeout_sec = int(
         os.environ.get("OLLAMA_CHAT_FIRST_EVENT_TIMEOUT", "90")
     )
-    if _deploy_target not in {"auto", "server", "local"}:
-        raise ValueError("GOAT_DEPLOY_TARGET must be one of: auto, server, local")
     if _rate_limit_window_sec < 1:
         raise ValueError("GOAT_RATE_LIMIT_WINDOW_SEC must be >= 1")
     if _rate_limit_max_requests < 1:
         raise ValueError("GOAT_RATE_LIMIT_MAX_REQUESTS must be >= 1")
+    if _ollama_max_concurrent_requests < 1:
+        raise ValueError("GOAT_OLLAMA_MAX_CONCURRENT_REQUESTS must be >= 1")
     if _server_port < 1 or _server_port > 65535:
         raise ValueError("GOAT_SERVER_PORT must be between 1 and 65535")
     if _local_port < 1 or _local_port > 65535:
@@ -469,10 +540,10 @@ def load_settings() -> Settings:
                 "GOAT_RUNTIME_POSTGRES_DSN is required when "
                 "GOAT_RUNTIME_METADATA_BACKEND=postgres"
             )
-        if _deploy_target != "server":
+        if _deploy_mode != REMOTE_DEPLOY_MODE:
             raise ValueError(
                 "GOAT_RUNTIME_METADATA_BACKEND=postgres currently requires "
-                "GOAT_DEPLOY_TARGET=server"
+                "GOAT_DEPLOY_MODE=2"
             )
     _feature_sandbox = _env_bool("GOAT_FEATURE_CODE_SANDBOX", "false")
     _feature_agent_workbench = _env_bool("GOAT_FEATURE_AGENT_WORKBENCH", "false")
@@ -615,6 +686,16 @@ def load_settings() -> Settings:
     _shared_access_session_ttl_sec = int(
         os.environ.get("GOAT_SHARED_ACCESS_SESSION_TTL_SEC", str(60 * 60 * 24 * 30))
     )
+    _require_session_owner = _env_bool("GOAT_REQUIRE_SESSION_OWNER", "false")
+    if _deploy_mode != REMOTE_DEPLOY_MODE:
+        configured_auth_envs = [
+            name for name in _AUTH_CONFIG_ENV_NAMES if os.environ.get(name, "").strip()
+        ]
+        if configured_auth_envs:
+            raise ValueError(
+                "Auth configuration is only supported when GOAT_DEPLOY_MODE=2; "
+                f"remove {', '.join(configured_auth_envs)} from the current environment."
+            )
     if _api_key_write and not _api_key:
         raise ValueError(
             "GOAT_API_KEY_WRITE requires GOAT_API_KEY (read key) to be set."
@@ -722,10 +803,11 @@ def load_settings() -> Settings:
         shared_access_password_hash=_shared_access_password_hash,
         shared_access_session_secret=_shared_access_session_secret,
         shared_access_session_ttl_sec=_shared_access_session_ttl_sec,
-        require_session_owner=_env_bool("GOAT_REQUIRE_SESSION_OWNER", "false"),
+        require_session_owner=_require_session_owner,
         rate_limit_window_sec=_rate_limit_window_sec,
         rate_limit_max_requests=_rate_limit_max_requests,
-        deploy_target=_deploy_target,
+        ollama_max_concurrent_requests=_ollama_max_concurrent_requests,
+        deploy_mode=cast(DeployMode, _deploy_mode),
         server_port=_server_port,
         local_port=_local_port,
         gpu_target_uuid=os.environ.get("GOAT_GPU_UUID", "").strip(),

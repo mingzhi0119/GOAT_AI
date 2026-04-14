@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { fetchModelCapabilities, fetchModels } from '../api/models'
 import type { ModelCapabilitiesResponse } from '../api/types'
 
-const DEFAULT_MODEL = 'gemma4:26b'
+const DEFAULT_MODEL = 'qwen3:4b'
 
 export interface UseModelsReturn {
   models: string[]

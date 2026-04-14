@@ -37,7 +37,7 @@ class SystemRouterIntegrationTests(unittest.TestCase):
             app_root=root,
             logo_svg=root / "logo.svg",
             log_db_path=root / "chat_logs.db",
-            deploy_target="auto",
+            deploy_mode=0,
             server_port=62606,
             local_port=62606,
         )
@@ -56,7 +56,8 @@ class SystemRouterIntegrationTests(unittest.TestCase):
 
         self.assertEqual(200, response.status_code)
         payload = response.json()
-        self.assertEqual("auto", payload["deploy_target"])
+        self.assertEqual(0, payload["deploy_mode"])
+        self.assertEqual("local", payload["deploy_mode_name"])
         self.assertIn("current", payload)
         self.assertIn("ordered_targets", payload)
         self.assertGreaterEqual(len(payload["ordered_targets"]), 1)

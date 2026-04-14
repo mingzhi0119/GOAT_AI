@@ -990,7 +990,7 @@ export interface components {
         ChatRequest: {
             /**
              * Model
-             * @default gemma4:26b
+             * @default qwen3:4b
              */
             model: string;
             /** Messages */
@@ -1885,8 +1885,10 @@ export interface components {
          * @description Resolved runtime target metadata used by deploy/ops tooling.
          */
         RuntimeTargetResponse: {
-            /** Deploy Target */
-            deploy_target: string;
+            /** Deploy Mode */
+            deploy_mode: number;
+            /** Deploy Mode Name */
+            deploy_mode_name: string;
             current: components["schemas"]["RuntimeTargetItemResponse"];
             /** Ordered Targets */
             ordered_targets: components["schemas"]["RuntimeTargetItemResponse"][];

@@ -21,7 +21,7 @@ if FastAPI is not None:
 
 class FakeModelsLLMClient:
     def list_model_names(self) -> list[str]:
-        return ["gemma4:26b", "qwen3:4b", "rogue-model"]
+        return ["gemma3:4b", "qwen3:4b", "rogue-model"]
 
     def describe_model_for_api(self, model: str) -> tuple[list[str], int | None]:
         if model == "qwen3:4b":
@@ -114,7 +114,7 @@ class ModelsRouterIntegrationTests(unittest.TestCase):
         response = self.client.get("/api/models")
 
         self.assertEqual(200, response.status_code)
-        self.assertEqual(["qwen3:4b", "gemma4:26b"], response.json()["models"])
+        self.assertEqual(["qwen3:4b", "gemma3:4b"], response.json()["models"])
 
     def test_model_capabilities_endpoint_reports_tool_support(self) -> None:
         response = self.client.get(

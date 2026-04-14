@@ -75,3 +75,5 @@ git-commit-push.bat
 scripts/.selenium_chrome_profile/
 scripts/.selenium_chrome_profile_workers/
 scripts/open_close_url_loop.py
+
+.vercel

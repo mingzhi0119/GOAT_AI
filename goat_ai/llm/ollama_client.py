@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 import logging
 import random
-import re
 import threading
+import re
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Generator, Literal, Protocol
 
@@ -29,6 +30,39 @@ from goat_ai.chat.tools import (
 from goat_ai.shared.types import ChatTurn
 
 logger = logging.getLogger(__name__)
+
+
+class _InferenceConcurrencyGate:
+    """FIFO process-local inference gate for expensive Ollama generate/chat calls."""
+
+    def __init__(self) -> None:
+        self._condition = threading.Condition()
+        self._waiting: list[object] = []
+        self._active = 0
+
+    @contextmanager
+    def acquire(self, *, max_concurrent: int) -> Generator[None, None, None]:
+        token = object()
+        entered = False
+        with self._condition:
+            self._waiting.append(token)
+            while self._waiting[0] is not token or self._active >= max_concurrent:
+                self._condition.wait()
+            self._waiting.pop(0)
+            self._active += 1
+            entered = True
+        try:
+            yield
+        finally:
+            with self._condition:
+                if entered:
+                    self._active -= 1
+                elif token in self._waiting:
+                    self._waiting.remove(token)
+                self._condition.notify_all()
+
+
+_INFERENCE_CONCURRENCY_GATE = _InferenceConcurrencyGate()
 
 
 def _resolve_allowed_model(model: str) -> str:
@@ -185,6 +219,13 @@ class OllamaService:
         self._breaker_open_until_monotonic = 0.0
         self._breaker_state = "closed"
         self._breaker_lock = threading.Lock()
+
+    @contextmanager
+    def _reserve_inference_slot(self) -> Generator[None, None, None]:
+        with _INFERENCE_CONCURRENCY_GATE.acquire(
+            max_concurrent=self._s.ollama_max_concurrent_requests
+        ):
+            yield
 
     def _is_retryable_http_status(self, status_code: int) -> bool:
         return status_code in {408, 425, 429, 500, 502, 503, 504}
@@ -429,23 +470,24 @@ class OllamaService:
         }
         if ollama_options:
             payload["options"] = ollama_options
-        res = self._post_chat(
-            payload,
-            stream=True,
-            stream_timeout_sec=self._s.chat_first_event_timeout_sec,
-        )
-        try:
-            for line in res.iter_lines():
-                if line:
-                    chunk = json.loads(line.decode("utf-8"))
-                    yield from _iter_stream_parts_from_chunk(chunk)
-        except requests.RequestException as exc:
-            inc_ollama_error(
-                code=OLLAMA_ERROR_API_CODE,
-                endpoint="chat",
-                http_status="stream_interrupted",
+        with self._reserve_inference_slot():
+            res = self._post_chat(
+                payload,
+                stream=True,
+                stream_timeout_sec=self._s.chat_first_event_timeout_sec,
             )
-            raise OllamaUnavailable("Ollama chat stream interrupted") from exc
+            try:
+                for line in res.iter_lines():
+                    if line:
+                        chunk = json.loads(line.decode("utf-8"))
+                        yield from _iter_stream_parts_from_chunk(chunk)
+            except requests.RequestException as exc:
+                inc_ollama_error(
+                    code=OLLAMA_ERROR_API_CODE,
+                    endpoint="chat",
+                    http_status="stream_interrupted",
+                )
+                raise OllamaUnavailable("Ollama chat stream interrupted") from exc
 
     def yield_generate_tokens(
         self,
@@ -459,32 +501,33 @@ class OllamaService:
         payload: dict[str, Any] = {"model": model, "prompt": prompt, "stream": True}
         if ollama_options:
             payload["options"] = ollama_options
-        try:
-            with otel_span("ollama.api.generate", stream="true"):
-                res = requests.post(
-                    f"{self._s.ollama_base_url}/api/generate",
-                    json=payload,
-                    stream=True,
-                    timeout=self._s.generate_timeout,
+        with self._reserve_inference_slot():
+            try:
+                with otel_span("ollama.api.generate", stream="true"):
+                    res = requests.post(
+                        f"{self._s.ollama_base_url}/api/generate",
+                        json=payload,
+                        stream=True,
+                        timeout=self._s.generate_timeout,
+                    )
+                res.raise_for_status()
+            except requests.RequestException as exc:
+                inc_ollama_error(
+                    code=OLLAMA_ERROR_API_CODE, endpoint="generate", http_status="none"
                 )
-            res.raise_for_status()
-        except requests.RequestException as exc:
-            inc_ollama_error(
-                code=OLLAMA_ERROR_API_CODE, endpoint="generate", http_status="none"
-            )
-            raise OllamaUnavailable("Cannot reach Ollama /api/generate") from exc
-        try:
-            for line in res.iter_lines():
-                if line:
-                    chunk = json.loads(line.decode("utf-8"))
-                    yield from _iter_stream_parts_from_chunk(chunk)
-        except requests.RequestException as exc:
-            inc_ollama_error(
-                code=OLLAMA_ERROR_API_CODE,
-                endpoint="generate",
-                http_status="stream_interrupted",
-            )
-            raise OllamaUnavailable("Ollama generate stream interrupted") from exc
+                raise OllamaUnavailable("Cannot reach Ollama /api/generate") from exc
+            try:
+                for line in res.iter_lines():
+                    if line:
+                        chunk = json.loads(line.decode("utf-8"))
+                        yield from _iter_stream_parts_from_chunk(chunk)
+            except requests.RequestException as exc:
+                inc_ollama_error(
+                    code=OLLAMA_ERROR_API_CODE,
+                    endpoint="generate",
+                    http_status="stream_interrupted",
+                )
+                raise OllamaUnavailable("Ollama generate stream interrupted") from exc
 
     def generate_completion(
         self,
@@ -498,22 +541,23 @@ class OllamaService:
         payload: dict[str, Any] = {"model": model, "prompt": prompt, "stream": False}
         if ollama_options:
             payload["options"] = ollama_options
-        try:
-            with otel_span("ollama.api.generate", stream="false"):
-                res = requests.post(
-                    f"{self._s.ollama_base_url}/api/generate",
-                    json=payload,
-                    stream=False,
-                    timeout=self._s.generate_timeout,
+        with self._reserve_inference_slot():
+            try:
+                with otel_span("ollama.api.generate", stream="false"):
+                    res = requests.post(
+                        f"{self._s.ollama_base_url}/api/generate",
+                        json=payload,
+                        stream=False,
+                        timeout=self._s.generate_timeout,
+                    )
+                res.raise_for_status()
+            except requests.RequestException as exc:
+                inc_ollama_error(
+                    code=OLLAMA_ERROR_API_CODE, endpoint="generate", http_status="none"
                 )
-            res.raise_for_status()
-        except requests.RequestException as exc:
-            inc_ollama_error(
-                code=OLLAMA_ERROR_API_CODE, endpoint="generate", http_status="none"
-            )
-            raise OllamaUnavailable("Cannot reach Ollama /api/generate") from exc
-        data = res.json()
-        return str(data.get("response") or "").strip()
+                raise OllamaUnavailable("Cannot reach Ollama /api/generate") from exc
+            data = res.json()
+            return str(data.get("response") or "").strip()
 
     def stream_tokens(
         self,
@@ -566,56 +610,57 @@ class OllamaService:
         if ollama_options:
             payload["options"] = ollama_options
 
-        try:
-            res = self._post_chat(
-                payload,
-                stream=True,
-                stream_timeout_sec=self._s.chat_first_event_timeout_sec,
-            )
-        except ValueError:
-            return
+        with self._reserve_inference_slot():
+            try:
+                res = self._post_chat(
+                    payload,
+                    stream=True,
+                    stream_timeout_sec=self._s.chat_first_event_timeout_sec,
+                )
+            except ValueError:
+                return
 
-        try:
-            for line in res.iter_lines():
-                if not line:
-                    continue
+            try:
+                for line in res.iter_lines():
+                    if not line:
+                        continue
 
-                chunk = json.loads(line.decode("utf-8"))
-                message = chunk.get("message")
-                if isinstance(message, dict):
-                    tool_calls = message.get("tool_calls")
-                    if isinstance(tool_calls, list) and tool_calls:
-                        first_call = tool_calls[0]
-                        if isinstance(first_call, dict):
-                            function = first_call.get("function")
-                            if isinstance(function, dict):
-                                name = function.get("name")
-                                arguments = function.get("arguments")
-                                if isinstance(name, str) and isinstance(
-                                    arguments, dict
-                                ):
-                                    yield ToolCallPlan(
-                                        assistant_message={
-                                            "role": str(
-                                                message.get("role") or "assistant"
-                                            ),
-                                            "content": str(
-                                                message.get("content") or ""
-                                            ),
-                                            "tool_calls": tool_calls,
-                                        },
-                                        tool_name=name,
-                                        arguments=arguments,
-                                    )
+                    chunk = json.loads(line.decode("utf-8"))
+                    message = chunk.get("message")
+                    if isinstance(message, dict):
+                        tool_calls = message.get("tool_calls")
+                        if isinstance(tool_calls, list) and tool_calls:
+                            first_call = tool_calls[0]
+                            if isinstance(first_call, dict):
+                                function = first_call.get("function")
+                                if isinstance(function, dict):
+                                    name = function.get("name")
+                                    arguments = function.get("arguments")
+                                    if isinstance(name, str) and isinstance(
+                                        arguments, dict
+                                    ):
+                                        yield ToolCallPlan(
+                                            assistant_message={
+                                                "role": str(
+                                                    message.get("role") or "assistant"
+                                                ),
+                                                "content": str(
+                                                    message.get("content") or ""
+                                                ),
+                                                "tool_calls": tool_calls,
+                                            },
+                                            tool_name=name,
+                                            arguments=arguments,
+                                        )
 
-                yield from _iter_stream_parts_from_chunk(chunk)
-        except requests.RequestException as exc:
-            inc_ollama_error(
-                code=OLLAMA_ERROR_API_CODE,
-                endpoint="chat",
-                http_status="stream_interrupted",
-            )
-            raise OllamaUnavailable("Ollama tool stream interrupted") from exc
+                    yield from _iter_stream_parts_from_chunk(chunk)
+            except requests.RequestException as exc:
+                inc_ollama_error(
+                    code=OLLAMA_ERROR_API_CODE,
+                    endpoint="chat",
+                    http_status="stream_interrupted",
+                )
+                raise OllamaUnavailable("Ollama tool stream interrupted") from exc
 
     def plan_tool_call(
         self,
@@ -637,37 +682,38 @@ class OllamaService:
         if ollama_options:
             payload["options"] = ollama_options
 
-        try:
-            res = self._post_chat(payload, stream=False)
-        except ValueError:
-            return None
+        with self._reserve_inference_slot():
+            try:
+                res = self._post_chat(payload, stream=False)
+            except ValueError:
+                return None
 
-        data = res.json()
-        message = data.get("message")
-        if not isinstance(message, dict):
-            return None
+            data = res.json()
+            message = data.get("message")
+            if not isinstance(message, dict):
+                return None
 
-        tool_calls = message.get("tool_calls")
-        if not isinstance(tool_calls, list) or not tool_calls:
-            return None
+            tool_calls = message.get("tool_calls")
+            if not isinstance(tool_calls, list) or not tool_calls:
+                return None
 
-        first_call = tool_calls[0]
-        if not isinstance(first_call, dict):
-            return None
-        function = first_call.get("function")
-        if not isinstance(function, dict):
-            return None
+            first_call = tool_calls[0]
+            if not isinstance(first_call, dict):
+                return None
+            function = first_call.get("function")
+            if not isinstance(function, dict):
+                return None
 
-        name = function.get("name")
-        arguments = function.get("arguments")
-        if not isinstance(name, str) or not isinstance(arguments, dict):
-            return None
+            name = function.get("name")
+            arguments = function.get("arguments")
+            if not isinstance(name, str) or not isinstance(arguments, dict):
+                return None
 
-        return ToolCallPlan(
-            assistant_message=message,
-            tool_name=name,
-            arguments=arguments,
-        )
+            return ToolCallPlan(
+                assistant_message=message,
+                tool_name=name,
+                arguments=arguments,
+            )
 
     def stream_tool_followup(
         self,
@@ -688,24 +734,25 @@ class OllamaService:
         if ollama_options:
             payload["options"] = ollama_options
 
-        try:
-            res = self._post_chat(
-                payload,
-                stream=True,
-                stream_timeout_sec=self._s.chat_first_event_timeout_sec,
-            )
-        except ValueError:
-            return
+        with self._reserve_inference_slot():
+            try:
+                res = self._post_chat(
+                    payload,
+                    stream=True,
+                    stream_timeout_sec=self._s.chat_first_event_timeout_sec,
+                )
+            except ValueError:
+                return
 
-        try:
-            for line in res.iter_lines():
-                if line:
-                    chunk = json.loads(line.decode("utf-8"))
-                    yield from _iter_stream_parts_from_chunk(chunk)
-        except requests.RequestException as exc:
-            inc_ollama_error(
-                code=OLLAMA_ERROR_API_CODE,
-                endpoint="chat",
-                http_status="stream_interrupted",
-            )
-            raise OllamaUnavailable("Ollama follow-up stream interrupted") from exc
+            try:
+                for line in res.iter_lines():
+                    if line:
+                        chunk = json.loads(line.decode("utf-8"))
+                        yield from _iter_stream_parts_from_chunk(chunk)
+            except requests.RequestException as exc:
+                inc_ollama_error(
+                    code=OLLAMA_ERROR_API_CODE,
+                    endpoint="chat",
+                    http_status="stream_interrupted",
+                )
+                raise OllamaUnavailable("Ollama follow-up stream interrupted") from exc

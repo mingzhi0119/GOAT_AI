@@ -3638,7 +3638,7 @@
             "type": "string",
             "minLength": 1,
             "title": "Model",
-            "default": "gemma4:26b"
+            "default": "qwen3:4b"
           },
           "messages": {
             "items": {
@@ -5476,9 +5476,13 @@
       },
       "RuntimeTargetResponse": {
         "properties": {
-          "deploy_target": {
+          "deploy_mode": {
+            "type": "integer",
+            "title": "Deploy Mode"
+          },
+          "deploy_mode_name": {
             "type": "string",
-            "title": "Deploy Target"
+            "title": "Deploy Mode Name"
           },
           "current": {
             "$ref": "#/components/schemas/RuntimeTargetItemResponse"
@@ -5496,7 +5500,8 @@
         },
         "type": "object",
         "required": [
-          "deploy_target",
+          "deploy_mode",
+          "deploy_mode_name",
           "current",
           "ordered_targets",
           "operational_contract"

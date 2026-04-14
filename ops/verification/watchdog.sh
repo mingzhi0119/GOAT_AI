@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="${PROJECT_DIR:-$HOME/GOAT_AI}"
 FAIL_THRESHOLD="${GOAT_WATCHDOG_FAIL_THRESHOLD:-3}"
 SLEEP_SEC="${GOAT_WATCHDOG_SLEEP_SEC:-60}"
+DEPLOY_SCRIPT="${GOAT_WATCHDOG_DEPLOY_SCRIPT:-ops/deploy/deploy_remote_server.sh}"
 GOAT_RUNTIME_ROOT="${GOAT_RUNTIME_ROOT:-$PROJECT_DIR/var}"
 GOAT_LOG_DIR="${GOAT_LOG_DIR:-$GOAT_RUNTIME_ROOT/logs}"
 LOG="${GOAT_WATCHDOG_LOG:-$GOAT_LOG_DIR/watchdog.log}"
@@ -18,8 +19,8 @@ while true; do
     fail_count=$((fail_count + 1))
     echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") health failed ($fail_count/$FAIL_THRESHOLD)" >> "$LOG"
     if [ "$fail_count" -ge "$FAIL_THRESHOLD" ] && [ "${GOAT_WATCHDOG_RESTART:-0}" = "1" ]; then
-      echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") restarting via ops/deploy/deploy.sh (QUICK=1)" >> "$LOG"
-      (cd "$PROJECT_DIR" && QUICK=1 bash ops/deploy/deploy.sh) >> "$LOG" 2>&1 || true
+      echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") restarting via ${DEPLOY_SCRIPT} (QUICK=1)" >> "$LOG"
+      (cd "$PROJECT_DIR" && QUICK=1 bash "${DEPLOY_SCRIPT}") >> "$LOG" 2>&1 || true
       fail_count=0
     fi
   fi

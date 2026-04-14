@@ -66,7 +66,7 @@ Important packaged-runtime environment and launch parameters:
 - `GOAT_DATA_DIR`
 - `GOAT_SERVER_PORT`
 - `GOAT_LOCAL_PORT`
-- `GOAT_DEPLOY_TARGET=local`
+- `GOAT_DEPLOY_MODE=0`
 - `GOAT_DESKTOP_SHELL_LOG_PATH`
 - `GOAT_READY_SKIP_OLLAMA_PROBE=1` for CI/smoke evidence only
 
