@@ -58,6 +58,9 @@ async function installApiMocks(
           auth_required: false,
           authenticated: false,
           expires_at: null,
+          available_login_methods: [],
+          active_login_method: null,
+          user: null,
         }),
       )
       return
@@ -69,6 +72,9 @@ async function installApiMocks(
           auth_required: false,
           authenticated: false,
           expires_at: null,
+          available_login_methods: [],
+          active_login_method: null,
+          user: null,
         }),
       )
       return

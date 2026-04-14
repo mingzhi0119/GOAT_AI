@@ -56,8 +56,9 @@ class BrowserAccessSessionTests(unittest.TestCase):
         now = datetime(2026, 4, 13, 12, 0, 0, tzinfo=timezone.utc)
         session = issue_shared_access_session(settings, now=now)
         encoded = encode_shared_access_session(session=session, settings=settings)
-
-        tampered = encoded[:-1] + ("A" if encoded[-1] != "A" else "B")
+        payload, timestamp, signature = encoded.rsplit(".", 2)
+        tampered_signature = ("A" if signature[0] != "A" else "B") + signature[1:]
+        tampered = ".".join([payload, timestamp, tampered_signature])
 
         self.assertIsNone(
             decode_shared_access_session(tampered, settings=settings, now=now)

@@ -33,6 +33,10 @@ from backend.services.browser_access_session import (
     build_shared_access_authorization_context,
     read_shared_access_session_from_request,
 )
+from backend.services.account_auth import (
+    build_account_authorization_context,
+    read_account_session_from_request,
+)
 from goat_ai.shared.clocks import Clock, SystemClock
 from goat_ai.config.settings import Settings
 from goat_ai.telemetry.request_context import reset_request_id, set_request_id
@@ -42,6 +46,9 @@ _READY_PATH = "/api/ready"
 _AUTH_SESSION_PATH = "/api/auth/session"
 _AUTH_LOGIN_PATH = "/api/auth/login"
 _AUTH_LOGOUT_PATH = "/api/auth/logout"
+_ACCOUNT_LOGIN_PATH = "/api/auth/account/login"
+_GOOGLE_LOGIN_PATH = "/api/auth/account/google"
+_GOOGLE_LOGIN_URL_PATH = "/api/auth/account/google/url"
 _API_KEY_HEADER = "X-GOAT-API-Key"
 _OWNER_ID_HEADER = "X-GOAT-Owner-Id"
 _REQUEST_ID_HEADER = "X-Request-ID"
@@ -50,7 +57,7 @@ _CACHE_CONTROL_HEADER = "Cache-Control"
 _VARY_HEADER = "Vary"
 _RATE_LIMIT_MESSAGE = "Too many requests. Please try again shortly."
 _UNAUTHORIZED_MESSAGE = "Invalid or missing API key."
-_LOGIN_REQUIRED_MESSAGE = "Shared access login required."
+_LOGIN_REQUIRED_MESSAGE = "Browser login required."
 _READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 _WRITE_KEY_DETAIL = "Write operations require the write API key."
 _SENSITIVE_VARY_HEADERS = (
@@ -78,6 +85,9 @@ def _is_public_path(path: str) -> bool:
         _AUTH_SESSION_PATH,
         _AUTH_LOGIN_PATH,
         _AUTH_LOGOUT_PATH,
+        _ACCOUNT_LOGIN_PATH,
+        _GOOGLE_LOGIN_PATH,
+        _GOOGLE_LOGIN_URL_PATH,
     }
 
 
@@ -255,6 +265,16 @@ def register_http_security(
                 request.state.authorization_context = (
                     build_shared_access_authorization_context(shared_session)
                 )
+            else:
+                account_session = read_account_session_from_request(
+                    request,
+                    settings=settings,
+                )
+                if account_session is not None:
+                    request.state.account_session = account_session
+                    request.state.authorization_context = (
+                        build_account_authorization_context(account_session)
+                    )
 
             if _is_public_path(request.url.path):
                 response = await call_next(request)
@@ -281,6 +301,11 @@ def register_http_security(
                     return response
             elif settings.api_key:
                 provided_api_key = request.headers.get(_API_KEY_HEADER, "").strip()
+                if not provided_api_key and settings.browser_auth_required:
+                    status_code = 401
+                    response = _build_login_required_response(request_id)
+                    _apply_sensitive_cache_headers(request, response)
+                    return response
                 legacy_owner_id = (request.headers.get(_OWNER_ID_HEADER) or "").strip()
                 auth_context = resolve_authorization_context(
                     provided_api_key=provided_api_key,
@@ -318,7 +343,7 @@ def register_http_security(
                     )
                     _apply_sensitive_cache_headers(request, response)
                     return response
-            elif settings.shared_access_enabled:
+            elif settings.browser_auth_required:
                 status_code = 401
                 response = _build_login_required_response(request_id)
                 _apply_sensitive_cache_headers(request, response)

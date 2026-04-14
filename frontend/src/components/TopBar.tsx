@@ -34,7 +34,7 @@ interface Props {
   topP: number
   onTopPChange: (v: number) => void
   onResetAdvanced: () => void
-  sharedAccessSession: BrowserAuthSession | null
+  browserAuthSession: BrowserAuthSession | null
   isSigningOut: boolean
   onLogout: () => Promise<void>
 }
@@ -187,7 +187,7 @@ const TopBar: FC<Props> = ({
   topP,
   onTopPChange,
   onResetAdvanced,
-  sharedAccessSession,
+  browserAuthSession,
   isSigningOut,
   onLogout,
 }) => {
@@ -323,7 +323,7 @@ const TopBar: FC<Props> = ({
                 onTopPChange={onTopPChange}
                 onResetAdvanced={onResetAdvanced}
                 onOpenAppearance={onOpenAppearance}
-                sharedAccessSession={sharedAccessSession}
+                browserAuthSession={browserAuthSession}
                 isSigningOut={isSigningOut}
                 onLogout={onLogout}
                 onClose={closeActivePanel}

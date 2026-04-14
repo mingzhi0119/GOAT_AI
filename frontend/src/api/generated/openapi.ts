@@ -16,7 +16,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read browser shared-access session state */
+        /** Read browser authentication session state */
         get: operations["get_shared_access_session_api_auth_session_get"];
         put?: never;
         post?: never;
@@ -43,6 +43,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/account/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a browser account session */
+        post: operations["login_account_api_auth_account_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/account/google/url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Create a Google OAuth authorization URL */
+        get: operations["get_google_login_url_api_auth_account_google_url_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/account/google": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a browser account session from Google OAuth */
+        post: operations["login_google_account_api_auth_account_google_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/logout": {
         parameters: {
             query?: never;
@@ -52,7 +103,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Clear the browser shared-access session */
+        /** Clear the current browser authentication session */
         post: operations["logout_shared_access_api_auth_logout_post"];
         delete?: never;
         options?: never;
@@ -833,6 +884,27 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AccountLoginRequest */
+        AccountLoginRequest: {
+            /** Email */
+            email: string;
+            /** Password */
+            password: string;
+        };
+        /** AuthenticatedBrowserUser */
+        AuthenticatedBrowserUser: {
+            /** Id */
+            id: string;
+            /** Email */
+            email: string;
+            /** Display Name */
+            display_name: string;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "local" | "google";
+        };
         /** Body_analyze_upload_json_route_api_upload_analyze_post */
         Body_analyze_upload_json_route_api_upload_analyze_post: {
             /** File */
@@ -852,6 +924,23 @@ export interface components {
         Body_upload_and_parse_api_upload_post: {
             /** File */
             file: string;
+        };
+        /**
+         * BrowserAuthSessionResponse
+         * @description Browser-session status for shared-password and account auth.
+         */
+        BrowserAuthSessionResponse: {
+            /** Auth Required */
+            auth_required: boolean;
+            /** Authenticated */
+            authenticated: boolean;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Available Login Methods */
+            available_login_methods?: ("shared_password" | "account_password" | "google")[];
+            /** Active Login Method */
+            active_login_method?: ("shared_password" | "account_password" | "google") | null;
+            user?: components["schemas"]["AuthenticatedBrowserUser"] | null;
         };
         /**
          * ChatArtifact
@@ -1278,6 +1367,20 @@ export interface components {
             temperature_c?: number | null;
             /** Power Draw W */
             power_draw_w?: number | null;
+        };
+        /** GoogleOAuthLoginRequest */
+        GoogleOAuthLoginRequest: {
+            /** Code */
+            code: string;
+            /** State */
+            state: string;
+        };
+        /** GoogleOAuthUrlResponse */
+        GoogleOAuthUrlResponse: {
+            /** Authorization Url */
+            authorization_url: string;
+            /** State Expires At */
+            state_expires_at: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1798,18 +1901,6 @@ export interface components {
             password: string;
         };
         /**
-         * SharedAccessSessionResponse
-         * @description Browser-session status for the public shared-password gate.
-         */
-        SharedAccessSessionResponse: {
-            /** Auth Required */
-            auth_required: boolean;
-            /** Authenticated */
-            authenticated: boolean;
-            /** Expires At */
-            expires_at?: string | null;
-        };
-        /**
          * SystemFeaturesResponse
          * @description Public feature flags derived from config + host probes.
          */
@@ -2257,7 +2348,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SharedAccessSessionResponse"];
+                    "application/json": components["schemas"]["BrowserAuthSessionResponse"];
                 };
             };
             /** @description Too Many Requests */
@@ -2290,7 +2381,156 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SharedAccessSessionResponse"];
+                    "application/json": components["schemas"]["BrowserAuthSessionResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    login_account_api_auth_account_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserAuthSessionResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_google_login_url_api_auth_account_google_url_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleOAuthUrlResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    login_google_account_api_auth_account_google_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoogleOAuthLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserAuthSessionResponse"];
                 };
             };
             /** @description Bad Request */

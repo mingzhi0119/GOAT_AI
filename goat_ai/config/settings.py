@@ -247,6 +247,13 @@ class Settings:
     api_key: str = ""
     api_key_write: str = ""
     api_credentials_json: str = ""
+    account_auth_enabled: bool = False
+    browser_session_secret: str = ""
+    account_session_ttl_sec: int = 60 * 60 * 24 * 30
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = ""
+    google_oauth_state_ttl_sec: int = 60 * 10
     shared_access_password: str = ""
     shared_access_password_hash: str = ""
     shared_access_session_secret: str = ""
@@ -314,6 +321,18 @@ class Settings:
             self.shared_access_password_hash.strip()
             or self.shared_access_password.strip()
         )
+
+    @property
+    def google_oauth_enabled(self) -> bool:
+        return bool(
+            self.google_client_id.strip()
+            and self.google_client_secret.strip()
+            and self.google_redirect_uri.strip()
+        )
+
+    @property
+    def browser_auth_required(self) -> bool:
+        return self.shared_access_enabled or self.account_auth_enabled
 
 
 def resolve_localhost_sandbox_shell(settings: Settings) -> str | None:
@@ -575,6 +594,17 @@ def load_settings() -> Settings:
     _api_key = os.environ.get("GOAT_API_KEY", "").strip()
     _api_key_write = os.environ.get("GOAT_API_KEY_WRITE", "").strip()
     _api_credentials_json = os.environ.get("GOAT_API_CREDENTIALS_JSON", "").strip()
+    _account_auth_enabled = _env_bool("GOAT_ACCOUNT_AUTH_ENABLED", "false")
+    _browser_session_secret = os.environ.get("GOAT_BROWSER_SESSION_SECRET", "").strip()
+    _account_session_ttl_sec = int(
+        os.environ.get("GOAT_ACCOUNT_SESSION_TTL_SEC", str(60 * 60 * 24 * 30))
+    )
+    _google_client_id = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+    _google_client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
+    _google_redirect_uri = os.environ.get("GOOGLE_REDIRECT_URI", "").strip()
+    _google_oauth_state_ttl_sec = int(
+        os.environ.get("GOAT_GOOGLE_OAUTH_STATE_TTL_SEC", str(60 * 10))
+    )
     _shared_access_password = os.environ.get("GOAT_SHARED_ACCESS_PASSWORD", "").strip()
     _shared_access_password_hash = os.environ.get(
         "GOAT_SHARED_ACCESS_PASSWORD_HASH", ""
@@ -589,6 +619,25 @@ def load_settings() -> Settings:
         raise ValueError(
             "GOAT_API_KEY_WRITE requires GOAT_API_KEY (read key) to be set."
         )
+    if _account_session_ttl_sec < 1:
+        raise ValueError("GOAT_ACCOUNT_SESSION_TTL_SEC must be >= 1")
+    if _google_oauth_state_ttl_sec < 1:
+        raise ValueError("GOAT_GOOGLE_OAUTH_STATE_TTL_SEC must be >= 1")
+    google_envs = (
+        _google_client_id,
+        _google_client_secret,
+        _google_redirect_uri,
+    )
+    if any(google_envs) and not all(google_envs):
+        raise ValueError(
+            "GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI must all be set together."
+        )
+    if (_account_auth_enabled or all(google_envs)) and not _browser_session_secret:
+        raise ValueError(
+            "GOAT_BROWSER_SESSION_SECRET is required when account browser auth is enabled."
+        )
+    if all(google_envs) and not _account_auth_enabled:
+        raise ValueError("Google OAuth requires GOAT_ACCOUNT_AUTH_ENABLED=true.")
     _validate_pwdlib_hash(_shared_access_password_hash)
     if _shared_access_session_ttl_sec < 1:
         raise ValueError("GOAT_SHARED_ACCESS_SESSION_TTL_SEC must be >= 1")
@@ -662,6 +711,13 @@ def load_settings() -> Settings:
         api_key=_api_key,
         api_key_write=_api_key_write,
         api_credentials_json=_api_credentials_json,
+        account_auth_enabled=_account_auth_enabled,
+        browser_session_secret=_browser_session_secret,
+        account_session_ttl_sec=_account_session_ttl_sec,
+        google_client_id=_google_client_id,
+        google_client_secret=_google_client_secret,
+        google_redirect_uri=_google_redirect_uri,
+        google_oauth_state_ttl_sec=_google_oauth_state_ttl_sec,
         shared_access_password=_shared_access_password,
         shared_access_password_hash=_shared_access_password_hash,
         shared_access_session_secret=_shared_access_session_secret,

@@ -1,13 +1,22 @@
 /* @vitest-environment jsdom */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('../utils/browserNavigation', () => ({
+  navigateToExternalUrl: vi.fn(),
+}))
+
 import App from '../App'
 import { API_KEY_STORAGE_KEY, OWNER_ID_STORAGE_KEY } from '../api/auth'
 import { buildApiUrl } from '../api/urls'
 import { AppearanceProvider } from '../hooks/useAppearance'
+import { navigateToExternalUrl } from '../utils/browserNavigation'
 
 const AUTH_SESSION_URL = buildApiUrl('/auth/session')
 const AUTH_LOGIN_URL = buildApiUrl('/auth/login')
+const AUTH_ACCOUNT_LOGIN_URL = buildApiUrl('/auth/account/login')
+const AUTH_GOOGLE_URL_URL = buildApiUrl('/auth/account/google/url')
+const AUTH_GOOGLE_URL = buildApiUrl('/auth/account/google')
 const AUTH_LOGOUT_URL = buildApiUrl('/auth/logout')
 const MODELS_URL = buildApiUrl('/models')
 const MODEL_CAPABILITIES_URL_PREFIX = buildApiUrl('/models/capabilities')
@@ -16,6 +25,36 @@ const SYSTEM_FEATURES_URL = buildApiUrl('/system/features')
 const SYSTEM_GPU_URL = buildApiUrl('/system/gpu')
 const SYSTEM_INFERENCE_URL = buildApiUrl('/system/inference')
 const CHAT_URL = buildApiUrl('/chat')
+
+interface TestBrowserAuthUser {
+  id: string
+  email: string
+  display_name: string
+  provider: 'local' | 'google'
+}
+
+interface TestBrowserAuthSession {
+  auth_required: boolean
+  authenticated: boolean
+  expires_at: string | null
+  available_login_methods: ('shared_password' | 'account_password' | 'google')[]
+  active_login_method: 'shared_password' | 'account_password' | 'google' | null
+  user: TestBrowserAuthUser | null
+}
+
+function buildBrowserAuthSession(
+  overrides: Partial<TestBrowserAuthSession> = {},
+): TestBrowserAuthSession {
+  return {
+    auth_required: false,
+    authenticated: false,
+    expires_at: null,
+    available_login_methods: [],
+    active_login_method: null,
+    user: null,
+    ...overrides,
+  }
+}
 
 function buildJsonResponse(payload: unknown, ok = true) {
   return {
@@ -40,26 +79,76 @@ function buildStreamResponse(chunks: string[]) {
 }
 
 function buildFetchMock(options?: {
-  authSession?: { auth_required: boolean; authenticated: boolean; expires_at: string | null }
-  loginSession?: { auth_required: boolean; authenticated: boolean; expires_at: string | null }
+  authSession?: TestBrowserAuthSession
+  sharedLoginSession?: TestBrowserAuthSession
+  accountLoginSession?: TestBrowserAuthSession
+  googleLoginSession?: TestBrowserAuthSession
+  googleAuthorizationUrl?: string
 }) {
-  const authSession = options?.authSession ?? {
-    auth_required: false,
-    authenticated: false,
-    expires_at: null,
-  }
-  const loginSession = options?.loginSession ?? {
-    auth_required: true,
-    authenticated: true,
-    expires_at: '2026-05-13T20:00:00Z',
-  }
+  const authSession = options?.authSession ?? buildBrowserAuthSession()
+  const sharedLoginSession =
+    options?.sharedLoginSession ??
+    buildBrowserAuthSession({
+      auth_required: true,
+      authenticated: true,
+      expires_at: '2026-05-13T20:00:00Z',
+      available_login_methods: ['shared_password'],
+      active_login_method: 'shared_password',
+    })
+  const accountLoginSession =
+    options?.accountLoginSession ??
+    buildBrowserAuthSession({
+      auth_required: true,
+      authenticated: true,
+      expires_at: '2026-05-13T20:00:00Z',
+      available_login_methods: ['account_password', 'google'],
+      active_login_method: 'account_password',
+      user: {
+        id: 'user-1',
+        email: 'user@example.com',
+        display_name: 'User Example',
+        provider: 'local',
+      },
+    })
+  const googleLoginSession =
+    options?.googleLoginSession ??
+    buildBrowserAuthSession({
+      auth_required: true,
+      authenticated: true,
+      expires_at: '2026-05-13T20:00:00Z',
+      available_login_methods: ['account_password', 'google'],
+      active_login_method: 'google',
+      user: {
+        id: 'user-2',
+        email: 'google@example.com',
+        display_name: 'Google User',
+        provider: 'google',
+      },
+    })
+  const googleAuthorizationUrl =
+    options?.googleAuthorizationUrl ??
+    'https://accounts.google.com/o/oauth2/v2/auth?state=test-google-state'
 
   return vi.fn().mockImplementation((input: string, init?: RequestInit) => {
     if (input === AUTH_SESSION_URL) {
       return Promise.resolve(buildJsonResponse(authSession))
     }
     if (input === AUTH_LOGIN_URL) {
-      return Promise.resolve(buildJsonResponse(loginSession))
+      return Promise.resolve(buildJsonResponse(sharedLoginSession))
+    }
+    if (input === AUTH_ACCOUNT_LOGIN_URL) {
+      return Promise.resolve(buildJsonResponse(accountLoginSession))
+    }
+    if (input === AUTH_GOOGLE_URL_URL) {
+      return Promise.resolve(
+        buildJsonResponse({
+          authorization_url: googleAuthorizationUrl,
+          state_expires_at: '2026-05-13T20:00:00Z',
+        }),
+      )
+    }
+    if (input === AUTH_GOOGLE_URL) {
+      return Promise.resolve(buildJsonResponse(googleLoginSession))
     }
     if (input === AUTH_LOGOUT_URL) {
       return Promise.resolve({ ok: true })
@@ -227,7 +316,9 @@ function renderApp() {
 
 describe('App browser access integration', () => {
   afterEach(() => {
+    window.history.replaceState({}, '', '/')
     localStorage.clear()
+    vi.clearAllMocks()
     vi.restoreAllMocks()
   })
 
@@ -240,18 +331,19 @@ describe('App browser access integration', () => {
     localStorage.setItem('goat-ai-messages', JSON.stringify([{ id: 'm1', role: 'assistant' }]))
     localStorage.setItem('goat-ai-session-id', 'sess-1')
     const mockedFetch = buildFetchMock({
-      authSession: {
+      authSession: buildBrowserAuthSession({
         auth_required: true,
-        authenticated: false,
-        expires_at: null,
-      },
+        available_login_methods: ['shared_password', 'account_password', 'google'],
+      }),
     })
     vi.stubGlobal('fetch', mockedFetch)
 
     renderApp()
 
-    await screen.findByLabelText('Password')
+    await screen.findByLabelText('Shared password')
     expect(screen.getByRole('button', { name: /enter goat/i })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /shared password/i })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /account login/i })).toBeInTheDocument()
     expect(mockedFetch).toHaveBeenCalledTimes(1)
     expect(findCall(mockedFetch, AUTH_SESSION_URL)?.[1]).toMatchObject({
       credentials: 'same-origin',
@@ -300,24 +392,25 @@ describe('App browser access integration', () => {
 
   it('waits for login before mounting the shell and surfaces logout in settings', async () => {
     const mockedFetch = buildFetchMock({
-      authSession: {
+      authSession: buildBrowserAuthSession({
         auth_required: true,
-        authenticated: false,
-        expires_at: null,
-      },
-      loginSession: {
+        available_login_methods: ['shared_password'],
+      }),
+      sharedLoginSession: buildBrowserAuthSession({
         auth_required: true,
         authenticated: true,
         expires_at: '2026-05-13T20:00:00Z',
-      },
+        available_login_methods: ['shared_password'],
+        active_login_method: 'shared_password',
+      }),
     })
     vi.stubGlobal('fetch', mockedFetch)
 
     renderApp()
-    await screen.findByLabelText('Password')
+    await screen.findByLabelText('Shared password')
     expect(findCall(mockedFetch, MODELS_URL)).toBeFalsy()
 
-    fireEvent.change(screen.getByLabelText('Password'), {
+    fireEvent.change(screen.getByLabelText('Shared password'), {
       target: { value: 'goat-shared-password' },
     })
     fireEvent.click(screen.getByRole('button', { name: /enter goat/i }))
@@ -337,12 +430,111 @@ describe('App browser access integration', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /logout/i }))
 
-    await screen.findByLabelText('Password')
+    await screen.findByLabelText('Shared password')
     expect(findCall(mockedFetch, AUTH_LOGOUT_URL)?.[1]).toMatchObject({
       credentials: 'same-origin',
       method: 'POST',
     })
     expect(localStorage.getItem('goat-ai-messages')).toBeNull()
     expect(localStorage.getItem('goat-ai-session-id')).toBeNull()
+  })
+
+  it('supports account password login from the unified browser gate', async () => {
+    const mockedFetch = buildFetchMock({
+      authSession: buildBrowserAuthSession({
+        auth_required: true,
+        available_login_methods: ['shared_password', 'account_password', 'google'],
+      }),
+      accountLoginSession: buildBrowserAuthSession({
+        auth_required: true,
+        authenticated: true,
+        expires_at: '2026-05-13T20:00:00Z',
+        available_login_methods: ['shared_password', 'account_password', 'google'],
+        active_login_method: 'account_password',
+        user: {
+          id: 'user-1',
+          email: 'user@example.com',
+          display_name: 'User Example',
+          provider: 'local',
+        },
+      }),
+    })
+    vi.stubGlobal('fetch', mockedFetch)
+
+    renderApp()
+    await screen.findByRole('tab', { name: /account login/i })
+    fireEvent.click(screen.getByRole('tab', { name: /account login/i }))
+
+    fireEvent.change(screen.getByLabelText('Email'), {
+      target: { value: 'user@example.com' },
+    })
+    fireEvent.change(screen.getByLabelText('Password'), {
+      target: { value: 'account-password' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^sign in$/i }))
+
+    await waitFor(() => {
+      expect(findCall(mockedFetch, AUTH_ACCOUNT_LOGIN_URL)).toBeTruthy()
+    })
+    await waitForStartupFetches(mockedFetch)
+
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+    expect(screen.getByText('User Example (user@example.com)')).toBeInTheDocument()
+    expect(screen.queryByLabelText('API key')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Owner ID')).not.toBeInTheDocument()
+  })
+
+  it('starts Google login from the unified browser gate', async () => {
+    const mockedFetch = buildFetchMock({
+      authSession: buildBrowserAuthSession({
+        auth_required: true,
+        available_login_methods: ['account_password', 'google'],
+      }),
+      googleAuthorizationUrl:
+        'https://accounts.google.com/o/oauth2/v2/auth?state=google-state-123',
+    })
+    vi.stubGlobal('fetch', mockedFetch)
+
+    renderApp()
+    await screen.findByRole('button', { name: /continue with google/i })
+    fireEvent.click(screen.getByRole('button', { name: /continue with google/i }))
+
+    await waitFor(() => {
+      expect(findCall(mockedFetch, AUTH_GOOGLE_URL_URL)).toBeTruthy()
+    })
+    expect(navigateToExternalUrl).toHaveBeenCalledWith(
+      'https://accounts.google.com/o/oauth2/v2/auth?state=google-state-123',
+    )
+  })
+
+  it('completes the Google OAuth callback before mounting the shell', async () => {
+    window.history.pushState({}, '', '/?code=oauth-code&state=oauth-state&scope=email')
+    const mockedFetch = buildFetchMock({
+      googleLoginSession: buildBrowserAuthSession({
+        auth_required: true,
+        authenticated: true,
+        expires_at: '2026-05-13T20:00:00Z',
+        available_login_methods: ['account_password', 'google'],
+        active_login_method: 'google',
+        user: {
+          id: 'user-2',
+          email: 'google@example.com',
+          display_name: 'Google User',
+          provider: 'google',
+        },
+      }),
+    })
+    vi.stubGlobal('fetch', mockedFetch)
+
+    renderApp()
+
+    await waitFor(() => {
+      expect(findCall(mockedFetch, AUTH_GOOGLE_URL)).toBeTruthy()
+    })
+    await waitForStartupFetches(mockedFetch)
+    expect(window.location.search).toBe('')
+
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+    expect(screen.getByText('Google User (google@example.com)')).toBeInTheDocument()
   })
 })

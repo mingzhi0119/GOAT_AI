@@ -43,6 +43,7 @@ from backend.services.background_jobs import (
 )
 from backend.services.workbench_execution_service import execute_workbench_task
 from backend.services.runtime_persistence import (
+    build_account_repository,
     build_code_sandbox_execution_repository,
     build_conversation_logger,
     build_session_repository,
@@ -62,6 +63,7 @@ from backend.application.ports import (
     WorkbenchTaskDispatcher,
 )
 from backend.types import LLMClient, Settings
+from backend.services.account_repository import AccountRepository
 from goat_ai.llm.ollama_client import OllamaService
 
 
@@ -86,6 +88,13 @@ def get_session_repository(
 ) -> SessionRepository:
     """Return the session repository bound to current settings."""
     return build_session_repository(settings)
+
+
+def get_account_repository(
+    settings: Settings = Depends(get_settings),
+) -> AccountRepository:
+    """Return the account repository bound to current settings."""
+    return build_account_repository(settings)
 
 
 def get_workbench_task_repository(
@@ -219,11 +228,11 @@ def get_authorization_context(
     ctx = getattr(request.state, "authorization_context", None)
     if isinstance(ctx, AuthorizationContext):
         return ctx
-    if settings.shared_access_enabled:
+    if settings.browser_auth_required:
         raise HTTPException(
             status_code=401,
             detail=build_error_body(
-                detail="Shared access login required.",
+                detail="Browser login required.",
                 code=AUTH_LOGIN_REQUIRED,
                 status_code=401,
             ),

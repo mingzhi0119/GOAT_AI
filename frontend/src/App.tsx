@@ -1,8 +1,8 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import type { BrowserAuthSession, RuntimeFeature } from './api/types'
 import ChatWindow from './components/ChatWindow'
+import BrowserLoginGate from './components/BrowserLoginGate'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import SharedAccessLoginGate from './components/SharedAccessLoginGate'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
 import { useBranding } from './config/branding'
@@ -27,7 +27,7 @@ const LazyAppearancePanel = lazy(() => import('./components/AppearancePanel'))
 
 interface AppShellProps {
   appTitle: string
-  sharedAccessSession: BrowserAuthSession | null
+  browserAuthSession: BrowserAuthSession | null
   isSigningOut: boolean
   onLogout: () => Promise<void>
 }
@@ -99,7 +99,7 @@ function FullscreenStatus({
 
 function AppShell({
   appTitle,
-  sharedAccessSession,
+  browserAuthSession,
   isSigningOut,
   onLogout,
 }: AppShellProps) {
@@ -226,7 +226,7 @@ function AppShell({
           topP={advanced.topP}
           onTopPChange={advanced.setTopP}
           onResetAdvanced={advanced.resetAdvancedToDefaults}
-          sharedAccessSession={sharedAccessSession}
+          browserAuthSession={browserAuthSession}
           isSigningOut={isSigningOut}
           onLogout={onLogout}
         />
@@ -300,12 +300,15 @@ export default function App() {
 
   if (auth.session?.auth_required && !auth.session.authenticated) {
     return (
-      <SharedAccessLoginGate
+      <BrowserLoginGate
         appTitle={branding.appTitle}
+        session={auth.session}
         isLoading={auth.isLoading}
         isSubmitting={auth.isSubmitting}
         error={auth.error}
-        onLogin={auth.login}
+        onLoginShared={auth.loginShared}
+        onLoginAccount={auth.loginAccount}
+        onStartGoogleLogin={auth.startGoogleLogin}
         onRetry={auth.refresh}
       />
     )
@@ -325,7 +328,7 @@ export default function App() {
     <AppShell
       key={auth.shellKey}
       appTitle={branding.appTitle}
-      sharedAccessSession={auth.session}
+      browserAuthSession={auth.session}
       isSigningOut={auth.isSubmitting}
       onLogout={auth.logout}
     />

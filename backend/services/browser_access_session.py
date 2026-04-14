@@ -8,7 +8,6 @@ from uuid import uuid4
 
 from itsdangerous import BadData, URLSafeTimedSerializer
 from itsdangerous.timed import TimestampSigner
-from pwdlib import PasswordHash
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -18,13 +17,13 @@ from backend.domain.rate_limit_policy import RateLimitPolicy
 from backend.domain.scope_catalog import FULL_SCOPES
 from backend.services.rate_limiter import StoredSlidingWindowRateLimiter
 from backend.services.rate_limit_store import InMemorySlidingWindowRateLimitStore
+from backend.services.password_hashing import hash_password, verify_password
 from goat_ai.config.settings import Settings
 
 _COOKIE_NAME = "goat_access_session"
 _AUTH_MODE = "shared_access_cookie_v1"
 _DEFAULT_TENANT_ID = "tenant:default"
 _COOKIE_SERIALIZER_SALT = "goat.shared-access.cookie"
-_PASSWORD_HASHER = PasswordHash.recommended()
 _LOGIN_RATE_LIMITER = StoredSlidingWindowRateLimiter(
     policy=RateLimitPolicy(window_sec=300, max_requests=10),
     store=InMemorySlidingWindowRateLimitStore(),
@@ -152,15 +151,12 @@ def verify_shared_access_password(settings: Settings, *, password: str) -> bool:
     candidate = password.strip()
     password_hash = settings.shared_access_password_hash.strip()
     if password_hash:
-        try:
-            return _PASSWORD_HASHER.verify(candidate, password_hash)
-        except Exception:
-            return False
+        return verify_password(candidate, password_hash)
     return hmac.compare_digest(candidate, settings.shared_access_password.strip())
 
 
 def hash_shared_access_password(password: str) -> str:
-    return _PASSWORD_HASHER.hash(password.strip())
+    return hash_password(password.strip())
 
 
 def decode_shared_access_session(

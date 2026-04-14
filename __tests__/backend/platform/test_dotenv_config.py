@@ -503,6 +503,73 @@ class DotenvConfigTests(unittest.TestCase):
         finally:
             _restore_many(original_env)
 
+    def test_load_settings_parses_account_auth_and_google_oauth_env(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            app_root = Path(tmp)
+            runtime_root = app_root / "var"
+            original_env = _capture_env(
+                "GOAT_ACCOUNT_AUTH_ENABLED",
+                "GOAT_BROWSER_SESSION_SECRET",
+                "GOAT_ACCOUNT_SESSION_TTL_SEC",
+                "GOOGLE_CLIENT_ID",
+                "GOOGLE_CLIENT_SECRET",
+                "GOOGLE_REDIRECT_URI",
+            )
+            try:
+                _clear_env(*original_env.keys())
+                os.environ["GOAT_ACCOUNT_AUTH_ENABLED"] = "1"
+                os.environ["GOAT_BROWSER_SESSION_SECRET"] = "browser-secret"
+                os.environ["GOAT_ACCOUNT_SESSION_TTL_SEC"] = "7200"
+                os.environ["GOOGLE_CLIENT_ID"] = "client-id"
+                os.environ["GOOGLE_CLIENT_SECRET"] = "client-secret"
+                os.environ["GOOGLE_REDIRECT_URI"] = "http://localhost:3000/"
+                with (
+                    patch.object(config, "APP_ROOT", app_root),
+                    patch.object(config, "DEFAULT_RUNTIME_ROOT", runtime_root),
+                ):
+                    settings = config.load_settings()
+                self.assertTrue(settings.account_auth_enabled)
+                self.assertEqual("browser-secret", settings.browser_session_secret)
+                self.assertEqual(7200, settings.account_session_ttl_sec)
+                self.assertTrue(settings.google_oauth_enabled)
+                self.assertTrue(settings.browser_auth_required)
+            finally:
+                _restore_many(original_env)
+
+    def test_load_settings_rejects_account_auth_without_browser_session_secret(
+        self,
+    ) -> None:
+        original_env = _capture_env(
+            "GOAT_ACCOUNT_AUTH_ENABLED",
+            "GOAT_BROWSER_SESSION_SECRET",
+        )
+        try:
+            _clear_env(*original_env.keys())
+            os.environ["GOAT_ACCOUNT_AUTH_ENABLED"] = "1"
+            with self.assertRaisesRegex(ValueError, "GOAT_BROWSER_SESSION_SECRET"):
+                config.load_settings()
+        finally:
+            _restore_many(original_env)
+
+    def test_load_settings_rejects_partial_google_oauth_env(self) -> None:
+        original_env = _capture_env(
+            "GOAT_ACCOUNT_AUTH_ENABLED",
+            "GOAT_BROWSER_SESSION_SECRET",
+            "GOOGLE_CLIENT_ID",
+            "GOOGLE_CLIENT_SECRET",
+            "GOOGLE_REDIRECT_URI",
+        )
+        try:
+            _clear_env(*original_env.keys())
+            os.environ["GOAT_ACCOUNT_AUTH_ENABLED"] = "1"
+            os.environ["GOAT_BROWSER_SESSION_SECRET"] = "browser-secret"
+            os.environ["GOOGLE_CLIENT_ID"] = "client-id"
+            os.environ["GOOGLE_REDIRECT_URI"] = "http://localhost:3000/"
+            with self.assertRaisesRegex(ValueError, "GOOGLE_CLIENT_ID"):
+                config.load_settings()
+        finally:
+            _restore_many(original_env)
+
 
 def _capture_env(*names: str) -> dict[str, str | None]:
     return {name: os.environ.get(name) for name in names}

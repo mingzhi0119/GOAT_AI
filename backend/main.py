@@ -59,7 +59,7 @@ OPENAPI_TAGS = [
     {"name": "system", "description": "Health and server telemetry endpoints."},
     {
         "name": "auth",
-        "description": "Shared browser-access session endpoints for public deployments.",
+        "description": "Browser login endpoints for shared-password and account sessions.",
     },
     {
         "name": "models",

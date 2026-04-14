@@ -70,14 +70,14 @@ npm run dev
 ```
 
 If the backend is protected with `GOAT_API_KEY` or `GOAT_REQUIRE_SESSION_OWNER=1`
-and shared browser access is disabled, open the browser UI settings menu and
+and browser login is disabled, open the browser UI settings menu and
 populate `Protected access` with the shared API key and, when required, the
 owner ID. The SPA stores those values locally in the browser and attaches
 `X-GOAT-API-Key` / `X-GOAT-Owner-Id` to runtime API calls.
-If `GOAT_SHARED_ACCESS_PASSWORD_HASH` is enabled, or the legacy plaintext
-`GOAT_SHARED_ACCESS_PASSWORD` fallback is still in use, the browser UI instead shows a
-shared site-password gate and stores access in an HttpOnly signed cookie; the
-public UI no longer needs a manually entered owner id.
+If shared-password browser login or account browser login is enabled, the browser UI
+instead bootstraps `GET /api/auth/session`, shows the appropriate login gate, and
+stores access in HttpOnly signed cookies; the public UI no longer needs a manually
+entered owner id.
 Frontend API contract types are generated from `docs/api/openapi.json`; refresh them
 with `npm run contract:generate` whenever the backend contract changes.
 `npm run depcruise` exercises the frontend-only import-direction and cycle guardrails for
@@ -249,7 +249,7 @@ When the frontend is hosted on Vercel and FastAPI remains on a Linux host, use
 [VERCEL_FRONTEND_DEPLOY.md](VERCEL_FRONTEND_DEPLOY.md) as the canonical runbook.
 That path keeps browser requests same-origin at `goat-dev.vercel.app/api/*` and lets
 Vercel rewrite `/api/*` to `https://goat-api.duckdns.org/api/*`.
-For the public site, enable shared browser access on the backend instead of
+For the public site, enable browser login on the backend instead of
 publishing `X-GOAT-Owner-Id` controls in the browser UI.
 
 ## Deployment profiles
@@ -322,6 +322,13 @@ live in the configured bucket/prefix while SQLite metadata remains local.
 | `GOAT_SHARED_ACCESS_PASSWORD` | Legacy plaintext fallback for the shared site password; avoid in production when `GOAT_SHARED_ACCESS_PASSWORD_HASH` can be used instead | empty |
 | `GOAT_SHARED_ACCESS_SESSION_SECRET` | Required signing secret for `goat_access_session` cookies when shared browser access is enabled | empty |
 | `GOAT_SHARED_ACCESS_SESSION_TTL_SEC` | Browser-session cookie TTL in seconds for shared browser access | `2592000` |
+| `GOAT_ACCOUNT_AUTH_ENABLED` | Enables browser account login alongside or instead of the shared password flow | `false` |
+| `GOAT_BROWSER_SESSION_SECRET` | Required signing secret for `goat_account_session` and Google OAuth state cookies when account browser auth is enabled | empty |
+| `GOAT_ACCOUNT_SESSION_TTL_SEC` | Browser-session cookie TTL in seconds for account login | `2592000` |
+| `GOOGLE_CLIENT_ID` | Google OAuth client id for browser account login | empty |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret for browser account login | empty |
+| `GOOGLE_REDIRECT_URI` | Frontend callback URI that receives the Google OAuth authorization code | empty |
+| `GOAT_GOOGLE_OAUTH_STATE_TTL_SEC` | Google OAuth state-cookie TTL in seconds | `600` |
 | `GOAT_REQUIRE_SESSION_OWNER` | When `true`/`1`, chat and history routes require `X-GOAT-Owner-Id` (session scoping) | `false` |
 | `GOAT_RATE_LIMIT_WINDOW_SEC` | Rate limit window | `60` |
 | `GOAT_RATE_LIMIT_MAX_REQUESTS` | Max requests per window | `60` |
@@ -370,6 +377,7 @@ live in the configured bucket/prefix while SQLite metadata remains local.
 - Runtime metadata stays at `GOAT_LOG_PATH` for local and desktop by default; hosted/server deployments may opt into Postgres while Phase 16C continues to own only the binary/object payload boundary.
 - `GOAT_RUNTIME_METADATA_BACKEND=sqlite` remains the default runtime metadata mode, and local or desktop binaries stay on SQLite in the shipped app.
 - `GOAT_RUNTIME_METADATA_BACKEND=postgres` is a server-only hosted runtime mode. It requires `GOAT_DEPLOY_TARGET=server` plus `GOAT_RUNTIME_POSTGRES_DSN`, applies Alembic schema upgrades at startup through the same path exposed by `python -m tools.ops.upgrade_runtime_postgres_schema`, and is intended to be cut over only after `python -m tools.ops.export_runtime_metadata_snapshot`, `python -m tools.ops.import_runtime_metadata_snapshot`, and `python -m tools.ops.check_runtime_metadata_parity` succeed against the same restore set.
+- Runtime metadata snapshots now include `auth_users` and `auth_user_identities` when account login is enabled; treat every snapshot/backup that contains these tables as sensitive because it carries password hashes and external identity bindings.
 - `GOAT_OBJECT_STORE_BACKEND=local` keeps knowledge uploads, normalized payloads, vector payload JSON, media attachments, generated artifacts, and workspace-export files on the host filesystem under `GOAT_OBJECT_STORE_ROOT`.
 - `GOAT_OBJECT_STORE_BACKEND=s3` moves the same payload families behind an S3-compatible object-store contract. The backend environment must include `boto3` for this mode.
 - Read compatibility is preserved for older local files under `GOAT_DATA_DIR/uploads/*` and `GOAT_DATA_DIR/vector_index/*` while SQLite rows still reference legacy paths.
@@ -461,21 +469,33 @@ Example `GOAT_API_CREDENTIALS_JSON`:
 ]
 ```
 
-### Shared browser access for public deployments
+### Browser login modes for public deployments
 
-Use this mode when a public browser deployment should stay behind one shared
-site password while still keeping chat history, artifacts, media, and other
-owner-scoped reads isolated per browser.
+Use browser login when a public browser deployment should stay behind either a
+shared site password, stable user accounts, or both, while keeping
+history/artifacts/media/workbench data aligned with the existing caller-scoped
+authorization model.
 
-Configuration:
+Shared-password configuration:
 
 - set `GOAT_SHARED_ACCESS_PASSWORD_HASH` to a `pwdlib` hash of the public site password
 - set `GOAT_SHARED_ACCESS_SESSION_SECRET` to a long random signing secret
 - optionally tune `GOAT_SHARED_ACCESS_SESSION_TTL_SEC` (default `2592000`, or 30 days)
-- keep `GOAT_API_KEY` / `GOAT_API_KEY_WRITE` only for scripts or operator paths that
-  still need header-based credentials
 
-Generate the hash with:
+Account-login configuration:
+
+- set `GOAT_ACCOUNT_AUTH_ENABLED=1`
+- set `GOAT_BROWSER_SESSION_SECRET` to a long random signing secret for `goat_account_session`
+- optionally tune `GOAT_ACCOUNT_SESSION_TTL_SEC` (default `2592000`, or 30 days)
+- pre-provision local accounts with `python -m tools.ops.create_local_account --email user@example.com`
+
+Optional Google OAuth configuration:
+
+- set all of `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI`
+- set `GOAT_GOOGLE_OAUTH_STATE_TTL_SEC` only if you need a non-default state-cookie TTL
+- add the same frontend callback origin or path to the Google Console redirect URI allow-list
+
+Generate the shared-password hash with:
 
 ```bash
 python -c "from pwdlib import PasswordHash; print(PasswordHash.recommended().hash('replace-with-a-site-password'))"
@@ -483,25 +503,21 @@ python -c "from pwdlib import PasswordHash; print(PasswordHash.recommended().has
 
 Runtime behavior:
 
-- `GET /api/auth/session`, `POST /api/auth/login`, and `POST /api/auth/logout`
-  remain public so the SPA can bootstrap
-- successful login issues a host-only `goat_access_session` cookie with
-  `HttpOnly`, `Secure`, `SameSite=Lax`, and `Path=/`
-- each successful login creates a fresh browser-specific owner id and principal id
-- all other `/api` routes require either that cookie-backed browser session or a
-  valid API key
-- auth-sensitive `GET` routes and artifact downloads return
-  `Cache-Control: no-store` and `Vary: Cookie, X-GOAT-API-Key, X-GOAT-Owner-Id`
+- `GET /api/auth/session` and `POST /api/auth/logout` remain public so the SPA can bootstrap and recover
+- `POST /api/auth/login` issues `goat_access_session` for shared-password browser mode
+- `POST /api/auth/account/login` and `POST /api/auth/account/google` issue `goat_account_session` for stable user mode
+- `GET /api/auth/account/google/url` issues the short-lived `goat_google_oauth_state` cookie used to bind the OAuth callback to the same browser
+- successful login in one browser mode clears the other browser-mode cookies so the browser stays on one active login path at a time
+- shared-password login creates a fresh browser-specific owner id per login; account login resolves to stable owner ids of the form `user:<user_id>`
+- all other `/api` routes require either a valid browser session cookie or a valid API key
+- auth-sensitive `GET` routes and artifact downloads return `Cache-Control: no-store` and `Vary: Cookie, X-GOAT-API-Key, X-GOAT-Owner-Id`
 
 Minimum rollout order:
 
-1. Set `GOAT_SHARED_ACCESS_PASSWORD_HASH`, `GOAT_SHARED_ACCESS_SESSION_SECRET`, and
-   optionally `GOAT_SHARED_ACCESS_SESSION_TTL_SEC`.
-2. Restart the backend.
-3. Verify:
-   - `curl -i https://<backend>/api/auth/session`
-   - expect `200` with `{"auth_required": true, "authenticated": false, ...}`
-4. Dry-run the ownerless history cleanup:
+1. Decide whether the deployment should expose shared password, account login, or both.
+2. Set the matching env vars and restart the backend.
+3. Verify `curl -i https://<backend>/api/auth/session` returns `200` with `auth_required=true` plus the expected `available_login_methods`.
+4. If shared-password mode is newly enabled, dry-run the ownerless history cleanup:
 
    ```bash
    python -m tools.ops.purge_ownerless_history
@@ -513,8 +529,17 @@ Minimum rollout order:
    python -m tools.ops.purge_ownerless_history --execute
    ```
 
-6. Smoke-test with two clean browser profiles using the same shared password and
-   confirm they cannot see each other's `/api/history` rows.
+6. If account login is enabled, create at least one local test account:
+
+   ```bash
+   python -m tools.ops.create_local_account --email user@example.com
+   ```
+
+7. If Google OAuth is enabled, confirm the configured `GOOGLE_REDIRECT_URI` matches the frontend origin/path exactly.
+8. Smoke-test:
+   - two clean browser profiles using the same shared password cannot see each other's `/api/history` rows
+   - the same account can sign in from two browsers and see the same stable history
+   - invalid Google state or token returns `401` with `AUTH_INVALID_GOOGLE_STATE` or `AUTH_INVALID_GOOGLE_TOKEN`
 
 ### Authorization audit events (historical authz 16C)
 

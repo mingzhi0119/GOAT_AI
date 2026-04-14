@@ -11,7 +11,7 @@
         "tags": [
           "auth"
         ],
-        "summary": "Read browser shared-access session state",
+        "summary": "Read browser authentication session state",
         "operationId": "get_shared_access_session_api_auth_session_get",
         "responses": {
           "200": {
@@ -19,7 +19,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharedAccessSessionResponse"
+                  "$ref": "#/components/schemas/BrowserAuthSessionResponse"
                 }
               }
             }
@@ -60,7 +60,180 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharedAccessSessionResponse"
+                  "$ref": "#/components/schemas/BrowserAuthSessionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/account/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Create a browser account session",
+        "operationId": "login_account_api_auth_account_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserAuthSessionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/account/google/url": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Create a Google OAuth authorization URL",
+        "operationId": "get_google_login_url_api_auth_account_google_url_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleOAuthUrlResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/account/google": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Create a browser account session from Google OAuth",
+        "operationId": "login_google_account_api_auth_account_google_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleOAuthLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserAuthSessionResponse"
                 }
               }
             }
@@ -113,7 +286,7 @@
         "tags": [
           "auth"
         ],
-        "summary": "Clear the browser shared-access session",
+        "summary": "Clear the current browser authentication session",
         "operationId": "logout_shared_access_api_auth_logout_post",
         "responses": {
           "204": {
@@ -3186,6 +3359,60 @@
   },
   "components": {
     "schemas": {
+      "AccountLoginRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 320,
+            "minLength": 3,
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "AccountLoginRequest"
+      },
+      "AuthenticatedBrowserUser": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "local",
+              "google"
+            ],
+            "title": "Provider"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "display_name",
+          "provider"
+        ],
+        "title": "AuthenticatedBrowserUser"
+      },
       "Body_analyze_upload_json_route_api_upload_analyze_post": {
         "properties": {
           "file": {
@@ -3241,6 +3468,74 @@
           "file"
         ],
         "title": "Body_upload_and_parse_api_upload_post"
+      },
+      "BrowserAuthSessionResponse": {
+        "properties": {
+          "auth_required": {
+            "type": "boolean",
+            "title": "Auth Required"
+          },
+          "authenticated": {
+            "type": "boolean",
+            "title": "Authenticated"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "available_login_methods": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "shared_password",
+                "account_password",
+                "google"
+              ]
+            },
+            "type": "array",
+            "title": "Available Login Methods"
+          },
+          "active_login_method": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "shared_password",
+                  "account_password",
+                  "google"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Login Method"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AuthenticatedBrowserUser"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "auth_required",
+          "authenticated"
+        ],
+        "title": "BrowserAuthSessionResponse",
+        "description": "Browser-session status for shared-password and account auth."
       },
       "ChatArtifact": {
         "properties": {
@@ -4177,6 +4472,46 @@
         ],
         "title": "GPUStatusResponse",
         "description": "GPU telemetry payload used by sidebar status strip."
+      },
+      "GoogleOAuthLoginRequest": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Code"
+          },
+          "state": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "state"
+        ],
+        "title": "GoogleOAuthLoginRequest"
+      },
+      "GoogleOAuthUrlResponse": {
+        "properties": {
+          "authorization_url": {
+            "type": "string",
+            "title": "Authorization Url"
+          },
+          "state_expires_at": {
+            "type": "string",
+            "title": "State Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "authorization_url",
+          "state_expires_at"
+        ],
+        "title": "GoogleOAuthUrlResponse"
       },
       "HTTPValidationError": {
         "properties": {
@@ -5185,36 +5520,6 @@
         "title": "SharedAccessLoginRequest",
         "description": "Password payload for POST /api/auth/login."
       },
-      "SharedAccessSessionResponse": {
-        "properties": {
-          "auth_required": {
-            "type": "boolean",
-            "title": "Auth Required"
-          },
-          "authenticated": {
-            "type": "boolean",
-            "title": "Authenticated"
-          },
-          "expires_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expires At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "auth_required",
-          "authenticated"
-        ],
-        "title": "SharedAccessSessionResponse",
-        "description": "Browser-session status for the public shared-password gate."
-      },
       "SystemFeaturesResponse": {
         "properties": {
           "code_sandbox": {
@@ -5945,7 +6250,7 @@
     },
     {
       "name": "auth",
-      "description": "Shared browser-access session endpoints for public deployments."
+      "description": "Browser login endpoints for shared-password and account sessions."
     },
     {
       "name": "models",
