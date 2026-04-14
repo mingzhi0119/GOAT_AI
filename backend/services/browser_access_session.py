@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
-from fastapi import Request
-from fastapi.responses import Response
+from starlette.requests import Request
+from starlette.responses import Response
 
 from backend.domain.authz_types import AuthorizationContext
 from backend.domain.authorization import PrincipalId, TenantId

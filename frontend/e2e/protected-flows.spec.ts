@@ -2,6 +2,9 @@ import { expect, test, type Page, type Route } from '@playwright/test'
 
 type CapturedHeaders = Record<string, Record<string, string>[]>
 
+const AUTH_SESSION_PATH = '/api/auth/session'
+const AUTH_LOGIN_PATH = '/api/auth/login'
+const AUTH_LOGOUT_PATH = '/api/auth/logout'
 const API_KEY_STORAGE_KEY = 'goat-ai-api-key'
 const OWNER_ID_STORAGE_KEY = 'goat-ai-owner-id'
 
@@ -48,6 +51,33 @@ async function installApiMocks(
     recordHeaders(capturedHeaders, route)
     const method = route.request().method()
     const codeSandboxEnabled = options?.codeSandboxEnabled ?? false
+
+    if (pathname === AUTH_SESSION_PATH) {
+      await route.fulfill(
+        jsonResponse({
+          auth_required: false,
+          authenticated: false,
+          expires_at: null,
+        }),
+      )
+      return
+    }
+
+    if (pathname === AUTH_LOGIN_PATH) {
+      await route.fulfill(
+        jsonResponse({
+          auth_required: false,
+          authenticated: false,
+          expires_at: null,
+        }),
+      )
+      return
+    }
+
+    if (pathname === AUTH_LOGOUT_PATH) {
+      await route.fulfill({ status: 204, body: '' })
+      return
+    }
 
     if (pathname === '/api/models') {
       await route.fulfill(jsonResponse({ models: ['gemma4:26b'] }))

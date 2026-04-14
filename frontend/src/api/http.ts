@@ -17,7 +17,7 @@ function dispatchAuthRequiredEvent(): void {
 async function maybeDispatchAuthRequired(resp: Response): Promise<void> {
   if (resp.status !== 401) return
   try {
-    const payload = (await resp.json()) as unknown
+    const payload: unknown = await resp.json()
     const code = extractApiErrorCode(payload)
     if (code === null || code === 'AUTH_LOGIN_REQUIRED' || code === 'AUTH_INVALID_API_KEY') {
       dispatchAuthRequiredEvent()

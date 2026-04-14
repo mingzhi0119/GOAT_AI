@@ -41,7 +41,7 @@ class GateSummary:
 
 class GateLLM:
     def list_model_names(self) -> list[str]:
-        return ["gate-model"]
+        return ["gemma4:26b"]
 
     def describe_model_for_api(self, model: str) -> tuple[list[str], int | None]:
         return ["completion"], 8192
@@ -117,7 +117,7 @@ def _run_chat_sample(client: TestClient, index: int) -> GateSample:
     response = client.post(
         "/api/chat",
         json={
-            "model": "gate-model",
+        "model": "gemma4:26b",
             "session_id": f"pr-latency-gate-{index}",
             "messages": [{"role": "user", "content": "Reply with one short sentence."}],
         },

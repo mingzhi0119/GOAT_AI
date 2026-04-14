@@ -16,6 +16,7 @@ from backend.api_errors import (
 from backend.models.auth import SharedAccessLoginRequest, SharedAccessSessionResponse
 from backend.models.common import ErrorResponse
 from backend.platform.config import get_settings
+from backend.types import Settings
 from backend.services.browser_access_session import (
     SharedAccessSession,
     clear_shared_access_cookie,
@@ -24,7 +25,6 @@ from backend.services.browser_access_session import (
     set_shared_access_cookie,
     shared_access_enabled,
 )
-from goat_ai.config.settings import Settings
 
 router = APIRouter()
 
