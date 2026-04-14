@@ -117,7 +117,7 @@ def _run_chat_sample(client: TestClient, index: int) -> GateSample:
     response = client.post(
         "/api/chat",
         json={
-        "model": "gemma4:26b",
+            "model": "gemma4:26b",
             "session_id": f"pr-latency-gate-{index}",
             "messages": [{"role": "user", "content": "Reply with one short sentence."}],
         },
