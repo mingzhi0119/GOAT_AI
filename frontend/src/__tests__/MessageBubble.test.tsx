@@ -94,6 +94,7 @@ describe('MessageBubble', () => {
       await waitFor(() =>
         expect(fetchMock).toHaveBeenCalledWith('/api/artifacts/art-1', {
           method: 'GET',
+          credentials: 'same-origin',
           headers: {
             'X-GOAT-API-Key': 'secret-123',
             'X-GOAT-Owner-Id': 'alice',

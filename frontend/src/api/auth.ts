@@ -44,4 +44,9 @@ export function setStoredOwnerId(ownerId: string): void {
   setStoredValue(OWNER_ID_STORAGE_KEY, ownerId)
 }
 
+export function clearStoredProtectedAccess(): void {
+  setStoredApiKey('')
+  setStoredOwnerId('')
+}
+
 export { API_KEY_STORAGE_KEY, OWNER_ID_STORAGE_KEY }

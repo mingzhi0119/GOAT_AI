@@ -5,9 +5,12 @@ Base path: `/api`
 ## Global behavior
 
 - If `GOAT_API_KEY` is configured, every endpoint except `GET /api/health` and `GET /api/ready` requires `X-GOAT-API-Key`
+- If `GOAT_SHARED_ACCESS_PASSWORD` is configured, the browser/UI path becomes `GET /api/auth/session` + `POST /api/auth/login` + a signed `goat_access_session` cookie; every non-health API route then requires either that cookie-backed browser session or an API key
 - If `GOAT_API_KEY_WRITE` is configured, mutating routes (`POST`, `PATCH`, `DELETE`) require the write key or an equivalent write-scoped credential; otherwise the API returns `403` with `code = AUTH_WRITE_KEY_REQUIRED`
 - If `GOAT_REQUIRE_SESSION_OWNER` is enabled, chat and history routes require `X-GOAT-Owner-Id`; owner-mismatched protected reads resolve as `404` to avoid leaking resource existence
-- The bundled browser UI exposes these protected headers in `Settings -> Protected access` and stores them locally in the browser for subsequent API calls
+- In shared browser-access mode, the bundled browser UI shows a site-password gate instead of exposing `X-GOAT-Owner-Id`, and history/artifact visibility is derived from the signed browser session owner
+- Outside shared browser-access mode, the bundled browser UI exposes protected headers in `Settings -> Protected access` and stores them locally in the browser for subsequent API calls
+- Auth-sensitive `GET` routes and artifact downloads return `Cache-Control: no-store` plus `Vary: Cookie, X-GOAT-API-Key, X-GOAT-Owner-Id`
 - Responses include `X-Request-ID`
 - Rate-limited requests return `429` with `Retry-After`
 - Standard error shape:
@@ -26,6 +29,9 @@ Base path: `/api`
 |--------|------|---------|
 | `GET` | `/api/health` | Liveness probe |
 | `GET` | `/api/ready` | Readiness (SQLite + optional Ollama) |
+| `GET` | `/api/auth/session` | Read shared browser-access session state |
+| `POST` | `/api/auth/login` | Create one signed browser session from the shared site password |
+| `POST` | `/api/auth/logout` | Clear the current browser session cookie |
 | `GET` | `/api/system/metrics` | Prometheus text metrics |
 | `GET` | `/api/models` | List Ollama models |
 | `GET` | `/api/models/capabilities` | Read capabilities for one model |
@@ -80,6 +86,64 @@ Returns:
 ## `GET /api/ready`
 
 Returns JSON `{ "ready": boolean, "checks": { ... } }`. HTTP `503` when any required check fails, for example SQLite is unreachable or the optional Ollama probe fails. Set `GOAT_READY_SKIP_OLLAMA_PROBE=1` to omit the Ollama HTTP check.
+
+## `GET /api/auth/session`
+
+Returns the current browser-auth posture for deployments that use a shared site password.
+
+Example unauthenticated response:
+
+```json
+{
+  "auth_required": true,
+  "authenticated": false,
+  "expires_at": null
+}
+```
+
+Example authenticated response:
+
+```json
+{
+  "auth_required": true,
+  "authenticated": true,
+  "expires_at": "2026-05-13T19:42:11+00:00"
+}
+```
+
+Notes:
+
+- When `GOAT_SHARED_ACCESS_PASSWORD` is unset, this route returns `auth_required = false`
+- The route remains public so the SPA can bootstrap before loading history/models/features
+- Responses include `Cache-Control: no-store`
+
+## `POST /api/auth/login`
+
+Request body:
+
+```json
+{
+  "password": "shared-site-password"
+}
+```
+
+Returns the same payload shape as `GET /api/auth/session` and sets a host-only `goat_access_session` cookie with:
+
+- `HttpOnly`
+- `Secure`
+- `SameSite=Lax`
+- `Path=/`
+- `Max-Age = GOAT_SHARED_ACCESS_SESSION_TTL_SEC` (default `2592000`)
+
+Current behavior:
+
+- Each successful login creates a fresh browser-scoped owner identity; sessions created by one browser are not visible to another browser even when both use the same shared password
+- Invalid passwords return `401` with `code = AUTH_INVALID_ACCESS_PASSWORD`
+- Excessive login attempts return `429` with `Retry-After`
+
+## `POST /api/auth/logout`
+
+Clears the `goat_access_session` cookie and returns `204 No Content`.
 
 ## `GET /api/system/metrics`
 
@@ -769,8 +833,9 @@ Current behavior:
 
 - Returns the exact stored file with `Content-Disposition: attachment`
 - Resolves the payload by persisted `storage_key`; local backends may stream directly from disk, while remote backends proxy object bytes through the API response
-- Requires the same API key protection as the rest of `/api`
-- When session-owner scoping is enabled, download access is limited to the matching owner scope
+- Requires the same caller protection as the rest of `/api`: either a valid API key or, in shared browser-access mode, a valid signed browser session cookie
+- In shared browser-access mode, download access is limited to artifacts created by the current browser session owner
+- When explicit session-owner scoping is enabled, download access is limited to the matching owner scope
 - clients should treat the route as the stable download contract even when the storage backend changes
 - Missing artifacts return `404`
 
@@ -792,6 +857,12 @@ Returns session metadata list:
   ]
 }
 ```
+
+Current behavior:
+
+- In shared browser-access mode, the list is filtered to sessions created by the current browser session owner
+- Without a valid shared browser session, the route returns `401` with `code = AUTH_LOGIN_REQUIRED`
+- In non-shared no-key mode, `X-GOAT-Owner-Id` still acts as an optional local owner filter instead of being discarded
 
 ## `GET /api/history/{session_id}`
 
@@ -847,6 +918,7 @@ Notes:
 - session-linked restoration assumes that session id already exists in persisted history; workbench does not create chat-session stubs on its own in this slice
 - `chart_data_source` indicates where chart data came from: `uploaded`, `demo`, or `none`
 - Legacy stored sessions are still readable; compatibility decode lives in the backend storage codec, not the API contract
+- In shared browser-access mode, cross-browser reads are concealed as `404` instead of leaking another browser's session existence
 
 ## `PATCH /api/history/{session_id}`
 
@@ -862,11 +934,14 @@ Current behavior:
 
 - Returns `204 No Content` after the title is updated
 - Empty titles are rejected with `422`
+- In shared browser-access mode, only the browser session that created the history row can rename it
 - When owner scoping is active, rename follows the same visibility rules as history reads and deletes
 
 ## `DELETE /api/history`
 
 Returns `204 No Content`.
+
+In shared browser-access mode, this deletes only the current browser session owner's history.
 
 ## `DELETE /api/history/{session_id}`
 

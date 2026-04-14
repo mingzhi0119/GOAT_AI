@@ -1,5 +1,5 @@
-import { buildApiHeaders } from './auth'
 import { buildApiErrorMessage } from './errors'
+import { fetchApi } from './http'
 import {
   parseDesktopDiagnosticsResponse,
   parseGpuStatusResponse,
@@ -12,7 +12,6 @@ import type {
   InferenceLatency,
   SystemFeatures,
 } from './types'
-import { buildApiUrl } from './urls'
 
 export type {
   DesktopDiagnostics,
@@ -22,17 +21,13 @@ export type {
 } from './types'
 
 export async function fetchGpuStatus(): Promise<GPUStatus> {
-  const resp = await fetch(buildApiUrl('/system/gpu'), {
-    headers: buildApiHeaders(),
-  })
+  const resp = await fetchApi('/system/gpu')
   if (!resp.ok) throw new Error(await buildApiErrorMessage(resp, 'GPU status API'))
   return parseGpuStatusResponse(await resp.json())
 }
 
 export async function fetchInferenceLatency(): Promise<InferenceLatency> {
-  const resp = await fetch(buildApiUrl('/system/inference'), {
-    headers: buildApiHeaders(),
-  })
+  const resp = await fetchApi('/system/inference')
   if (!resp.ok) {
     throw new Error(await buildApiErrorMessage(resp, 'Inference latency API'))
   }
@@ -40,17 +35,13 @@ export async function fetchInferenceLatency(): Promise<InferenceLatency> {
 }
 
 export async function fetchSystemFeatures(): Promise<SystemFeatures> {
-  const resp = await fetch(buildApiUrl('/system/features'), {
-    headers: buildApiHeaders(),
-  })
+  const resp = await fetchApi('/system/features')
   if (!resp.ok) throw new Error(await buildApiErrorMessage(resp, 'System features API'))
   return parseSystemFeaturesResponse(await resp.json())
 }
 
 export async function fetchDesktopDiagnostics(): Promise<DesktopDiagnostics> {
-  const resp = await fetch(buildApiUrl('/system/desktop'), {
-    headers: buildApiHeaders(),
-  })
+  const resp = await fetchApi('/system/desktop')
   if (!resp.ok) {
     throw new Error(await buildApiErrorMessage(resp, 'Desktop diagnostics API'))
   }

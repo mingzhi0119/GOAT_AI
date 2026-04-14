@@ -6,7 +6,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
-import type { DesktopDiagnostics } from '../api/types'
+import type { BrowserAuthSession, DesktopDiagnostics } from '../api/types'
 import type { TopBarMenuFocusStrategy } from '../hooks/useTopBarPanels'
 import {
   AppearanceIcon,
@@ -29,6 +29,8 @@ export interface SettingsPanelProps {
   temperature: number
   maxTokens: number
   topP: number
+  sharedAccessSession: BrowserAuthSession | null
+  isSigningOut: boolean
   onApiKeyChange: (value: string) => void
   onOwnerIdChange: (value: string) => void
   onSystemInstructionChange: (value: string) => void
@@ -37,6 +39,7 @@ export interface SettingsPanelProps {
   onMaxTokensChange: (value: number) => void
   onTopPChange: (value: number) => void
   onResetAdvanced: () => void
+  onLogout: () => Promise<void>
   onOpenAppearance: () => void
   onClose: (options?: { restoreFocus?: boolean }) => void
 }
@@ -197,6 +200,56 @@ function ProtectedAccessSection({
           />
         </div>
       </div>
+    </section>
+  )
+}
+
+function formatSessionExpiry(expiresAt: string | null | undefined): string {
+  if (!expiresAt) return 'Signed in on this browser'
+  const parsed = new Date(expiresAt)
+  if (Number.isNaN(parsed.getTime())) return 'Signed in on this browser'
+  return `Signed in until ${parsed.toLocaleString()}`
+}
+
+function SharedAccessSessionSection({
+  session,
+  isSigningOut,
+  onLogout,
+}: {
+  session: BrowserAuthSession
+  isSigningOut: boolean
+  onLogout: () => Promise<void>
+}) {
+  return (
+    <section className="border-t pt-3" style={{ borderColor: 'var(--border-color)' }}>
+      <div className="mb-2">
+        <p
+          className="text-[11px] font-semibold uppercase tracking-[0.08em]"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          Session
+        </p>
+        <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+          {session.authenticated
+            ? formatSessionExpiry(session.expires_at)
+            : 'Shared access sign-in required for this deployment.'}
+        </p>
+      </div>
+      <button
+        type="button"
+        className="rounded-2xl border px-4 py-2 text-sm"
+        style={{
+          borderColor: 'var(--input-border)',
+          color: 'var(--text-main)',
+          opacity: isSigningOut ? 0.7 : 1,
+        }}
+        onClick={() => {
+          void onLogout()
+        }}
+        disabled={!session.authenticated || isSigningOut}
+      >
+        {isSigningOut ? 'Signing out...' : 'Logout'}
+      </button>
     </section>
   )
 }
@@ -694,6 +747,8 @@ export function SettingsPanel({
   temperature,
   maxTokens,
   topP,
+  sharedAccessSession,
+  isSigningOut,
   onApiKeyChange,
   onOwnerIdChange,
   onSystemInstructionChange,
@@ -702,6 +757,7 @@ export function SettingsPanel({
   onMaxTokensChange,
   onTopPChange,
   onResetAdvanced,
+  onLogout,
   onOpenAppearance,
   onClose,
 }: SettingsPanelProps) {
@@ -765,7 +821,9 @@ export function SettingsPanel({
             Settings
           </p>
           <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-            Tune instructions, protected access, and generation defaults.
+            {sharedAccessSession?.auth_required
+              ? 'Tune instructions, session access, and generation defaults.'
+              : 'Tune instructions, protected access, and generation defaults.'}
           </p>
         </div>
         <button
@@ -787,12 +845,20 @@ export function SettingsPanel({
           systemInstruction={systemInstruction}
           onSystemInstructionChange={onSystemInstructionChange}
         />
-        <ProtectedAccessSection
-          apiKey={apiKey}
-          ownerId={ownerId}
-          onApiKeyChange={onApiKeyChange}
-          onOwnerIdChange={onOwnerIdChange}
-        />
+        {sharedAccessSession?.auth_required ? (
+          <SharedAccessSessionSection
+            session={sharedAccessSession}
+            isSigningOut={isSigningOut}
+            onLogout={onLogout}
+          />
+        ) : (
+          <ProtectedAccessSection
+            apiKey={apiKey}
+            ownerId={ownerId}
+            onApiKeyChange={onApiKeyChange}
+            onOwnerIdChange={onOwnerIdChange}
+          />
+        )}
         <GenerationSettingsSection
           advancedOpen={advancedOpen}
           temperature={temperature}

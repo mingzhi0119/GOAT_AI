@@ -511,6 +511,21 @@ schemas:
       current: RuntimeTargetItemResponse
       ordered_targets: RuntimeTargetItemResponse[]
       operational_contract: RuntimeOperationalContractResponse
+  SharedAccessLoginRequest:
+    type: object
+    required:
+      - password
+    properties:
+      password: string
+  SharedAccessSessionResponse:
+    type: object
+    required:
+      - auth_required
+      - authenticated
+    properties:
+      auth_required: boolean
+      authenticated: boolean
+      expires_at: string|null
   SystemFeaturesResponse:
     type: object
     required:
@@ -684,6 +699,30 @@ schemas:
     properties:
       outputs: WorkbenchWorkspaceOutputPayload[]
 endpoints:
+  - op: get_shared_access_session
+    method: GET
+    path: /auth/session
+    response:
+      200: SharedAccessSessionResponse
+      errors:
+        - 429
+  - op: login_shared_access
+    method: POST
+    path: /auth/login
+    body: SharedAccessLoginRequest
+    content_type: application/json
+    response:
+      200: SharedAccessSessionResponse
+      errors:
+        - 400
+        - 401
+        - 422
+        - 429
+  - op: logout_shared_access
+    method: POST
+    path: /auth/logout
+    response:
+      204: no_content
   - op: list_models_route
     method: GET
     path: /models

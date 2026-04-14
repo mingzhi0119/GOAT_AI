@@ -2,7 +2,7 @@
 
 Strategic Intelligence assistant for Simon Business School, University of Rochester.
 
-- Example public deployment: <https://goat-dev.vercel.app> (frontend) with the public backend currently published at <https://goat-api.duckdns.org>
+- Example public deployment: <https://goat-dev.vercel.app> (frontend) with the public backend currently published at <https://goat-api.duckdns.org>; the public browser path now uses one shared site password plus a browser-scoped signed session cookie
 - Repo: <https://github.com/mingzhi0119/GOAT_AI>
 - Current snapshot: [docs/governance/PROJECT_STATUS.md](docs/governance/PROJECT_STATUS.md)
 - API contract: [docs/api/API_REFERENCE.md](docs/api/API_REFERENCE.md)
@@ -101,6 +101,7 @@ Core API surface:
 - Upload SSE ingests supported files into the knowledge pipeline and emits `knowledge_ready`, `error`, `done`
 - Charts are created only from native Ollama tool calls during chat
 - Session history is persisted in SQLite and can restore chart state plus attached knowledge documents
+- Public browser deployments can require one shared site password while still isolating history/artifacts per browser session via a signed HttpOnly cookie instead of a shared anonymous owner
 - Chat now includes a lightweight safeguard layer for clearly unsafe sexual or violent misuse requests
 - Request/error correlation uses `X-Request-ID`, with a stable JSON error envelope documented in [`docs/api/API_ERRORS.md`](docs/api/API_ERRORS.md)
 - Liveness and readiness are split into `GET /api/health` and `GET /api/ready`

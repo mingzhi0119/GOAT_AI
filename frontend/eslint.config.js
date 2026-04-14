@@ -8,6 +8,7 @@ export default tseslint.config(
   {
     ignores: [
       '.dependency-cruiser.cjs',
+      '.vercel/**',
       'coverage/**',
       'dist/**',
       'playwright-report/**',

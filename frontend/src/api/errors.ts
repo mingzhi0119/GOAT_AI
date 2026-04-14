@@ -1,4 +1,4 @@
-interface ApiErrorEnvelope {
+export interface ApiErrorEnvelope {
   detail?: unknown
   code?: unknown
   request_id?: unknown
@@ -21,6 +21,12 @@ export function extractApiErrorDetail(payload: unknown): string | null {
   if (typeof detail === 'string' && detail.trim()) return detail.trim()
   if (Array.isArray(detail)) return 'Request validation failed.'
   return null
+}
+
+export function extractApiErrorCode(payload: unknown): string | null {
+  if (typeof payload !== 'object' || payload === null) return null
+  const code = (payload as ApiErrorEnvelope).code
+  return typeof code === 'string' && code.trim() ? code.trim() : null
 }
 
 export async function buildApiErrorMessage(

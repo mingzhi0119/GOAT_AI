@@ -6,6 +6,9 @@ import { API_KEY_STORAGE_KEY, OWNER_ID_STORAGE_KEY } from '../api/auth'
 import { buildApiUrl } from '../api/urls'
 import { AppearanceProvider } from '../hooks/useAppearance'
 
+const AUTH_SESSION_URL = buildApiUrl('/auth/session')
+const AUTH_LOGIN_URL = buildApiUrl('/auth/login')
+const AUTH_LOGOUT_URL = buildApiUrl('/auth/logout')
 const MODELS_URL = buildApiUrl('/models')
 const MODEL_CAPABILITIES_URL_PREFIX = buildApiUrl('/models/capabilities')
 const HISTORY_URL = buildApiUrl('/history')
@@ -14,9 +17,9 @@ const SYSTEM_GPU_URL = buildApiUrl('/system/gpu')
 const SYSTEM_INFERENCE_URL = buildApiUrl('/system/inference')
 const CHAT_URL = buildApiUrl('/chat')
 
-function buildJsonResponse(payload: unknown) {
+function buildJsonResponse(payload: unknown, ok = true) {
   return {
-    ok: true,
+    ok,
     json: async () => payload,
   }
 }
@@ -36,8 +39,31 @@ function buildStreamResponse(chunks: string[]) {
   }
 }
 
-function buildFetchMock() {
+function buildFetchMock(options?: {
+  authSession?: { auth_required: boolean; authenticated: boolean; expires_at: string | null }
+  loginSession?: { auth_required: boolean; authenticated: boolean; expires_at: string | null }
+}) {
+  const authSession = options?.authSession ?? {
+    auth_required: false,
+    authenticated: false,
+    expires_at: null,
+  }
+  const loginSession = options?.loginSession ?? {
+    auth_required: true,
+    authenticated: true,
+    expires_at: '2026-05-13T20:00:00Z',
+  }
+
   return vi.fn().mockImplementation((input: string, init?: RequestInit) => {
+    if (input === AUTH_SESSION_URL) {
+      return Promise.resolve(buildJsonResponse(authSession))
+    }
+    if (input === AUTH_LOGIN_URL) {
+      return Promise.resolve(buildJsonResponse(loginSession))
+    }
+    if (input === AUTH_LOGOUT_URL) {
+      return Promise.resolve({ ok: true })
+    }
     if (input === MODELS_URL) {
       return Promise.resolve(buildJsonResponse({ models: ['gemma4:26b'] }))
     }
@@ -159,7 +185,10 @@ function buildFetchMock() {
     }
     if (input === CHAT_URL) {
       return Promise.resolve(
-        buildStreamResponse(['data: {"type":"token","token":"Hello back"}\n\n', 'data: {"type":"done"}\n\n']),
+        buildStreamResponse([
+          'data: {"type":"token","token":"Hello back"}\n\n',
+          'data: {"type":"done"}\n\n',
+        ]),
       )
     }
 
@@ -196,13 +225,50 @@ function renderApp() {
   )
 }
 
-describe('App protected access integration', () => {
+describe('App browser access integration', () => {
   afterEach(() => {
     localStorage.clear()
     vi.restoreAllMocks()
   })
 
-  it('uses persisted protected-access headers for startup API calls', async () => {
+  it('blocks startup API calls behind shared-access login and clears private state', async () => {
+    localStorage.setItem(API_KEY_STORAGE_KEY, 'secret-123')
+    localStorage.setItem(OWNER_ID_STORAGE_KEY, 'owner-42')
+    localStorage.setItem('goat-ai-username', 'Alice')
+    localStorage.setItem('goat-ai-system-instruction', 'Use bullets')
+    localStorage.setItem('goat-ai-file-context', JSON.stringify([{ filename: 'brief.md' }]))
+    localStorage.setItem('goat-ai-messages', JSON.stringify([{ id: 'm1', role: 'assistant' }]))
+    localStorage.setItem('goat-ai-session-id', 'sess-1')
+    const mockedFetch = buildFetchMock({
+      authSession: {
+        auth_required: true,
+        authenticated: false,
+        expires_at: null,
+      },
+    })
+    vi.stubGlobal('fetch', mockedFetch)
+
+    renderApp()
+
+    await screen.findByLabelText('Password')
+    expect(screen.getByRole('button', { name: /enter goat/i })).toBeInTheDocument()
+    expect(mockedFetch).toHaveBeenCalledTimes(1)
+    expect(findCall(mockedFetch, AUTH_SESSION_URL)?.[1]).toMatchObject({
+      credentials: 'same-origin',
+    })
+    expect(findCall(mockedFetch, MODELS_URL)).toBeFalsy()
+    expect(findCall(mockedFetch, HISTORY_URL)).toBeFalsy()
+    expect(findCall(mockedFetch, SYSTEM_FEATURES_URL)).toBeFalsy()
+    expect(localStorage.getItem(API_KEY_STORAGE_KEY)).toBeNull()
+    expect(localStorage.getItem(OWNER_ID_STORAGE_KEY)).toBeNull()
+    expect(localStorage.getItem('goat-ai-username')).toBeNull()
+    expect(localStorage.getItem('goat-ai-system-instruction')).toBeNull()
+    expect(localStorage.getItem('goat-ai-file-context')).toBeNull()
+    expect(localStorage.getItem('goat-ai-messages')).toBeNull()
+    expect(localStorage.getItem('goat-ai-session-id')).toBeNull()
+  })
+
+  it('uses persisted protected-access headers for startup API calls outside shared mode', async () => {
     localStorage.setItem(API_KEY_STORAGE_KEY, 'secret-123')
     localStorage.setItem(OWNER_ID_STORAGE_KEY, 'owner-42')
     const mockedFetch = buildFetchMock()
@@ -211,6 +277,9 @@ describe('App protected access integration', () => {
     renderApp()
     await waitForStartupFetches(mockedFetch)
 
+    expect(findCall(mockedFetch, AUTH_SESSION_URL)?.[1]).toMatchObject({
+      credentials: 'same-origin',
+    })
     for (const url of [
       MODELS_URL,
       HISTORY_URL,
@@ -220,6 +289,7 @@ describe('App protected access integration', () => {
     ]) {
       const call = findCall(mockedFetch, url)
       expect(call?.[1]).toMatchObject({
+        credentials: 'same-origin',
         headers: {
           'X-GOAT-API-Key': 'secret-123',
           'X-GOAT-Owner-Id': 'owner-42',
@@ -228,108 +298,51 @@ describe('App protected access integration', () => {
     }
   })
 
-  it('persists protected access from settings and reuses it for chat after refresh', async () => {
-    const mockedFetch = buildFetchMock()
+  it('waits for login before mounting the shell and surfaces logout in settings', async () => {
+    const mockedFetch = buildFetchMock({
+      authSession: {
+        auth_required: true,
+        authenticated: false,
+        expires_at: null,
+      },
+      loginSession: {
+        auth_required: true,
+        authenticated: true,
+        expires_at: '2026-05-13T20:00:00Z',
+      },
+    })
     vi.stubGlobal('fetch', mockedFetch)
 
-    const firstRender = renderApp()
-    await waitForStartupFetches(mockedFetch)
-
-    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
-    fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'secret-abc' } })
-    fireEvent.change(screen.getByLabelText('Owner ID'), { target: { value: 'owner-99' } })
-
-    expect(localStorage.getItem(API_KEY_STORAGE_KEY)).toBe('secret-abc')
-    expect(localStorage.getItem(OWNER_ID_STORAGE_KEY)).toBe('owner-99')
-
-    firstRender.unmount()
-    mockedFetch.mockClear()
-
     renderApp()
-    await waitForStartupFetches(mockedFetch)
+    await screen.findByLabelText('Password')
+    expect(findCall(mockedFetch, MODELS_URL)).toBeFalsy()
 
-    fireEvent.change(screen.getByPlaceholderText('Message GOAT'), {
-      target: { value: 'Hello protected world' },
+    fireEvent.change(screen.getByLabelText('Password'), {
+      target: { value: 'goat-shared-password' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+    fireEvent.click(screen.getByRole('button', { name: /enter goat/i }))
 
     await waitFor(() => {
-      expect(findCall(mockedFetch, CHAT_URL)).toBeTruthy()
+      expect(findCall(mockedFetch, AUTH_LOGIN_URL)).toBeTruthy()
     })
+    await waitForStartupFetches(mockedFetch)
 
-    expect(findCall(mockedFetch, CHAT_URL)?.[1]).toMatchObject({
+    localStorage.setItem('goat-ai-messages', JSON.stringify([{ id: 'm1', role: 'assistant' }]))
+    localStorage.setItem('goat-ai-session-id', 'sess-1')
+
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+    expect(screen.getByText('Session')).toBeInTheDocument()
+    expect(screen.queryByLabelText('API key')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Owner ID')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /logout/i }))
+
+    await screen.findByLabelText('Password')
+    expect(findCall(mockedFetch, AUTH_LOGOUT_URL)?.[1]).toMatchObject({
+      credentials: 'same-origin',
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-GOAT-API-Key': 'secret-abc',
-        'X-GOAT-Owner-Id': 'owner-99',
-      },
     })
-    const assistantReplies = await screen.findAllByText(/^Hello back$/i, undefined, {
-      timeout: 5000,
-    })
-    expect(assistantReplies.length).toBeGreaterThan(0)
-  })
-
-  it('refreshes capability discovery when protected access headers change', async () => {
-    const mockedFetch = buildFetchMock()
-    vi.stubGlobal('fetch', mockedFetch)
-
-    renderApp()
-    await waitForStartupFetches(mockedFetch)
-
-    const featureCallsBefore = mockedFetch.mock.calls.filter(
-      ([url]) => url === SYSTEM_FEATURES_URL,
-    ).length
-
-    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
-    fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'secret-rotated' } })
-    fireEvent.change(screen.getByLabelText('Owner ID'), { target: { value: 'owner-rotated' } })
-
-    await waitFor(() => {
-      const featureCalls = mockedFetch.mock.calls.filter(
-        ([url]) => url === SYSTEM_FEATURES_URL,
-      )
-      expect(featureCalls.length).toBeGreaterThan(featureCallsBefore)
-    })
-
-    const featureCalls = mockedFetch.mock.calls.filter(([url]) => url === SYSTEM_FEATURES_URL)
-    const latestFeatureCall = featureCalls[featureCalls.length - 1]
-    expect(latestFeatureCall?.[1]).toMatchObject({
-      headers: {
-        'X-GOAT-API-Key': 'secret-rotated',
-        'X-GOAT-Owner-Id': 'owner-rotated',
-      },
-    })
-  })
-
-  it('keeps plan mode disabled when backend capability discovery says it is unavailable', async () => {
-    const mockedFetch = buildFetchMock()
-    vi.stubGlobal('fetch', mockedFetch)
-
-    renderApp()
-    await waitForStartupFetches(mockedFetch)
-
-    fireEvent.click(screen.getByTitle(/open upload and planning actions/i))
-
-    const planModeSwitch = screen.getByRole('switch', { name: /plan mode unavailable/i })
-    expect(planModeSwitch).toBeDisabled()
-    expect(screen.getByText('Disabled in this deployment configuration')).toBeInTheDocument()
-
-    fireEvent.change(screen.getByPlaceholderText('Message GOAT'), {
-      target: { value: 'Tell me something careful' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
-
-    await waitFor(() => {
-      expect(findCall(mockedFetch, CHAT_URL)).toBeTruthy()
-    })
-
-    const chatCall = findCall(mockedFetch, CHAT_URL)
-    const requestBody = JSON.parse(String(chatCall?.[1]?.body ?? '{}')) as {
-      plan_mode?: boolean
-    }
-    expect(requestBody.plan_mode).toBe(false)
-    expect(screen.queryByRole('button', { name: /plan enabled/i })).not.toBeInTheDocument()
+    expect(localStorage.getItem('goat-ai-messages')).toBeNull()
+    expect(localStorage.getItem('goat-ai-session-id')).toBeNull()
   })
 })

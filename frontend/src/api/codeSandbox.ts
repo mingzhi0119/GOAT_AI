@@ -1,5 +1,6 @@
 import { buildApiHeaders } from './auth'
 import { buildApiErrorMessage } from './errors'
+import { fetchApi } from './http'
 import {
   parseCodeSandboxExecutionEventsResponse,
   parseCodeSandboxLogStreamEvent,
@@ -25,9 +26,9 @@ function emitParsedEvent(line: string, onEvent: (event: CodeSandboxLogStreamEven
 export async function executeCodeSandbox(
   request: CodeSandboxExecRequest,
 ): Promise<CodeSandboxExecutionResponse> {
-  const resp = await fetch(buildApiUrl('/code-sandbox/exec'), {
+  const resp = await fetchApi('/code-sandbox/exec', {
     method: 'POST',
-    headers: buildApiHeaders({ 'Content-Type': 'application/json' }),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
   })
   if (!resp.ok) throw new Error(await buildApiErrorMessage(resp, 'Code sandbox API'))
@@ -37,9 +38,7 @@ export async function executeCodeSandbox(
 export async function fetchCodeSandboxExecution(
   executionId: string,
 ): Promise<CodeSandboxExecutionResponse> {
-  const resp = await fetch(buildApiUrl(`/code-sandbox/executions/${executionId}`), {
-    headers: buildApiHeaders(),
-  })
+  const resp = await fetchApi(`/code-sandbox/executions/${executionId}`)
   if (!resp.ok) throw new Error(await buildApiErrorMessage(resp, 'Code sandbox API'))
   return parseCodeSandboxExecutionResponse(await resp.json())
 }
@@ -47,9 +46,7 @@ export async function fetchCodeSandboxExecution(
 export async function fetchCodeSandboxExecutionEvents(
   executionId: string,
 ): Promise<CodeSandboxExecutionEventsResponse> {
-  const resp = await fetch(buildApiUrl(`/code-sandbox/executions/${executionId}/events`), {
-    headers: buildApiHeaders(),
-  })
+  const resp = await fetchApi(`/code-sandbox/executions/${executionId}/events`)
   if (!resp.ok) throw new Error(await buildApiErrorMessage(resp, 'Code sandbox API'))
   return parseCodeSandboxExecutionEventsResponse(await resp.json())
 }
@@ -76,6 +73,7 @@ export function openCodeSandboxLogStream(
   void (async () => {
     try {
       const resp = await fetch(url.toString(), {
+        credentials: 'same-origin',
         headers: buildApiHeaders(),
         signal: controller.signal,
       })

@@ -6,6 +6,122 @@
     "version": "1.3.0"
   },
   "paths": {
+    "/api/auth/session": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Read browser shared-access session state",
+        "operationId": "get_shared_access_session_api_auth_session_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedAccessSessionResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Create a browser shared-access session",
+        "operationId": "login_shared_access_api_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SharedAccessLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedAccessSessionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Clear the browser shared-access session",
+        "operationId": "logout_shared_access_api_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
     "/api/models": {
       "get": {
         "tags": [
@@ -5053,6 +5169,52 @@
         "title": "RuntimeTargetResponse",
         "description": "Resolved runtime target metadata used by deploy/ops tooling."
       },
+      "SharedAccessLoginRequest": {
+        "properties": {
+          "password": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "password"
+        ],
+        "title": "SharedAccessLoginRequest",
+        "description": "Password payload for POST /api/auth/login."
+      },
+      "SharedAccessSessionResponse": {
+        "properties": {
+          "auth_required": {
+            "type": "boolean",
+            "title": "Auth Required"
+          },
+          "authenticated": {
+            "type": "boolean",
+            "title": "Authenticated"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "auth_required",
+          "authenticated"
+        ],
+        "title": "SharedAccessSessionResponse",
+        "description": "Browser-session status for the public shared-password gate."
+      },
       "SystemFeaturesResponse": {
         "properties": {
           "code_sandbox": {
@@ -5780,6 +5942,10 @@
     {
       "name": "system",
       "description": "Health and server telemetry endpoints."
+    },
+    {
+      "name": "auth",
+      "description": "Shared browser-access session endpoints for public deployments."
     },
     {
       "name": "models",

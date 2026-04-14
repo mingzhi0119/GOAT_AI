@@ -1,5 +1,5 @@
 import { useId, useRef, type FC } from 'react'
-import type { DesktopDiagnostics } from '../api/types'
+import type { BrowserAuthSession, DesktopDiagnostics } from '../api/types'
 import { useTopBarPanels } from '../hooks/useTopBarPanels'
 import type { ChatLayoutMode } from '../utils/chatLayout'
 import { ConversationActionsMenu, SettingsPanel } from './TopBarPanels'
@@ -34,6 +34,9 @@ interface Props {
   topP: number
   onTopPChange: (v: number) => void
   onResetAdvanced: () => void
+  sharedAccessSession: BrowserAuthSession | null
+  isSigningOut: boolean
+  onLogout: () => Promise<void>
 }
 
 interface CapabilityItem {
@@ -184,6 +187,9 @@ const TopBar: FC<Props> = ({
   topP,
   onTopPChange,
   onResetAdvanced,
+  sharedAccessSession,
+  isSigningOut,
+  onLogout,
 }) => {
   const panelBoundaryRef = useRef<HTMLDivElement>(null)
   const actionsTriggerRef = useRef<HTMLButtonElement | null>(null)
@@ -317,6 +323,9 @@ const TopBar: FC<Props> = ({
                 onTopPChange={onTopPChange}
                 onResetAdvanced={onResetAdvanced}
                 onOpenAppearance={onOpenAppearance}
+                sharedAccessSession={sharedAccessSession}
+                isSigningOut={isSigningOut}
+                onLogout={onLogout}
                 onClose={closeActivePanel}
               />
             )}

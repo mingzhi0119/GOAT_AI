@@ -66,6 +66,9 @@ describe('TopBarPanels', () => {
         onMaxTokensChange={onMaxTokensChange}
         onTopPChange={onTopPChange}
         onResetAdvanced={onResetAdvanced}
+        sharedAccessSession={null}
+        isSigningOut={false}
+        onLogout={vi.fn()}
         onOpenAppearance={onOpenAppearance}
         onClose={onClose}
       />,
@@ -136,6 +139,9 @@ describe('TopBarPanels', () => {
         onMaxTokensChange={vi.fn()}
         onTopPChange={vi.fn()}
         onResetAdvanced={vi.fn()}
+        sharedAccessSession={null}
+        isSigningOut={false}
+        onLogout={vi.fn()}
         onOpenAppearance={vi.fn()}
         onClose={vi.fn()}
       />,
@@ -183,6 +189,9 @@ describe('TopBarPanels', () => {
         onMaxTokensChange={vi.fn()}
         onTopPChange={vi.fn()}
         onResetAdvanced={vi.fn()}
+        sharedAccessSession={null}
+        isSigningOut={false}
+        onLogout={vi.fn()}
         onOpenAppearance={vi.fn()}
         onClose={vi.fn()}
       />,
@@ -217,6 +226,9 @@ describe('TopBarPanels', () => {
         onMaxTokensChange={vi.fn()}
         onTopPChange={vi.fn()}
         onResetAdvanced={vi.fn()}
+        sharedAccessSession={null}
+        isSigningOut={false}
+        onLogout={vi.fn()}
         onOpenAppearance={vi.fn()}
         onClose={onClose}
       />,
@@ -234,5 +246,48 @@ describe('TopBarPanels', () => {
 
     fireEvent.keyDown(screen.getByRole('dialog', { name: /settings/i }), { key: 'Escape' })
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('replaces protected access inputs with shared session controls when browser auth is required', () => {
+    const onLogout = vi.fn()
+
+    render(
+      <SettingsPanel
+        panelId="settings-panel"
+        triggerId="settings-trigger"
+        appearanceSummary="Classic System"
+        advancedOpen={false}
+        apiKey="secret-123"
+        ownerId="alice"
+        systemInstruction=""
+        temperature={0.7}
+        maxTokens={1024}
+        topP={0.9}
+        onApiKeyChange={vi.fn()}
+        onOwnerIdChange={vi.fn()}
+        onSystemInstructionChange={vi.fn()}
+        onAdvancedOpenChange={vi.fn()}
+        onTemperatureChange={vi.fn()}
+        onMaxTokensChange={vi.fn()}
+        onTopPChange={vi.fn()}
+        onResetAdvanced={vi.fn()}
+        sharedAccessSession={{
+          auth_required: true,
+          authenticated: true,
+          expires_at: '2026-05-13T20:00:00Z',
+        }}
+        isSigningOut={false}
+        onLogout={onLogout}
+        onOpenAppearance={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Session')).toBeInTheDocument()
+    expect(screen.queryByLabelText('API key')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Owner ID')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /logout/i }))
+    expect(onLogout).toHaveBeenCalled()
   })
 })

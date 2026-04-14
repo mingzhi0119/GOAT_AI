@@ -232,6 +232,9 @@ class Settings:
     api_key: str = ""
     api_key_write: str = ""
     api_credentials_json: str = ""
+    shared_access_password: str = ""
+    shared_access_session_secret: str = ""
+    shared_access_session_ttl_sec: int = 60 * 60 * 24 * 30
     require_session_owner: bool = False
     rate_limit_window_sec: int = 60
     rate_limit_max_requests: int = 60
@@ -288,6 +291,10 @@ class Settings:
     @property
     def user_facing_error(self) -> str:
         return USER_FACING_ERROR
+
+    @property
+    def shared_access_enabled(self) -> bool:
+        return bool(self.shared_access_password.strip())
 
 
 def resolve_localhost_sandbox_shell(settings: Settings) -> str | None:
@@ -549,9 +556,23 @@ def load_settings() -> Settings:
     _api_key = os.environ.get("GOAT_API_KEY", "").strip()
     _api_key_write = os.environ.get("GOAT_API_KEY_WRITE", "").strip()
     _api_credentials_json = os.environ.get("GOAT_API_CREDENTIALS_JSON", "").strip()
+    _shared_access_password = os.environ.get("GOAT_SHARED_ACCESS_PASSWORD", "").strip()
+    _shared_access_session_secret = os.environ.get(
+        "GOAT_SHARED_ACCESS_SESSION_SECRET", ""
+    ).strip()
+    _shared_access_session_ttl_sec = int(
+        os.environ.get("GOAT_SHARED_ACCESS_SESSION_TTL_SEC", str(60 * 60 * 24 * 30))
+    )
     if _api_key_write and not _api_key:
         raise ValueError(
             "GOAT_API_KEY_WRITE requires GOAT_API_KEY (read key) to be set."
+        )
+    if _shared_access_session_ttl_sec < 1:
+        raise ValueError("GOAT_SHARED_ACCESS_SESSION_TTL_SEC must be >= 1")
+    if _shared_access_password and not _shared_access_session_secret:
+        raise ValueError(
+            "GOAT_SHARED_ACCESS_SESSION_SECRET is required when "
+            "GOAT_SHARED_ACCESS_PASSWORD is set."
         )
     log_db_path = _resolve_env_path(
         os.environ.get("GOAT_LOG_PATH", str(_default_log_db)),
@@ -616,6 +637,9 @@ def load_settings() -> Settings:
         api_key=_api_key,
         api_key_write=_api_key_write,
         api_credentials_json=_api_credentials_json,
+        shared_access_password=_shared_access_password,
+        shared_access_session_secret=_shared_access_session_secret,
+        shared_access_session_ttl_sec=_shared_access_session_ttl_sec,
         require_session_owner=_env_bool("GOAT_REQUIRE_SESSION_OWNER", "false"),
         rate_limit_window_sec=_rate_limit_window_sec,
         rate_limit_max_requests=_rate_limit_max_requests,

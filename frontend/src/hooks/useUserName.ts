@@ -25,3 +25,7 @@ export function useUserName(): UseUserNameReturn {
 
   return { userName, setUserName }
 }
+
+export function clearStoredUserName(): void {
+  localStorage.removeItem(STORAGE_KEY)
+}

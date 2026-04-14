@@ -1,8 +1,7 @@
-import { buildApiHeaders } from './auth'
 import { buildApiErrorMessage } from './errors'
+import { fetchApi } from './http'
 import { parseChatStreamEvent } from './runtimeSchemas'
 import type { ChatRequest, ChatStreamEvent } from './types'
-import { buildApiUrl } from './urls'
 
 export interface StreamChatOptions {
   signal?: AbortSignal
@@ -30,12 +29,12 @@ export async function* streamChat(
   req: ChatRequest,
   options?: StreamChatOptions,
 ): AsyncGenerator<ChatStreamEvent> {
-  const headers = buildApiHeaders({ 'Content-Type': 'application/json' })
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (options?.userName) headers['X-User-Name'] = options.userName
 
   let resp: Response
   try {
-    resp = await fetch(buildApiUrl('/chat'), {
+    resp = await fetchApi('/chat', {
       method: 'POST',
       headers,
       body: JSON.stringify(req),

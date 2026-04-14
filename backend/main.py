@@ -16,6 +16,7 @@ from backend.domain.rate_limit_policy import RateLimitPolicy
 from backend.platform.exception_handlers import register_exception_handlers
 from backend.platform.http_security import register_http_security
 from backend.routers import (
+    auth,
     artifacts,
     chat,
     code_sandbox,
@@ -56,6 +57,10 @@ DIST = Path(__file__).parent.parent / "frontend" / "dist"
 APP_VERSION = "1.3.0"
 OPENAPI_TAGS = [
     {"name": "system", "description": "Health and server telemetry endpoints."},
+    {
+        "name": "auth",
+        "description": "Shared browser-access session endpoints for public deployments.",
+    },
     {
         "name": "models",
         "description": "Model discovery endpoints for Ollama-backed chat.",
@@ -145,6 +150,7 @@ def _configure_runtime_services(settings: Settings) -> None:
 
 
 def _register_routes(app: FastAPI) -> None:
+    app.include_router(auth.router, prefix="/api", tags=["auth"])
     app.include_router(models.router, prefix="/api", tags=["models"])
     app.include_router(chat.router, prefix="/api", tags=["chat"])
     app.include_router(upload.router, prefix="/api", tags=["upload"])
