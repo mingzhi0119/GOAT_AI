@@ -48,8 +48,9 @@ describe('code sandbox api', () => {
       buildApiUrl('/code-sandbox/exec'),
       expect.objectContaining({
         method: 'POST',
+        credentials: 'same-origin',
         headers: {
-          'Content-Type': 'application/json',
+          'content-type': 'application/json',
           'X-GOAT-API-Key': 'secret-123',
           'X-GOAT-Owner-Id': 'alice',
         },
@@ -125,20 +126,22 @@ describe('code sandbox api', () => {
       1,
       buildApiUrl('/code-sandbox/executions/cs-1'),
       {
-      headers: {
-        'X-GOAT-API-Key': 'secret-123',
-        'X-GOAT-Owner-Id': 'alice',
-      },
+        credentials: 'same-origin',
+        headers: {
+          'X-GOAT-API-Key': 'secret-123',
+          'X-GOAT-Owner-Id': 'alice',
+        },
       },
     )
     expect(mockedFetch).toHaveBeenNthCalledWith(
       2,
       buildApiUrl('/code-sandbox/executions/cs-1/events'),
       {
-      headers: {
-        'X-GOAT-API-Key': 'secret-123',
-        'X-GOAT-Owner-Id': 'alice',
-      },
+        credentials: 'same-origin',
+        headers: {
+          'X-GOAT-API-Key': 'secret-123',
+          'X-GOAT-Owner-Id': 'alice',
+        },
       },
     )
   })

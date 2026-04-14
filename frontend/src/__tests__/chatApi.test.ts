@@ -85,11 +85,12 @@ describe('chat api', () => {
       buildApiUrl('/chat'),
       expect.objectContaining({
         method: 'POST',
+        credentials: 'same-origin',
         headers: {
-          'Content-Type': 'application/json',
+          'content-type': 'application/json',
           'X-GOAT-API-Key': 'secret-123',
           'X-GOAT-Owner-Id': 'alice',
-          'X-User-Name': 'Simon',
+          'x-user-name': 'Simon',
         },
       }),
     )

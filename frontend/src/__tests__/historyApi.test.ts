@@ -32,12 +32,16 @@ describe('history api', () => {
 
     const sessions = await fetchHistory()
     expect(sessions).toHaveLength(1)
-    expect(mockedFetch).toHaveBeenCalledWith(buildApiUrl('/history'), {
-      headers: {
-        'X-GOAT-API-Key': 'secret-123',
-        'X-GOAT-Owner-Id': 'alice',
-      },
-    })
+    expect(mockedFetch).toHaveBeenCalledWith(
+      buildApiUrl('/history'),
+      expect.objectContaining({
+        credentials: 'same-origin',
+        headers: {
+          'X-GOAT-API-Key': 'secret-123',
+          'X-GOAT-Owner-Id': 'alice',
+        },
+      }),
+    )
   })
 
   it('fetches single session detail', async () => {
@@ -121,12 +125,16 @@ describe('history api', () => {
         download_url: '/api/artifacts/art-1',
       },
     ])
-    expect(mockedFetch).toHaveBeenCalledWith(buildApiUrl('/history/s1'), {
-      headers: {
-        'X-GOAT-API-Key': 'secret-123',
-        'X-GOAT-Owner-Id': 'alice',
-      },
-    })
+    expect(mockedFetch).toHaveBeenCalledWith(
+      buildApiUrl('/history/s1'),
+      expect.objectContaining({
+        credentials: 'same-origin',
+        headers: {
+          'X-GOAT-API-Key': 'secret-123',
+          'X-GOAT-Owner-Id': 'alice',
+        },
+      }),
+    )
   })
 
   it('keeps an empty history list when sessions is omitted', async () => {
@@ -198,13 +206,17 @@ describe('history api', () => {
     vi.stubGlobal('fetch', mockedFetch)
 
     await deleteSession('abc')
-    expect(mockedFetch).toHaveBeenCalledWith(buildApiUrl('/history/abc'), {
-      method: 'DELETE',
-      headers: {
-        'X-GOAT-API-Key': 'secret-123',
-        'X-GOAT-Owner-Id': 'alice',
-      },
-    })
+    expect(mockedFetch).toHaveBeenCalledWith(
+      buildApiUrl('/history/abc'),
+      expect.objectContaining({
+        method: 'DELETE',
+        credentials: 'same-origin',
+        headers: {
+          'X-GOAT-API-Key': 'secret-123',
+          'X-GOAT-Owner-Id': 'alice',
+        },
+      }),
+    )
   })
 
   it('deletes all sessions', async () => {
@@ -214,13 +226,17 @@ describe('history api', () => {
     vi.stubGlobal('fetch', mockedFetch)
 
     await deleteAllSessions()
-    expect(mockedFetch).toHaveBeenCalledWith(buildApiUrl('/history'), {
-      method: 'DELETE',
-      headers: {
-        'X-GOAT-API-Key': 'secret-123',
-        'X-GOAT-Owner-Id': 'alice',
-      },
-    })
+    expect(mockedFetch).toHaveBeenCalledWith(
+      buildApiUrl('/history'),
+      expect.objectContaining({
+        method: 'DELETE',
+        credentials: 'same-origin',
+        headers: {
+          'X-GOAT-API-Key': 'secret-123',
+          'X-GOAT-Owner-Id': 'alice',
+        },
+      }),
+    )
   })
 
   it('renames a session', async () => {
@@ -230,14 +246,18 @@ describe('history api', () => {
     vi.stubGlobal('fetch', mockedFetch)
 
     await renameSession('abc', 'New title')
-    expect(mockedFetch).toHaveBeenCalledWith(buildApiUrl('/history/abc'), {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-GOAT-API-Key': 'secret-123',
-        'X-GOAT-Owner-Id': 'alice',
-      },
-      body: JSON.stringify({ title: 'New title' }),
-    })
+    expect(mockedFetch).toHaveBeenCalledWith(
+      buildApiUrl('/history/abc'),
+      expect.objectContaining({
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: {
+          'X-GOAT-API-Key': 'secret-123',
+          'X-GOAT-Owner-Id': 'alice',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ title: 'New title' }),
+      }),
+    )
   })
 })

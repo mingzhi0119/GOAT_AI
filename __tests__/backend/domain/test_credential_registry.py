@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from backend.domain.credential_registry import (
+    build_local_authorization_context,
     load_api_credentials,
     resolve_authorization_context,
     resolve_credential,
@@ -31,6 +32,14 @@ def _settings(**overrides: object) -> Settings:
 
 
 class CredentialRegistryTests(unittest.TestCase):
+    def test_build_local_authorization_context_preserves_owner_when_provided(
+        self,
+    ) -> None:
+        ctx = build_local_authorization_context(legacy_owner_id="alice")
+
+        self.assertEqual("alice", ctx.legacy_owner_id)
+        self.assertEqual("principal:local-noauth", ctx.principal_id.value)
+
     def test_env_fallback_builds_default_credentials(self) -> None:
         settings = _settings(api_key="read-key", api_key_write="write-key")
         credentials = load_api_credentials(settings)

@@ -33,6 +33,7 @@ describe('media api', () => {
       buildApiUrl('/media/uploads'),
       expect.objectContaining({
         method: 'POST',
+        credentials: 'same-origin',
         headers: {
           'X-GOAT-API-Key': 'secret-123',
           'X-GOAT-Owner-Id': 'alice',

@@ -2,6 +2,14 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import TopBar from '../components/TopBar'
 
+function buildSharedAccessProps() {
+  return {
+    sharedAccessSession: null,
+    isSigningOut: false,
+    onLogout: vi.fn(),
+  }
+}
+
 function renderTopBar() {
   const onOpenAppearance = vi.fn()
   const onRenameConversation = vi.fn()
@@ -42,6 +50,7 @@ function renderTopBar() {
       topP={0.9}
       onTopPChange={onTopPChange}
       onResetAdvanced={onResetAdvanced}
+      {...buildSharedAccessProps()}
     />,
   )
 
@@ -139,6 +148,7 @@ describe('TopBar options callout', () => {
         topP={0.9}
         onTopPChange={vi.fn()}
         onResetAdvanced={vi.fn()}
+        {...buildSharedAccessProps()}
       />,
     )
 
@@ -280,6 +290,7 @@ describe('TopBar options callout', () => {
         topP={0.9}
         onTopPChange={vi.fn()}
         onResetAdvanced={vi.fn()}
+        {...buildSharedAccessProps()}
       />,
     )
 
@@ -334,6 +345,7 @@ describe('TopBar options callout', () => {
         topP={0.9}
         onTopPChange={vi.fn()}
         onResetAdvanced={vi.fn()}
+        {...buildSharedAccessProps()}
       />,
     )
 

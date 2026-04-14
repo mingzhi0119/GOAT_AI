@@ -31,6 +31,7 @@ Last updated: 2026-04-13
 ### Sessions, artifacts, and authorization
 
 - persisted session history with `session_messages` normalization and legacy compatibility
+- public browser deployments can now require one shared site password while isolating history, artifacts, and related owner-scoped reads per browser through a signed HttpOnly session cookie
 - generated chat artifacts served from persisted artifact ids while keeping `download_url` on the stable `/api/artifacts/{artifact_id}` contract
 - chat prompting now teaches text-first downloadable exports such as Markdown by requiring exactly one inline filename link (for example `[brief.md](brief.md)`) when the user asks for a file to download
 - generated artifacts, media attachments, and future workspace-export blobs now resolve through the configured object store (`local` by default, `s3` optional)

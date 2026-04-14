@@ -16,6 +16,8 @@ except ImportError:  # pragma: no cover
     TestClient = None  # type: ignore[assignment]
 
 from backend.api_errors import (
+    AUTH_INVALID_ACCESS_PASSWORD,
+    AUTH_LOGIN_REQUIRED,
     AUTH_SESSION_OWNER_REQUIRED,
     AUTH_WRITE_KEY_REQUIRED,
     FEATURE_DISABLED,
@@ -782,6 +784,161 @@ class ApiAuthzTests(unittest.TestCase):
             headers={"X-GOAT-API-Key": "write-key", "X-GOAT-Owner-Id": "bob"},
         )
         self.assertEqual(404, retry_response.status_code)
+
+
+@unittest.skipUnless(TestClient is not None, "fastapi not installed")
+class SharedAccessApiAuthzTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        root = Path(self.tmpdir.name)
+        self.settings = Settings(
+            ollama_base_url="http://127.0.0.1:11434",
+            generate_timeout=120,
+            max_upload_mb=20,
+            max_upload_bytes=20 * 1024 * 1024,
+            max_dataframe_rows=50000,
+            use_chat_api=True,
+            system_prompt="test system prompt",
+            app_root=root,
+            logo_svg=root / "logo.svg",
+            log_db_path=root / "chat_logs.db",
+            data_dir=root / "data",
+            object_store_root=root / "object-store",
+            shared_access_password="goat-shared",
+            shared_access_session_secret="shared-secret",
+            ready_skip_ollama_probe=True,
+        )
+        log_service.init_db(self.settings.log_db_path)
+
+        app = create_app()
+        app.dependency_overrides[get_settings] = lambda: self.settings
+        app.dependency_overrides[get_llm_client] = lambda: ContractFakeLLM()
+        app.dependency_overrides[get_title_generator] = lambda: FakeTitleGenerator()
+        self.client = TestClient(app, base_url="https://testserver")
+        self.other_client = TestClient(app, base_url="https://testserver")
+
+    def tearDown(self) -> None:
+        self.client.close()
+        self.other_client.close()
+        self.tmpdir.cleanup()
+
+    def _login(self, client: TestClient) -> None:
+        response = client.post("/api/auth/login", json={"password": "goat-shared"})
+        self.assertEqual(200, response.status_code)
+        self.assertTrue(response.json()["authenticated"])
+
+    def test_shared_access_requires_login_for_history(self) -> None:
+        session = self.client.get("/api/auth/session")
+        self.assertEqual(200, session.status_code)
+        self.assertEqual(
+            {
+                "auth_required": True,
+                "authenticated": False,
+                "expires_at": None,
+            },
+            session.json(),
+        )
+        self.assertEqual("no-store", session.headers["cache-control"])
+        self.assertIn("Cookie", session.headers["vary"])
+
+        history = self.client.get("/api/history")
+        self.assertEqual(401, history.status_code)
+        self.assertEqual(AUTH_LOGIN_REQUIRED, history.json()["code"])
+        self.assertEqual("no-store", history.headers["cache-control"])
+        self.assertIn("Cookie", history.headers["vary"])
+
+    def test_shared_access_rejects_invalid_password(self) -> None:
+        response = self.client.post(
+            "/api/auth/login",
+            json={"password": "wrong-password"},
+        )
+
+        self.assertEqual(401, response.status_code)
+        self.assertEqual(AUTH_INVALID_ACCESS_PASSWORD, response.json()["code"])
+
+    def test_shared_access_browser_sessions_isolate_history(self) -> None:
+        self._login(self.client)
+        self._login(self.other_client)
+
+        first = self.client.post(
+            "/api/chat",
+            json={
+                "model": "blackbox-model",
+                "session_id": "shared-a",
+                "messages": [{"role": "user", "content": "hello from a"}],
+            },
+        )
+        second = self.other_client.post(
+            "/api/chat",
+            json={
+                "model": "blackbox-model",
+                "session_id": "shared-b",
+                "messages": [{"role": "user", "content": "hello from b"}],
+            },
+        )
+        self.assertEqual(200, first.status_code)
+        self.assertEqual(200, second.status_code)
+
+        first_history = self.client.get("/api/history")
+        second_history = self.other_client.get("/api/history")
+        self.assertEqual(
+            ["shared-a"],
+            [item["id"] for item in first_history.json()["sessions"]],
+        )
+        self.assertEqual(
+            ["shared-b"],
+            [item["id"] for item in second_history.json()["sessions"]],
+        )
+        self.assertEqual(404, self.client.get("/api/history/shared-b").status_code)
+        self.assertEqual(
+            404, self.other_client.get("/api/history/shared-a").status_code
+        )
+
+    def test_shared_access_logout_revokes_browser_history_access(self) -> None:
+        self._login(self.client)
+
+        logout = self.client.post("/api/auth/logout")
+        self.assertEqual(204, logout.status_code)
+
+        history = self.client.get("/api/history")
+        session = self.client.get("/api/auth/session")
+        self.assertEqual(401, history.status_code)
+        self.assertEqual(AUTH_LOGIN_REQUIRED, history.json()["code"])
+        self.assertFalse(session.json()["authenticated"])
+
+    def test_shared_access_cookie_scopes_artifact_downloads(self) -> None:
+        self._login(self.client)
+        self._login(self.other_client)
+
+        create = self.client.post(
+            "/api/chat",
+            json={
+                "model": "blackbox-model",
+                "session_id": "artifact-shared-1",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Create a downloadable file with a short brief.",
+                    }
+                ],
+            },
+        )
+        self.assertEqual(200, create.status_code)
+        artifact = next(
+            event
+            for event in parse_sse_payloads(create.text)
+            if event.get("type") == "artifact"
+        )
+
+        denied = self.other_client.get(artifact["download_url"])
+        allowed = self.client.get(artifact["download_url"])
+
+        self.assertEqual(404, denied.status_code)
+        self.assertEqual(200, allowed.status_code)
+        self.assertEqual(
+            'attachment; filename="brief.md"',
+            allowed.headers["content-disposition"],
+        )
 
 
 if __name__ == "__main__":

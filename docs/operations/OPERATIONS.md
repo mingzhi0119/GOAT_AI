@@ -69,10 +69,14 @@ npm run bundle:check
 npm run dev
 ```
 
-If the backend is protected with `GOAT_API_KEY` or `GOAT_REQUIRE_SESSION_OWNER=1`,
-open the browser UI settings menu and populate `Protected access` with the shared
-API key and, when required, the owner ID. The SPA stores those values locally in
-the browser and attaches `X-GOAT-API-Key` / `X-GOAT-Owner-Id` to runtime API calls.
+If the backend is protected with `GOAT_API_KEY` or `GOAT_REQUIRE_SESSION_OWNER=1`
+and shared browser access is disabled, open the browser UI settings menu and
+populate `Protected access` with the shared API key and, when required, the
+owner ID. The SPA stores those values locally in the browser and attaches
+`X-GOAT-API-Key` / `X-GOAT-Owner-Id` to runtime API calls.
+If `GOAT_SHARED_ACCESS_PASSWORD` is enabled, the browser UI instead shows a
+shared site-password gate and stores access in an HttpOnly signed cookie; the
+public UI no longer needs a manually entered owner id.
 Frontend API contract types are generated from `docs/api/openapi.json`; refresh them
 with `npm run contract:generate` whenever the backend contract changes.
 `npm run depcruise` exercises the frontend-only import-direction and cycle guardrails for
@@ -244,6 +248,8 @@ When the frontend is hosted on Vercel and FastAPI remains on a Linux host, use
 [VERCEL_FRONTEND_DEPLOY.md](VERCEL_FRONTEND_DEPLOY.md) as the canonical runbook.
 That path keeps browser requests same-origin at `goat-dev.vercel.app/api/*` and lets
 Vercel rewrite `/api/*` to `https://goat-api.duckdns.org/api/*`.
+For the public site, enable shared browser access on the backend instead of
+publishing `X-GOAT-Owner-Id` controls in the browser UI.
 
 ## Deployment profiles
 
@@ -311,6 +317,9 @@ live in the configured bucket/prefix while SQLite metadata remains local.
 | `GOAT_API_KEY` | Protect non-health APIs via `X-GOAT-API-Key` | empty |
 | `GOAT_API_KEY_WRITE` | Optional second key: `GET`/`HEAD`/`OPTIONS` may use read key (`GOAT_API_KEY`); other methods require this write key when set | empty |
 | `GOAT_API_CREDENTIALS_JSON` | Optional JSON credential registry; each entry may provide `secret` or `secret_sha256`, and when empty the app derives default read/write credentials from `GOAT_API_KEY` and `GOAT_API_KEY_WRITE` | empty |
+| `GOAT_SHARED_ACCESS_PASSWORD` | Optional site password for public browser deployments; when set, the SPA must log in via `/api/auth/login` before loading history/models/features | empty |
+| `GOAT_SHARED_ACCESS_SESSION_SECRET` | Required HMAC signing secret for `goat_access_session` cookies when `GOAT_SHARED_ACCESS_PASSWORD` is set | empty |
+| `GOAT_SHARED_ACCESS_SESSION_TTL_SEC` | Browser-session cookie TTL in seconds for shared browser access | `2592000` |
 | `GOAT_REQUIRE_SESSION_OWNER` | When `true`/`1`, chat and history routes require `X-GOAT-Owner-Id` (session scoping) | `false` |
 | `GOAT_RATE_LIMIT_WINDOW_SEC` | Rate limit window | `60` |
 | `GOAT_RATE_LIMIT_MAX_REQUESTS` | Max requests per window | `60` |
@@ -449,6 +458,55 @@ Example `GOAT_API_CREDENTIALS_JSON`:
   }
 ]
 ```
+
+### Shared browser access for public deployments
+
+Use this mode when a public browser deployment should stay behind one shared
+site password while still keeping chat history, artifacts, media, and other
+owner-scoped reads isolated per browser.
+
+Configuration:
+
+- set `GOAT_SHARED_ACCESS_PASSWORD` to the public site password
+- set `GOAT_SHARED_ACCESS_SESSION_SECRET` to a long random signing secret
+- optionally tune `GOAT_SHARED_ACCESS_SESSION_TTL_SEC` (default `2592000`, or 30 days)
+- keep `GOAT_API_KEY` / `GOAT_API_KEY_WRITE` only for scripts or operator paths that
+  still need header-based credentials
+
+Runtime behavior:
+
+- `GET /api/auth/session`, `POST /api/auth/login`, and `POST /api/auth/logout`
+  remain public so the SPA can bootstrap
+- successful login issues a host-only `goat_access_session` cookie with
+  `HttpOnly`, `Secure`, `SameSite=Lax`, and `Path=/`
+- each successful login creates a fresh browser-specific owner id and principal id
+- all other `/api` routes require either that cookie-backed browser session or a
+  valid API key
+- auth-sensitive `GET` routes and artifact downloads return
+  `Cache-Control: no-store` and `Vary: Cookie, X-GOAT-API-Key, X-GOAT-Owner-Id`
+
+Minimum rollout order:
+
+1. Set `GOAT_SHARED_ACCESS_PASSWORD`, `GOAT_SHARED_ACCESS_SESSION_SECRET`, and
+   optionally `GOAT_SHARED_ACCESS_SESSION_TTL_SEC`.
+2. Restart the backend.
+3. Verify:
+   - `curl -i https://<backend>/api/auth/session`
+   - expect `200` with `{"auth_required": true, "authenticated": false, ...}`
+4. Dry-run the ownerless history cleanup:
+
+   ```bash
+   python -m tools.ops.purge_ownerless_history
+   ```
+
+5. Execute the cleanup after reviewing the matched session ids:
+
+   ```bash
+   python -m tools.ops.purge_ownerless_history --execute
+   ```
+
+6. Smoke-test with two clean browser profiles using the same shared password and
+   confirm they cannot see each other's `/api/history` rows.
 
 ### Authorization audit events (historical authz 16C)
 

@@ -9,7 +9,11 @@ from fastapi import BackgroundTasks, Depends, HTTPException, Request
 
 from backend.domain.authz_types import AuthorizationContext
 from backend.domain.credential_registry import build_local_authorization_context
-from backend.api_errors import AUTH_INVALID_API_KEY, build_error_body
+from backend.api_errors import (
+    AUTH_INVALID_API_KEY,
+    AUTH_LOGIN_REQUIRED,
+    build_error_body,
+)
 from backend.platform.config import get_settings
 from backend.services.chat_runtime import (
     ConversationLogger,
@@ -215,8 +219,19 @@ def get_authorization_context(
     ctx = getattr(request.state, "authorization_context", None)
     if isinstance(ctx, AuthorizationContext):
         return ctx
+    if settings.shared_access_enabled:
+        raise HTTPException(
+            status_code=401,
+            detail=build_error_body(
+                detail="Shared access login required.",
+                code=AUTH_LOGIN_REQUIRED,
+                status_code=401,
+            ),
+        )
     if not settings.api_key:
-        return build_local_authorization_context()
+        return build_local_authorization_context(
+            legacy_owner_id=(request.headers.get("X-GOAT-Owner-Id") or "").strip()
+        )
     raise HTTPException(
         status_code=401,
         detail=build_error_body(

@@ -209,6 +209,8 @@ export interface DesktopDiagnostics {
   packaged_shell_log_path: string | null
 }
 
+export type BrowserAuthSession = ApiSchemas['SharedAccessSessionResponse']
+
 export type CodeSandboxRuntimePreset = CodeSandboxExecutionContract['runtime_preset']
 export type CodeSandboxExecutionStatus = CodeSandboxExecutionContract['status']
 export type CodeSandboxExecutionMode = CodeSandboxExecutionContract['execution_mode']

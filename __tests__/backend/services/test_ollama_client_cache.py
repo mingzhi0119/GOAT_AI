@@ -167,7 +167,7 @@ def test_describe_model_for_api_parses_context_length() -> None:
     fake_response.raise_for_status.return_value = None
 
     with patch("goat_ai.llm.ollama_client.requests.post", return_value=fake_response):
-        caps, ctx = service.describe_model_for_api("ctx-parse-model")
+        caps, ctx = service.describe_model_for_api("gemma4:26b")
 
     assert caps == ["completion"]
     assert ctx == 4096
@@ -186,8 +186,8 @@ def test_get_model_context_length_reuses_show_cache() -> None:
     with patch(
         "goat_ai.llm.ollama_client.requests.post", return_value=fake_response
     ) as post_mock:
-        assert service.get_model_capabilities("m") == ["completion"]
-        assert service.get_model_context_length("m") == 8192
+        assert service.get_model_capabilities("qwen3:4b") == ["completion"]
+        assert service.get_model_context_length("qwen3:4b") == 8192
 
     assert post_mock.call_count == 1
 

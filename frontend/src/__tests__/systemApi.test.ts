@@ -35,12 +35,16 @@ describe('system api', () => {
     vi.stubGlobal('fetch', mockedFetch)
     const payload = await fetchGpuStatus()
     expect(payload.available).toBe(true)
-    expect(mockedFetch).toHaveBeenCalledWith(buildApiUrl('/system/gpu'), {
-      headers: {
-        'X-GOAT-API-Key': 'secret-123',
-        'X-GOAT-Owner-Id': 'alice',
-      },
-    })
+    expect(mockedFetch).toHaveBeenCalledWith(
+      buildApiUrl('/system/gpu'),
+      expect.objectContaining({
+        credentials: 'same-origin',
+        headers: {
+          'X-GOAT-API-Key': 'secret-123',
+          'X-GOAT-Owner-Id': 'alice',
+        },
+      }),
+    )
   })
 
   it('fetches inference latency payload', async () => {
@@ -74,12 +78,16 @@ describe('system api', () => {
     vi.stubGlobal('fetch', mockedFetch)
     const payload = await fetchInferenceLatency()
     expect(payload.chat_sample_count).toBe(3)
-    expect(mockedFetch).toHaveBeenCalledWith(buildApiUrl('/system/inference'), {
-      headers: {
-        'X-GOAT-API-Key': 'secret-123',
-        'X-GOAT-Owner-Id': 'alice',
-      },
-    })
+    expect(mockedFetch).toHaveBeenCalledWith(
+      buildApiUrl('/system/inference'),
+      expect.objectContaining({
+        credentials: 'same-origin',
+        headers: {
+          'X-GOAT-API-Key': 'secret-123',
+          'X-GOAT-Owner-Id': 'alice',
+        },
+      }),
+    )
   })
 
   it('fetches system features payload', async () => {
@@ -154,12 +162,16 @@ describe('system api', () => {
     const payload = await fetchSystemFeatures()
     expect(payload.code_sandbox.policy_allowed).toBe(false)
     expect(payload.workbench.agent_tasks.effective_enabled).toBe(true)
-    expect(mockedFetch).toHaveBeenCalledWith(buildApiUrl('/system/features'), {
-      headers: {
-        'X-GOAT-API-Key': 'secret-123',
-        'X-GOAT-Owner-Id': 'alice',
-      },
-    })
+    expect(mockedFetch).toHaveBeenCalledWith(
+      buildApiUrl('/system/features'),
+      expect.objectContaining({
+        credentials: 'same-origin',
+        headers: {
+          'X-GOAT-API-Key': 'secret-123',
+          'X-GOAT-Owner-Id': 'alice',
+        },
+      }),
+    )
   })
 
   it('normalizes missing deny reasons in system feature payloads', async () => {
@@ -325,11 +337,15 @@ describe('system api', () => {
     const payload = await fetchDesktopDiagnostics()
     expect(payload.desktop_mode).toBe(true)
     expect(payload.packaged_shell_log_path).toContain('desktop-shell.log')
-    expect(mockedFetch).toHaveBeenCalledWith(buildApiUrl('/system/desktop'), {
-      headers: {
-        'X-GOAT-API-Key': 'secret-123',
-        'X-GOAT-Owner-Id': 'alice',
-      },
-    })
+    expect(mockedFetch).toHaveBeenCalledWith(
+      buildApiUrl('/system/desktop'),
+      expect.objectContaining({
+        credentials: 'same-origin',
+        headers: {
+          'X-GOAT-API-Key': 'secret-123',
+          'X-GOAT-Owner-Id': 'alice',
+        },
+      }),
+    )
   })
 })

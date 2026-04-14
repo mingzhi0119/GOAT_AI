@@ -79,6 +79,10 @@ function store(items: FileContextItem[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
 }
 
+export function clearStoredFileContext(): void {
+  localStorage.removeItem(STORAGE_KEY)
+}
+
 function matchIndex(items: FileContextItem[], next: FileContextUpdate): number {
   if (next.id) {
     const byId = items.findIndex(item => item.id === next.id)
@@ -168,7 +172,7 @@ export function useFileContext(): UseFileContextReturn {
 
   const clearFileContext = useCallback(() => {
     setFileContexts([])
-    localStorage.removeItem(STORAGE_KEY)
+    clearStoredFileContext()
   }, [])
 
   return {

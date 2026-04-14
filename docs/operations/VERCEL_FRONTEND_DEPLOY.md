@@ -10,6 +10,7 @@ on **Vercel** and the existing FastAPI backend stays on a Linux host behind
 - Backend origin: `https://goat-api.duckdns.org`
 - Browser API origin during runtime: `https://goat-dev.vercel.app/api/*`
 - Runtime proxy model: Vercel rewrites `/api/*` to `https://goat-api.duckdns.org/api/*`
+- Public browser auth model: one shared site password plus a signed browser-specific cookie
 
 This preserves the frontend's same-origin runtime posture without adding browser
 CORS complexity to chat, uploads, downloads, or SSE.
@@ -21,6 +22,8 @@ CORS complexity to chat, uploads, downloads, or SSE.
 - frontend runtime API calls now normalize to root-relative `/api/...` paths
 - `frontend/package.json` now uses `node: 24.x` so Vercel can satisfy the engine
   constraint without depending on a specific Node 24 minor
+- the SPA now bootstraps `GET /api/auth/session` before loading history/models/features
+  and shows a shared-password gate when the backend enables browser access control
 
 ## Vercel project setup
 
@@ -65,6 +68,17 @@ Point the backend hostname to the Linux host or its reverse proxy:
 
 Keep FastAPI/Uvicorn on the existing Linux host at `127.0.0.1:62606`, then place
 Nginx in front of it for `goat-api.duckdns.org`.
+
+Recommended backend auth env vars for the public site:
+
+```bash
+export GOAT_SHARED_ACCESS_PASSWORD='replace-with-a-site-password'
+export GOAT_SHARED_ACCESS_SESSION_SECRET='replace-with-a-long-random-signing-secret'
+export GOAT_SHARED_ACCESS_SESSION_TTL_SEC=2592000
+```
+
+Keep header-based API keys only for operator/script access; the public browser
+path should rely on the signed cookie flow instead of a visible owner id.
 
 Example Nginx server block:
 
@@ -129,13 +143,19 @@ npm run build
 Public deployment:
 
 1. `https://goat-api.duckdns.org/api/health` returns `200`.
-2. `https://goat-dev.vercel.app` loads and the browser can reach `GET /api/health`
+2. `https://goat-api.duckdns.org/api/auth/session` returns `200` with
+   `auth_required=true`.
+3. `https://goat-dev.vercel.app` loads and the browser can reach `GET /api/health`
    through the frontend origin.
-3. `POST /api/chat` from the frontend receives streamed `thinking` or `token`
+4. `POST /api/chat` from the frontend receives streamed `thinking` or `token`
    frames without proxy buffering delays.
-4. History load, upload, artifact download, and `/api/system/features` all work
-   through `goat-dev.vercel.app`.
-5. Preview deployments still proxy `/api/*` to `goat-api.duckdns.org` as intended.
+5. Anonymous `curl https://goat-dev.vercel.app/api/history` now returns `401`
+   with `code = AUTH_LOGIN_REQUIRED`.
+6. Two clean browser profiles can log in with the same shared site password but
+   only see their own history rows and artifact downloads.
+7. History load, upload, artifact download, and `/api/system/features` all work
+   through `goat-dev.vercel.app` after login.
+8. Preview deployments still proxy `/api/*` to `goat-api.duckdns.org` as intended.
 
 ## Rollback
 

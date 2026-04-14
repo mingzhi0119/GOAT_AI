@@ -34,3 +34,11 @@ export function useSystemInstruction(): UseSystemInstructionReturn {
 
   return { systemInstruction, setSystemInstruction }
 }
+
+export function clearStoredSystemInstruction(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+  } catch {
+    // localStorage may be unavailable
+  }
+}

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type {
+  BrowserAuthSession,
   ChatStreamEvent,
   CodeSandboxExecutionEventsResponse,
   CodeSandboxExecutionResponse,
@@ -181,6 +182,12 @@ const desktopDiagnosticsSchema = z.object({
   log_dir: optionalNullableStringSchema,
   log_db_path: optionalNullableStringSchema,
   packaged_shell_log_path: optionalNullableStringSchema,
+})
+
+const browserAuthSessionSchema: z.ZodType<BrowserAuthSession> = z.object({
+  auth_required: z.boolean(),
+  authenticated: z.boolean(),
+  expires_at: optionalNullableStringSchema,
 })
 
 const modelsResponseSchema = z.object({
@@ -416,6 +423,10 @@ export function parseInferenceLatencyResponse(payload: unknown): InferenceLatenc
 
 export function parseDesktopDiagnosticsResponse(payload: unknown): DesktopDiagnostics {
   return parseApiPayload(desktopDiagnosticsSchema, payload, 'Desktop diagnostics API')
+}
+
+export function parseBrowserAuthSessionResponse(payload: unknown): BrowserAuthSession {
+  return parseApiPayload(browserAuthSessionSchema, payload, 'Browser auth session API')
 }
 
 export function parseModelsResponse(payload: unknown): ModelsResponse {

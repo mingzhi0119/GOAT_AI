@@ -1,8 +1,15 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
+import type { BrowserAuthSession, RuntimeFeature } from './api/types'
+import ChatWindow from './components/ChatWindow'
+import { ErrorBoundary } from './components/ErrorBoundary'
+import SharedAccessLoginGate from './components/SharedAccessLoginGate'
+import Sidebar from './components/Sidebar'
+import TopBar from './components/TopBar'
 import { useBranding } from './config/branding'
 import { useAdvancedSettings } from './hooks/useAdvancedSettings'
 import { useAppearance } from './hooks/useAppearance'
 import { useApiKey } from './hooks/useApiKey'
+import { useBrowserAccessAuth } from './hooks/useBrowserAccessAuth'
 import { useChatLayoutMode } from './hooks/useChatLayoutMode'
 import { useChatSession } from './hooks/useChatSession'
 import { useChatShellActions } from './hooks/useChatShellActions'
@@ -10,18 +17,20 @@ import { useDesktopDiagnostics } from './hooks/useDesktopDiagnostics'
 import { useGpuStatus } from './hooks/useGpuStatus'
 import { useModels } from './hooks/useModels'
 import { useOwnerId } from './hooks/useOwnerId'
-import { useSystemInstruction } from './hooks/useSystemInstruction'
 import { useSystemFeatures } from './hooks/useSystemFeatures'
+import { useSystemInstruction } from './hooks/useSystemInstruction'
 import { useUserName } from './hooks/useUserName'
-import { getChatLayoutDecisions } from './utils/chatLayout'
 import { downloadChatAsMarkdown } from './utils/exportChatMarkdown'
-import type { RuntimeFeature } from './api/types'
-import ChatWindow from './components/ChatWindow'
-import { ErrorBoundary } from './components/ErrorBoundary'
-import Sidebar from './components/Sidebar'
-import TopBar from './components/TopBar'
+import { getChatLayoutDecisions } from './utils/chatLayout'
 
 const LazyAppearancePanel = lazy(() => import('./components/AppearancePanel'))
+
+interface AppShellProps {
+  appTitle: string
+  sharedAccessSession: BrowserAuthSession | null
+  isSigningOut: boolean
+  onLogout: () => Promise<void>
+}
 
 function describePlanModeAvailability(feature: RuntimeFeature | null): string {
   if (!feature) return 'Checking backend planning readiness'
@@ -36,14 +45,69 @@ function describePlanModeAvailability(feature: RuntimeFeature | null): string {
   return 'Backend planning runtime is unavailable on this deployment'
 }
 
-/** Root application: compose stateful controllers and render the shell UI. */
-export default function App() {
+function FullscreenStatus({
+  title,
+  message,
+  isBusy,
+  onRetry,
+}: {
+  title: string
+  message: string
+  isBusy?: boolean
+  onRetry: () => Promise<void>
+}) {
+  return (
+    <div
+      className="flex min-h-screen items-center justify-center px-4"
+      style={{ background: 'var(--bg-main)' }}
+    >
+      <div
+        className="w-full max-w-md rounded-[28px] border px-6 py-7 shadow-[0_18px_48px_var(--panel-shadow-color)]"
+        style={{
+          background: 'var(--composer-menu-bg-strong)',
+          borderColor: 'var(--input-border)',
+          color: 'var(--text-main)',
+          backdropFilter: 'blur(18px)',
+        }}
+      >
+        <p className="text-xs font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--text-muted)' }}>
+          GOAT startup
+        </p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em]">{title}</h1>
+        <p className="mt-3 text-sm leading-6" style={{ color: 'var(--text-muted)' }}>
+          {message}
+        </p>
+        <button
+          type="button"
+          className="mt-6 rounded-2xl border px-4 py-3 text-sm"
+          style={{
+            borderColor: 'var(--input-border)',
+            color: 'var(--text-main)',
+            opacity: isBusy ? 0.7 : 1,
+          }}
+          onClick={() => {
+            void onRetry()
+          }}
+          disabled={isBusy}
+        >
+          {isBusy ? 'Checking...' : 'Retry'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function AppShell({
+  appTitle,
+  sharedAccessSession,
+  isSigningOut,
+  onLogout,
+}: AppShellProps) {
   const [planModeEnabled, setPlanModeEnabled] = useState(false)
   const [reasoningLevel, setReasoningLevel] = useState<'low' | 'medium' | 'high'>('medium')
   const [thinkingEnabled, setThinkingEnabled] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [appearanceOpen, setAppearanceOpen] = useState(false)
-  const branding = useBranding()
   const { appearance, effectiveMode, appearanceSummary, updateAppearance, resetAppearance } =
     useAppearance()
   const models = useModels()
@@ -83,8 +147,8 @@ export default function App() {
   } = useChatShellActions(session)
 
   useEffect(() => {
-    document.title = branding.appTitle
-  }, [branding.appTitle])
+    document.title = appTitle
+  }, [appTitle])
 
   useEffect(() => {
     setSidebarOpen(chatLayout.sidebarBehavior === 'docked')
@@ -127,7 +191,7 @@ export default function App() {
         onRefreshHistory={handleRefreshHistory}
         onDeleteAllHistory={handleDeleteAllHistory}
       />
-      <div className="flex flex-col flex-1 min-w-0 min-h-0">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <TopBar
           sessionTitle={session.sessionTitle}
           hasSession={Boolean(session.sessionId)}
@@ -162,6 +226,9 @@ export default function App() {
           topP={advanced.topP}
           onTopPChange={advanced.setTopP}
           onResetAdvanced={advanced.resetAdvancedToDefaults}
+          sharedAccessSession={sharedAccessSession}
+          isSigningOut={isSigningOut}
+          onLogout={onLogout}
         />
         <ErrorBoundary>
           <ChatWindow
@@ -212,5 +279,55 @@ export default function App() {
         </Suspense>
       )}
     </div>
+  )
+}
+
+/** Root application: bootstrap browser auth first, then mount the shell. */
+export default function App() {
+  const branding = useBranding()
+  const auth = useBrowserAccessAuth()
+
+  if (auth.isLoading && auth.session === null) {
+    return (
+      <FullscreenStatus
+        title={branding.appTitle}
+        message="Checking browser access for this deployment."
+        isBusy={true}
+        onRetry={auth.refresh}
+      />
+    )
+  }
+
+  if (auth.session?.auth_required && !auth.session.authenticated) {
+    return (
+      <SharedAccessLoginGate
+        appTitle={branding.appTitle}
+        isLoading={auth.isLoading}
+        isSubmitting={auth.isSubmitting}
+        error={auth.error}
+        onLogin={auth.login}
+        onRetry={auth.refresh}
+      />
+    )
+  }
+
+  if (auth.session === null) {
+    return (
+      <FullscreenStatus
+        title={branding.appTitle}
+        message={auth.error ?? 'Unable to load this deployment right now.'}
+        onRetry={auth.refresh}
+      />
+    )
+  }
+
+  return (
+    <AppShell
+      key={auth.shellKey}
+      appTitle={branding.appTitle}
+      sharedAccessSession={auth.session}
+      isSigningOut={auth.isSubmitting}
+      onLogout={auth.logout}
+    />
   )
 }

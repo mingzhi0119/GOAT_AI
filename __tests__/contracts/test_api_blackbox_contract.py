@@ -616,6 +616,75 @@ class ApiBlackboxContractTests(unittest.TestCase):
             "AI service temporarily unavailable.", unavailable_events[0]["message"]
         )
 
+    def test_owner_header_filters_history_even_without_api_keys(self) -> None:
+        timestamp = "2026-04-13T12:00:00+00:00"
+        payload = {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "hello",
+                    "image_attachment_ids": [],
+                    "artifacts": [],
+                },
+                {
+                    "role": "assistant",
+                    "content": "world",
+                    "image_attachment_ids": [],
+                    "artifacts": [],
+                },
+            ],
+            "chart_spec": None,
+            "knowledge_documents": [],
+            "chart_data_source": "none",
+        }
+        log_service.upsert_session(
+            db_path=self.settings.log_db_path,
+            session_id="owner-a",
+            title="Owner A",
+            model="qwen3:4b",
+            schema_version=SESSION_PAYLOAD_VERSION,
+            payload=payload,
+            created_at=timestamp,
+            updated_at=timestamp,
+            owner_id="alice",
+        )
+        log_service.upsert_session(
+            db_path=self.settings.log_db_path,
+            session_id="owner-b",
+            title="Owner B",
+            model="qwen3:4b",
+            schema_version=SESSION_PAYLOAD_VERSION,
+            payload=payload,
+            created_at=timestamp,
+            updated_at=timestamp,
+            owner_id="bob",
+        )
+
+        alice_history = self.client.get(
+            "/api/history",
+            headers={"X-GOAT-Owner-Id": "alice"},
+        )
+        bob_history = self.client.get(
+            "/api/history",
+            headers={"X-GOAT-Owner-Id": "bob"},
+        )
+
+        self.assertEqual(
+            ["owner-a"],
+            [item["id"] for item in alice_history.json()["sessions"]],
+        )
+        self.assertEqual(
+            ["owner-b"],
+            [item["id"] for item in bob_history.json()["sessions"]],
+        )
+        self.assertEqual(
+            404,
+            self.client.get(
+                "/api/history/owner-b",
+                headers={"X-GOAT-Owner-Id": "alice"},
+            ).status_code,
+        )
+
     def test_chat_endpoint_blocks_unsafe_input_and_uses_safe_session_title(
         self,
     ) -> None:

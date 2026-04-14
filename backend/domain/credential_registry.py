@@ -157,14 +157,20 @@ def _resolve_secret_hash(item: dict[str, object]) -> str:
     return ""
 
 
-def build_local_authorization_context() -> AuthorizationContext:
+def build_local_authorization_context(
+    *,
+    legacy_owner_id: str = "",
+    principal_id: str = "principal:local-noauth",
+    credential_id: str = "credential:local-noauth",
+    auth_mode: str = _AUTH_MODE_LOCAL,
+) -> AuthorizationContext:
     return AuthorizationContext(
-        principal_id=PrincipalId("principal:local-noauth"),
+        principal_id=PrincipalId(principal_id),
         tenant_id=TenantId(_DEFAULT_TENANT),
         scopes=FULL_SCOPES,
-        credential_id="credential:local-noauth",
-        legacy_owner_id="",
-        auth_mode=_AUTH_MODE_LOCAL,
+        credential_id=credential_id,
+        legacy_owner_id=legacy_owner_id,
+        auth_mode=auth_mode,
     )
 
 
