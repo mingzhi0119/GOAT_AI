@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { API_KEY_STORAGE_KEY, OWNER_ID_STORAGE_KEY } from '../api/auth'
 import { streamChat } from '../api/chat'
 import type { ChatRequest } from '../api/types'
+import { buildApiUrl } from '../api/urls'
 
 function buildStreamResponse(chunks: string[]) {
   const encoder = new TextEncoder()
@@ -81,7 +82,7 @@ describe('chat api', () => {
       { type: 'done' },
     ])
     expect(fetch).toHaveBeenCalledWith(
-      './api/chat',
+      buildApiUrl('/chat'),
       expect.objectContaining({
         method: 'POST',
         headers: {

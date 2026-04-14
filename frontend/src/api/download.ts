@@ -1,4 +1,5 @@
 import { buildApiHeaders } from './auth'
+import { buildApiUrl } from './urls'
 
 function resolveDownloadFilename(
   contentDisposition: string | null,
@@ -23,7 +24,7 @@ export async function downloadFileWithAuth(
   downloadUrl: string,
   fallbackFilename: string,
 ): Promise<void> {
-  const response = await fetch(downloadUrl, {
+  const response = await fetch(buildApiUrl(downloadUrl), {
     method: 'GET',
     headers: buildApiHeaders(),
   })

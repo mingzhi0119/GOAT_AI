@@ -55,15 +55,15 @@ def test_build_provenance_payload_records_expected_artifacts(
     nsis_dir = bundle_root / "nsis"
     msi_dir.mkdir(parents=True)
     nsis_dir.mkdir(parents=True)
-    (msi_dir / "GOAT AI_1.2.0_x64_en-US.msi").write_bytes(b"msi")
-    (nsis_dir / "GOAT AI_1.2.0_x64-setup.exe").write_bytes(b"nsis")
+    (msi_dir / "GOAT AI_1.3.0_x64_en-US.msi").write_bytes(b"msi")
+    (nsis_dir / "GOAT AI_1.3.0_x64-setup.exe").write_bytes(b"nsis")
 
     monkeypatch.setattr(subject, "authenticode_status", lambda path: None)
 
     payload = subject.build_provenance_payload(
         bundle_root=bundle_root,
         patterns=["msi/*.msi", "nsis/*-setup.exe"],
-        release_ref="refs/tags/v1.2.0",
+        release_ref="refs/tags/v1.3.0",
         resolved_sha="abc123",
         platform_label="windows-x64",
         distribution_channel="internal_test",
@@ -76,8 +76,8 @@ def test_build_provenance_payload_records_expected_artifacts(
     assert isinstance(artifacts, list)
     assert len(artifacts) == 2
     assert {artifact["file_name"] for artifact in artifacts} == {
-        "GOAT AI_1.2.0_x64_en-US.msi",
-        "GOAT AI_1.2.0_x64-setup.exe",
+        "GOAT AI_1.3.0_x64_en-US.msi",
+        "GOAT AI_1.3.0_x64-setup.exe",
     }
 
 
@@ -89,15 +89,15 @@ def test_build_provenance_payload_requires_signed_artifacts_when_requested(
     nsis_dir = bundle_root / "nsis"
     msi_dir.mkdir(parents=True)
     nsis_dir.mkdir(parents=True)
-    (msi_dir / "GOAT AI_1.2.0_x64_en-US.msi").write_bytes(b"msi")
-    (nsis_dir / "GOAT AI_1.2.0_x64-setup.exe").write_bytes(b"nsis")
+    (msi_dir / "GOAT AI_1.3.0_x64_en-US.msi").write_bytes(b"msi")
+    (nsis_dir / "GOAT AI_1.3.0_x64-setup.exe").write_bytes(b"nsis")
     monkeypatch.setattr(subject, "authenticode_status", lambda path: "NotSigned")
 
     with pytest.raises(SystemExit, match="Expected signed desktop artifact"):
         subject.build_provenance_payload(
             bundle_root=bundle_root,
             patterns=["msi/*.msi", "nsis/*-setup.exe"],
-            release_ref="refs/tags/v1.2.0",
+            release_ref="refs/tags/v1.3.0",
             resolved_sha="abc123",
             platform_label="windows-x64",
             distribution_channel="public",
@@ -307,8 +307,8 @@ def test_main_writes_json_output(
     nsis_dir = bundle_root / "nsis"
     msi_dir.mkdir(parents=True)
     nsis_dir.mkdir(parents=True)
-    (msi_dir / "GOAT AI_1.2.0_x64_en-US.msi").write_bytes(b"msi")
-    (nsis_dir / "GOAT AI_1.2.0_x64-setup.exe").write_bytes(b"nsis")
+    (msi_dir / "GOAT AI_1.3.0_x64_en-US.msi").write_bytes(b"msi")
+    (nsis_dir / "GOAT AI_1.3.0_x64-setup.exe").write_bytes(b"nsis")
     output_path = tmp_path / "desktop-provenance.json"
     monkeypatch.setattr(subject, "authenticode_status", lambda path: None)
     monkeypatch.setattr(
@@ -318,7 +318,7 @@ def test_main_writes_json_output(
             bundle_root=str(bundle_root),
             pattern=["msi/*.msi", "nsis/*-setup.exe"],
             output=str(output_path),
-            release_ref="refs/tags/v1.2.0",
+            release_ref="refs/tags/v1.3.0",
             resolved_sha="abc123",
             platform="windows-x64",
             distribution_channel="internal_test",

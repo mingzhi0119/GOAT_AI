@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { API_KEY_STORAGE_KEY, OWNER_ID_STORAGE_KEY } from '../api/auth'
 import { deleteAllSessions, deleteSession, fetchHistory, fetchSession, renameSession } from '../api/history'
+import { buildApiUrl } from '../api/urls'
 
 describe('history api', () => {
   afterEach(() => {
@@ -31,7 +32,7 @@ describe('history api', () => {
 
     const sessions = await fetchHistory()
     expect(sessions).toHaveLength(1)
-    expect(mockedFetch).toHaveBeenCalledWith('./api/history', {
+    expect(mockedFetch).toHaveBeenCalledWith(buildApiUrl('/history'), {
       headers: {
         'X-GOAT-API-Key': 'secret-123',
         'X-GOAT-Owner-Id': 'alice',
@@ -120,7 +121,7 @@ describe('history api', () => {
         download_url: '/api/artifacts/art-1',
       },
     ])
-    expect(mockedFetch).toHaveBeenCalledWith('./api/history/s1', {
+    expect(mockedFetch).toHaveBeenCalledWith(buildApiUrl('/history/s1'), {
       headers: {
         'X-GOAT-API-Key': 'secret-123',
         'X-GOAT-Owner-Id': 'alice',
@@ -197,7 +198,7 @@ describe('history api', () => {
     vi.stubGlobal('fetch', mockedFetch)
 
     await deleteSession('abc')
-    expect(mockedFetch).toHaveBeenCalledWith('./api/history/abc', {
+    expect(mockedFetch).toHaveBeenCalledWith(buildApiUrl('/history/abc'), {
       method: 'DELETE',
       headers: {
         'X-GOAT-API-Key': 'secret-123',
@@ -213,7 +214,7 @@ describe('history api', () => {
     vi.stubGlobal('fetch', mockedFetch)
 
     await deleteAllSessions()
-    expect(mockedFetch).toHaveBeenCalledWith('./api/history', {
+    expect(mockedFetch).toHaveBeenCalledWith(buildApiUrl('/history'), {
       method: 'DELETE',
       headers: {
         'X-GOAT-API-Key': 'secret-123',
@@ -229,7 +230,7 @@ describe('history api', () => {
     vi.stubGlobal('fetch', mockedFetch)
 
     await renameSession('abc', 'New title')
-    expect(mockedFetch).toHaveBeenCalledWith('./api/history/abc', {
+    expect(mockedFetch).toHaveBeenCalledWith(buildApiUrl('/history/abc'), {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',

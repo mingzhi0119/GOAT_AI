@@ -6,6 +6,7 @@ import {
   fetchCodeSandboxExecutionEvents,
   openCodeSandboxLogStream,
 } from '../api/codeSandbox'
+import { buildApiUrl } from '../api/urls'
 
 describe('code sandbox api', () => {
   afterEach(() => {
@@ -44,7 +45,7 @@ describe('code sandbox api', () => {
     const payload = await executeCodeSandbox({ code: 'echo ok' })
     expect(payload.execution_id).toBe('cs-1')
     expect(mockedFetch).toHaveBeenCalledWith(
-      './api/code-sandbox/exec',
+      buildApiUrl('/code-sandbox/exec'),
       expect.objectContaining({
         method: 'POST',
         headers: {
@@ -120,18 +121,26 @@ describe('code sandbox api', () => {
 
     expect(execution.status).toBe('completed')
     expect(events.events[0]?.event_type).toBe('execution.queued')
-    expect(mockedFetch).toHaveBeenNthCalledWith(1, './api/code-sandbox/executions/cs-1', {
+    expect(mockedFetch).toHaveBeenNthCalledWith(
+      1,
+      buildApiUrl('/code-sandbox/executions/cs-1'),
+      {
       headers: {
         'X-GOAT-API-Key': 'secret-123',
         'X-GOAT-Owner-Id': 'alice',
       },
-    })
-    expect(mockedFetch).toHaveBeenNthCalledWith(2, './api/code-sandbox/executions/cs-1/events', {
+      },
+    )
+    expect(mockedFetch).toHaveBeenNthCalledWith(
+      2,
+      buildApiUrl('/code-sandbox/executions/cs-1/events'),
+      {
       headers: {
         'X-GOAT-API-Key': 'secret-123',
         'X-GOAT-Owner-Id': 'alice',
       },
-    })
+      },
+    )
   })
 
   it('normalizes optional execution and event fields', async () => {

@@ -1,6 +1,7 @@
 import { buildApiHeaders } from './auth'
 import { buildApiErrorMessage } from './errors'
 import { parseUploadStreamEvent } from './runtimeSchemas'
+import { buildApiUrl } from './urls'
 /** Stream file-ingestion events from the RAG knowledge upload pipeline. */
 
 export interface UploadFilePromptEvent {
@@ -40,7 +41,7 @@ export async function* streamUpload(file: File): AsyncGenerator<UploadStreamEven
   const form = new FormData()
   form.append('file', file)
 
-  const resp = await fetch('./api/upload', {
+  const resp = await fetch(buildApiUrl('/upload'), {
     method: 'POST',
     headers: buildApiHeaders(),
     body: form,

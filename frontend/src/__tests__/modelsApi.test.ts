@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { API_KEY_STORAGE_KEY, OWNER_ID_STORAGE_KEY } from '../api/auth'
 import { fetchModelCapabilities, fetchModels } from '../api/models'
+import { buildApiUrl } from '../api/urls'
 
 describe('models api', () => {
   afterEach(() => {
@@ -36,18 +37,22 @@ describe('models api', () => {
 
     expect(models).toEqual(['gemma4:26b', 'llama3:8b'])
     expect(capabilities.supports_vision).toBe(true)
-    expect(mockedFetch).toHaveBeenNthCalledWith(1, './api/models', {
+    expect(mockedFetch).toHaveBeenNthCalledWith(1, buildApiUrl('/models'), {
       headers: {
         'X-GOAT-API-Key': 'secret-123',
         'X-GOAT-Owner-Id': 'alice',
       },
     })
-    expect(mockedFetch).toHaveBeenNthCalledWith(2, './api/models/capabilities?model=gemma4%3A26b', {
+    expect(mockedFetch).toHaveBeenNthCalledWith(
+      2,
+      buildApiUrl('/models/capabilities?model=gemma4%3A26b'),
+      {
       headers: {
         'X-GOAT-API-Key': 'secret-123',
         'X-GOAT-Owner-Id': 'alice',
       },
-    })
+      },
+    )
   })
 
   it('normalizes missing optional model capability fields', async () => {

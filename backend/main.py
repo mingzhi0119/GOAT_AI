@@ -53,7 +53,7 @@ from goat_ai.telemetry.otel_tracing import init_otel_if_enabled, is_otel_enabled
 logger = logging.getLogger(__name__)
 
 DIST = Path(__file__).parent.parent / "frontend" / "dist"
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.3.0"
 OPENAPI_TAGS = [
     {"name": "system", "description": "Health and server telemetry endpoints."},
     {

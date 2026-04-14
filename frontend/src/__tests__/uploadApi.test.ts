@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { API_KEY_STORAGE_KEY, OWNER_ID_STORAGE_KEY } from '../api/auth'
 import { streamUpload } from '../api/upload'
+import { buildApiUrl } from '../api/urls'
 
 function sseResponse(lines: string): Response {
   const encoder = new TextEncoder()
@@ -38,7 +39,7 @@ describe('upload api', () => {
     expect((events[1] as { type: string }).type).toBe('knowledge_ready')
     expect((events[2] as { type: string }).type).toBe('done')
     expect(fetch).toHaveBeenCalledWith(
-      './api/upload',
+      buildApiUrl('/upload'),
       expect.objectContaining({
         method: 'POST',
         headers: {

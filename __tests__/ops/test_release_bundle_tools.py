@@ -76,7 +76,7 @@ def test_install_release_bundle_replaces_source_tree_but_preserves_runtime_paths
         repo_root=repo_root,
         output_bundle=bundle_path,
         output_manifest=manifest_path,
-        release_ref="refs/tags/v1.2.0",
+        release_ref="refs/tags/v1.3.0",
         resolved_sha="feedface",
         actor="tester",
     )

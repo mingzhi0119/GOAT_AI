@@ -238,6 +238,13 @@ Important behavior:
 
 Windows PowerShell deploy remains fully supported. Use WSL only when you specifically need Linux-targeted deploy-script parity or shell semantics.
 
+### Vercel-hosted frontend split deployment
+
+When the frontend is hosted on Vercel and FastAPI remains on a Linux host, use
+[VERCEL_FRONTEND_DEPLOY.md](VERCEL_FRONTEND_DEPLOY.md) as the canonical runbook.
+That path keeps browser requests same-origin at `goat-dev.vercel.app/api/*` and lets
+Vercel rewrite `/api/*` to `https://goat-api.duckdns.org/api/*`.
+
 ## Deployment profiles
 
 The app is **portable** across environments (see `README.md` **Environments**). The following sections describe **common** profiles, not exclusive ones.

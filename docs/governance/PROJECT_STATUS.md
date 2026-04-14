@@ -4,7 +4,7 @@ Last updated: 2026-04-13
 
 ## Release snapshot
 
-- **Current release:** `v1.2.0`
+- **Current release:** `v1.3.0`
 - **Shipped baseline:** phases 11-15 are complete and documented
 
 ## Shipped platform summary
@@ -12,6 +12,7 @@ Last updated: 2026-04-13
 ### Core app
 
 - React SPA + FastAPI backend
+- public split deployment now runs with the frontend on `https://goat-dev.vercel.app` and the loopback-only backend published at `https://goat-api.duckdns.org`
 - Ollama-backed chat with typed SSE events: `thinking`, `token`, `chart_spec`, `artifact`, `error`, `done`
 - split liveness/readiness probes at `GET /api/health` and `GET /api/ready`
 - Prometheus metrics at `GET /api/system/metrics`
@@ -31,6 +32,7 @@ Last updated: 2026-04-13
 
 - persisted session history with `session_messages` normalization and legacy compatibility
 - generated chat artifacts served from persisted artifact ids while keeping `download_url` on the stable `/api/artifacts/{artifact_id}` contract
+- chat prompting now teaches text-first downloadable exports such as Markdown by requiring exactly one inline filename link (for example `[brief.md](brief.md)`) when the user asks for a file to download
 - generated artifacts, media attachments, and future workspace-export blobs now resolve through the configured object store (`local` by default, `s3` optional)
 - credential-backed authorization context with tenant/principal scoping
 - explicit persisted-resource ownership envelopes at storage boundaries
@@ -47,6 +49,7 @@ Last updated: 2026-04-13
 - caller-scoped `project_memory` retrieval plus operator-provisioned read-only connector bindings are now part of the shipped source registry and bounded browse/deep-research runtime foundation
 - shared runtime foundations now include a pure source catalog, caller-visible source facts for capability discovery, and a LangGraph source-executor registry under the existing workbench wrappers
 - frontend workbench affordances now treat `/api/system/features` as the single truth for plan-mode readiness, disabling local-only toggles whenever backend capability discovery is absent or denied
+- public backend model discovery and chat entrypoints now enforce a server-side allowlist for the deployed `qwen3:4b`, `llama3.2:3b`, `gemma3:4b`, `qwen2.5-coder:3b`, and `gemma4:26b` surfaces
 - durable code sandbox execution with persisted events and replayable logs
 - queued plus running sandbox cancellation now flows through an in-process
   supervisor seam, and startup recovery fails abandoned `running` executions

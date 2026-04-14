@@ -3,7 +3,16 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
 import { API_KEY_STORAGE_KEY, OWNER_ID_STORAGE_KEY } from '../api/auth'
+import { buildApiUrl } from '../api/urls'
 import { AppearanceProvider } from '../hooks/useAppearance'
+
+const MODELS_URL = buildApiUrl('/models')
+const MODEL_CAPABILITIES_URL_PREFIX = buildApiUrl('/models/capabilities')
+const HISTORY_URL = buildApiUrl('/history')
+const SYSTEM_FEATURES_URL = buildApiUrl('/system/features')
+const SYSTEM_GPU_URL = buildApiUrl('/system/gpu')
+const SYSTEM_INFERENCE_URL = buildApiUrl('/system/inference')
+const CHAT_URL = buildApiUrl('/chat')
 
 function buildJsonResponse(payload: unknown) {
   return {
@@ -29,10 +38,10 @@ function buildStreamResponse(chunks: string[]) {
 
 function buildFetchMock() {
   return vi.fn().mockImplementation((input: string, init?: RequestInit) => {
-    if (input === './api/models') {
+    if (input === MODELS_URL) {
       return Promise.resolve(buildJsonResponse({ models: ['gemma4:26b'] }))
     }
-    if (input.startsWith('./api/models/capabilities')) {
+    if (input.startsWith(MODEL_CAPABILITIES_URL_PREFIX)) {
       return Promise.resolve(
         buildJsonResponse({
           model: 'gemma4:26b',
@@ -45,13 +54,13 @@ function buildFetchMock() {
         }),
       )
     }
-    if (input === './api/history') {
+    if (input === HISTORY_URL) {
       if (init?.method === 'DELETE') {
         return Promise.resolve(buildJsonResponse({}))
       }
       return Promise.resolve(buildJsonResponse({ sessions: [] }))
     }
-    if (input === './api/system/features') {
+    if (input === SYSTEM_FEATURES_URL) {
       return Promise.resolve(
         buildJsonResponse({
           code_sandbox: {
@@ -117,7 +126,7 @@ function buildFetchMock() {
         }),
       )
     }
-    if (input === './api/system/gpu') {
+    if (input === SYSTEM_GPU_URL) {
       return Promise.resolve(
         buildJsonResponse({
           available: true,
@@ -133,7 +142,7 @@ function buildFetchMock() {
         }),
       )
     }
-    if (input === './api/system/inference') {
+    if (input === SYSTEM_INFERENCE_URL) {
       return Promise.resolve(
         buildJsonResponse({
           chat_avg_ms: 10,
@@ -148,7 +157,7 @@ function buildFetchMock() {
         }),
       )
     }
-    if (input === './api/chat') {
+    if (input === CHAT_URL) {
       return Promise.resolve(
         buildStreamResponse(['data: {"type":"token","token":"Hello back"}\n\n', 'data: {"type":"done"}\n\n']),
       )
@@ -171,11 +180,11 @@ function findCall(
 
 async function waitForStartupFetches(mockedFetch: ReturnType<typeof buildFetchMock>) {
   await waitFor(() => {
-    expect(findCall(mockedFetch, './api/models')).toBeTruthy()
-    expect(findCall(mockedFetch, './api/history')).toBeTruthy()
-    expect(findCall(mockedFetch, './api/system/features')).toBeTruthy()
-    expect(findCall(mockedFetch, './api/system/gpu')).toBeTruthy()
-    expect(findCall(mockedFetch, './api/system/inference')).toBeTruthy()
+    expect(findCall(mockedFetch, MODELS_URL)).toBeTruthy()
+    expect(findCall(mockedFetch, HISTORY_URL)).toBeTruthy()
+    expect(findCall(mockedFetch, SYSTEM_FEATURES_URL)).toBeTruthy()
+    expect(findCall(mockedFetch, SYSTEM_GPU_URL)).toBeTruthy()
+    expect(findCall(mockedFetch, SYSTEM_INFERENCE_URL)).toBeTruthy()
   })
 }
 
@@ -203,11 +212,11 @@ describe('App protected access integration', () => {
     await waitForStartupFetches(mockedFetch)
 
     for (const url of [
-      './api/models',
-      './api/history',
-      './api/system/features',
-      './api/system/gpu',
-      './api/system/inference',
+      MODELS_URL,
+      HISTORY_URL,
+      SYSTEM_FEATURES_URL,
+      SYSTEM_GPU_URL,
+      SYSTEM_INFERENCE_URL,
     ]) {
       const call = findCall(mockedFetch, url)
       expect(call?.[1]).toMatchObject({
@@ -245,10 +254,10 @@ describe('App protected access integration', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
 
     await waitFor(() => {
-      expect(findCall(mockedFetch, './api/chat')).toBeTruthy()
+      expect(findCall(mockedFetch, CHAT_URL)).toBeTruthy()
     })
 
-    expect(findCall(mockedFetch, './api/chat')?.[1]).toMatchObject({
+    expect(findCall(mockedFetch, CHAT_URL)?.[1]).toMatchObject({
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -270,7 +279,7 @@ describe('App protected access integration', () => {
     await waitForStartupFetches(mockedFetch)
 
     const featureCallsBefore = mockedFetch.mock.calls.filter(
-      ([url]) => url === './api/system/features',
+      ([url]) => url === SYSTEM_FEATURES_URL,
     ).length
 
     fireEvent.click(screen.getByRole('button', { name: /settings/i }))
@@ -279,12 +288,12 @@ describe('App protected access integration', () => {
 
     await waitFor(() => {
       const featureCalls = mockedFetch.mock.calls.filter(
-        ([url]) => url === './api/system/features',
+        ([url]) => url === SYSTEM_FEATURES_URL,
       )
       expect(featureCalls.length).toBeGreaterThan(featureCallsBefore)
     })
 
-    const featureCalls = mockedFetch.mock.calls.filter(([url]) => url === './api/system/features')
+    const featureCalls = mockedFetch.mock.calls.filter(([url]) => url === SYSTEM_FEATURES_URL)
     const latestFeatureCall = featureCalls[featureCalls.length - 1]
     expect(latestFeatureCall?.[1]).toMatchObject({
       headers: {
@@ -313,10 +322,10 @@ describe('App protected access integration', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
 
     await waitFor(() => {
-      expect(findCall(mockedFetch, './api/chat')).toBeTruthy()
+      expect(findCall(mockedFetch, CHAT_URL)).toBeTruthy()
     })
 
-    const chatCall = findCall(mockedFetch, './api/chat')
+    const chatCall = findCall(mockedFetch, CHAT_URL)
     const requestBody = JSON.parse(String(chatCall?.[1]?.body ?? '{}')) as {
       plan_mode?: boolean
     }
