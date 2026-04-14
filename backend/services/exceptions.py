@@ -9,6 +9,10 @@ class InferenceBackendUnavailable(Exception):
     """Raised when the configured LLM inference endpoint (e.g. Ollama) is unreachable."""
 
 
+class ModelNotAllowed(Exception):
+    """Raised when a caller selects a model outside the deployment allowlist."""
+
+
 class KnowledgeFeatureNotImplemented(Exception):
     """Raised for contract-first knowledge endpoints that are defined before implementation lands."""
 

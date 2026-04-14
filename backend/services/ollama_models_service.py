@@ -8,6 +8,10 @@ from goat_ai.shared.exceptions import OllamaUnavailable
 
 from backend.models.chat import ModelCapabilitiesResponse, ModelsResponse
 from backend.services.exceptions import InferenceBackendUnavailable
+from backend.services.public_model_policy import (
+    filter_public_model_names,
+    require_public_model_name,
+)
 from backend.types import LLMClient
 
 logger = logging.getLogger(__name__)
@@ -20,13 +24,14 @@ def list_models_for_api(llm: LLMClient) -> ModelsResponse:
     except OllamaUnavailable as exc:
         logger.warning("Ollama unreachable: %s", exc)
         raise InferenceBackendUnavailable from exc
-    return ModelsResponse(models=names or ["gemma4:26b"])
+    return ModelsResponse(models=filter_public_model_names(names))
 
 
 def model_capabilities_for_api(llm: LLMClient, model: str) -> ModelCapabilitiesResponse:
     """Return Ollama-reported capabilities for one model."""
+    resolved_model = require_public_model_name(model)
     try:
-        capabilities, context_length = llm.describe_model_for_api(model)
+        capabilities, context_length = llm.describe_model_for_api(resolved_model)
     except OllamaUnavailable as exc:
         logger.warning("Ollama unreachable during model capability lookup: %s", exc)
         raise InferenceBackendUnavailable from exc
@@ -34,7 +39,7 @@ def model_capabilities_for_api(llm: LLMClient, model: str) -> ModelCapabilitiesR
     supports_vision = "vision" in capabilities
     supports_thinking = "thinking" in capabilities
     return ModelCapabilitiesResponse(
-        model=model,
+        model=resolved_model,
         capabilities=capabilities,
         supports_tool_calling=supports_tool_calling,
         supports_chart_tools=supports_tool_calling,

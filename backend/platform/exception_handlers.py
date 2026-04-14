@@ -27,6 +27,7 @@ from backend.application.ports import (
     ArtifactNotFound,
     InferenceBackendUnavailable,
     KnowledgeDocumentNotFound,
+    ModelNotAllowed,
     MediaNotFound,
     VisionNotSupported,
 )
@@ -60,6 +61,18 @@ def register_exception_handlers(app: FastAPI) -> None:
                     detail="AI backend unavailable",
                     code=INFERENCE_BACKEND_UNAVAILABLE,
                     status_code=503,
+                ),
+            ),
+        )
+
+    @app.exception_handler(ModelNotAllowed)
+    def _model_not_allowed(_request: Request, exc: ModelNotAllowed) -> JSONResponse:
+        return _attach_request_id(
+            JSONResponse(
+                status_code=422,
+                content=build_error_body(
+                    detail=str(exc),
+                    status_code=422,
                 ),
             ),
         )

@@ -176,11 +176,11 @@ Returns:
 
 ```json
 {
-  "models": ["gemma4:26b", "qwen3"]
+  "models": ["qwen3:4b", "gemma4:26b"]
 }
 ```
 
-If Ollama is unavailable, returns `503`.
+Only models allowed by the deployment policy are returned. If Ollama is unavailable, returns `503`.
 
 ## `GET /api/models/capabilities`
 
@@ -188,11 +188,13 @@ Query:
 
 - `model`: exact Ollama model name
 
+The deployment rejects models outside the public allowlist with `422`.
+
 Returns:
 
 ```json
 {
-  "model": "qwen3",
+  "model": "qwen3:4b",
   "capabilities": ["completion", "tools", "vision"],
   "supports_tool_calling": true,
   "supports_chart_tools": true,
@@ -212,6 +214,7 @@ Purpose:
 - Persist session history when `session_id` is present
 - Emit chart specs only from real native tool calls
 - Apply lightweight safeguard blocking for clearly unsafe misuse
+- Reject models outside the deployment allowlist before calling Ollama
 
 Request body:
 

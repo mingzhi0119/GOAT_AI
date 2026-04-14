@@ -166,6 +166,8 @@ def test_release_docs_and_status_match_current_truth() -> None:
     assert "promotion evidence" in release_doc
     assert "exercise_release_rollback_drill" in rollback_doc
     assert "python -m tools.quality.run_pr_latency_gate" in operations_doc
+    assert "nginx.goat-api.duckdns.org.conf" in operations_doc
+    assert "sudo certbot --nginx -d goat-api.duckdns.org" in operations_doc
     assert "`backend-fast`" in operations_doc
     assert "`backend-heavy`" in operations_doc
     assert "OTel enabled-path tests" in operations_doc

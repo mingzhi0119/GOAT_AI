@@ -14,6 +14,10 @@ from typing import Any, Generator, Literal, Protocol
 import requests
 
 from goat_ai.config.settings import Settings
+from goat_ai.llm.public_model_policy import (
+    filter_public_model_names,
+    resolve_public_model_name,
+)
 from goat_ai.shared.exceptions import OllamaUnavailable
 from goat_ai.telemetry.otel_tracing import otel_span
 from goat_ai.telemetry.telemetry_counters import OLLAMA_ERROR_API_CODE, inc_ollama_error
@@ -25,6 +29,13 @@ from goat_ai.chat.tools import (
 from goat_ai.shared.types import ChatTurn
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_allowed_model(model: str) -> str:
+    resolved = resolve_public_model_name(model)
+    if resolved is None:
+        raise ValueError(f"Model {model!r} is not enabled on this deployment.")
+    return resolved
 
 
 @dataclass(frozen=True)
@@ -282,10 +293,10 @@ class OllamaService:
                 # Invalidate capability cache when model inventory is queried freshly.
                 with self._cache_lock:
                     known = set(self._cap_cache.keys())
-                    current = set(names)
+                    current = set(filter_public_model_names(names))
                     for removed in known - current:
                         self._cap_cache.pop(removed, None)
-                return names
+                return filter_public_model_names(names)
             except requests.HTTPError as exc:
                 status_code = (
                     exc.response.status_code if exc.response is not None else None
@@ -316,6 +327,7 @@ class OllamaService:
 
     def _load_model_show(self, model: str) -> tuple[list[str], int | None]:
         """Fetch ``/api/show`` once; return capabilities and parsed context length."""
+        model = _resolve_allowed_model(model)
         ttl_sec = max(0, int(self._s.model_cap_cache_ttl_sec))
         now = time.monotonic()
         if ttl_sec > 0:
@@ -409,6 +421,7 @@ class OllamaService:
         ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> Generator[StreamTextPart, None, None]:
         """Yield streamed text segments from /api/chat (thinking vs answer)."""
+        model = _resolve_allowed_model(model)
         payload: dict[str, Any] = {
             "model": model,
             "messages": api_messages,
@@ -442,6 +455,7 @@ class OllamaService:
         ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> Generator[StreamTextPart, None, None]:
         """Yield streamed text segments from /api/generate (thinking vs answer)."""
+        model = _resolve_allowed_model(model)
         payload: dict[str, Any] = {"model": model, "prompt": prompt, "stream": True}
         if ollama_options:
             payload["options"] = ollama_options
@@ -480,6 +494,7 @@ class OllamaService:
         ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> str:
         """Return a single non-streaming completion from /api/generate."""
+        model = _resolve_allowed_model(model)
         payload: dict[str, Any] = {"model": model, "prompt": prompt, "stream": False}
         if ollama_options:
             payload["options"] = ollama_options
@@ -541,6 +556,7 @@ class OllamaService:
         ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> Generator[str | StreamTextPart | ToolCallPlan, None, None]:
         """Stream assistant segments and surface native tool calls when they occur."""
+        model = _resolve_allowed_model(model)
         payload: dict[str, Any] = {
             "model": model,
             "messages": messages_for_ollama(messages, system_prompt),
@@ -611,6 +627,7 @@ class OllamaService:
         ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> ToolCallPlan | None:
         """Ask Ollama for a single native tool call plan without streaming."""
+        model = _resolve_allowed_model(model)
         payload: dict[str, Any] = {
             "model": model,
             "messages": messages_for_ollama(messages, system_prompt),
@@ -661,6 +678,7 @@ class OllamaService:
         ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> Generator[str | StreamTextPart, None, None]:
         """Stream the model's final response after a tool result is appended."""
+        model = _resolve_allowed_model(model)
         payload: dict[str, Any] = {
             "model": model,
             "messages": followup_messages,

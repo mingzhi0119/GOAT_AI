@@ -14,16 +14,17 @@ from goat_ai.llm.ollama_client import ToolCallPlan
 from goat_ai.shared.types import ChatTurn
 
 if FastAPI is not None:
+    from backend.platform.exception_handlers import register_exception_handlers
     from backend.platform.dependencies import get_llm_client
     from backend.routers import models
 
 
 class FakeModelsLLMClient:
     def list_model_names(self) -> list[str]:
-        return ["gemma4:26b", "qwen3"]
+        return ["gemma4:26b", "qwen3:4b", "rogue-model"]
 
     def describe_model_for_api(self, model: str) -> tuple[list[str], int | None]:
-        if model == "qwen3":
+        if model == "qwen3:4b":
             return ["completion", "tools"], 32768
         return ["completion"], None
 
@@ -104,23 +105,38 @@ class FakeModelsLLMClient:
 class ModelsRouterIntegrationTests(unittest.TestCase):
     def setUp(self) -> None:
         app = FastAPI()
+        register_exception_handlers(app)
         app.include_router(models.router, prefix="/api")
         app.dependency_overrides[get_llm_client] = lambda: FakeModelsLLMClient()
         self.client = TestClient(app)
 
+    def test_models_endpoint_filters_to_public_allowlist(self) -> None:
+        response = self.client.get("/api/models")
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(["qwen3:4b", "gemma4:26b"], response.json()["models"])
+
     def test_model_capabilities_endpoint_reports_tool_support(self) -> None:
         response = self.client.get(
-            "/api/models/capabilities", params={"model": "qwen3"}
+            "/api/models/capabilities", params={"model": "qwen3:4b"}
         )
 
         self.assertEqual(200, response.status_code)
         payload = response.json()
-        self.assertEqual("qwen3", payload["model"])
+        self.assertEqual("qwen3:4b", payload["model"])
         self.assertEqual(["completion", "tools"], payload["capabilities"])
         self.assertTrue(payload["supports_tool_calling"])
         self.assertTrue(payload["supports_chart_tools"])
         self.assertFalse(payload["supports_vision"])
         self.assertEqual(32768, payload["context_length"])
+
+    def test_model_capabilities_endpoint_rejects_disallowed_model(self) -> None:
+        response = self.client.get(
+            "/api/models/capabilities", params={"model": "rogue-model"}
+        )
+
+        self.assertEqual(422, response.status_code)
+        self.assertIn("not enabled on this deployment", response.json()["detail"])
 
 
 if __name__ == "__main__":

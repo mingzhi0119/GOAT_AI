@@ -342,10 +342,11 @@ fi
 if [ "${SYSTEMD_USED}" != "1" ]; then
   echo "Freeing port ${SERVER_PORT}"
   free_port "${SERVER_PORT}"
-  echo "Starting FastAPI on 0.0.0.0:${SERVER_PORT} (log: ${API_LOG})"
+  echo "Starting FastAPI on 127.0.0.1:${SERVER_PORT} (log: ${API_LOG})"
   OLLAMA_BASE_URL="${EFFECTIVE_OLLAMA_URL}" \
   GOAT_USE_SCHOOL_OLLAMA_LOCAL="${GOAT_USE_SCHOOL_OLLAMA_LOCAL}" \
   GOAT_OLLAMA_PROFILE="${GOAT_OLLAMA_PROFILE}" \
+  GOAT_HOST="127.0.0.1" \
   GOAT_SERVER_PORT="${SERVER_PORT}" \
   GOAT_LOCAL_PORT="${SERVER_PORT}" \
   GOAT_RUNTIME_ROOT="${GOAT_RUNTIME_ROOT}" \
@@ -354,9 +355,8 @@ if [ "${SYSTEMD_USED}" != "1" ]; then
   GOAT_DATA_DIR="${GOAT_DATA_DIR}" \
   nohup "${VENV_DIR}/bin/python" -m uvicorn server:create_app \
     --factory \
-    --host 0.0.0.0 \
+    --host 127.0.0.1 \
     --port "${SERVER_PORT}" \
-    --workers 2 \
     >> "$API_LOG" 2>&1 &
   echo $! > "$API_PID"
   echo "PID: $(cat "$API_PID")"

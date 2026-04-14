@@ -38,6 +38,7 @@ from backend.services.idempotency_service import (
 from backend.services.runtime_persistence import build_idempotency_store
 from backend.services.media_service import load_images_base64_for_chat
 from backend.services.chat_service import stream_chat_sse
+from backend.services.public_model_policy import require_public_model_name
 
 _SSE_HEADERS = {
     "Cache-Control": "no-cache",
@@ -56,6 +57,7 @@ def _resolve_base_system_prompt(req: ChatRequest, settings: Settings) -> str:
 class PreparedChatRequest:
     """Normalized chat request state produced by application preflight."""
 
+    model: str
     merged_messages: list[ChatMessage]
     session_owner_id: str
     auth_context: AuthorizationContext
@@ -103,6 +105,7 @@ def prepare_chat_request(
 ) -> PreparedChatRequest:
     """Validate chat request constraints and resolve derived request state."""
     session_owner_id = auth_context.legacy_owner_id
+    resolved_model = require_public_model_name(req.model)
     validate_chat_capacity(req=req, settings=settings)
     if req.knowledge_document_ids and req.image_attachment_ids:
         raise ChatKnowledgeImageConflictError(
@@ -125,13 +128,14 @@ def prepare_chat_request(
             request_id=request_id,
         )
         try:
-            caps = llm.get_model_capabilities(req.model)
+            caps = llm.get_model_capabilities(resolved_model)
         except OllamaUnavailable as exc:
             raise OllamaUnavailable("AI backend unavailable") from exc
         if "vision" not in caps:
             raise VisionNotSupported()
 
     return PreparedChatRequest(
+        model=resolved_model,
         merged_messages=merged_messages,
         session_owner_id=session_owner_id,
         auth_context=auth_context,
@@ -181,7 +185,7 @@ def _build_source_stream(
 ) -> Generator[str, None, None]:
     return stream_chat_sse(
         llm=llm,
-        model=req.model,
+        model=prepared.model,
         messages=prepared.merged_messages,
         system_prompt=_resolve_base_system_prompt(req, settings),
         ip=client_ip,
