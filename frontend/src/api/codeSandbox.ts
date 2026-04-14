@@ -11,6 +11,7 @@ import type {
   CodeSandboxLogStreamEvent,
   CodeSandboxExecutionResponse,
 } from './types'
+import { buildApiUrl } from './urls'
 
 function emitParsedEvent(line: string, onEvent: (event: CodeSandboxLogStreamEvent) => void): void {
   if (!line.startsWith('data: ')) return
@@ -24,7 +25,7 @@ function emitParsedEvent(line: string, onEvent: (event: CodeSandboxLogStreamEven
 export async function executeCodeSandbox(
   request: CodeSandboxExecRequest,
 ): Promise<CodeSandboxExecutionResponse> {
-  const resp = await fetch('./api/code-sandbox/exec', {
+  const resp = await fetch(buildApiUrl('/code-sandbox/exec'), {
     method: 'POST',
     headers: buildApiHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(request),
@@ -36,7 +37,7 @@ export async function executeCodeSandbox(
 export async function fetchCodeSandboxExecution(
   executionId: string,
 ): Promise<CodeSandboxExecutionResponse> {
-  const resp = await fetch(`./api/code-sandbox/executions/${executionId}`, {
+  const resp = await fetch(buildApiUrl(`/code-sandbox/executions/${executionId}`), {
     headers: buildApiHeaders(),
   })
   if (!resp.ok) throw new Error(await buildApiErrorMessage(resp, 'Code sandbox API'))
@@ -46,7 +47,7 @@ export async function fetchCodeSandboxExecution(
 export async function fetchCodeSandboxExecutionEvents(
   executionId: string,
 ): Promise<CodeSandboxExecutionEventsResponse> {
-  const resp = await fetch(`./api/code-sandbox/executions/${executionId}/events`, {
+  const resp = await fetch(buildApiUrl(`/code-sandbox/executions/${executionId}/events`), {
     headers: buildApiHeaders(),
   })
   if (!resp.ok) throw new Error(await buildApiErrorMessage(resp, 'Code sandbox API'))
@@ -64,7 +65,10 @@ export function openCodeSandboxLogStream(
   options: CodeSandboxLogStreamOptions,
 ): () => void {
   const controller = new AbortController()
-  const url = new URL(`./api/code-sandbox/executions/${executionId}/logs`, window.location.href)
+  const url = new URL(
+    buildApiUrl(`/code-sandbox/executions/${executionId}/logs`),
+    window.location.origin,
+  )
   if (options.afterSequence && options.afterSequence > 0) {
     url.searchParams.set('after_seq', String(options.afterSequence))
   }

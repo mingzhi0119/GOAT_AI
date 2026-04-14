@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { API_KEY_STORAGE_KEY, OWNER_ID_STORAGE_KEY } from '../api/auth'
 import { uploadMediaImage } from '../api/media'
+import { buildApiUrl } from '../api/urls'
 
 describe('media api', () => {
   afterEach(() => {
@@ -29,7 +30,7 @@ describe('media api', () => {
 
     expect(payload.attachment_id).toBe('att-1')
     expect(mockedFetch).toHaveBeenCalledWith(
-      './api/media/uploads',
+      buildApiUrl('/media/uploads'),
       expect.objectContaining({
         method: 'POST',
         headers: {

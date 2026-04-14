@@ -2,7 +2,7 @@
 
 Strategic Intelligence assistant for Simon Business School, University of Rochester.
 
-- Example public deployment: <https://ai.simonbb.com/mingzhi/> (not the only environment the app can run in)
+- Example public deployment: <https://goat-dev.vercel.app> (frontend) with the public backend currently published at <https://goat-api.duckdns.org>
 - Repo: <https://github.com/mingzhi0119/GOAT_AI>
 - Current snapshot: [docs/governance/PROJECT_STATUS.md](docs/governance/PROJECT_STATUS.md)
 - API contract: [docs/api/API_REFERENCE.md](docs/api/API_REFERENCE.md)
@@ -283,6 +283,7 @@ P1 governance assets now live in-repo too:
 - [docs/api/API_REFERENCE.md](docs/api/API_REFERENCE.md): endpoint contract
 - [docs/api/API_ERRORS.md](docs/api/API_ERRORS.md): stable error envelope and error-code rules
 - [docs/operations/OPERATIONS.md](docs/operations/OPERATIONS.md): deploy, env vars, ops notes
+- [docs/operations/VERCEL_FRONTEND_DEPLOY.md](docs/operations/VERCEL_FRONTEND_DEPLOY.md): Vercel frontend + `goat-api.duckdns.org` split-deploy runbook
 - [docs/operations/SCHOOL_UBUNTU_SERVER.md](docs/operations/SCHOOL_UBUNTU_SERVER.md): school-only Ubuntu server profile for the `ollama-local` helper scripts and service unit
 - [docs/operations/BACKUP_RESTORE.md](docs/operations/BACKUP_RESTORE.md): SQLite backup/restore drill
 - [docs/operations/ROLLBACK.md](docs/operations/ROLLBACK.md): rollback procedure for shared-host deploys

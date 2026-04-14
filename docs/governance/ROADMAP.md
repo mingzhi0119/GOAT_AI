@@ -1,7 +1,7 @@
 # GOAT AI Roadmap
 
 > Last updated: 2026-04-13
-> Current release tag: **v1.2.0**
+> Current release tag: **v1.3.0**
 > Shipped status: [PROJECT_STATUS.md](PROJECT_STATUS.md)
 
 This file tracks **unfinished work only**.

@@ -3,7 +3,7 @@
   "info": {
     "title": "GOAT AI",
     "description": "Simon Business School Strategic Intelligence API",
-    "version": "1.2.0"
+    "version": "1.3.0"
   },
   "paths": {
     "/api/models": {

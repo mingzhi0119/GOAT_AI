@@ -51,6 +51,13 @@ _MATH_LATEX_PROTOCOL = (
     "for display math. Close each formula before continuing the surrounding prose, and "
     "do not emit bare mathematical expressions that rely on the client to guess math formatting."
 )
+_DOWNLOADABLE_ARTIFACT_PROTOCOL = (
+    "If the user asks for a downloadable file or explicitly wants a Markdown, text, CSV, "
+    "XLSX, or DOCX file, produce the answer content normally and include exactly one inline "
+    "Markdown link whose target is just the desired filename, for example `[report.md](report.md)`. "
+    "Use a short ASCII filename with one of these extensions: `.md`, `.txt`, `.csv`, `.xlsx`, "
+    "or `.docx`. Do not claim that you cannot create files when a text-based export would satisfy the request."
+)
 
 _CHART_INTENT_RE = re.compile(
     r"(\b(chart|plot|graph|visuali[sz]e|visualization|trend|compare|comparison|pie)\b|图表|图形|可视化|趋势|对比|饼图)",
@@ -66,7 +73,11 @@ def _compose_system_prompt(
     plan_mode: bool = False,
 ) -> str:
     """Merge base GOAT prompt, optional planning prompt, name, and user instructions."""
-    parts: list[str] = [base_prompt, _MATH_LATEX_PROTOCOL]
+    parts: list[str] = [
+        base_prompt,
+        _MATH_LATEX_PROTOCOL,
+        _DOWNLOADABLE_ARTIFACT_PROTOCOL,
+    ]
     if plan_mode:
         parts.append(
             "Plan mode is enabled. Think through the task in a few concise internal "

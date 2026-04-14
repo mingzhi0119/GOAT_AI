@@ -30,6 +30,16 @@ The following landed or completed content was removed from the active roadmap an
 - landed desktop foundation phases 19 / 19A / 19B
 - previously completed rationale blocks and "landed slice" notes that no longer belonged in an unfinished-work file
 
+## Shipped v1.3.0
+
+The `v1.3.0` checkpoint marks the first successful public split deployment for the
+current GOAT AI stack.
+
+- Frontend hosting now runs on Vercel at `https://goat-dev.vercel.app`, with root-relative `/api/*` calls rewritten to the public backend.
+- The backend is now published through `https://goat-api.duckdns.org` with `nginx` terminating TLS in front of a loopback-only `127.0.0.1:62606` FastAPI/Uvicorn process.
+- Public Ollama access is constrained by a server-side allowlist so deployment callers only see the intended `qwen3:4b`, `llama3.2:3b`, `gemma3:4b`, `qwen2.5-coder:3b`, and `gemma4:26b` model surfaces.
+- Chat export behavior now explicitly teaches the model how to trigger downloadable Markdown and other text-first artifacts through a single inline filename link.
+
 ## Shipped v1.2.0
 
 Phases 11-15 are complete and documented. The shipped release also includes the frontend control-surface polish landed on `main`.

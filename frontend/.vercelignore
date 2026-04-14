@@ -1,0 +1,10 @@
+# Desktop packaging artifacts are not part of the Vercel-hosted web app.
+src-tauri/target
+src-tauri/binaries
+src-tauri/.desktop-sidecar-build
+
+# Local/frontend-generated outputs should not be uploaded as source.
+dist
+test-results
+playwright-report
+coverage

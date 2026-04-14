@@ -58,7 +58,7 @@ def test_release_rollback_drill_restores_known_good_bundle_and_manifest_chain() 
         known_good_bundle, known_good_manifest = _build_bundle(
             known_good_repo,
             artifacts_root,
-            "refs/tags/v1.2.0",
+            "refs/tags/v1.3.0",
             "known-good-sha",
         )
         candidate_bundle, candidate_manifest = _build_bundle(

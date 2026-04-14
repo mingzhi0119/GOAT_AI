@@ -56,6 +56,8 @@ class ChatOptionsTests(unittest.TestCase):
         self.assertIn("lower priority than the base system instructions", prompt)
         self.assertIn("Use `$...$` for inline math", prompt)
         self.assertIn("do not emit bare mathematical expressions", prompt)
+        self.assertIn("If the user asks for a downloadable file", prompt)
+        self.assertIn("[report.md](report.md)", prompt)
 
     def test_theme_default_prompts_vary_by_theme(self) -> None:
         classic = default_system_prompt_for_theme("classic")

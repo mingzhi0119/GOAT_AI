@@ -1,6 +1,7 @@
 import { buildApiHeaders } from './auth'
 import { buildApiErrorMessage } from './errors'
 import { parseMediaUploadResponse } from './runtimeSchemas'
+import { buildApiUrl } from './urls'
 
 /** POST /api/media/uploads - vision image attachments. */
 export interface MediaUploadResponse {
@@ -15,7 +16,7 @@ export interface MediaUploadResponse {
 export async function uploadMediaImage(file: File): Promise<MediaUploadResponse> {
   const body = new FormData()
   body.append('file', file)
-  const resp = await fetch('./api/media/uploads', {
+  const resp = await fetch(buildApiUrl('/media/uploads'), {
     method: 'POST',
     headers: buildApiHeaders(),
     body,

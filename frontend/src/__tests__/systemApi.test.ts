@@ -6,6 +6,7 @@ import {
   fetchInferenceLatency,
   fetchSystemFeatures,
 } from '../api/system'
+import { buildApiUrl } from '../api/urls'
 
 describe('system api', () => {
   afterEach(() => {
@@ -34,7 +35,7 @@ describe('system api', () => {
     vi.stubGlobal('fetch', mockedFetch)
     const payload = await fetchGpuStatus()
     expect(payload.available).toBe(true)
-    expect(mockedFetch).toHaveBeenCalledWith('./api/system/gpu', {
+    expect(mockedFetch).toHaveBeenCalledWith(buildApiUrl('/system/gpu'), {
       headers: {
         'X-GOAT-API-Key': 'secret-123',
         'X-GOAT-Owner-Id': 'alice',
@@ -73,7 +74,7 @@ describe('system api', () => {
     vi.stubGlobal('fetch', mockedFetch)
     const payload = await fetchInferenceLatency()
     expect(payload.chat_sample_count).toBe(3)
-    expect(mockedFetch).toHaveBeenCalledWith('./api/system/inference', {
+    expect(mockedFetch).toHaveBeenCalledWith(buildApiUrl('/system/inference'), {
       headers: {
         'X-GOAT-API-Key': 'secret-123',
         'X-GOAT-Owner-Id': 'alice',
@@ -153,7 +154,7 @@ describe('system api', () => {
     const payload = await fetchSystemFeatures()
     expect(payload.code_sandbox.policy_allowed).toBe(false)
     expect(payload.workbench.agent_tasks.effective_enabled).toBe(true)
-    expect(mockedFetch).toHaveBeenCalledWith('./api/system/features', {
+    expect(mockedFetch).toHaveBeenCalledWith(buildApiUrl('/system/features'), {
       headers: {
         'X-GOAT-API-Key': 'secret-123',
         'X-GOAT-Owner-Id': 'alice',
@@ -324,7 +325,7 @@ describe('system api', () => {
     const payload = await fetchDesktopDiagnostics()
     expect(payload.desktop_mode).toBe(true)
     expect(payload.packaged_shell_log_path).toContain('desktop-shell.log')
-    expect(mockedFetch).toHaveBeenCalledWith('./api/system/desktop', {
+    expect(mockedFetch).toHaveBeenCalledWith(buildApiUrl('/system/desktop'), {
       headers: {
         'X-GOAT-API-Key': 'secret-123',
         'X-GOAT-Owner-Id': 'alice',

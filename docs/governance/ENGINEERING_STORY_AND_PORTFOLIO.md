@@ -94,7 +94,7 @@ These are worth a **"Trade-offs"** subsection on a homepage. Align wording with 
 
 ## 5. Verifiable outcomes (what visitors can check)
 
-Now that Phases 13-15 are complete and `v1.2.0` aligns the shipped docs, your homepage or README should point to **concrete hooks**:
+Now that Phases 13-15 are complete and `v1.3.0` aligns the shipped docs plus the first live split deployment, your homepage or README should point to **concrete hooks**:
 
 | Area | Example of verifiable claim |
 |------|------------------------------|
@@ -169,15 +169,17 @@ The differentiator is not the stack list; it is **the documented path from demo-
 
 ---
 
-### 8. Current portfolio posture at v1.2.0
+### 8. Current portfolio posture at v1.3.0
 
-`v1.2.0` is a sensible portfolio checkpoint because the codebase now combines:
+`v1.3.0` is a sensible portfolio checkpoint because the codebase now combines:
 
 - completed backend industrialization and hardening across Phases 11-15
 - a real retrieval and media path rather than a chat-only shell
 - frontend control-surface polish that makes upload management, model controls, options, and dark-mode presentation look like a maintained product
+- a live public split deployment with Vercel serving the frontend and a loopback-only Ubuntu backend published through Duck DNS + nginx/TLS
 - the first credible workbench/runtime layer: durable task creation, polling, event timelines, source registry, and minimal retrieval-backed task execution
 - capability-gated feature reporting that separates "operator enabled" from "actually runnable right now"
+- server-side public model policy and taught downloadable-artifact prompting, so the deployed product surface stays bounded while still producing user-downloadable Markdown/text outputs
 - clearer multi-thread development governance via ownership, review, and contract-sync discipline
 - supporting docs that explain not just what shipped, but why the sequencing and trade-offs were chosen
 

@@ -18,7 +18,7 @@ def test_build_provenance_payload_records_artifact_and_optional_sbom(
 
     payload = subject.build_provenance_payload(
         artifact=artifact,
-        release_ref="refs/tags/v1.2.0",
+        release_ref="refs/tags/v1.3.0",
         resolved_sha="abc123",
         platform_label="linux-x64",
         target_triple="x86_64-unknown-linux-gnu",
@@ -38,7 +38,7 @@ def test_build_provenance_payload_requires_existing_artifact(tmp_path: Path) -> 
     with pytest.raises(SystemExit, match="Expected Linux desktop artifact"):
         subject.build_provenance_payload(
             artifact=missing,
-            release_ref="refs/tags/v1.2.0",
+            release_ref="refs/tags/v1.3.0",
             resolved_sha="abc123",
             platform_label="linux-x64",
             target_triple="x86_64-unknown-linux-gnu",
@@ -56,7 +56,7 @@ def test_main_writes_json_output(tmp_path: Path, monkeypatch) -> None:
         lambda: _parser_with_namespace(
             artifact=str(artifact),
             output=str(output_path),
-            release_ref="refs/tags/v1.2.0",
+            release_ref="refs/tags/v1.3.0",
             resolved_sha="abc123",
             platform="linux-x64",
             target_triple="x86_64-unknown-linux-gnu",
