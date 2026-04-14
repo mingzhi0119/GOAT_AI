@@ -13,10 +13,10 @@ from backend.api_errors import (
     RATE_LIMITED,
     build_error_body,
 )
+from backend.application.ports import Settings
 from backend.models.auth import SharedAccessLoginRequest, SharedAccessSessionResponse
 from backend.models.common import ErrorResponse
 from backend.platform.config import get_settings
-from backend.types import Settings
 from backend.services.browser_access_session import (
     SharedAccessSession,
     clear_shared_access_cookie,
