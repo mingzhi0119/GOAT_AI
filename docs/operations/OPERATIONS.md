@@ -362,7 +362,7 @@ live in the configured bucket/prefix while SQLite metadata remains local.
 | `GOAT_DEPLOY_MODE` | `0=local`, `1=school_server`, `2=remote` | required |
 | `GOAT_SERVER_PORT` | Preferred server port | `62606` |
 | `GOAT_LOCAL_PORT` | Deprecated alias (single-port policy uses `GOAT_SERVER_PORT`) | `62606` |
-| `GIT_REF` | Explicit branch/tag/commit checkout target for rollback deploys | `main` |
+| `GIT_REF` | Explicit branch/tag/commit checkout target for rollback deploys | current checkout |
 | `GOAT_GPU_UUID` | Preferred GPU UUID | empty |
 | `GOAT_GPU_INDEX` | GPU index fallback | `0` |
 | `GOAT_LATENCY_ROLLING_MAX_SAMPLES` | Inference average sample window | `20` |
