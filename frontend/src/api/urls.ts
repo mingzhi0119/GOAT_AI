@@ -1,7 +1,15 @@
 const ABSOLUTE_URL_PATTERN = /^[a-z][a-z0-9+.-]*:\/\//i
 
+function resolveAgainstAppBase(path: string): string {
+  if (typeof document === 'undefined' || !document.baseURI) {
+    return `/${path}`
+  }
+  return new URL(path, document.baseURI).toString()
+}
+
 /**
- * Normalize internal API paths to root-relative `/api/...` URLs.
+ * Normalize internal API paths to app-relative `api/...` URLs so the SPA keeps
+ * working behind sub-path proxies such as `/mingzhi/`.
  * Keeps absolute URLs unchanged so artifact downloads can still point elsewhere.
  */
 export function buildApiUrl(path: string): string {
@@ -18,14 +26,17 @@ export function buildApiUrl(path: string): string {
     normalized = normalized.slice(1)
   }
 
-  if (normalized === '/api' || normalized.startsWith('/api/')) {
-    return normalized
+  if (normalized === '/api') {
+    return resolveAgainstAppBase('api')
+  }
+  if (normalized.startsWith('/api/')) {
+    return resolveAgainstAppBase(normalized.slice(1))
   }
   if (normalized === 'api' || normalized.startsWith('api/')) {
-    return `/${normalized}`
+    return resolveAgainstAppBase(normalized)
   }
   if (normalized.startsWith('/')) {
-    return `/api${normalized}`
+    return resolveAgainstAppBase(`api${normalized}`)
   }
-  return `/api/${normalized}`
+  return resolveAgainstAppBase(`api/${normalized}`)
 }

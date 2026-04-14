@@ -120,6 +120,12 @@ sync_requested_ref() {
 
 _goat_systemd_restart() {
   local unit="$1"
+  if [ -z "${XDG_RUNTIME_DIR:-}" ] && [ -d "/run/user/$(id -u)" ]; then
+    export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+  fi
+  if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "${XDG_RUNTIME_DIR:-}/bus" ]; then
+    export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
+  fi
   if systemctl --user is-enabled "$unit" >/dev/null 2>&1; then
     echo "Restarting FastAPI via systemd (${unit})"
     systemctl --user restart "$unit"
@@ -142,6 +148,8 @@ goat_backend_server_deploy() {
   GOAT_LOG_PATH="${GOAT_LOG_PATH:-$GOAT_RUNTIME_ROOT/chat_logs.db}"
   GOAT_DATA_DIR="${GOAT_DATA_DIR:-$GOAT_RUNTIME_ROOT/data}"
   SERVER_PORT="${GOAT_SERVER_PORT:-62606}"
+  BIND_HOST="${GOAT_BIND_HOST:-127.0.0.1}"
+  RUNTIME_HOST="${GOAT_HOST:-127.0.0.1}"
   DEPLOY_LABEL="${DEPLOY_LABEL:-GOAT AI deploy}"
   GOAT_SYSTEMD_UNIT="${GOAT_SYSTEMD_UNIT:-}"
 
@@ -272,8 +280,8 @@ goat_backend_server_deploy() {
   if [ "${SYSTEMD_USED}" != "1" ]; then
     echo "Freeing port ${SERVER_PORT}"
     free_port "${SERVER_PORT}"
-    echo "Starting FastAPI on 127.0.0.1:${SERVER_PORT} (log: ${API_LOG})"
-    export GOAT_HOST="127.0.0.1"
+    echo "Starting FastAPI on ${BIND_HOST}:${SERVER_PORT} (log: ${API_LOG})"
+    export GOAT_HOST="${RUNTIME_HOST}"
     export GOAT_DEPLOY_MODE="${GOAT_DEPLOY_MODE}"
     export GOAT_SERVER_PORT="${SERVER_PORT}"
     export GOAT_LOCAL_PORT="${SERVER_PORT}"
@@ -283,7 +291,7 @@ goat_backend_server_deploy() {
     export GOAT_DATA_DIR="${GOAT_DATA_DIR}"
     nohup "${VENV_DIR}/bin/python" -m uvicorn server:create_app \
       --factory \
-      --host 127.0.0.1 \
+      --host "${BIND_HOST}" \
       --port "${SERVER_PORT}" \
       >> "$API_LOG" 2>&1 &
     echo $! > "$API_PID"

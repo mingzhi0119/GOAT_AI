@@ -37,6 +37,8 @@ dist-ssr
 
 # Environment
 .env
+.env.school-ubuntu
+.env.school_ubuntu
 .env.production
 .env.local
 .env.development.local
