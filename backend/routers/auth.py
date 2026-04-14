@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hmac
-
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 
@@ -24,6 +22,7 @@ from backend.services.browser_access_session import (
     issue_shared_access_session,
     set_shared_access_cookie,
     shared_access_enabled,
+    verify_shared_access_password,
 )
 
 router = APIRouter()
@@ -109,10 +108,7 @@ def login_shared_access(
             ),
             headers={"Retry-After": str(decision.retry_after)},
         )
-    if not hmac.compare_digest(
-        payload.password.strip(),
-        settings.shared_access_password.strip(),
-    ):
+    if not verify_shared_access_password(settings, password=payload.password):
         raise HTTPException(
             status_code=401,
             detail=build_error_body(

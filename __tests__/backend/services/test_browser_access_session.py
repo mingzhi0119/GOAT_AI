@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -8,7 +9,9 @@ from backend.services.browser_access_session import (
     build_shared_access_authorization_context,
     decode_shared_access_session,
     encode_shared_access_session,
+    hash_shared_access_password,
     issue_shared_access_session,
+    verify_shared_access_password,
 )
 from goat_ai.config.settings import Settings
 
@@ -26,7 +29,7 @@ def _settings() -> Settings:
         logo_svg=Path("logo.svg"),
         log_db_path=Path("chat_logs.db"),
         data_dir=Path("data"),
-        shared_access_password="goat-shared",
+        shared_access_password_hash=hash_shared_access_password("goat-shared"),
         shared_access_session_secret="session-secret",
         ready_skip_ollama_probe=True,
     )
@@ -58,6 +61,40 @@ class BrowserAccessSessionTests(unittest.TestCase):
 
         self.assertIsNone(
             decode_shared_access_session(tampered, settings=settings, now=now)
+        )
+
+    def test_decode_rejects_expired_cookie(self) -> None:
+        settings = _settings()
+        now = datetime(2026, 4, 13, 12, 0, 0, tzinfo=timezone.utc)
+        session = issue_shared_access_session(settings, now=now)
+        encoded = encode_shared_access_session(session=session, settings=settings)
+
+        self.assertIsNone(
+            decode_shared_access_session(
+                encoded,
+                settings=settings,
+                now=datetime(2026, 5, 14, 12, 0, 1, tzinfo=timezone.utc),
+            )
+        )
+
+    def test_verify_shared_access_password_uses_pwdlib_hash(self) -> None:
+        settings = _settings()
+
+        self.assertTrue(verify_shared_access_password(settings, password="goat-shared"))
+        self.assertFalse(
+            verify_shared_access_password(settings, password="wrong-password")
+        )
+
+    def test_verify_shared_access_password_supports_plaintext_fallback(self) -> None:
+        settings = replace(
+            _settings(),
+            shared_access_password="goat-shared",
+            shared_access_password_hash="",
+        )
+
+        self.assertTrue(verify_shared_access_password(settings, password="goat-shared"))
+        self.assertFalse(
+            verify_shared_access_password(settings, password="wrong-password")
         )
 
     def test_build_shared_access_authorization_context_uses_browser_identity(

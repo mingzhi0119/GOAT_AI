@@ -74,7 +74,8 @@ and shared browser access is disabled, open the browser UI settings menu and
 populate `Protected access` with the shared API key and, when required, the
 owner ID. The SPA stores those values locally in the browser and attaches
 `X-GOAT-API-Key` / `X-GOAT-Owner-Id` to runtime API calls.
-If `GOAT_SHARED_ACCESS_PASSWORD` is enabled, the browser UI instead shows a
+If `GOAT_SHARED_ACCESS_PASSWORD_HASH` is enabled, or the legacy plaintext
+`GOAT_SHARED_ACCESS_PASSWORD` fallback is still in use, the browser UI instead shows a
 shared site-password gate and stores access in an HttpOnly signed cookie; the
 public UI no longer needs a manually entered owner id.
 Frontend API contract types are generated from `docs/api/openapi.json`; refresh them
@@ -317,8 +318,9 @@ live in the configured bucket/prefix while SQLite metadata remains local.
 | `GOAT_API_KEY` | Protect non-health APIs via `X-GOAT-API-Key` | empty |
 | `GOAT_API_KEY_WRITE` | Optional second key: `GET`/`HEAD`/`OPTIONS` may use read key (`GOAT_API_KEY`); other methods require this write key when set | empty |
 | `GOAT_API_CREDENTIALS_JSON` | Optional JSON credential registry; each entry may provide `secret` or `secret_sha256`, and when empty the app derives default read/write credentials from `GOAT_API_KEY` and `GOAT_API_KEY_WRITE` | empty |
-| `GOAT_SHARED_ACCESS_PASSWORD` | Optional site password for public browser deployments; when set, the SPA must log in via `/api/auth/login` before loading history/models/features | empty |
-| `GOAT_SHARED_ACCESS_SESSION_SECRET` | Required HMAC signing secret for `goat_access_session` cookies when `GOAT_SHARED_ACCESS_PASSWORD` is set | empty |
+| `GOAT_SHARED_ACCESS_PASSWORD_HASH` | Preferred `pwdlib` hash for the shared site password on public browser deployments | empty |
+| `GOAT_SHARED_ACCESS_PASSWORD` | Legacy plaintext fallback for the shared site password; avoid in production when `GOAT_SHARED_ACCESS_PASSWORD_HASH` can be used instead | empty |
+| `GOAT_SHARED_ACCESS_SESSION_SECRET` | Required signing secret for `goat_access_session` cookies when shared browser access is enabled | empty |
 | `GOAT_SHARED_ACCESS_SESSION_TTL_SEC` | Browser-session cookie TTL in seconds for shared browser access | `2592000` |
 | `GOAT_REQUIRE_SESSION_OWNER` | When `true`/`1`, chat and history routes require `X-GOAT-Owner-Id` (session scoping) | `false` |
 | `GOAT_RATE_LIMIT_WINDOW_SEC` | Rate limit window | `60` |
@@ -467,11 +469,17 @@ owner-scoped reads isolated per browser.
 
 Configuration:
 
-- set `GOAT_SHARED_ACCESS_PASSWORD` to the public site password
+- set `GOAT_SHARED_ACCESS_PASSWORD_HASH` to a `pwdlib` hash of the public site password
 - set `GOAT_SHARED_ACCESS_SESSION_SECRET` to a long random signing secret
 - optionally tune `GOAT_SHARED_ACCESS_SESSION_TTL_SEC` (default `2592000`, or 30 days)
 - keep `GOAT_API_KEY` / `GOAT_API_KEY_WRITE` only for scripts or operator paths that
   still need header-based credentials
+
+Generate the hash with:
+
+```bash
+python -c "from pwdlib import PasswordHash; print(PasswordHash.recommended().hash('replace-with-a-site-password'))"
+```
 
 Runtime behavior:
 
@@ -487,7 +495,7 @@ Runtime behavior:
 
 Minimum rollout order:
 
-1. Set `GOAT_SHARED_ACCESS_PASSWORD`, `GOAT_SHARED_ACCESS_SESSION_SECRET`, and
+1. Set `GOAT_SHARED_ACCESS_PASSWORD_HASH`, `GOAT_SHARED_ACCESS_SESSION_SECRET`, and
    optionally `GOAT_SHARED_ACCESS_SESSION_TTL_SEC`.
 2. Restart the backend.
 3. Verify:
