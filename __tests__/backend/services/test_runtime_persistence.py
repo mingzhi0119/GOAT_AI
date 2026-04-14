@@ -5,6 +5,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from backend.services.account_repository import (
+    PostgresAccountRepository,
+    SQLiteAccountRepository,
+)
 from backend.services.chat_runtime import (
     PostgresConversationLogger,
     PostgresSessionRepository,
@@ -28,6 +32,7 @@ from backend.services.media_service import (
     SQLiteMediaRepository,
 )
 from backend.services.runtime_persistence import (
+    build_account_repository,
     build_code_sandbox_execution_repository,
     build_conversation_logger,
     build_idempotency_store,
@@ -91,6 +96,9 @@ class RuntimePersistenceFactoryTests(unittest.TestCase):
             build_knowledge_repository(settings), SQLiteKnowledgeRepository
         )
         self.assertIsInstance(build_media_repository(settings), SQLiteMediaRepository)
+        self.assertIsInstance(
+            build_account_repository(settings), SQLiteAccountRepository
+        )
         self.assertIsInstance(build_idempotency_store(settings), SQLiteIdempotencyStore)
         self.assertEqual("sqlite-first", runtime_storage_model_label(settings))
 
@@ -115,6 +123,9 @@ class RuntimePersistenceFactoryTests(unittest.TestCase):
             build_knowledge_repository(settings), PostgresKnowledgeRepository
         )
         self.assertIsInstance(build_media_repository(settings), PostgresMediaRepository)
+        self.assertIsInstance(
+            build_account_repository(settings), PostgresAccountRepository
+        )
         self.assertIsInstance(
             build_idempotency_store(settings), PostgresIdempotencyStore
         )

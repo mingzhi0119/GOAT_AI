@@ -17,7 +17,7 @@ class PostgresRuntimeMigrationsTests(unittest.TestCase):
             run_postgres_runtime_migrations(dsn)
             run_postgres_runtime_migrations(dsn)
 
-            self.assertEqual("20260413_01", current_postgres_alembic_revision(dsn))
+            self.assertEqual("20260414_01", current_postgres_alembic_revision(dsn))
             with postgres_connect(dsn) as conn:
                 ensure_postgres_runtime_metadata_tables_exist(conn)
                 conversations_columns = {
@@ -32,6 +32,18 @@ class PostgresRuntimeMigrationsTests(unittest.TestCase):
                 }
                 self.assertIn("session_id", conversations_columns)
                 self.assertIn("user_name", conversations_columns)
+                auth_user_columns = {
+                    str(row["column_name"])
+                    for row in conn.execute(
+                        """
+                        SELECT column_name
+                        FROM information_schema.columns
+                        WHERE table_name = 'auth_users'
+                        """
+                    ).fetchall()
+                }
+                self.assertIn("email", auth_user_columns)
+                self.assertIn("primary_provider", auth_user_columns)
 
 
 if __name__ == "__main__":

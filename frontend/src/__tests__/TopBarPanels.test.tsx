@@ -66,7 +66,7 @@ describe('TopBarPanels', () => {
         onMaxTokensChange={onMaxTokensChange}
         onTopPChange={onTopPChange}
         onResetAdvanced={onResetAdvanced}
-        sharedAccessSession={null}
+        browserAuthSession={null}
         isSigningOut={false}
         onLogout={vi.fn()}
         onOpenAppearance={onOpenAppearance}
@@ -139,7 +139,7 @@ describe('TopBarPanels', () => {
         onMaxTokensChange={vi.fn()}
         onTopPChange={vi.fn()}
         onResetAdvanced={vi.fn()}
-        sharedAccessSession={null}
+        browserAuthSession={null}
         isSigningOut={false}
         onLogout={vi.fn()}
         onOpenAppearance={vi.fn()}
@@ -189,7 +189,7 @@ describe('TopBarPanels', () => {
         onMaxTokensChange={vi.fn()}
         onTopPChange={vi.fn()}
         onResetAdvanced={vi.fn()}
-        sharedAccessSession={null}
+        browserAuthSession={null}
         isSigningOut={false}
         onLogout={vi.fn()}
         onOpenAppearance={vi.fn()}
@@ -226,7 +226,7 @@ describe('TopBarPanels', () => {
         onMaxTokensChange={vi.fn()}
         onTopPChange={vi.fn()}
         onResetAdvanced={vi.fn()}
-        sharedAccessSession={null}
+        browserAuthSession={null}
         isSigningOut={false}
         onLogout={vi.fn()}
         onOpenAppearance={vi.fn()}
@@ -248,7 +248,7 @@ describe('TopBarPanels', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('replaces protected access inputs with shared session controls when browser auth is required', () => {
+  it('replaces protected access inputs with browser session controls when browser auth is required', () => {
     const onLogout = vi.fn()
 
     render(
@@ -271,10 +271,18 @@ describe('TopBarPanels', () => {
         onMaxTokensChange={vi.fn()}
         onTopPChange={vi.fn()}
         onResetAdvanced={vi.fn()}
-        sharedAccessSession={{
+        browserAuthSession={{
           auth_required: true,
           authenticated: true,
           expires_at: '2026-05-13T20:00:00Z',
+          available_login_methods: ['account_password', 'google'],
+          active_login_method: 'account_password',
+          user: {
+            id: 'user-1',
+            email: 'user@example.com',
+            display_name: 'User Example',
+            provider: 'local',
+          },
         }}
         isSigningOut={false}
         onLogout={onLogout}
@@ -284,6 +292,7 @@ describe('TopBarPanels', () => {
     )
 
     expect(screen.getByText('Session')).toBeInTheDocument()
+    expect(screen.getByText('User Example (user@example.com)')).toBeInTheDocument()
     expect(screen.queryByLabelText('API key')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Owner ID')).not.toBeInTheDocument()
 

@@ -124,6 +124,19 @@ def build_media_repository(settings: Settings):
     _raise_unsupported_backend(settings)
 
 
+def build_account_repository(settings: Settings):
+    """Return the active account metadata repository implementation."""
+    if settings.runtime_metadata_backend == "sqlite":
+        from backend.services.account_repository import SQLiteAccountRepository
+
+        return SQLiteAccountRepository(settings.log_db_path)
+    if settings.runtime_metadata_backend == "postgres":
+        from backend.services.account_repository import PostgresAccountRepository
+
+        return PostgresAccountRepository(settings.runtime_postgres_dsn)
+    _raise_unsupported_backend(settings)
+
+
 def build_idempotency_store(settings: Settings, *, clock: Clock | None = None):
     """Return the active idempotency store implementation."""
     if settings.runtime_metadata_backend == "sqlite":

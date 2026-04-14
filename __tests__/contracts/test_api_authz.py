@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 import io
 from pathlib import Path
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlparse
 
 try:
     from fastapi.testclient import TestClient
@@ -17,6 +18,9 @@ except ImportError:  # pragma: no cover
 
 from backend.api_errors import (
     AUTH_INVALID_ACCESS_PASSWORD,
+    AUTH_INVALID_ACCOUNT_CREDENTIALS,
+    AUTH_INVALID_GOOGLE_STATE,
+    AUTH_INVALID_GOOGLE_TOKEN,
     AUTH_LOGIN_REQUIRED,
     AUTH_SESSION_OWNER_REQUIRED,
     AUTH_WRITE_KEY_REQUIRED,
@@ -46,6 +50,9 @@ if TestClient is not None:
         SandboxProviderResult,
     )
     from backend.services import log_service
+    from backend.services.account_repository import AccountUser
+    from backend.services.password_hashing import hash_password
+    from backend.services.runtime_persistence import build_account_repository
     from backend.services.browser_access_session import hash_shared_access_password
     from backend.services.session_message_codec import (
         SESSION_PAYLOAD_VERSION,
@@ -79,6 +86,15 @@ class AuthzNoopCodeSandboxDispatcher:
 class AuthzNoopWorkbenchTaskDispatcher:
     def dispatch_task(self, *, task_id: str, request_id: str = "") -> None:
         _ = (task_id, request_id)
+
+
+class FakeGoogleResponse:
+    def __init__(self, *, status_code: int, payload: dict[str, object]) -> None:
+        self.status_code = status_code
+        self._payload = payload
+
+    def json(self) -> dict[str, object]:
+        return dict(self._payload)
 
 
 @unittest.skipUnless(TestClient is not None, "fastapi not installed")
@@ -833,9 +849,12 @@ class SharedAccessApiAuthzTests(unittest.TestCase):
         self.assertEqual(200, session.status_code)
         self.assertEqual(
             {
+                "active_login_method": None,
                 "auth_required": True,
                 "authenticated": False,
+                "available_login_methods": ["shared_password"],
                 "expires_at": None,
+                "user": None,
             },
             session.json(),
         )
@@ -939,6 +958,222 @@ class SharedAccessApiAuthzTests(unittest.TestCase):
         self.assertEqual(
             'attachment; filename="brief.md"',
             allowed.headers["content-disposition"],
+        )
+
+
+@unittest.skipUnless(TestClient is not None, "fastapi not installed")
+class AccountBrowserAuthApiAuthzTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        root = Path(self.tmpdir.name)
+        self.settings = Settings(
+            ollama_base_url="http://127.0.0.1:11434",
+            generate_timeout=120,
+            max_upload_mb=20,
+            max_upload_bytes=20 * 1024 * 1024,
+            max_dataframe_rows=50000,
+            use_chat_api=True,
+            system_prompt="test system prompt",
+            app_root=root,
+            logo_svg=root / "logo.svg",
+            log_db_path=root / "chat_logs.db",
+            data_dir=root / "data",
+            object_store_root=root / "object-store",
+            account_auth_enabled=True,
+            browser_session_secret="browser-secret",
+            google_client_id="google-client-id",
+            google_client_secret="google-client-secret",
+            google_redirect_uri="https://testserver/",
+            ready_skip_ollama_probe=True,
+        )
+        log_service.init_db(self.settings.log_db_path)
+
+        app = create_app()
+        app.dependency_overrides[get_settings] = lambda: self.settings
+        app.dependency_overrides[get_llm_client] = lambda: ContractFakeLLM()
+        app.dependency_overrides[get_title_generator] = lambda: FakeTitleGenerator()
+        self.client = TestClient(app, base_url="https://testserver")
+        self.other_client = TestClient(app, base_url="https://testserver")
+
+    def tearDown(self) -> None:
+        self.client.close()
+        self.other_client.close()
+        self.tmpdir.cleanup()
+
+    def _create_local_user(
+        self,
+        *,
+        email: str,
+        password: str,
+        display_name: str = "Local User",
+    ) -> AccountUser:
+        repository = build_account_repository(self.settings)
+        user = AccountUser(
+            id="user-local-1",
+            email=email,
+            password_hash=hash_password(password),
+            display_name=display_name,
+            primary_provider="local",
+            created_at="2026-04-14T12:00:00+00:00",
+            updated_at="2026-04-14T12:00:00+00:00",
+        )
+        repository.create_user(user)
+        return user
+
+    def _login_local(self, client: TestClient, *, email: str, password: str) -> None:
+        response = client.post(
+            "/api/auth/account/login",
+            json={"email": email, "password": password},
+        )
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("account_password", response.json()["active_login_method"])
+
+    def test_account_auth_requires_login_for_history(self) -> None:
+        response = self.client.get("/api/auth/session")
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(
+            {
+                "auth_required": True,
+                "authenticated": False,
+                "expires_at": None,
+                "available_login_methods": ["account_password", "google"],
+                "active_login_method": None,
+                "user": None,
+            },
+            response.json(),
+        )
+        history = self.client.get("/api/history")
+        self.assertEqual(401, history.status_code)
+        self.assertEqual(AUTH_LOGIN_REQUIRED, history.json()["code"])
+
+    def test_account_login_rejects_invalid_password(self) -> None:
+        self._create_local_user(email="user@example.com", password="correct-password")
+
+        response = self.client.post(
+            "/api/auth/account/login",
+            json={"email": "user@example.com", "password": "wrong-password"},
+        )
+
+        self.assertEqual(401, response.status_code)
+        self.assertEqual(AUTH_INVALID_ACCOUNT_CREDENTIALS, response.json()["code"])
+
+    def test_account_login_uses_stable_user_history_across_browsers(self) -> None:
+        self._create_local_user(email="user@example.com", password="correct-password")
+
+        self._login_local(
+            self.client,
+            email="user@example.com",
+            password="correct-password",
+        )
+        self._login_local(
+            self.other_client,
+            email="user@example.com",
+            password="correct-password",
+        )
+
+        create = self.client.post(
+            "/api/chat",
+            json={
+                "model": "blackbox-model",
+                "session_id": "account-shared-1",
+                "messages": [{"role": "user", "content": "hello from account"}],
+            },
+        )
+        self.assertEqual(200, create.status_code)
+
+        history = self.other_client.get("/api/history")
+        self.assertEqual(
+            ["account-shared-1"],
+            [item["id"] for item in history.json()["sessions"]],
+        )
+
+    def test_google_login_rejects_invalid_state(self) -> None:
+        response = self.client.post(
+            "/api/auth/account/google",
+            json={"code": "auth-code", "state": "missing-state"},
+        )
+
+        self.assertEqual(401, response.status_code)
+        self.assertEqual(AUTH_INVALID_GOOGLE_STATE, response.json()["code"])
+
+    @patch(
+        "backend.services.google_oauth_service.requests.post",
+        return_value=FakeGoogleResponse(status_code=400, payload={}),
+    )
+    def test_google_login_rejects_invalid_token(self, _mock_post: object) -> None:
+        url_response = self.client.get("/api/auth/account/google/url")
+        state = parse_qs(urlparse(url_response.json()["authorization_url"]).query)[
+            "state"
+        ][0]
+
+        response = self.client.post(
+            "/api/auth/account/google",
+            json={"code": "bad-code", "state": state},
+        )
+
+        self.assertEqual(401, response.status_code)
+        self.assertEqual(AUTH_INVALID_GOOGLE_TOKEN, response.json()["code"])
+
+    @patch(
+        "backend.services.google_oauth_service.requests.get",
+        return_value=FakeGoogleResponse(
+            status_code=200,
+            payload={
+                "aud": "google-client-id",
+                "iss": "https://accounts.google.com",
+                "sub": "google-subject-1",
+                "email": "user@example.com",
+                "email_verified": "true",
+                "name": "Google User",
+                "exp": str(int(datetime.now(timezone.utc).timestamp()) + 3600),
+            },
+        ),
+    )
+    @patch(
+        "backend.services.google_oauth_service.requests.post",
+        return_value=FakeGoogleResponse(
+            status_code=200,
+            payload={"id_token": "google-id-token"},
+        ),
+    )
+    def test_google_login_binds_existing_local_account(
+        self,
+        _mock_post: object,
+        _mock_get: object,
+    ) -> None:
+        self._create_local_user(email="user@example.com", password="correct-password")
+        url_response = self.client.get("/api/auth/account/google/url")
+        state = parse_qs(urlparse(url_response.json()["authorization_url"]).query)[
+            "state"
+        ][0]
+
+        google_login = self.client.post(
+            "/api/auth/account/google",
+            json={"code": "good-code", "state": state},
+        )
+        self.assertEqual(200, google_login.status_code)
+        self.assertEqual("google", google_login.json()["active_login_method"])
+        self.assertEqual("user@example.com", google_login.json()["user"]["email"])
+
+        create = self.client.post(
+            "/api/chat",
+            json={
+                "model": "blackbox-model",
+                "session_id": "google-history-1",
+                "messages": [{"role": "user", "content": "hello from google"}],
+            },
+        )
+        self.assertEqual(200, create.status_code)
+
+        self._login_local(
+            self.other_client,
+            email="user@example.com",
+            password="correct-password",
+        )
+        history = self.other_client.get("/api/history")
+        self.assertEqual(
+            ["google-history-1"],
+            [item["id"] for item in history.json()["sessions"]],
         )
 
 

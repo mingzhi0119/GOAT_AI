@@ -29,7 +29,7 @@ export interface SettingsPanelProps {
   temperature: number
   maxTokens: number
   topP: number
-  sharedAccessSession: BrowserAuthSession | null
+  browserAuthSession: BrowserAuthSession | null
   isSigningOut: boolean
   onApiKeyChange: (value: string) => void
   onOwnerIdChange: (value: string) => void
@@ -211,7 +211,7 @@ function formatSessionExpiry(expiresAt: string | null | undefined): string {
   return `Signed in until ${parsed.toLocaleString()}`
 }
 
-function SharedAccessSessionSection({
+function BrowserAuthSessionSection({
   session,
   isSigningOut,
   onLogout,
@@ -229,10 +229,17 @@ function SharedAccessSessionSection({
         >
           Session
         </p>
+        {session.authenticated && (
+          <p className="mt-1 text-xs font-medium" style={{ color: 'var(--text-main)' }}>
+            {session.user
+              ? `${session.user.display_name} (${session.user.email})`
+              : 'Shared password session'}
+          </p>
+        )}
         <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
           {session.authenticated
             ? formatSessionExpiry(session.expires_at)
-            : 'Shared access sign-in required for this deployment.'}
+            : 'Browser sign-in required for this deployment.'}
         </p>
       </div>
       <button
@@ -747,7 +754,7 @@ export function SettingsPanel({
   temperature,
   maxTokens,
   topP,
-  sharedAccessSession,
+  browserAuthSession,
   isSigningOut,
   onApiKeyChange,
   onOwnerIdChange,
@@ -821,7 +828,7 @@ export function SettingsPanel({
             Settings
           </p>
           <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-            {sharedAccessSession?.auth_required
+            {browserAuthSession?.auth_required
               ? 'Tune instructions, session access, and generation defaults.'
               : 'Tune instructions, protected access, and generation defaults.'}
           </p>
@@ -845,9 +852,9 @@ export function SettingsPanel({
           systemInstruction={systemInstruction}
           onSystemInstructionChange={onSystemInstructionChange}
         />
-        {sharedAccessSession?.auth_required ? (
-          <SharedAccessSessionSection
-            session={sharedAccessSession}
+        {browserAuthSession?.auth_required ? (
+          <BrowserAuthSessionSection
+            session={browserAuthSession}
             isSigningOut={isSigningOut}
             onLogout={onLogout}
           />

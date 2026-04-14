@@ -4,7 +4,7 @@ import TopBar from '../components/TopBar'
 
 function buildSharedAccessProps() {
   return {
-    sharedAccessSession: null,
+    browserAuthSession: null,
     isSigningOut: false,
     onLogout: vi.fn(),
   }

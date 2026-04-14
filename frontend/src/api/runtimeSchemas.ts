@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type {
   BrowserAuthSession,
+  BrowserAuthUser,
   ChatStreamEvent,
   CodeSandboxExecutionEventsResponse,
   CodeSandboxExecutionResponse,
@@ -8,6 +9,7 @@ import type {
   CodeSandboxLogStreamEvent,
   DesktopDiagnostics,
   GPUStatus,
+  GoogleOAuthUrlResponse,
   HistorySessionDetail,
   HistorySessionItem,
   InferenceLatency,
@@ -32,6 +34,8 @@ const codeSandboxNetworkPolicies = ['disabled'] as const
 const chatKinds = ['line', 'bar', 'stacked_bar', 'area', 'scatter', 'pie'] as const
 const historyChartDataSources = ['uploaded', 'demo', 'none'] as const
 const codeSandboxLogEventTypes = ['stdout', 'stderr', 'status', 'done'] as const
+const browserLoginMethods = ['shared_password', 'account_password', 'google'] as const
+const browserAuthProviders = ['local', 'google'] as const
 
 const unknownRecordSchema = z.record(z.string(), z.unknown())
 const stringOrNumberRecordSchema = z.record(z.string(), z.union([z.string(), z.number()]))
@@ -184,10 +188,35 @@ const desktopDiagnosticsSchema = z.object({
   packaged_shell_log_path: optionalNullableStringSchema,
 })
 
+const browserAuthUserSchema: z.ZodType<BrowserAuthUser> = z.object({
+  id: z.string(),
+  email: z.string(),
+  display_name: z.string(),
+  provider: z.enum(browserAuthProviders),
+})
+
 const browserAuthSessionSchema: z.ZodType<BrowserAuthSession> = z.object({
   auth_required: z.boolean(),
   authenticated: z.boolean(),
   expires_at: optionalNullableStringSchema,
+  available_login_methods: z
+    .array(z.enum(browserLoginMethods))
+    .optional()
+    .transform(value => value ?? []),
+  active_login_method: z
+    .enum(browserLoginMethods)
+    .nullable()
+    .optional()
+    .transform(value => value ?? null),
+  user: browserAuthUserSchema
+    .nullable()
+    .optional()
+    .transform(value => value ?? null),
+})
+
+const googleOAuthUrlResponseSchema: z.ZodType<GoogleOAuthUrlResponse> = z.object({
+  authorization_url: z.string(),
+  state_expires_at: z.string(),
 })
 
 const modelsResponseSchema = z.object({
@@ -427,6 +456,10 @@ export function parseDesktopDiagnosticsResponse(payload: unknown): DesktopDiagno
 
 export function parseBrowserAuthSessionResponse(payload: unknown): BrowserAuthSession {
   return parseApiPayload(browserAuthSessionSchema, payload, 'Browser auth session API')
+}
+
+export function parseGoogleOAuthUrlResponse(payload: unknown): GoogleOAuthUrlResponse {
+  return parseApiPayload(googleOAuthUrlResponseSchema, payload, 'Google OAuth URL API')
 }
 
 export function parseModelsResponse(payload: unknown): ModelsResponse {

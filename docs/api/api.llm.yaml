@@ -29,6 +29,38 @@ api:
     503:
       detail: ai backend unavailable
 schemas:
+  AccountLoginRequest:
+    type: object
+    required:
+      - email
+      - password
+    properties:
+      email: string
+      password: string
+  AuthenticatedBrowserUser:
+    type: object
+    required:
+      - id
+      - email
+      - display_name
+      - provider
+    properties:
+      id: string
+      email: string
+      display_name: string
+      provider: local|google
+  BrowserAuthSessionResponse:
+    type: object
+    required:
+      - auth_required
+      - authenticated
+    properties:
+      auth_required: boolean
+      authenticated: boolean
+      expires_at: string|null
+      available_login_methods: shared_password|account_password|google[]
+      active_login_method: shared_password|account_password|google|null
+      user: AuthenticatedBrowserUser|null
   ChatArtifact:
     type: object
     required:
@@ -212,6 +244,22 @@ schemas:
       memory_total_mb: number|null
       temperature_c: number|null
       power_draw_w: number|null
+  GoogleOAuthLoginRequest:
+    type: object
+    required:
+      - code
+      - state
+    properties:
+      code: string
+      state: string
+  GoogleOAuthUrlResponse:
+    type: object
+    required:
+      - authorization_url
+      - state_expires_at
+    properties:
+      authorization_url: string
+      state_expires_at: string
   HistorySessionDetailResponse:
     type: object
     required:
@@ -517,15 +565,6 @@ schemas:
       - password
     properties:
       password: string
-  SharedAccessSessionResponse:
-    type: object
-    required:
-      - auth_required
-      - authenticated
-    properties:
-      auth_required: boolean
-      authenticated: boolean
-      expires_at: string|null
   SystemFeaturesResponse:
     type: object
     required:
@@ -703,7 +742,7 @@ endpoints:
     method: GET
     path: /auth/session
     response:
-      200: SharedAccessSessionResponse
+      200: BrowserAuthSessionResponse
       errors:
         - 429
   - op: login_shared_access
@@ -712,7 +751,38 @@ endpoints:
     body: SharedAccessLoginRequest
     content_type: application/json
     response:
-      200: SharedAccessSessionResponse
+      200: BrowserAuthSessionResponse
+      errors:
+        - 400
+        - 401
+        - 422
+        - 429
+  - op: login_account
+    method: POST
+    path: /auth/account/login
+    body: AccountLoginRequest
+    content_type: application/json
+    response:
+      200: BrowserAuthSessionResponse
+      errors:
+        - 400
+        - 401
+        - 422
+        - 429
+  - op: get_google_login_url
+    method: GET
+    path: /auth/account/google/url
+    response:
+      200: GoogleOAuthUrlResponse
+      errors:
+        - 400
+  - op: login_google_account
+    method: POST
+    path: /auth/account/google
+    body: GoogleOAuthLoginRequest
+    content_type: application/json
+    response:
+      200: BrowserAuthSessionResponse
       errors:
         - 400
         - 401

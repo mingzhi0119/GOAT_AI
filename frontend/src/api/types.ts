@@ -209,7 +209,24 @@ export interface DesktopDiagnostics {
   packaged_shell_log_path: string | null
 }
 
-export type BrowserAuthSession = ApiSchemas['SharedAccessSessionResponse']
+export type BrowserLoginMethod = NonNullable<
+  ApiSchemas['BrowserAuthSessionResponse']['active_login_method']
+>
+export type BrowserAuthAccountProvider = ApiSchemas['AuthenticatedBrowserUser']['provider']
+export type BrowserAuthUser = ApiSchemas['AuthenticatedBrowserUser']
+
+export interface BrowserAuthSession
+  extends Omit<
+    ApiSchemas['BrowserAuthSessionResponse'],
+    'expires_at' | 'available_login_methods' | 'active_login_method' | 'user'
+  > {
+  expires_at: string | null
+  available_login_methods: BrowserLoginMethod[]
+  active_login_method: BrowserLoginMethod | null
+  user: BrowserAuthUser | null
+}
+
+export type GoogleOAuthUrlResponse = ApiSchemas['GoogleOAuthUrlResponse']
 
 export type CodeSandboxRuntimePreset = CodeSandboxExecutionContract['runtime_preset']
 export type CodeSandboxExecutionStatus = CodeSandboxExecutionContract['status']

@@ -52,6 +52,7 @@ class DbMigrationsTests(unittest.TestCase):
                         "020_workbench_workspace_outputs",
                         "021_workbench_task_cancelled_status",
                         "022_storage_object_keys",
+                        "023_auth_accounts",
                     ],
                 )
                 cols = [
@@ -196,6 +197,23 @@ class DbMigrationsTests(unittest.TestCase):
                 self.assertIn("seq", sandbox_log_cols)
                 self.assertIn("stream_name", sandbox_log_cols)
                 self.assertIn("chunk_text", sandbox_log_cols)
+                auth_user_cols = [
+                    r[1]
+                    for r in conn.execute("PRAGMA table_info(auth_users)").fetchall()
+                ]
+                self.assertIn("email", auth_user_cols)
+                self.assertIn("password_hash", auth_user_cols)
+                self.assertIn("display_name", auth_user_cols)
+                self.assertIn("primary_provider", auth_user_cols)
+                auth_identity_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(auth_user_identities)"
+                    ).fetchall()
+                ]
+                self.assertIn("user_id", auth_identity_cols)
+                self.assertIn("provider", auth_identity_cols)
+                self.assertIn("provider_subject", auth_identity_cols)
                 table_names = {
                     str(row[0])
                     for row in conn.execute(
@@ -242,7 +260,7 @@ class DbMigrationsTests(unittest.TestCase):
             conn = sqlite3.connect(db_path)
             try:
                 n = conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]
-                self.assertEqual(n, 22)
+                self.assertEqual(n, 23)
                 cols = [
                     r[1]
                     for r in conn.execute("PRAGMA table_info(conversations)").fetchall()
@@ -284,6 +302,19 @@ class DbMigrationsTests(unittest.TestCase):
                 self.assertIn("storage_key", media_cols)
                 self.assertIn("tenant_id", media_cols)
                 self.assertIn("principal_id", media_cols)
+                auth_user_cols = [
+                    r[1]
+                    for r in conn.execute("PRAGMA table_info(auth_users)").fetchall()
+                ]
+                self.assertIn("email", auth_user_cols)
+                self.assertIn("password_hash", auth_user_cols)
+                auth_identity_cols = [
+                    r[1]
+                    for r in conn.execute(
+                        "PRAGMA table_info(auth_user_identities)"
+                    ).fetchall()
+                ]
+                self.assertIn("provider_subject", auth_identity_cols)
                 workbench_cols = [
                     r[1]
                     for r in conn.execute(
