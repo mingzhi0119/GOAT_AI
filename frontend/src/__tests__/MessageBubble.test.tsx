@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import MessageBubble from '../components/MessageBubble'
 import { API_KEY_STORAGE_KEY, OWNER_ID_STORAGE_KEY } from '../api/auth'
+import { buildApiUrl } from '../api/urls'
 import { brandingConfig } from '../config/branding'
 
 describe('MessageBubble', () => {
@@ -92,7 +93,7 @@ describe('MessageBubble', () => {
       fireEvent.click(screen.getAllByRole('link', { name: /brief\.md/i })[0]!)
 
       await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith('/api/artifacts/art-1', {
+        expect(fetchMock).toHaveBeenCalledWith(buildApiUrl('/artifacts/art-1'), {
           method: 'GET',
           credentials: 'same-origin',
           headers: {

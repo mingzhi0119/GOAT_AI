@@ -43,6 +43,12 @@ GOAT_OLLAMA_PROFILE="${GOAT_OLLAMA_PROFILE:-$(
   read_first_dotenv_value "GOAT_OLLAMA_PROFILE" "${SCHOOL_DOTENV_PATH}" "${PRIMARY_DOTENV_PATH}"
 )}"
 GOAT_OLLAMA_PROFILE="${GOAT_OLLAMA_PROFILE:-school-ubuntu}"
+if [ -z "${GOAT_BIND_HOST:-}" ]; then
+  GOAT_BIND_HOST="$(
+    read_first_dotenv_value "GOAT_BIND_HOST" "${SCHOOL_DOTENV_PATH}" "${PRIMARY_DOTENV_PATH}"
+  )"
+fi
+GOAT_BIND_HOST="${GOAT_BIND_HOST:-0.0.0.0}"
 if [ -z "${OLLAMA_BASE_URL:-}" ]; then
   OLLAMA_BASE_URL="$(
     read_first_dotenv_value "OLLAMA_BASE_URL" "${SCHOOL_DOTENV_PATH}" "${PRIMARY_DOTENV_PATH}"
@@ -52,6 +58,7 @@ OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-${SCHOOL_LOCAL_OLLAMA_URL}}"
 
 export GOAT_USE_SCHOOL_OLLAMA_LOCAL
 export GOAT_OLLAMA_PROFILE
+export GOAT_BIND_HOST
 export OLLAMA_BASE_URL
 
 goat_before_backend_start() {

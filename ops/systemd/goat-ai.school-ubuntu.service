@@ -8,11 +8,10 @@ WorkingDirectory=%h/GOAT_AI
 ExecStartPre=/usr/bin/mkdir -p %h/GOAT_AI/var/logs %h/GOAT_AI/var/data
 ExecStartPre=/usr/bin/bash %h/GOAT_AI/scripts/ollama/start_ollama_local.sh
 Environment=GOAT_HOST=127.0.0.1
+Environment=GOAT_BIND_HOST=0.0.0.0
 Environment=GOAT_DEPLOY_MODE=1
 Environment=GOAT_SERVER_PORT=62606
-ExecStart=%h/GOAT_AI/.venv/bin/python -m uvicorn server:create_app \
-    --factory \
-    --host 127.0.0.1 --port 62606
+ExecStart=/usr/bin/bash -lc '%h/GOAT_AI/.venv/bin/python -m uvicorn server:create_app --factory --host "${GOAT_BIND_HOST:-127.0.0.1}" --port "${GOAT_SERVER_PORT:-62606}"'
 Restart=always
 RestartSec=5
 StandardOutput=append:%h/GOAT_AI/var/logs/fastapi.log
