@@ -157,6 +157,7 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
     )
 
     assert "desktop-package-windows" in ci_workflow
+    assert "workflow_dispatch:" in ci_workflow
     assert "runs-on: windows-latest" in ci_workflow
     assert "npm run desktop:build" in ci_workflow
     assert "'frontend/src/**'" in changes_filter
@@ -197,6 +198,7 @@ def test_ci_and_provenance_workflows_cover_packaged_desktop_release_path() -> No
         in ci_workflow
     )
     assert "Build Linux desktop sidecar" in desktop_supply_chain_job
+    assert "github.event_name == 'workflow_dispatch'" in desktop_supply_chain_job
     assert "actions/setup-node@v4" in desktop_supply_chain_job
     assert "npm ci" in desktop_supply_chain_job
     assert "Build Linux packaged desktop" in desktop_supply_chain_job

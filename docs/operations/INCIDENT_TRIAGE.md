@@ -12,7 +12,7 @@ Use this runbook when staging or production health regresses and you need a fast
 
 1. Clear `backend-fast` first. Its changed-files `ruff format --check` and repo-wide `ruff check` can block the rest of backend CI before contract, audit, and `pytest` results are even visible.
 2. After `backend-fast` is green, inspect `backend-heavy` for `python -m tools.contracts.check_api_contract_sync`, OTel enabled-path tests, the observability asset contract, `pytest`, `pip-audit`, `python -m tools.quality.run_rag_eval`, `lint-imports`, and the PR latency gate.
-3. Only after backend is green should triage move to `desktop-package-windows` and `desktop-supply-chain`.
+3. Only after backend is green should triage move to `desktop-package-windows`; use `desktop-supply-chain` only when you need the Linux supply-chain gate or a manual `workflow_dispatch` run.
 4. Treat `desktop-package-windows` as the source of truth for packaged pre-ready startup resilience because it now carries the packaged-shell fault smoke for missing-sidecar, early-exit, and health-timeout paths.
 5. Expect `desktop-package-windows` for desktop build inputs, not just `frontend/src-tauri/**`: frontend build inputs such as `frontend/src/**`, `frontend/public/**`, `frontend/index.html`, Vite/Tailwind/PostCSS/TS config, desktop scripts, desktop tools, and desktop governance tests/workflows are in scope for that PR gate.
 6. Do not expect `desktop-package-windows` for non-desktop-only backend or documentation changes when the packaged Windows build surface is untouched.

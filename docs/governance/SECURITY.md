@@ -45,7 +45,7 @@ matter for the repository's current security posture.
 
 ## Frontend and desktop supply chain
 
-- Frontend and desktop dependency audits are release gates, not advisory checks. PRs and pushes to `main` must keep the `frontend`, `desktop-package-windows`, and `desktop-supply-chain` jobs green.
+- Frontend and desktop dependency audits are release gates, not advisory checks. PRs and pushes to `main` must keep the `frontend` and `desktop-package-windows` jobs green; `desktop-supply-chain` is a targeted Linux supply-chain gate that can also be run manually through `workflow_dispatch`.
 - Desktop artifacts produced from local developer machines or unsigned ad hoc builds are internal/test-only artifacts. They must not be presented as public production releases.
 - Publicly distributed Windows desktop installers must come from `.github/workflows/desktop-provenance.yml`, which signs the packaged installers, records provenance for the shipped files, and now retains installed-app startup evidence for both MSI and NSIS artifacts before upload.
 - `desktop-package-windows` remains the merge-blocking packaged-binary gate for desktop-related PRs; installed Windows evidence belongs to `.github/workflows/desktop-provenance.yml` and the recurring `.github/workflows/fault-injection.yml` drill, not to local unsigned bundles.

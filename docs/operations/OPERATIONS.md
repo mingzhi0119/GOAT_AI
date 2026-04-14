@@ -46,7 +46,7 @@ When merge-blocking CI is red, clear the gates in this order instead of mixing b
 
 - `backend-fast`: treat changed-files `ruff format --check` and repo-wide `ruff check` as the first blocker; when this job is red, deeper backend results are still hidden
 - `backend-heavy`: after `backend-fast` is green, inspect dependency audit, import-layer lint, RAG regression, API contract sync, OTel enabled-path tests, the observability asset contract, full `pytest`, and the PR latency gate
-- desktop gates: only after backend is green should triage move to `desktop-package-windows` and `desktop-supply-chain`
+- desktop gates: only after backend is green should triage move to `desktop-package-windows`; use `desktop-supply-chain` only for the Linux supply-chain gate or a manual `workflow_dispatch` smoke check
 
 ### SQLite schema migrations (Phase 13 Section 13.0)
 
@@ -139,10 +139,11 @@ Important notes:
 - non-desktop-only backend or documentation changes should not burn the Windows packaged PR gate when they do not affect the packaged desktop build surface
 - `desktop-supply-chain` now also builds Linux packaged desktop artifacts and
   retains `desktop-linux-ci-provenance.json` plus packaged `AppImage` / `deb`
-  artifacts for CI-parity diagnostics
+  artifacts for CI-parity diagnostics; it can also be launched manually through
+  `workflow_dispatch` when you need a targeted CLI check
 - the `desktop-windows-fault-smoke` artifact should contain at least `build.log`, `packaged-shell-fault-smoke.log`, top-level `summary.json`, and per-scenario logs/result JSON so packaged PR failures stay diagnosable without rerunning the workflow
 - when the Windows package build succeeds, CI should still retain packaged installers plus `desktop-windows-ci-provenance.json` even if the packaged fault smoke fails later in the same job
-- `desktop-supply-chain` remains the Linux sidecar/provenance/cargo-audit gate; it does not own the Windows pre-ready retry semantics
+- `desktop-supply-chain` remains the Linux sidecar/provenance/cargo-audit gate; it does not own the Windows pre-ready retry semantics, and it can be triggered manually for targeted validation when needed
 - `.github/workflows/desktop-provenance.yml` now runs `python -m tools.desktop.installed_windows_desktop_fault_smoke` against both the built `.msi` and NSIS installers before release assets are uploaded, and the NSIS pass still runs if the MSI pass fails first
 - `.github/workflows/fault-injection.yml` reruns the same installed Windows drill on a schedule so installer regressions do not hide behind release-only evidence, and it also preserves the second installer path when the first one fails
 - installed Windows evidence now writes `summary.json` even on install or scenario failure, including installer kind/path/digest, install root, log paths, partial scenario results, uninstall outcome, workflow metadata such as release ref, resolved SHA, and distribution channel, plus `primary_failure_phase` / `primary_failure_error` when uninstall failure is secondary

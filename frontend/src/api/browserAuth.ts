@@ -23,7 +23,7 @@ async function parseErrorResponse(
   fallbackMessage: string,
 ): Promise<BrowserAuthApiError> {
   try {
-    const payload = (await resp.json()) as unknown
+    const payload = await resp.json()
     return new BrowserAuthApiError(
       extractApiErrorDetail(payload) ?? fallbackMessage,
       {
