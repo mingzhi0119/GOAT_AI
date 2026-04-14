@@ -38,7 +38,7 @@ from backend.services.idempotency_service import (
 from backend.services.runtime_persistence import build_idempotency_store
 from backend.services.media_service import load_images_base64_for_chat
 from backend.services.chat_service import stream_chat_sse
-from backend.services.public_model_policy import require_public_model_name
+from backend.services.public_model_policy import require_model_name_for_deployment
 
 _SSE_HEADERS = {
     "Cache-Control": "no-cache",
@@ -105,7 +105,7 @@ def prepare_chat_request(
 ) -> PreparedChatRequest:
     """Validate chat request constraints and resolve derived request state."""
     session_owner_id = auth_context.legacy_owner_id
-    resolved_model = require_public_model_name(req.model)
+    resolved_model = require_model_name_for_deployment(req.model, settings=settings)
     validate_chat_capacity(req=req, settings=settings)
     if req.knowledge_document_ids and req.image_attachment_ids:
         raise ChatKnowledgeImageConflictError(

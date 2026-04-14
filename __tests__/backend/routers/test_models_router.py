@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import unittest
+import tempfile
 from collections.abc import Generator
+from pathlib import Path
 
 try:
     from fastapi import FastAPI
@@ -12,8 +14,10 @@ except ImportError:  # pragma: no cover - environment without backend deps
 
 from goat_ai.llm.ollama_client import ToolCallPlan
 from goat_ai.shared.types import ChatTurn
+from goat_ai.config.settings import Settings
 
 if FastAPI is not None:
+    from backend.platform.config import get_settings
     from backend.platform.exception_handlers import register_exception_handlers
     from backend.platform.dependencies import get_llm_client
     from backend.routers import models
@@ -103,18 +107,54 @@ class FakeModelsLLMClient:
     FastAPI is not None and TestClient is not None, "fastapi not installed"
 )
 class ModelsRouterIntegrationTests(unittest.TestCase):
-    def setUp(self) -> None:
+    def _settings(self, *, deploy_mode: int) -> Settings:
+        root = Path(tempfile.mkdtemp())
+        return Settings(
+            ollama_base_url="http://127.0.0.1:11434",
+            generate_timeout=120,
+            max_upload_mb=20,
+            max_upload_bytes=20 * 1024 * 1024,
+            max_dataframe_rows=50000,
+            use_chat_api=True,
+            system_prompt="test",
+            app_root=root,
+            logo_svg=root / "logo.svg",
+            log_db_path=root / "chat_logs.db",
+            deploy_mode=deploy_mode,
+        )
+
+    def _build_app(self, *, deploy_mode: int) -> None:
         app = FastAPI()
         register_exception_handlers(app)
         app.include_router(models.router, prefix="/api")
         app.dependency_overrides[get_llm_client] = lambda: FakeModelsLLMClient()
+        app.dependency_overrides[get_settings] = lambda: self._settings(
+            deploy_mode=deploy_mode
+        )
         self.client = TestClient(app)
 
-    def test_models_endpoint_filters_to_public_allowlist(self) -> None:
+    def setUp(self) -> None:
+        self._build_app(deploy_mode=2)
+
+    def test_models_endpoint_filters_to_public_allowlist_for_remote_deploy(
+        self,
+    ) -> None:
         response = self.client.get("/api/models")
 
         self.assertEqual(200, response.status_code)
         self.assertEqual(["qwen3:4b", "gemma3:4b"], response.json()["models"])
+
+    def test_models_endpoint_returns_all_installed_models_for_local_deploy(
+        self,
+    ) -> None:
+        self._build_app(deploy_mode=0)
+
+        response = self.client.get("/api/models")
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(
+            ["gemma3:4b", "qwen3:4b", "rogue-model"], response.json()["models"]
+        )
 
     def test_model_capabilities_endpoint_reports_tool_support(self) -> None:
         response = self.client.get(
@@ -130,13 +170,27 @@ class ModelsRouterIntegrationTests(unittest.TestCase):
         self.assertFalse(payload["supports_vision"])
         self.assertEqual(32768, payload["context_length"])
 
-    def test_model_capabilities_endpoint_rejects_disallowed_model(self) -> None:
+    def test_model_capabilities_endpoint_rejects_disallowed_model_for_remote_deploy(
+        self,
+    ) -> None:
         response = self.client.get(
             "/api/models/capabilities", params={"model": "rogue-model"}
         )
 
         self.assertEqual(422, response.status_code)
         self.assertIn("not enabled on this deployment", response.json()["detail"])
+
+    def test_model_capabilities_endpoint_allows_non_public_model_for_local_deploy(
+        self,
+    ) -> None:
+        self._build_app(deploy_mode=0)
+
+        response = self.client.get(
+            "/api/models/capabilities", params={"model": "rogue-model"}
+        )
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("rogue-model", response.json()["model"])
 
 
 if __name__ == "__main__":

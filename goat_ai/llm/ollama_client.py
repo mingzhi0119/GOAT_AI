@@ -227,6 +227,16 @@ class OllamaService:
         ):
             yield
 
+    def _visible_model_names(self, names: list[str]) -> list[str]:
+        if not self._s.is_remote_deploy:
+            return names
+        return filter_public_model_names(names)
+
+    def _resolve_model_for_deployment(self, model: str) -> str:
+        if not self._s.is_remote_deploy:
+            return model
+        return _resolve_allowed_model(model)
+
     def _is_retryable_http_status(self, status_code: int) -> bool:
         return status_code in {408, 425, 429, 500, 502, 503, 504}
 
@@ -334,10 +344,10 @@ class OllamaService:
                 # Invalidate capability cache when model inventory is queried freshly.
                 with self._cache_lock:
                     known = set(self._cap_cache.keys())
-                    current = set(filter_public_model_names(names))
+                    current = set(self._visible_model_names(names))
                     for removed in known - current:
                         self._cap_cache.pop(removed, None)
-                return filter_public_model_names(names)
+                return self._visible_model_names(names)
             except requests.HTTPError as exc:
                 status_code = (
                     exc.response.status_code if exc.response is not None else None
@@ -368,7 +378,7 @@ class OllamaService:
 
     def _load_model_show(self, model: str) -> tuple[list[str], int | None]:
         """Fetch ``/api/show`` once; return capabilities and parsed context length."""
-        model = _resolve_allowed_model(model)
+        model = self._resolve_model_for_deployment(model)
         ttl_sec = max(0, int(self._s.model_cap_cache_ttl_sec))
         now = time.monotonic()
         if ttl_sec > 0:
@@ -462,7 +472,7 @@ class OllamaService:
         ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> Generator[StreamTextPart, None, None]:
         """Yield streamed text segments from /api/chat (thinking vs answer)."""
-        model = _resolve_allowed_model(model)
+        model = self._resolve_model_for_deployment(model)
         payload: dict[str, Any] = {
             "model": model,
             "messages": api_messages,
@@ -497,7 +507,7 @@ class OllamaService:
         ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> Generator[StreamTextPart, None, None]:
         """Yield streamed text segments from /api/generate (thinking vs answer)."""
-        model = _resolve_allowed_model(model)
+        model = self._resolve_model_for_deployment(model)
         payload: dict[str, Any] = {"model": model, "prompt": prompt, "stream": True}
         if ollama_options:
             payload["options"] = ollama_options
@@ -537,7 +547,7 @@ class OllamaService:
         ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> str:
         """Return a single non-streaming completion from /api/generate."""
-        model = _resolve_allowed_model(model)
+        model = self._resolve_model_for_deployment(model)
         payload: dict[str, Any] = {"model": model, "prompt": prompt, "stream": False}
         if ollama_options:
             payload["options"] = ollama_options
@@ -600,7 +610,7 @@ class OllamaService:
         ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> Generator[str | StreamTextPart | ToolCallPlan, None, None]:
         """Stream assistant segments and surface native tool calls when they occur."""
-        model = _resolve_allowed_model(model)
+        model = self._resolve_model_for_deployment(model)
         payload: dict[str, Any] = {
             "model": model,
             "messages": messages_for_ollama(messages, system_prompt),
@@ -672,7 +682,7 @@ class OllamaService:
         ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> ToolCallPlan | None:
         """Ask Ollama for a single native tool call plan without streaming."""
-        model = _resolve_allowed_model(model)
+        model = self._resolve_model_for_deployment(model)
         payload: dict[str, Any] = {
             "model": model,
             "messages": messages_for_ollama(messages, system_prompt),
@@ -724,7 +734,7 @@ class OllamaService:
         ollama_options: dict[str, float | int | bool | str] | None = None,
     ) -> Generator[str | StreamTextPart, None, None]:
         """Stream the model's final response after a tool result is appended."""
-        model = _resolve_allowed_model(model)
+        model = self._resolve_model_for_deployment(model)
         payload: dict[str, Any] = {
             "model": model,
             "messages": followup_messages,

@@ -24,12 +24,12 @@ def test_build_entrypoints_exist_for_local_and_school_modes() -> None:
     build_local = (REPO_ROOT / "ops" / "build" / "build_local.sh").read_text(
         encoding="utf-8"
     )
-    build_school = (
-        REPO_ROOT / "ops" / "build" / "build_school_server.sh"
-    ).read_text(encoding="utf-8")
-    build_lib = (
-        REPO_ROOT / "ops" / "build" / "lib" / "project_build.sh"
-    ).read_text(encoding="utf-8")
+    build_school = (REPO_ROOT / "ops" / "build" / "build_school_server.sh").read_text(
+        encoding="utf-8"
+    )
+    build_lib = (REPO_ROOT / "ops" / "build" / "lib" / "project_build.sh").read_text(
+        encoding="utf-8"
+    )
     build_ps1 = (REPO_ROOT / "ops" / "build" / "build_local.ps1").read_text(
         encoding="utf-8"
     )
@@ -38,14 +38,14 @@ def test_build_entrypoints_exist_for_local_and_school_modes() -> None:
     assert 'GOAT_DEPLOY_MODE="${GOAT_DEPLOY_MODE:-0}"' in build_local
     assert 'source "${SCRIPT_DIR}/lib/project_build.sh"' in build_school
     assert 'GOAT_DEPLOY_MODE="${GOAT_DEPLOY_MODE:-1}"' in build_school
-    assert 'REQUIRE_SECONDARY_DOTENV=1' in build_school
+    assert "REQUIRE_SECONDARY_DOTENV=1" in build_school
     assert 'SECONDARY_DOTENV_PATH="${PROJECT_DIR}/.env.school-ubuntu"' in build_school
-    assert 'GOAT_DEPLOY_MODE must be set by the build wrapper.' in build_lib
-    assert 'npm run build' in build_lib
-    assert 'load_settings' in build_lib
+    assert "GOAT_DEPLOY_MODE must be set by the build wrapper." in build_lib
+    assert "npm run build" in build_lib
+    assert "load_settings" in build_lib
     assert '$env:GOAT_DEPLOY_MODE = "0"' in build_ps1
-    assert 'npm run build' in build_ps1
-    assert 'load_settings' in build_ps1
+    assert "npm run build" in build_ps1
+    assert "load_settings" in build_ps1
 
 
 def test_canonical_deploy_scripts_use_factory_entrypoint() -> None:

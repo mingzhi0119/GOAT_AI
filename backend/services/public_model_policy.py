@@ -9,9 +9,20 @@ from goat_ai.llm.public_model_policy import (
 )
 
 from backend.services.exceptions import ModelNotAllowed
+from backend.types import Settings
 
 
-def require_public_model_name(model: str) -> str:
+def filter_model_names_for_deployment(
+    names: list[str], *, settings: Settings
+) -> list[str]:
+    if not settings.is_remote_deploy:
+        return names
+    return filter_public_model_names(names)
+
+
+def require_model_name_for_deployment(model: str, *, settings: Settings) -> str:
+    if not settings.is_remote_deploy:
+        return model
     resolved = resolve_public_model_name(model)
     if resolved is not None:
         return resolved
@@ -21,4 +32,7 @@ def require_public_model_name(model: str) -> str:
     )
 
 
-__all__ = ["filter_public_model_names", "require_public_model_name"]
+__all__ = [
+    "filter_model_names_for_deployment",
+    "require_model_name_for_deployment",
+]

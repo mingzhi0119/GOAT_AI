@@ -262,10 +262,25 @@ class ApplicationChatTests(unittest.TestCase):
         ):
             prepare_chat_request(
                 req=req,
-                settings=self.settings,
+                settings=replace(self.settings, deploy_mode=2),
                 llm=_FakeLLM(),
                 auth_context=_auth_context(),
             )
+
+    def test_prepare_chat_request_allows_non_public_model_in_local_deploy(self) -> None:
+        req = ChatRequest(
+            model="rogue-model",
+            messages=[ChatMessage(role="user", content="Hello")],
+        )
+
+        prepared = prepare_chat_request(
+            req=req,
+            settings=replace(self.settings, deploy_mode=0),
+            llm=_FakeLLM(),
+            auth_context=_auth_context(),
+        )
+
+        self.assertEqual("rogue-model", prepared.model)
 
 
 if __name__ == "__main__":

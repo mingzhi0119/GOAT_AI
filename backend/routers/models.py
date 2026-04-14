@@ -5,10 +5,12 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from backend.application.models import get_model_capabilities, list_models
+from backend.platform.config import get_settings
 from backend.platform.dependencies import get_llm_client
 from backend.models.chat import ModelCapabilitiesResponse, ModelsResponse
 from backend.models.common import ErrorResponse
 from backend.application.ports import LLMClient
+from backend.types import Settings
 
 router = APIRouter()
 
@@ -23,9 +25,12 @@ router = APIRouter()
         503: {"model": ErrorResponse},
     },
 )
-def list_models_route(llm: LLMClient = Depends(get_llm_client)) -> ModelsResponse:
+def list_models_route(
+    llm: LLMClient = Depends(get_llm_client),
+    settings: Settings = Depends(get_settings),
+) -> ModelsResponse:
     """Return the list of locally available Ollama model names."""
-    return list_models(llm)
+    return list_models(llm, settings=settings)
 
 
 @router.get(
@@ -41,6 +46,7 @@ def list_models_route(llm: LLMClient = Depends(get_llm_client)) -> ModelsRespons
 def get_model_capabilities_route(
     model: str,
     llm: LLMClient = Depends(get_llm_client),
+    settings: Settings = Depends(get_settings),
 ) -> ModelCapabilitiesResponse:
     """Return Ollama-reported capabilities for the selected model."""
-    return get_model_capabilities(llm, model)
+    return get_model_capabilities(llm, model, settings=settings)
