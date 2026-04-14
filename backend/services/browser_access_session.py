@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import base64
-import hashlib
 import hmac
-import json
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
+from itsdangerous import BadData, URLSafeTimedSerializer
+from itsdangerous.timed import TimestampSigner
+from pwdlib import PasswordHash
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -23,6 +23,8 @@ from goat_ai.config.settings import Settings
 _COOKIE_NAME = "goat_access_session"
 _AUTH_MODE = "shared_access_cookie_v1"
 _DEFAULT_TENANT_ID = "tenant:default"
+_COOKIE_SERIALIZER_SALT = "goat.shared-access.cookie"
+_PASSWORD_HASHER = PasswordHash.recommended()
 _LOGIN_RATE_LIMITER = StoredSlidingWindowRateLimiter(
     policy=RateLimitPolicy(window_sec=300, max_requests=10),
     store=InMemorySlidingWindowRateLimitStore(),
@@ -41,6 +43,22 @@ class SharedAccessSession:
 class SharedAccessLoginAttemptDecision:
     allowed: bool
     retry_after: int = 0
+
+
+class _SharedAccessTimestampSigner(TimestampSigner):
+    def __init__(
+        self,
+        *args: object,
+        current_time: datetime | None = None,
+        **kwargs: object,
+    ) -> None:
+        self._current_time = current_time
+        super().__init__(*args, **kwargs)
+
+    def get_timestamp(self) -> int:
+        if self._current_time is None:
+            return super().get_timestamp()
+        return int(_coerce_utc(self._current_time).timestamp())
 
 
 def shared_access_cookie_name() -> str:
@@ -124,28 +142,38 @@ def encode_shared_access_session(
         "issued_at": session.issued_at,
         "expires_at": session.expires_at,
     }
-    encoded_payload = _b64_encode(
-        json.dumps(
-            payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True
-        ).encode("utf-8")
-    )
-    signature = _sign_shared_access_payload(encoded_payload, settings=settings)
-    return f"{encoded_payload}.{signature}"
+    return _shared_access_serializer(
+        settings,
+        now=_parse_utc_timestamp(session.issued_at),
+    ).dumps(payload)
+
+
+def verify_shared_access_password(settings: Settings, *, password: str) -> bool:
+    candidate = password.strip()
+    password_hash = settings.shared_access_password_hash.strip()
+    if password_hash:
+        try:
+            return _PASSWORD_HASHER.verify(candidate, password_hash)
+        except Exception:
+            return False
+    return hmac.compare_digest(candidate, settings.shared_access_password.strip())
+
+
+def hash_shared_access_password(password: str) -> str:
+    return _PASSWORD_HASHER.hash(password.strip())
 
 
 def decode_shared_access_session(
     raw: str, *, settings: Settings, now: datetime | None = None
 ) -> SharedAccessSession | None:
     try:
-        encoded_payload, encoded_signature = raw.split(".", 1)
-    except ValueError:
+        payload = _shared_access_serializer(settings, now=now).loads(
+            raw,
+            max_age=settings.shared_access_session_ttl_sec,
+        )
+    except BadData:
         return None
-    expected_signature = _sign_shared_access_payload(encoded_payload, settings=settings)
-    if not hmac.compare_digest(encoded_signature, expected_signature):
-        return None
-    try:
-        payload = json.loads(_b64_decode(encoded_payload).decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
+    if not isinstance(payload, dict):
         return None
     owner_id = str(payload.get("owner_id", "")).strip()
     principal_id = str(payload.get("principal_id", "")).strip()
@@ -156,8 +184,6 @@ def decode_shared_access_session(
     issued_dt = _parse_utc_timestamp(issued_at)
     expires_dt = _parse_utc_timestamp(expires_at)
     if issued_dt is None or expires_dt is None or expires_dt <= issued_dt:
-        return None
-    if expires_dt <= _coerce_utc(now):
         return None
     return SharedAccessSession(
         owner_id=owner_id,
@@ -193,22 +219,18 @@ def _request_client_identity(request: Request) -> str:
     return "unknown"
 
 
-def _sign_shared_access_payload(encoded_payload: str, *, settings: Settings) -> str:
-    digest = hmac.new(
-        settings.shared_access_session_secret.encode("utf-8"),
-        encoded_payload.encode("utf-8"),
-        hashlib.sha256,
-    ).digest()
-    return _b64_encode(digest)
-
-
-def _b64_encode(data: bytes) -> str:
-    return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
-
-
-def _b64_decode(data: str) -> bytes:
-    padding = "=" * (-len(data) % 4)
-    return base64.urlsafe_b64decode(data + padding)
+def _shared_access_serializer(
+    settings: Settings, *, now: datetime | None = None
+) -> URLSafeTimedSerializer:
+    signer_kwargs: dict[str, object] = {}
+    if now is not None:
+        signer_kwargs["current_time"] = now
+    return URLSafeTimedSerializer(
+        secret_key=settings.shared_access_session_secret,
+        salt=_COOKIE_SERIALIZER_SALT,
+        signer=_SharedAccessTimestampSigner,
+        signer_kwargs=signer_kwargs,
+    )
 
 
 def _coerce_utc(value: datetime | None) -> datetime:

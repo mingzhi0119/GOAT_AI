@@ -46,6 +46,7 @@ if TestClient is not None:
         SandboxProviderResult,
     )
     from backend.services import log_service
+    from backend.services.browser_access_session import hash_shared_access_password
     from backend.services.session_message_codec import (
         SESSION_PAYLOAD_VERSION,
         build_session_payload,
@@ -804,7 +805,7 @@ class SharedAccessApiAuthzTests(unittest.TestCase):
             log_db_path=root / "chat_logs.db",
             data_dir=root / "data",
             object_store_root=root / "object-store",
-            shared_access_password="goat-shared",
+            shared_access_password_hash=hash_shared_access_password("goat-shared"),
             shared_access_session_secret="shared-secret",
             ready_skip_ollama_probe=True,
         )

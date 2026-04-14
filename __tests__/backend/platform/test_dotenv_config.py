@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import goat_ai.config.settings as config
+from backend.services.browser_access_session import hash_shared_access_password
 
 
 class DotenvConfigTests(unittest.TestCase):
@@ -404,13 +405,15 @@ class DotenvConfigTests(unittest.TestCase):
             app_root = Path(tmp)
             runtime_root = app_root / "var"
             original_env = _capture_env(
-                "GOAT_SHARED_ACCESS_PASSWORD",
+                "GOAT_SHARED_ACCESS_PASSWORD_HASH",
                 "GOAT_SHARED_ACCESS_SESSION_SECRET",
                 "GOAT_SHARED_ACCESS_SESSION_TTL_SEC",
             )
             try:
                 _clear_env(*original_env.keys())
-                os.environ["GOAT_SHARED_ACCESS_PASSWORD"] = "goat-shared"
+                os.environ["GOAT_SHARED_ACCESS_PASSWORD_HASH"] = (
+                    hash_shared_access_password("goat-shared")
+                )
                 os.environ["GOAT_SHARED_ACCESS_SESSION_SECRET"] = "session-secret"
                 os.environ["GOAT_SHARED_ACCESS_SESSION_TTL_SEC"] = "86400"
                 with (
@@ -418,7 +421,8 @@ class DotenvConfigTests(unittest.TestCase):
                     patch.object(config, "DEFAULT_RUNTIME_ROOT", runtime_root),
                 ):
                     settings = config.load_settings()
-                self.assertEqual("goat-shared", settings.shared_access_password)
+                self.assertEqual("", settings.shared_access_password)
+                self.assertTrue(settings.shared_access_password_hash)
                 self.assertEqual(
                     "session-secret", settings.shared_access_session_secret
                 )
@@ -427,11 +431,33 @@ class DotenvConfigTests(unittest.TestCase):
             finally:
                 _restore_many(original_env)
 
+    def test_load_settings_accepts_legacy_plaintext_shared_access_password(
+        self,
+    ) -> None:
+        original_env = _capture_env(
+            "GOAT_SHARED_ACCESS_PASSWORD",
+            "GOAT_SHARED_ACCESS_PASSWORD_HASH",
+            "GOAT_SHARED_ACCESS_SESSION_SECRET",
+        )
+        try:
+            _clear_env(*original_env.keys())
+            os.environ["GOAT_SHARED_ACCESS_PASSWORD"] = "goat-shared"
+            os.environ["GOAT_SHARED_ACCESS_SESSION_SECRET"] = "session-secret"
+
+            settings = config.load_settings()
+
+            self.assertEqual("goat-shared", settings.shared_access_password)
+            self.assertEqual("", settings.shared_access_password_hash)
+            self.assertTrue(settings.shared_access_enabled)
+        finally:
+            _restore_many(original_env)
+
     def test_load_settings_rejects_shared_access_password_without_session_secret(
         self,
     ) -> None:
         original_env = _capture_env(
             "GOAT_SHARED_ACCESS_PASSWORD",
+            "GOAT_SHARED_ACCESS_PASSWORD_HASH",
             "GOAT_SHARED_ACCESS_SESSION_SECRET",
         )
         try:
@@ -447,6 +473,7 @@ class DotenvConfigTests(unittest.TestCase):
     def test_load_settings_rejects_non_positive_shared_access_ttl(self) -> None:
         original_env = _capture_env(
             "GOAT_SHARED_ACCESS_PASSWORD",
+            "GOAT_SHARED_ACCESS_PASSWORD_HASH",
             "GOAT_SHARED_ACCESS_SESSION_SECRET",
             "GOAT_SHARED_ACCESS_SESSION_TTL_SEC",
         )
@@ -458,6 +485,20 @@ class DotenvConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(
                 ValueError, "GOAT_SHARED_ACCESS_SESSION_TTL_SEC"
             ):
+                config.load_settings()
+        finally:
+            _restore_many(original_env)
+
+    def test_load_settings_rejects_invalid_shared_access_password_hash(self) -> None:
+        original_env = _capture_env(
+            "GOAT_SHARED_ACCESS_PASSWORD_HASH",
+            "GOAT_SHARED_ACCESS_SESSION_SECRET",
+        )
+        try:
+            _clear_env(*original_env.keys())
+            os.environ["GOAT_SHARED_ACCESS_PASSWORD_HASH"] = "definitely-not-a-hash"
+            os.environ["GOAT_SHARED_ACCESS_SESSION_SECRET"] = "session-secret"
+            with self.assertRaisesRegex(ValueError, "GOAT_SHARED_ACCESS_PASSWORD_HASH"):
                 config.load_settings()
         finally:
             _restore_many(original_env)
