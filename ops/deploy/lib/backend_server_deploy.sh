@@ -74,6 +74,37 @@ wait_for_pid_exit() {
   return 1
 }
 
+default_git_ref() {
+  if git symbolic-ref --quiet --short HEAD >/dev/null 2>&1; then
+    git symbolic-ref --quiet --short HEAD
+    return 0
+  fi
+  git rev-parse HEAD
+}
+
+resolve_default_git_checkout() {
+  local project_dir="$1"
+  if [ -n "${GIT_REF:-}" ]; then
+    GIT_BRANCH="${GIT_BRANCH:-$GIT_REF}"
+    return 0
+  fi
+  if [ -n "${GIT_BRANCH:-}" ]; then
+    GIT_REF="${GIT_BRANCH}"
+    return 0
+  fi
+  if [ -d "${project_dir}/.git" ]; then
+    local current_checkout_ref=""
+    current_checkout_ref="$(
+      cd "${project_dir}" && default_git_ref
+    )"
+    GIT_REF="${current_checkout_ref}"
+    GIT_BRANCH="${current_checkout_ref}"
+    return 0
+  fi
+  GIT_BRANCH="main"
+  GIT_REF="main"
+}
+
 stop_pidfile() {
   local pidfile="$1"
   if [ -f "$pidfile" ]; then
@@ -139,8 +170,6 @@ _goat_systemd_restart() {
 goat_backend_server_deploy() {
   REPO_URL="${REPO_URL:-https://github.com/mingzhi0119/GOAT_AI.git}"
   PROJECT_DIR="${PROJECT_DIR:-$HOME/GOAT_AI}"
-  GIT_BRANCH="${GIT_BRANCH:-main}"
-  GIT_REF="${GIT_REF:-$GIT_BRANCH}"
   PYTHON_BIN="${PYTHON_BIN:-python3}"
   VENV_DIR="${VENV_DIR:-$PROJECT_DIR/.venv}"
   GOAT_RUNTIME_ROOT="${GOAT_RUNTIME_ROOT:-$PROJECT_DIR/var}"
@@ -172,6 +201,8 @@ goat_backend_server_deploy() {
   else
     : "${SKIP_BUILD:=0}"
   fi
+
+  resolve_default_git_checkout "${PROJECT_DIR}"
 
   echo "${DEPLOY_LABEL} starting (branch: ${GIT_BRANCH}, ref: ${GIT_REF})${QUICK:+ [QUICK mode]}"
 
