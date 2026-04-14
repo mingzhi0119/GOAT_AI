@@ -5,7 +5,7 @@ Base path: `/api`
 ## Global behavior
 
 - If `GOAT_API_KEY` is configured, every endpoint except `GET /api/health` and `GET /api/ready` requires `X-GOAT-API-Key`
-- If `GOAT_SHARED_ACCESS_PASSWORD` is configured, the browser/UI path becomes `GET /api/auth/session` + `POST /api/auth/login` + a signed `goat_access_session` cookie; every non-health API route then requires either that cookie-backed browser session or an API key
+- If `GOAT_SHARED_ACCESS_PASSWORD_HASH` is configured, or the legacy plaintext `GOAT_SHARED_ACCESS_PASSWORD` fallback is still used, the browser/UI path becomes `GET /api/auth/session` + `POST /api/auth/login` + a signed `goat_access_session` cookie; every non-health API route then requires either that cookie-backed browser session or an API key
 - If `GOAT_API_KEY_WRITE` is configured, mutating routes (`POST`, `PATCH`, `DELETE`) require the write key or an equivalent write-scoped credential; otherwise the API returns `403` with `code = AUTH_WRITE_KEY_REQUIRED`
 - If `GOAT_REQUIRE_SESSION_OWNER` is enabled, chat and history routes require `X-GOAT-Owner-Id`; owner-mismatched protected reads resolve as `404` to avoid leaking resource existence
 - In shared browser-access mode, the bundled browser UI shows a site-password gate instead of exposing `X-GOAT-Owner-Id`, and history/artifact visibility is derived from the signed browser session owner
@@ -113,7 +113,7 @@ Example authenticated response:
 
 Notes:
 
-- When `GOAT_SHARED_ACCESS_PASSWORD` is unset, this route returns `auth_required = false`
+- When neither `GOAT_SHARED_ACCESS_PASSWORD_HASH` nor the legacy plaintext `GOAT_SHARED_ACCESS_PASSWORD` fallback is set, this route returns `auth_required = false`
 - The route remains public so the SPA can bootstrap before loading history/models/features
 - Responses include `Cache-Control: no-store`
 

@@ -116,6 +116,21 @@ def _default_ollama_base_url() -> str:
     return DEFAULT_OLLAMA_BASE_URL
 
 
+def _validate_pwdlib_hash(value: str) -> None:
+    candidate = value.strip()
+    if not candidate:
+        return
+
+    from pwdlib import PasswordHash
+
+    try:
+        PasswordHash.recommended().verify("goat-password-config-probe", candidate)
+    except Exception as exc:  # pragma: no cover - exercised via config tests
+        raise ValueError(
+            "GOAT_SHARED_ACCESS_PASSWORD_HASH must be a valid pwdlib hash."
+        ) from exc
+
+
 def _resolve_env_path(value: str, *, relative_to: Path) -> Path:
     path = Path(value).expanduser()
     if path.is_absolute():
@@ -233,6 +248,7 @@ class Settings:
     api_key_write: str = ""
     api_credentials_json: str = ""
     shared_access_password: str = ""
+    shared_access_password_hash: str = ""
     shared_access_session_secret: str = ""
     shared_access_session_ttl_sec: int = 60 * 60 * 24 * 30
     require_session_owner: bool = False
@@ -294,7 +310,10 @@ class Settings:
 
     @property
     def shared_access_enabled(self) -> bool:
-        return bool(self.shared_access_password.strip())
+        return bool(
+            self.shared_access_password_hash.strip()
+            or self.shared_access_password.strip()
+        )
 
 
 def resolve_localhost_sandbox_shell(settings: Settings) -> str | None:
@@ -557,6 +576,9 @@ def load_settings() -> Settings:
     _api_key_write = os.environ.get("GOAT_API_KEY_WRITE", "").strip()
     _api_credentials_json = os.environ.get("GOAT_API_CREDENTIALS_JSON", "").strip()
     _shared_access_password = os.environ.get("GOAT_SHARED_ACCESS_PASSWORD", "").strip()
+    _shared_access_password_hash = os.environ.get(
+        "GOAT_SHARED_ACCESS_PASSWORD_HASH", ""
+    ).strip()
     _shared_access_session_secret = os.environ.get(
         "GOAT_SHARED_ACCESS_SESSION_SECRET", ""
     ).strip()
@@ -567,12 +589,15 @@ def load_settings() -> Settings:
         raise ValueError(
             "GOAT_API_KEY_WRITE requires GOAT_API_KEY (read key) to be set."
         )
+    _validate_pwdlib_hash(_shared_access_password_hash)
     if _shared_access_session_ttl_sec < 1:
         raise ValueError("GOAT_SHARED_ACCESS_SESSION_TTL_SEC must be >= 1")
-    if _shared_access_password and not _shared_access_session_secret:
+    if (
+        _shared_access_password or _shared_access_password_hash
+    ) and not _shared_access_session_secret:
         raise ValueError(
             "GOAT_SHARED_ACCESS_SESSION_SECRET is required when "
-            "GOAT_SHARED_ACCESS_PASSWORD is set."
+            "shared browser access is enabled."
         )
     log_db_path = _resolve_env_path(
         os.environ.get("GOAT_LOG_PATH", str(_default_log_db)),
@@ -638,6 +663,7 @@ def load_settings() -> Settings:
         api_key_write=_api_key_write,
         api_credentials_json=_api_credentials_json,
         shared_access_password=_shared_access_password,
+        shared_access_password_hash=_shared_access_password_hash,
         shared_access_session_secret=_shared_access_session_secret,
         shared_access_session_ttl_sec=_shared_access_session_ttl_sec,
         require_session_owner=_env_bool("GOAT_REQUIRE_SESSION_OWNER", "false"),

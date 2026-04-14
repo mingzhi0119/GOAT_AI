@@ -72,7 +72,7 @@ Nginx in front of it for `goat-api.duckdns.org`.
 Recommended backend auth env vars for the public site:
 
 ```bash
-export GOAT_SHARED_ACCESS_PASSWORD='replace-with-a-site-password'
+export GOAT_SHARED_ACCESS_PASSWORD_HASH="$(python -c "from pwdlib import PasswordHash; print(PasswordHash.recommended().hash('replace-with-a-site-password'))")"
 export GOAT_SHARED_ACCESS_SESSION_SECRET='replace-with-a-long-random-signing-secret'
 export GOAT_SHARED_ACCESS_SESSION_TTL_SEC=2592000
 ```
