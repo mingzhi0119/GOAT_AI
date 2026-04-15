@@ -400,7 +400,8 @@ def _build_compact_spec(openapi: dict[str, Any]) -> dict[str, Any]:
 
 def _write_yaml(document: dict[str, Any], path: Path) -> None:
     yaml_text = "\n".join(_yaml_lines(document)) + "\n"
-    path.write_text(yaml_text, encoding="utf-8")
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(yaml_text)
 
 
 def main() -> None:
