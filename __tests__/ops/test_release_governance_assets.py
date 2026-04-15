@@ -37,20 +37,28 @@ def test_release_workflow_promotes_one_immutable_bundle_with_promotion_evidence(
 
 def test_deploy_scripts_support_bundle_installs_and_exact_ref_deploys() -> None:
     deploy_sh = (REPO_ROOT / "ops" / "deploy" / "deploy.sh").read_text(encoding="utf-8")
+    deploy_lib = (
+        REPO_ROOT / "ops" / "deploy" / "lib" / "backend_server_deploy.sh"
+    ).read_text(encoding="utf-8")
     deploy_ps1 = (REPO_ROOT / "ops" / "deploy" / "deploy.ps1").read_text(
         encoding="utf-8"
     )
 
-    assert 'EXPECTED_GIT_SHA="${EXPECTED_GIT_SHA:-}"' in deploy_sh
-    assert 'RELEASE_BUNDLE="${RELEASE_BUNDLE:-}"' in deploy_sh
-    assert 'RELEASE_MANIFEST="${RELEASE_MANIFEST:-}"' in deploy_sh
+    assert 'GOAT_DEPLOY_MODE="${GOAT_DEPLOY_MODE:-0}"' in deploy_sh
+    assert 'source "${SCRIPT_DIR}/lib/backend_server_deploy.sh"' in deploy_sh
+
+    assert 'EXPECTED_GIT_SHA="${EXPECTED_GIT_SHA:-}"' in deploy_lib
+    assert 'RELEASE_BUNDLE="${RELEASE_BUNDLE:-}"' in deploy_lib
+    assert 'RELEASE_MANIFEST="${RELEASE_MANIFEST:-}"' in deploy_lib
     assert (
         '"${PYTHON_BIN}" "${REPO_ROOT}/tools/release/install_release_bundle.py"'
-        in deploy_sh
+        in deploy_lib
     )
-    assert 'git show-ref --verify --quiet "refs/remotes/origin/${GIT_REF}"' in deploy_sh
-    assert 'git reset --hard "origin/${GIT_REF}"' in deploy_sh
-    assert 'git rev-parse --verify "${GIT_REF}^{commit}"' in deploy_sh
+    assert (
+        'git show-ref --verify --quiet "refs/remotes/origin/${GIT_REF}"' in deploy_lib
+    )
+    assert 'git reset --hard "origin/${GIT_REF}"' in deploy_lib
+    assert 'git rev-parse --verify "${GIT_REF}^{commit}"' in deploy_lib
 
     assert "[string]$ExpectedGitSha = $env:EXPECTED_GIT_SHA" in deploy_ps1
     assert "[string]$ReleaseBundle = $env:RELEASE_BUNDLE" in deploy_ps1

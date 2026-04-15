@@ -40,6 +40,7 @@ class LocalOllamaConfigTests(unittest.TestCase):
             {
                 "GOAT_USE_SCHOOL_OLLAMA_LOCAL": "1",
                 "OLLAMA_BASE_URL": "http://127.0.0.1:9999",
+                "GOAT_DEPLOY_MODE": "0",
             },
             clear=True,
         ):

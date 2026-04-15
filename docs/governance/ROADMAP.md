@@ -77,4 +77,8 @@ notes.
   [POSTGRES_RUNTIME_PERSISTENCE_DECISION_PACKAGE.md](../architecture/POSTGRES_RUNTIME_PERSISTENCE_DECISION_PACKAGE.md),
   while local and desktop remain SQLite-first by design.
 
+### Repository-native Skills and Agent Automation
+
+The `wsl-linux-build`, `wsl-linux-ops-checks`, and `wsl-linux-rust-desktop` remain execution-layer helpers, while the new `goat-*` skills sit above them as governance/proof workflows.
+
 ---

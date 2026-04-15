@@ -5,6 +5,7 @@ from __future__ import annotations
 from goat_ai.llm.public_model_policy import (
     filter_public_model_names,
     public_model_allowlist_text,
+    normalize_public_model_name,
     resolve_public_model_name,
 )
 
@@ -22,7 +23,7 @@ def filter_model_names_for_deployment(
 
 def require_model_name_for_deployment(model: str, *, settings: Settings) -> str:
     if not settings.is_remote_deploy:
-        return model
+        return normalize_public_model_name(model)
     resolved = resolve_public_model_name(model)
     if resolved is not None:
         return resolved
