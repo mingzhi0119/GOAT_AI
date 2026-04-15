@@ -40,6 +40,17 @@ class GenerateLlmApiYamlTests(unittest.TestCase):
         self.assertIn("format: llm-compact-api", text)
         self.assertIn("canonical_openapi: docs/api/openapi.json", text)
 
+    def test_write_yaml_uses_lf_newlines(self) -> None:
+        document = {"format": "llm-compact-api", "source": {"items": ["a"]}}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "api.llm.yaml"
+            generate_llm_api_yaml._write_yaml(document, path)
+            raw = path.read_bytes()
+
+        self.assertIn(b"\n", raw)
+        self.assertNotIn(b"\r\n", raw)
+
 
 if __name__ == "__main__":
     unittest.main()
