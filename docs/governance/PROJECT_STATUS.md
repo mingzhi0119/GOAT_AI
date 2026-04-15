@@ -1,6 +1,6 @@
 # GOAT AI Project Status
 
-Last updated: 2026-04-13
+Last updated: 2026-04-14
 
 ## Release snapshot
 
@@ -12,51 +12,47 @@ Last updated: 2026-04-13
 ### Core app
 
 - React SPA + FastAPI backend
-- public split deployment now runs with the frontend on `https://goat-dev.vercel.app` and the loopback-only backend published at `https://goat-api.duckdns.org`
-- Ollama-backed chat with typed SSE events: `thinking`, `token`, `chart_spec`, `artifact`, `error`, `done`
+- public split deployment runs with the frontend on
+  `https://goat-dev.vercel.app` and the backend on
+  `https://goat-api.duckdns.org`
+- Ollama-backed chat with typed SSE events:
+  `thinking`, `token`, `chart_spec`, `artifact`, `error`, `done`
 - split liveness/readiness probes at `GET /api/health` and `GET /api/ready`
 - Prometheus metrics at `GET /api/system/metrics`
 - stable JSON error envelope using `detail`, `code`, and `request_id`
 
-### Knowledge and media
+### Knowledge, sessions, and artifacts
 
-- persisted upload and ingestion pipeline for `csv`, `xlsx`, `txt`, `md`, `pdf`, and `docx`
-- knowledge source files, normalized text/metadata, and vector-index payloads now persist through a storage-key/object-store boundary instead of direct path assumptions
-- retrieval-backed chat and `/api/knowledge/*` contract family
-- `/api/knowledge/answers` now aligns with chat-style synthesis while keeping the stable `answer + citations` response shape
-- local `simple_local_v1` vector index with optional lexical rerank and conservative query rewrite
-- image uploads for vision-capable chat via `POST /api/media/uploads`
-- RAG quality regression runner in CI via `python -m tools.quality.run_rag_eval`
+- persisted upload and ingestion pipeline for supported text/tabular/document
+  formats
+- retrieval-backed knowledge APIs and chat integration
+- persisted session history with legacy compatibility
+- generated artifacts served from persisted ids, with the stable
+  `/api/artifacts/{artifact_id}` contract
+- stable `/api/artifacts/{artifact_id}` contract
+- generated blobs resolve through the configured object store boundary
+  (`local` by default, `s3` optional)
 
-### Sessions, artifacts, and authorization
+### Authorization and deployment behavior
 
-- persisted session history with `session_messages` normalization and legacy compatibility
-- public browser deployments can now require one shared site password while isolating history, artifacts, and related owner-scoped reads per browser through a signed HttpOnly session cookie
-- generated chat artifacts served from persisted artifact ids while keeping `download_url` on the stable `/api/artifacts/{artifact_id}` contract
-- chat prompting now teaches text-first downloadable exports such as Markdown by requiring exactly one inline filename link (for example `[brief.md](brief.md)`) when the user asks for a file to download
-- generated artifacts, media attachments, and future workspace-export blobs now resolve through the configured object store (`local` by default, `s3` optional)
-- credential-backed authorization context with tenant/principal scoping
-- explicit persisted-resource ownership envelopes at storage boundaries
-- capability gates that distinguish policy denial from runtime unavailability
+- public browser deployments can require one shared site password while still
+  isolating history and artifact access per browser session
+- account and Google browser login are landed for remote-capable deployments
+- public backend model discovery and chat entrypoints enforce a server-side
+  allowlist only for the remote/public deployment surface
+- three deployment modes are shipped and isolated:
+  `local`, `school_server`, and `remote`
 
 ### Workbench and sandbox
 
 - durable workbench tasks with polling and event timelines
-- minimal runtime execution for `plan`, `browse`, `deep_research`, and `canvas`
-- typed durable workspace outputs, with `canvas_document` as the first shipped output kind
-- session-bound workspace outputs now restore through history reads, outputs can be reopened directly by durable id, and outputs can be exported into downloadable artifacts
-- declarative workbench source registry with `knowledge` ready and experimental DDGS-backed `web` retrieval now runtime-ready
-- bounded LangGraph-backed multi-step research for `browse` and `deep_research`, with durable plan/retrieval/follow-up/synthesis events and a private rollback switch to the legacy single-pass path
-- caller-scoped `project_memory` retrieval plus operator-provisioned read-only connector bindings are now part of the shipped source registry and bounded browse/deep-research runtime foundation
-- shared runtime foundations now include a pure source catalog, caller-visible source facts for capability discovery, and a LangGraph source-executor registry under the existing workbench wrappers
-- frontend workbench affordances now treat `/api/system/features` as the single truth for plan-mode readiness, disabling local-only toggles whenever backend capability discovery is absent or denied
-- public backend model discovery and chat entrypoints now enforce a server-side allowlist for the deployed `qwen3:4b`, `llama3.2:3b`, `gemma3:4b`, and `qwen2.5-coder:3b` surfaces
+- bounded runtime execution for `plan`, `browse`, `deep_research`, and `canvas`
+- typed durable workspace outputs and output reopen/export linkage
+- shared source catalog and capability assembly under existing workbench/system
+  wrappers
 - durable code sandbox execution with persisted events and replayable logs
-- queued plus running sandbox cancellation now flows through an in-process
-  supervisor seam, and startup recovery fails abandoned `running` executions
-  closed instead of leaving durable rows stranded
-- sandbox workspaces now receive `.goat/workspace_manifest.json` plus
-  `GOAT_SANDBOX_*` environment hints for runtime path discovery
+- queued plus running sandbox cancellation and fail-closed restart recovery are
+  shipped
 - Docker-first isolation with `localhost` as an explicit trusted-dev fallback
 
 ### Desktop
@@ -64,92 +60,63 @@ Last updated: 2026-04-13
 - Tauri 2 desktop shell
 - PyInstaller-built backend sidecar
 - working Windows packaging flow producing `.msi` and NSIS installers
-- signed Windows desktop release path in `.github/workflows/desktop-provenance.yml`
-- Linux packaged-desktop build/provenance now runs in CI and the release
-  provenance workflow, retaining `.AppImage` / `.deb` artifacts plus packaged
-  provenance alongside the existing sidecar proof
-- macOS packaged-desktop workflow scaffolding now emits a blocker report and
-  stays manually gated so the repo does not misrepresent public macOS release
-  support before signing/notarization proof exists
-- desktop smoke coverage for sidecar boot and startup diagnostics
-- packaged desktop shell diagnostics persisted under the platform app-log directory
-- packaged desktop startup now uses bounded pre-ready restart/backoff before the main window is revealed, then still fails explicitly if the sidecar never becomes ready or exits unexpectedly after reveal
-- release governance now retains installed Windows evidence for both MSI and NSIS artifacts before signed installers are uploaded
-- `docs/operations/DESKTOP_DISTRIBUTION_READINESS.md` now records packaged
-  prerequisites, updater gating, and runtime diagnostic inputs for Windows,
-  Linux, and the currently blocked macOS public path
+- signed Windows desktop release path in
+  `.github/workflows/desktop-provenance.yml`
+- Linux packaged proof/readiness workflow coverage is landed
+- macOS public distribution remains blocked pending signing/notarization work
+- packaged startup uses bounded pre-ready restart/backoff
+- installed Windows evidence is retained in release and drill workflows
+- `desktop-package-windows` keeps merge-blocking packaged-shell fault smoke for
+  desktop-related changes
 
 ### Governance and operations
 
 - artifact-first staged release governance workflow and approval gate
-- desktop provenance workflow for the Linux sidecar artifact, Linux packaged
-  desktop provenance/assets, macOS blocker-report scaffolding, and signed
-  Windows installer digests/attestations
-- merge-blocking backend CI now stages `backend-fast -> backend-heavy -> backend`, so triage clears changed-file Ruff/format blockers before reading deeper backend failures
-- repo-native decision records now have a canonical entrypoint under `docs/decisions/`, approved templates, and PR guidance for tradeoffs, rollback posture, and proof links
-- the engineering standards and PR template now include an explicit admission gate for future workbench, connector, and project-memory expansion, including feature-spec, decision-package, caller-scoped contract-proof, runtime-parser, and docs-sync requirements
-- frontend-only `dependency-cruiser` now runs in standard CI beside lint/build/contract gates to pin module direction, cycle checks, and API-layer import boundaries
-- frontend runtime schema parsing now covers the current shipped JSON adapters under `frontend/src/api/` plus the current chat/upload/code-sandbox SSE boundaries, while the existing `docs/api/openapi.json -> openapi-typescript -> contract:check` chain remains the only generated contract source
-- lightweight feature-scoped `spec/plan/tasks` artifacts now exist under `docs/governance/specs/` as a non-canonical pilot for complex brownfield changes
-- versioned observability assets in-repo
-- nightly performance smoke with explicit budgets
-- merge-blocking PR latency gate for the core in-process chat path
-- weekly quality snapshot workflow for recurring coverage, security-review, and optional performance-summary capture
-- recurring fault-injection workflow for upstream-unavailable, persistence-failure, database recovery-drill, artifact rollback drill, and desktop-boot diagnostics
-- recurring installed Windows drill in `.github/workflows/fault-injection.yml` so installer regressions are not release-only discoveries
-- backup, restore, rollback, and recovery-drill coverage
-- documented vulnerability response, dependency-refresh cadence, and credential-rotation policy
-- CI gates for lint, tests, build, contract sync, dependency audit, secret scan, and desktop supply chain
-- `desktop-package-windows` now has desktop-change trigger boundaries, merge-blocking packaged-shell fault smoke, retained build/smoke diagnostics, and governance tests so missing-sidecar, early-exit, and pre-ready-timeout regressions stay auditable for desktop-related changes
-- `.github/workflows/desktop-provenance.yml` and `.github/workflows/fault-injection.yml` now always retain structured MSI/NSIS install -> healthy launch -> pre-ready fault -> uninstall evidence, plus workflow metadata and step summaries for failure diagnosis
-- caller-scoped workbench feature semantics and observability asset coverage are now mechanically pinned by contract tests, workflow tests, and docs/runbook truth instead of roadmap watchpoints
-- the original atomicity/composition brownfield hotspots are now split into
-  narrower workbench execution helpers, workbench application modules,
-  knowledge-chat flow helpers, and chat-session controller hooks while keeping
-  the published behavior stable
+- backend CI stages `backend-fast -> backend-heavy -> backend`
+- contract sync, dependency audit, secret scan, rollback, backup/restore, and
+  recovery-drill coverage are documented and gated
+- repo-native decision records, ops runbooks, and observability assets are
+  checked in
+- `desktop-package-windows` remains a named merge-blocking desktop gate
+- merge-blocking packaged-shell fault smoke remains part of the desktop gate
+- current desktop packaging governance and evidence remain retention-backed and
+  auditable
+- `OBJECT_STORAGE_CONTRACT.md` is part of the live reference set
 
 ## Current known boundaries
 
-- workbench browse/deep-research now use a bounded multi-step LangGraph loop rather than the earlier single-pass evidence brief, but the runtime is still intentionally step-limited instead of open-ended autonomous research
-- read-only project memory and static connector bindings are shipped, but write-capable connectors, live remote adapters, and any project-memory mutation flow remain future work
-- future workbench, connector, and project-memory widening is now governed by the admission gate in `docs/standards/ENGINEERING_STANDARDS.md` rather than by roadmap notes alone
-- runtime metadata now supports an opt-in hosted/server Postgres backend with Alembic-owned schema truth and deterministic SQLite snapshot import/parity tooling, while local and desktop remain SQLite-first by design
-- sandbox async control now supports queued and running cancellation plus
-  fail-closed restart recovery, but retry remains terminal-only and
-  `network_policy` remains disabled-only until allowlisted egress is proven
-- signed Windows public packaging is shipped, and Linux packaged proof plus
-  readiness docs are landed, but public macOS signing/notarization and updater
-  activation remain open
-- pre-ready desktop restart/backoff is shipped, and the packaged-shell fault smoke in `desktop-package-windows` is now path-scoped, merge-blocking, and retention-backed for desktop-related changes
-- installed Windows startup evidence now stays auditable across release and scheduled workflows: signed installer validation lives in `.github/workflows/desktop-provenance.yml`, recurring installer drift detection lives in `.github/workflows/fault-injection.yml`, and both retain structured failure artifacts even when the drill fails
-- GitHub-side branch protection wiring, signing-secret availability, and hosted Windows runner behavior remain external conditions outside repo-only proof
-- frontend runtime schema parsing now covers the current shipped frontend API adapters, but future workbench/frontier surfaces should adopt the same pattern only when a real frontend consumer lands
-- `docs/governance/specs/` is intentionally a narrow working-artifact pilot, not a second governance source
+- browse/deep-research remains intentionally bounded rather than open-ended
+  autonomous runtime behavior
+- read-only project memory and static connector bindings are shipped, but
+  write-capable connectors and live remote adapters are not
+- runtime metadata supports opt-in hosted/server Postgres while local and
+  desktop remain SQLite-first
+- sandbox retry remains terminal-only and `network_policy` remains
+  disabled-only
+- signed Windows public packaging is shipped, but public macOS
+  signing/notarization and updater activation remain open
+- GitHub-side branch protection wiring, signing-secret availability, and hosted
+  Windows runner behavior remain external conditions outside repo-only proof
+- `docs/governance/specs/` remains a narrow working-artifact pilot rather than
+  a second governance source
 
 ## Shipped coverage by roadmap area
 
-- **16B/16C storage evolution:** complete; repository ownership boundaries are explicit across sessions, artifacts, knowledge, media, workbench, and sandbox, persisted blobs now use `storage_key` plus the local/S3 object-store boundary
-- **16D Postgres-backed runtime persistence:** complete for the hosted/server opt-in path; Alembic owns the Postgres runtime schema, repository adapters preserve the existing contracts, and SQLite snapshot export/import/parity plus rollback runbooks now anchor cutover proof
-- **17 runtime platform:** the shipped baseline includes durable workbench tasks, canvas/workspace-output persistence, session restoration, direct output reopen, output-to-artifact export linkage, experimental DDGS-backed public-web retrieval, bounded LangGraph-backed multi-step research for browse/deep-research, read-only `project_memory` retrieval, and caller-scoped static connector bindings
-- **17 shared runtime foundations:** the shipped baseline now also includes a shared workbench source catalog, caller-visible capability assembly, and a LangGraph source-executor seam under the existing `/api/workbench/*` and `/api/system/features` contracts
+- **16B/16C storage evolution:** complete; persisted blobs use `storage_key`
+  plus the local/S3 object-store boundary
+- **16D Postgres-backed runtime persistence:** complete for the hosted/server
+  opt-in path
+- **17 runtime platform:** durable workbench tasks, bounded browse/deep
+  research, read-only `project_memory`, and caller-scoped static connector
+  bindings are shipped
 - **18 sandbox follow-ons:** the shipped baseline includes the Docker-first
-  sandbox MVP, queued plus running cancellation through an in-process
-  supervisor seam, fail-closed restart recovery for abandoned runs, durable
-  execution/event storage, workspace manifest/runtime metadata hints, and
+  sandbox MVP, queued/running cancellation, fail-closed restart recovery, and
   replayable sandbox logs
-- **atomicity and composition follow-ons:** complete for the initial four
-  brownfield targets; `backend/services/workbench_execution_service.py`,
-  `backend/application/workbench.py`, `backend/services/chat_service.py`, and
-  `frontend/src/hooks/useChatSession.ts` now act as composition roots over
-  narrower helper modules instead of continuing to accumulate orchestration
-  logic
 - **19 desktop maturity:** the shipped baseline includes signed Windows
-  packaging, Linux packaged-desktop CI/release scaffolding with retained
-  provenance, macOS blocker-report workflow scaffolding, packaged-readiness
-  docs, installed Windows evidence retention, and pre-ready startup fault
-  handling
-- **governance tooling follow-ons:** decision records and PR guidance are landed, frontend-only `dependency-cruiser` is merge-blocking, current shipped frontend API adapters now validate JSON and current SSE boundaries through shared runtime parsers, and lightweight feature specs are available as a non-canonical pilot for complex brownfield changes
-- **engineering quality uplift:** audit remediation through the 2026-04-12 P3 governance-maintenance closeout is complete inside the repository, and the current industrial-score floor is backed by mechanical gates, workflow evidence, and contract tests
+  packaging, Linux packaged proof/readiness, and macOS blocker-report
+  scaffolding
+- **engineering quality uplift:** the current industrial-score floor is backed
+  by mechanical gates, workflow evidence, and contract tests
 
 ## Recommended live references
 
