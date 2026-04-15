@@ -8,6 +8,24 @@ export interface StreamChatOptions {
   userName?: string
 }
 
+const FIRST_EVENT_TIMEOUT_MS = 15_000
+
+function readWithTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+    promise.then(
+      value => {
+        window.clearTimeout(timer)
+        resolve(value)
+      },
+      error => {
+        window.clearTimeout(timer)
+        reject(error)
+      },
+    )
+  })
+}
+
 /** Parse completed SSE lines and yield typed chat stream events. */
 function* parseSSELines(lines: string[]): Generator<ChatStreamEvent> {
   for (const line of lines) {
@@ -51,21 +69,30 @@ export async function* streamChat(
   const reader = resp.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
+  let sawStreamEvent = false
 
   try {
     while (true) {
-      const { done, value } = await reader.read()
+      const { done, value } = sawStreamEvent
+        ? await reader.read()
+        : await readWithTimeout(
+            reader.read(),
+            FIRST_EVENT_TIMEOUT_MS,
+            'Chat API timed out before streaming any output',
+          )
       if (done) break
       buffer += decoder.decode(value, { stream: true })
       const parts = buffer.split('\n')
       buffer = parts[parts.length - 1] ?? ''
       for (const event of parseSSELines(parts.slice(0, -1))) {
+        sawStreamEvent = true
         yield event
         if (event.type === 'done') return
       }
     }
     if (buffer.trim()) {
       for (const event of parseSSELines([buffer])) {
+        sawStreamEvent = true
         yield event
         if (event.type === 'done') return
       }

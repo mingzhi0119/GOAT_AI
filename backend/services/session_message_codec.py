@@ -25,10 +25,11 @@ STORED_CHART_ROLE = "__chart__"
 STORED_FILE_CONTEXT_ROLE = "__file_context__"
 STORED_FILE_CONTEXT_ACK_ROLE = "__file_context_ack__"
 FILE_CONTEXT_REPLY = "I have loaded the file context."
-SESSION_PAYLOAD_VERSION = 4
+SESSION_PAYLOAD_VERSION = 5
 
 # Alternate upload-analysis header (legacy compatibility / future prompts).
 FILE_CONTEXT_REQUESTED_PREFIX = "[User requested analysis of uploaded tabular data]"
+_PERSONA_THEME_STYLES = {"classic", "urochester", "thu"}
 
 
 @dataclass(frozen=True)
@@ -40,6 +41,23 @@ class DecodedSessionPayload:
     file_context_prompt: str | None
     knowledge_documents: list[dict[str, str]]
     chart_data_source: ChartDataSource = "none"
+    persona_snapshot: dict[str, str] | None = None
+
+
+def _normalize_persona_snapshot(raw_snapshot: Any) -> dict[str, str] | None:
+    """Validate and normalize stored persona snapshot metadata."""
+    if not isinstance(raw_snapshot, dict):
+        return None
+    raw_theme_style = raw_snapshot.get("theme_style")
+    raw_system_instruction = raw_snapshot.get("system_instruction")
+    if raw_theme_style not in _PERSONA_THEME_STYLES:
+        return None
+    if not isinstance(raw_system_instruction, str):
+        return None
+    return {
+        "theme_style": str(raw_theme_style),
+        "system_instruction": raw_system_instruction,
+    }
 
 
 def is_file_context_message(message: ChatMessage) -> bool:
@@ -101,6 +119,7 @@ def build_session_payload(
     knowledge_documents: list[dict[str, str]] | None = None,
     assistant_artifacts: list[dict[str, object]] | None = None,
     chart_data_source: ChartDataSource = "none",
+    persona_snapshot: dict[str, str] | None = None,
 ) -> dict[str, object]:
     """Build the versioned storage payload for new session snapshots."""
     visible_messages: list[dict[str, object]] = []
@@ -135,6 +154,9 @@ def build_session_payload(
         payload["file_context_prompt"] = file_context_prompt
     if knowledge_documents:
         payload["knowledge_documents"] = knowledge_documents
+    normalized_persona_snapshot = _normalize_persona_snapshot(persona_snapshot)
+    if normalized_persona_snapshot is not None:
+        payload["persona_snapshot"] = normalized_persona_snapshot
     return payload
 
 
@@ -173,6 +195,7 @@ def _decode_legacy_session_payload(raw_payload: list[object]) -> DecodedSessionP
         file_context_prompt=file_context_prompt,
         knowledge_documents=[],
         chart_data_source="uploaded" if file_context_prompt else "none",
+        persona_snapshot=None,
     )
 
 
@@ -232,12 +255,16 @@ def decode_session_payload(raw_payload: Any) -> DecodedSessionPayload:
             and raw_source in {"uploaded", "demo", "none"}
             else ("uploaded" if file_context_prompt else "none")
         )
+        persona_snapshot = _normalize_persona_snapshot(
+            raw_payload.get("persona_snapshot")
+        )
         return DecodedSessionPayload(
             messages=messages,
             chart_spec=chart_spec,
             file_context_prompt=file_context_prompt,
             knowledge_documents=knowledge_documents,
             chart_data_source=chart_data_source,
+            persona_snapshot=persona_snapshot,
         )
 
     return DecodedSessionPayload(
@@ -246,4 +273,5 @@ def decode_session_payload(raw_payload: Any) -> DecodedSessionPayload:
         file_context_prompt=None,
         knowledge_documents=[],
         chart_data_source="none",
+        persona_snapshot=None,
     )

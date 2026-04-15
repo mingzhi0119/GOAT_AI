@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
-import type { ChartSpec, OllamaOptionsPayload, ThemeStyle } from '../api/types'
+import type { ChartSpec, OllamaOptionsPayload, PersonaSnapshot, ThemeStyle } from '../api/types'
 import type { FileBindingMode, FileContextItem } from './useFileContext'
 import { normalizeSessionTitle } from '../utils/sessionTitle'
 
@@ -40,9 +40,8 @@ interface UseChatSendMessageControllerArgs {
   fileContexts: FileContextItem[]
   selectedModel: string
   userName: string
-  systemInstruction: string
   planModeEnabled: boolean
-  themeStyle: ThemeStyle
+  resolvePersonaSnapshot: (sessionId: string) => PersonaSnapshot
   ollamaOptions?: OllamaOptionsPayload
   setChartSpec: Dispatch<SetStateAction<ChartSpec | null>>
   setFileContextMode: (id: string, mode: FileBindingMode) => void
@@ -54,9 +53,8 @@ export function useChatSendMessageController({
   fileContexts,
   selectedModel,
   userName,
-  systemInstruction,
   planModeEnabled,
-  themeStyle,
+  resolvePersonaSnapshot,
   ollamaOptions,
   setChartSpec,
   setFileContextMode,
@@ -64,6 +62,7 @@ export function useChatSendMessageController({
   return useCallback(
     async (content: string, imageAttachmentIds?: string[]) => {
       const activeSessionId = chat.sessionId ?? crypto.randomUUID()
+      const personaSnapshot = resolvePersonaSnapshot(activeSessionId)
       const optimisticTitle = normalizeSessionTitle(content) || 'New Chat'
       const nowIso = new Date().toISOString()
       history.upsertSession({
@@ -87,8 +86,8 @@ export function useChatSendMessageController({
         userName,
         shouldAttachKnowledge ? knowledgeDocumentIds : undefined,
         planModeEnabled,
-        systemInstruction,
-        themeStyle,
+        personaSnapshot.system_instruction,
+        personaSnapshot.theme_style,
         ollamaOptions,
         setChartSpec,
         imageAttachmentIds,
@@ -105,11 +104,10 @@ export function useChatSendMessageController({
       history,
       ollamaOptions,
       planModeEnabled,
+      resolvePersonaSnapshot,
       selectedModel,
       setChartSpec,
       setFileContextMode,
-      systemInstruction,
-      themeStyle,
       userName,
     ],
   )

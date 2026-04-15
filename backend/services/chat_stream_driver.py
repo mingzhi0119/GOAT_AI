@@ -65,6 +65,7 @@ def phase_input_guard(run: ChatStreamRunContext) -> Generator[str, None, None]:
         session_repository=run.session_repository,
         title_generator=run.title_generator,
         started_at=run.started_at,
+        persona_snapshot=run.persona_snapshot,
         session_owner_id=run.session_owner_id,
         tenant_id=run.tenant_id,
         principal_id=run.principal_id,

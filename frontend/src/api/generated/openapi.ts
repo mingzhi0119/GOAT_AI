@@ -1411,6 +1411,7 @@ export interface components {
             owner_id: string;
             /** Messages */
             messages: components["schemas"]["HistorySessionMessage"][];
+            persona_snapshot?: components["schemas"]["HistorySessionPersonaSnapshot"] | null;
             /** Chart Spec */
             chart_spec?: {
                 [key: string]: unknown;
@@ -1473,6 +1474,16 @@ export interface components {
              * @description Downloadable generated files associated with this assistant turn.
              */
             artifacts?: components["schemas"]["ChatArtifact"][];
+        };
+        /**
+         * HistorySessionPersonaSnapshot
+         * @description Persona inputs locked to one persisted chat session.
+         */
+        HistorySessionPersonaSnapshot: {
+            /** Theme Style */
+            theme_style: string;
+            /** System Instruction */
+            system_instruction: string;
         };
         /**
          * HistorySessionRenameRequest

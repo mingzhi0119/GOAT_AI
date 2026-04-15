@@ -15,6 +15,7 @@ import type {
   InferenceLatency,
   ModelCapabilitiesResponse,
   ModelsResponse,
+  PersonaSnapshot,
   RuntimeFeature,
   SystemFeatures,
   WorkbenchFeatures,
@@ -269,6 +270,11 @@ const historySessionKnowledgeDocumentSchema = z.object({
   mime_type: z.string(),
 })
 
+const personaSnapshotSchema: z.ZodType<PersonaSnapshot> = z.object({
+  theme_style: z.enum(['classic', 'urochester', 'thu']),
+  system_instruction: z.string(),
+})
+
 const workbenchWorkspaceOutputSchema = z.object({
   output_id: z.string(),
   output_kind: z.literal('canvas_document'),
@@ -287,6 +293,10 @@ const historySessionListResponseSchema = z.object({
 
 const historySessionDetailSchema = historySessionItemSchema.extend({
   messages: z.array(historySessionMessageSchema),
+  persona_snapshot: personaSnapshotSchema
+    .nullable()
+    .optional()
+    .transform(value => value ?? null),
   chart_spec: chartSpecSchema.nullable().optional().transform(value => value ?? null),
   file_context: historySessionFileContextSchema
     .nullable()

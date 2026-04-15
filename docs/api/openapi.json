@@ -4565,6 +4565,16 @@
             "type": "array",
             "title": "Messages"
           },
+          "persona_snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HistorySessionPersonaSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "chart_spec": {
             "anyOf": [
               {
@@ -4718,6 +4728,26 @@
         ],
         "title": "HistorySessionMessage",
         "description": "Stored message row for persisted session history."
+      },
+      "HistorySessionPersonaSnapshot": {
+        "properties": {
+          "theme_style": {
+            "type": "string",
+            "pattern": "^(classic|urochester|thu)$",
+            "title": "Theme Style"
+          },
+          "system_instruction": {
+            "type": "string",
+            "title": "System Instruction"
+          }
+        },
+        "type": "object",
+        "required": [
+          "theme_style",
+          "system_instruction"
+        ],
+        "title": "HistorySessionPersonaSnapshot",
+        "description": "Persona inputs locked to one persisted chat session."
       },
       "HistorySessionRenameRequest": {
         "properties": {

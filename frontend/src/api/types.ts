@@ -20,6 +20,11 @@ export type CodeSandboxExecutionEventsContract =
 export type ReasoningLevel = 'low' | 'medium' | 'high'
 export type ThemeStyle = 'classic' | 'urochester' | 'thu'
 
+export interface PersonaSnapshot {
+  theme_style: ThemeStyle
+  system_instruction: string
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
@@ -81,6 +86,7 @@ export type HistoryChartDataSource = 'uploaded' | 'demo' | 'none'
 
 export interface HistorySessionDetail extends HistorySessionItem {
   messages: HistorySessionMessage[]
+  persona_snapshot: PersonaSnapshot | null
   chart_spec: ChartSpec | null
   file_context: HistorySessionFileContext | null
   knowledge_documents: HistorySessionKnowledgeDocument[]

@@ -199,6 +199,7 @@ def get_history_session_detail(
         for item in raw_knowledge_documents
         if isinstance(item, dict)
     ]
+    response_body["persona_snapshot"] = response_body.get("persona_snapshot")
     response_body["workspace_outputs"] = _list_visible_session_workspace_outputs(
         workbench_repository=workbench_repository,
         session_id=session_id,

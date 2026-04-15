@@ -8,6 +8,7 @@ from backend.models.chat import ChatMessage
 from backend.services.session_message_codec import (
     FILE_CONTEXT_UPLOAD_PREFIX,
     build_session_payload,
+    decode_session_payload,
     is_file_context_message,
 )
 from goat_ai.chat.tools import CHART_DATA_CSV_MARKER, LEGACY_CSV_FENCE_SUBSTRING
@@ -69,6 +70,34 @@ class SessionMessageCodecTests(unittest.TestCase):
                 }
             ],
             payload.get("knowledge_documents"),
+        )
+
+    def test_persona_snapshot_round_trips_through_payload_codec(self) -> None:
+        payload = build_session_payload(
+            messages=[ChatMessage(role="user", content="visible ask")],
+            assistant_text="ok",
+            chart_spec=None,
+            chart_data_source="none",
+            persona_snapshot={
+                "theme_style": "thu",
+                "system_instruction": "Use short bullets.",
+            },
+        )
+
+        self.assertEqual(
+            {
+                "theme_style": "thu",
+                "system_instruction": "Use short bullets.",
+            },
+            payload.get("persona_snapshot"),
+        )
+        decoded = decode_session_payload(payload)
+        self.assertEqual(
+            {
+                "theme_style": "thu",
+                "system_instruction": "Use short bullets.",
+            },
+            decoded.persona_snapshot,
         )
 
 

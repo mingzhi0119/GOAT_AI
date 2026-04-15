@@ -12,6 +12,7 @@ import {
 import { API_AUTH_REQUIRED_EVENT } from '../api/http'
 import type { BrowserAuthSession } from '../api/types'
 import { navigateToExternalUrl } from '../utils/browserNavigation'
+import { retryDesktopBootstrapAction } from '../utils/desktopBootstrap'
 import { clearBrowserPrivateState } from './browserPrivateState'
 
 const GOOGLE_CALLBACK_QUERY_KEYS = [
@@ -150,18 +151,27 @@ export function useBrowserAccessAuth(): UseBrowserAccessAuthReturn {
     setShellKey(previous => previous + 1)
   }, [])
 
+  const loadCurrentSession = useCallback(
+    () =>
+      retryDesktopBootstrapAction(
+        () => fetchBrowserAuthSession(),
+        error => !(error instanceof BrowserAuthApiError),
+      ),
+    [],
+  )
+
   const refresh = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
-      applySession(await fetchBrowserAuthSession())
+      applySession(await loadCurrentSession())
     } catch (nextError) {
       setError(mapBrowserAuthError(nextError, 'Failed to load browser session.'))
       setSession(null)
     } finally {
       setIsLoading(false)
     }
-  }, [applySession])
+  }, [applySession, loadCurrentSession])
 
   const finishLogin = useCallback((next: BrowserAuthSession) => {
     clearBrowserPrivateState()
@@ -238,7 +248,7 @@ export function useBrowserAccessAuth(): UseBrowserAccessAuthReturn {
         clearGoogleCallbackParams()
         const message = mapGoogleRedirectError(callback.error, callback.errorDescription)
         try {
-          const next = await fetchBrowserAuthSession()
+          const next = await loadCurrentSession()
           if (!cancelled) {
             applySession(next)
             setError(message)
@@ -273,7 +283,7 @@ export function useBrowserAccessAuth(): UseBrowserAccessAuthReturn {
           clearGoogleCallbackParams()
           const message = mapBrowserAuthError(nextError, 'Google login failed.')
           try {
-            const next = await fetchBrowserAuthSession()
+            const next = await loadCurrentSession()
             if (!cancelled) {
               applySession(next)
               setError(message)
@@ -299,7 +309,7 @@ export function useBrowserAccessAuth(): UseBrowserAccessAuthReturn {
     return () => {
       cancelled = true
     }
-  }, [applySession, finishLogin, refresh])
+  }, [applySession, finishLogin, loadCurrentSession, refresh])
 
   useEffect(() => {
     if (!session?.auth_required) return

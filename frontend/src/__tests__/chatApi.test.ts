@@ -27,6 +27,7 @@ const request: ChatRequest = {
 describe('chat api', () => {
   afterEach(() => {
     localStorage.clear()
+    vi.useRealTimers()
     vi.restoreAllMocks()
   })
 
@@ -152,5 +153,34 @@ describe('chat api', () => {
     }
 
     expect(events).toEqual([])
+  })
+
+  it('fails when the stream never yields a first event', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        body: new ReadableStream<Uint8Array>({
+          start() {
+            // Keep the stream open without yielding bytes.
+          },
+        }),
+      }),
+    )
+
+    const failure = (async () => {
+      for await (const _event of streamChat(request)) {
+        // consume
+      }
+    })().catch(error => error)
+
+    await vi.advanceTimersByTimeAsync(15_000)
+
+    await expect(failure).resolves.toEqual(
+      expect.objectContaining({
+        message: 'Chat API timed out before streaming any output',
+      }),
+    )
   })
 })

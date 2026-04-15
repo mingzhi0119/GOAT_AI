@@ -57,6 +57,10 @@ describe('history api', () => {
         created_at: 'c',
         updated_at: 'u',
         owner_id: 'alice',
+        persona_snapshot: {
+          theme_style: 'thu',
+          system_instruction: 'Stay concise.',
+        },
         chart_spec: {
           version: '2.0',
           engine: 'echarts',
@@ -113,6 +117,10 @@ describe('history api', () => {
       },
     })
     expect(detail.file_context).toEqual({ prompt: 'prompt' })
+    expect(detail.persona_snapshot).toEqual({
+      theme_style: 'thu',
+      system_instruction: 'Stay concise.',
+    })
     expect(detail.knowledge_documents).toEqual([
       { document_id: 'doc-1', filename: 'strategy.pdf', mime_type: 'application/pdf' },
     ])
@@ -170,6 +178,7 @@ describe('history api', () => {
     const detail = await fetchSession('s2')
 
     expect(detail.chart_spec).toBeNull()
+    expect(detail.persona_snapshot).toBeNull()
     expect(detail.file_context).toBeNull()
     expect(detail.knowledge_documents).toEqual([])
     expect(detail.workspace_outputs).toEqual([])

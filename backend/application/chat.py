@@ -183,6 +183,10 @@ def _build_source_stream(
     settings: Settings,
     request_id: str,
 ) -> Generator[str, None, None]:
+    persona_snapshot = {
+        "theme_style": req.theme_style,
+        "system_instruction": (req.system_instruction or "").strip(),
+    }
     return stream_chat_sse(
         llm=llm,
         model=prepared.model,
@@ -197,6 +201,7 @@ def _build_source_stream(
         title_generator=title_generator,
         safeguard_service=safeguard_service,
         system_instruction=(req.system_instruction or "").strip(),
+        persona_snapshot=persona_snapshot,
         plan_mode=prepared.plan_mode,
         ollama_options=prepared.ollama_options,
         tabular_extractor=tabular_extractor,

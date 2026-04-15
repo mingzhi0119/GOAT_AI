@@ -54,6 +54,7 @@ def stream_knowledge_chat_sse(
     title_generator: TitleGenerator | None,
     safeguard_service: SafeguardService | None,
     system_instruction: str,
+    persona_snapshot: dict[str, str] | None,
     plan_mode: bool,
     ollama_options: dict[str, float | int | bool | str] | None,
     tabular_extractor: TabularContextExtractor | None,
@@ -87,6 +88,7 @@ def stream_knowledge_chat_sse(
                 session_repository=session_repository,
                 title_generator=title_generator,
                 started_at=started_at,
+                persona_snapshot=persona_snapshot,
                 session_owner_id=session_owner_id,
             )
             return
@@ -135,6 +137,7 @@ def stream_knowledge_chat_sse(
         title_generator=title_generator,
         safeguard_service=safeguard_service,
         system_instruction=knowledge_instruction,
+        persona_snapshot=persona_snapshot,
         plan_mode=plan_mode,
         ollama_options=ollama_options,
         tabular_extractor=tabular_extractor,

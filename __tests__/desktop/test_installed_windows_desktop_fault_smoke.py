@@ -104,6 +104,22 @@ def test_build_healthy_launch_environment_uses_isolated_runtime_and_ready_skip(
     assert str(metadata["expected_shell_log_path"]).endswith("desktop-shell.log")
 
 
+def test_shell_log_sidecar_start_count_counts_sidecar_spawns(tmp_path: Path) -> None:
+    shell_log = tmp_path / "desktop-shell.log"
+    shell_log.write_text(
+        "\n".join(
+            [
+                "Starting bundled backend sidecar.",
+                "Bundled backend sidecar spawned.",
+                "Starting bundled backend sidecar.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    assert subject._shell_log_sidecar_start_count(shell_log) == 2
+
+
 def test_msi_uninstall_args_extract_product_code() -> None:
     uninstall_log = Path("uninstall.msiexec.log")
 
@@ -220,6 +236,7 @@ def test_main_writes_summary_json(
     assert summary["healthy_launch"]["status"] == "passed"
     assert summary["healthy_launch"]["ready_skip_ollama_probe"] is True
     assert summary["healthy_launch"]["ready_status"] == 200
+    assert summary["healthy_launch"]["second_launch_handoff_ok"] is True
     assert summary["results"][0]["failure_stage"] == "backend_spawn_failed"
     assert summary["uninstall"]["succeeded"] is True
 
@@ -534,6 +551,14 @@ def _healthy_launch_result(
         shell_log_source_path=str(
             healthy_dir / "runtime-env" / "LocalAppData" / "desktop-shell.log"
         ),
+        second_launch_stdout_path=str(healthy_dir / "second-launch.stdout.log"),
+        second_launch_stderr_path=str(healthy_dir / "second-launch.stderr.log"),
+        second_launch_exit_code=0,
+        second_launch_handoff_ok=True,
+        health_ready_after_second_launch=True,
+        ready_status_after_second_launch=200,
+        shell_log_spawn_count_before_second_launch=1,
+        shell_log_spawn_count_after_second_launch=1,
         shutdown_method="taskkill_tree_force",
         shutdown_exit_code=0,
         status=status,
