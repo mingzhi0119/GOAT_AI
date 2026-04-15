@@ -57,10 +57,11 @@ def integration_env(
     object_store_dir = base / "object-store"
     data_dir.mkdir(parents=True, exist_ok=True)
     object_store_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("GOAT_DEPLOY_MODE", "0")
     monkeypatch.setenv("GOAT_API_KEY", "")
     monkeypatch.setenv("GOAT_API_KEY_WRITE", "")
     monkeypatch.setenv("GOAT_API_CREDENTIALS_JSON", "")
-    monkeypatch.setenv("GOAT_REQUIRE_SESSION_OWNER", "false")
+    monkeypatch.delenv("GOAT_REQUIRE_SESSION_OWNER", raising=False)
     monkeypatch.setenv("GOAT_LOG_PATH", str(log_db))
     monkeypatch.setenv("GOAT_DATA_DIR", str(data_dir))
     monkeypatch.setenv("GOAT_OBJECT_STORE_ROOT", str(object_store_dir))

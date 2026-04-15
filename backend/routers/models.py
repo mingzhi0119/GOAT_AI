@@ -5,12 +5,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from backend.application.models import get_model_capabilities, list_models
+from backend.application.ports import LLMClient, Settings
 from backend.platform.config import get_settings
 from backend.platform.dependencies import get_llm_client
 from backend.models.chat import ModelCapabilitiesResponse, ModelsResponse
 from backend.models.common import ErrorResponse
-from backend.application.ports import LLMClient
-from backend.types import Settings
 
 router = APIRouter()
 
