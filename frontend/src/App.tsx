@@ -20,6 +20,7 @@ import { useOwnerId } from './hooks/useOwnerId'
 import { useSystemFeatures } from './hooks/useSystemFeatures'
 import { useSystemInstruction } from './hooks/useSystemInstruction'
 import { useUserName } from './hooks/useUserName'
+import { reportDesktopBootstrapStatus } from './utils/desktopBootstrap'
 import { downloadChatAsMarkdown } from './utils/exportChatMarkdown'
 import { getChatLayoutDecisions } from './utils/chatLayout'
 
@@ -70,8 +71,11 @@ function FullscreenStatus({
           backdropFilter: 'blur(18px)',
         }}
       >
-        <p className="text-xs font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--text-muted)' }}>
-          GOAT startup
+        <p
+          className="text-xs font-semibold uppercase tracking-[0.1em]"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          GOAT AI desktop
         </p>
         <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em]">{title}</h1>
         <p className="mt-3 text-sm leading-6" style={{ color: 'var(--text-muted)' }}>
@@ -235,6 +239,7 @@ function AppShell({
             messages={session.messages}
             chartSpec={session.chartSpec}
             isStreaming={session.isStreaming}
+            personaStatusMessage={session.personaStatusMessage}
             layoutDecisions={chatLayout}
             models={models.models}
             selectedModel={models.selectedModel}
@@ -286,6 +291,17 @@ function AppShell({
 export default function App() {
   const branding = useBranding()
   const auth = useBrowserAccessAuth()
+  const bootstrapStatus =
+    auth.isLoading && auth.session === null
+      ? 'pending'
+      : auth.session === null
+        ? 'failed'
+        : 'ready'
+
+  useEffect(() => {
+    if (bootstrapStatus === 'pending') return
+    void reportDesktopBootstrapStatus(bootstrapStatus)
+  }, [bootstrapStatus])
 
   if (auth.isLoading && auth.session === null) {
     return (

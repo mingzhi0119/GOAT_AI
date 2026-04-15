@@ -11,6 +11,7 @@ describe('session history utils', () => {
       created_at: 'c',
       updated_at: 'u',
       owner_id: '',
+      persona_snapshot: null,
       file_context: { prompt: '[User uploaded tabular data for analysis]\n\nCHART_DATA_CSV:\n```csv```' },
       knowledge_documents: [],
       workspace_outputs: [],

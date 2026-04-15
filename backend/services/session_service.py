@@ -99,6 +99,7 @@ def persist_chat_session(
     knowledge_documents: list[dict[str, str]] | None = None,
     assistant_artifacts: list[dict[str, object]] | None = None,
     chart_data_source: ChartDataSource = "none",
+    persona_snapshot: dict[str, str] | None = None,
     title_override: str | None = None,
     owner_id: str = "",
     tenant_id: str = "tenant:default",
@@ -136,6 +137,7 @@ def persist_chat_session(
         knowledge_documents=knowledge_documents,
         assistant_artifacts=assistant_artifacts,
         chart_data_source=resolved_chart_data_source,
+        persona_snapshot=persona_snapshot,
     )
 
     session_repository.upsert_session(

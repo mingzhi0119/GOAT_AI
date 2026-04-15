@@ -70,6 +70,7 @@ class InMemorySessionRepository:
             file_context_prompt=decoded.file_context_prompt,
             knowledge_documents=decoded.knowledge_documents,
             chart_data_source=decoded.chart_data_source,
+            persona_snapshot=decoded.persona_snapshot,
         )
 
     def upsert_session(self, payload: SessionUpsertPayload) -> None:

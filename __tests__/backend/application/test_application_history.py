@@ -130,6 +130,10 @@ class ApplicationHistoryTests(unittest.TestCase):
                 }
             ],
             chart_data_source="none",
+            persona_snapshot={
+                "theme_style": "thu",
+                "system_instruction": "Use short bullets.",
+            },
         )
         payload["file_context_prompt"] = "Attached context"
         repository.upsert_session(
@@ -158,6 +162,11 @@ class ApplicationHistoryTests(unittest.TestCase):
 
         self.assertEqual("Attached context", detail.file_context.prompt)
         self.assertEqual("doc-1", detail.knowledge_documents[0].document_id)
+        self.assertIsNotNone(detail.persona_snapshot)
+        self.assertEqual("thu", detail.persona_snapshot.theme_style)
+        self.assertEqual(
+            "Use short bullets.", detail.persona_snapshot.system_instruction
+        )
 
     def test_get_history_session_detail_conceals_unauthorized_sessions(self) -> None:
         repository = InMemorySessionRepository()

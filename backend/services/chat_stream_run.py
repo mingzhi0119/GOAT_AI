@@ -126,6 +126,7 @@ class ChatStreamRunContext:
     title_generator: TitleGenerator | None
     safeguard: SafeguardService | None
     system_instruction: str
+    persona_snapshot: dict[str, str] | None
     ollama_options: dict[str, float | int | bool | str] | None
     prompt_composer: PromptComposer
     chart_orchestrator: ChartToolOrchestrator
@@ -168,6 +169,7 @@ def prepare_chat_stream_run(
     title_generator: TitleGenerator | None,
     safeguard_service: SafeguardService | None,
     system_instruction: str,
+    persona_snapshot: dict[str, str] | None,
     plan_mode: bool,
     ollama_options: dict[str, float | int | bool | str] | None,
     tabular_extractor: TabularContextExtractor | None,
@@ -234,6 +236,7 @@ def prepare_chat_stream_run(
         title_generator=title_generator,
         safeguard=safeguard_service,
         system_instruction=system_instruction,
+        persona_snapshot=persona_snapshot,
         ollama_options=ollama_options,
         prompt_composer=prompt_composer,
         chart_orchestrator=chart_orchestrator,

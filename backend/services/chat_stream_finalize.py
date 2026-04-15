@@ -85,6 +85,7 @@ def phase_emit_completion(
                     artifact.model_dump(mode="json")
                     for artifact in run.emitted_artifacts
                 ],
+                persona_snapshot=run.persona_snapshot,
                 chart_data_source=run.chart_data_source
                 if chart_spec is not None
                 else "none",
@@ -116,6 +117,7 @@ def phase_emit_completion(
         session_repository=run.session_repository,
         title_generator=run.title_generator,
         started_at=run.started_at,
+        persona_snapshot=run.persona_snapshot,
         session_owner_id=run.session_owner_id,
         tenant_id=run.tenant_id,
         principal_id=run.principal_id,

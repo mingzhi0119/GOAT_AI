@@ -279,6 +279,7 @@ schemas:
       updated_at: string
       owner_id: string
       messages: HistorySessionMessage[]
+      persona_snapshot: HistorySessionPersonaSnapshot|null
       chart_spec: object|null
       file_context: HistorySessionFileContext|null
       knowledge_documents: HistorySessionKnowledgeDocument[]
@@ -316,6 +317,14 @@ schemas:
       content: string
       image_attachment_ids: string[]
       artifacts: ChatArtifact[]
+  HistorySessionPersonaSnapshot:
+    type: object
+    required:
+      - theme_style
+      - system_instruction
+    properties:
+      theme_style: string
+      system_instruction: string
   HistorySessionRenameRequest:
     type: object
     required:

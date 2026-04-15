@@ -18,6 +18,7 @@ interface UseChatSessionHistorySyncArgs {
   setChartSpec: Dispatch<SetStateAction<ChartSpec | null>>
   replaceFileContexts: (items: FileContextItem[]) => void
   clearFileContext: () => void
+  onSessionLoaded?: (session: HistorySessionDetail) => void
 }
 
 export function useChatSessionHistorySync({
@@ -26,16 +27,18 @@ export function useChatSessionHistorySync({
   setChartSpec,
   replaceFileContexts,
   clearFileContext,
+  onSessionLoaded,
 }: UseChatSessionHistorySyncArgs) {
   return useCallback(
     async (sessionId: string) => {
       const session = await history.loadSession(sessionId)
       setChartSpec(session.chart_spec)
       chat.loadSession(session)
+      onSessionLoaded?.(session)
       const attachments = historyKnowledgeAttachments(session)
       if (attachments.length > 0) replaceFileContexts(attachments)
       else clearFileContext()
     },
-    [chat, clearFileContext, history, replaceFileContexts, setChartSpec],
+    [chat, clearFileContext, history, onSessionLoaded, replaceFileContexts, setChartSpec],
   )
 }

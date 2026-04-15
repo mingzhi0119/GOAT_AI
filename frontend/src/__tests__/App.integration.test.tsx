@@ -6,10 +6,16 @@ vi.mock('../utils/browserNavigation', () => ({
   navigateToExternalUrl: vi.fn(),
 }))
 
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: vi.fn(),
+}))
+
 import App from '../App'
 import { API_KEY_STORAGE_KEY, OWNER_ID_STORAGE_KEY } from '../api/auth'
+import { BrowserAuthApiError } from '../api/browserAuth'
 import { buildApiUrl } from '../api/urls'
 import { AppearanceProvider } from '../hooks/useAppearance'
+import { invoke } from '@tauri-apps/api/core'
 import { navigateToExternalUrl } from '../utils/browserNavigation'
 
 const AUTH_SESSION_URL = buildApiUrl('/auth/session')
@@ -25,6 +31,15 @@ const SYSTEM_FEATURES_URL = buildApiUrl('/system/features')
 const SYSTEM_GPU_URL = buildApiUrl('/system/gpu')
 const SYSTEM_INFERENCE_URL = buildApiUrl('/system/inference')
 const CHAT_URL = buildApiUrl('/chat')
+
+function matchesRequestUrl(actual: string, expected: string): boolean {
+  if (actual === expected) return true
+  try {
+    return new URL(actual).pathname === new URL(expected).pathname
+  } catch {
+    return false
+  }
+}
 
 interface TestBrowserAuthUser {
   id: string
@@ -80,12 +95,14 @@ function buildStreamResponse(chunks: string[]) {
 
 function buildFetchMock(options?: {
   authSession?: TestBrowserAuthSession
+  authSessionSequence?: (TestBrowserAuthSession | Error)[]
   sharedLoginSession?: TestBrowserAuthSession
   accountLoginSession?: TestBrowserAuthSession
   googleLoginSession?: TestBrowserAuthSession
   googleAuthorizationUrl?: string
 }) {
   const authSession = options?.authSession ?? buildBrowserAuthSession()
+  const authSessionSequence = options?.authSessionSequence ?? [authSession]
   const sharedLoginSession =
     options?.sharedLoginSession ??
     buildBrowserAuthSession({
@@ -128,18 +145,27 @@ function buildFetchMock(options?: {
   const googleAuthorizationUrl =
     options?.googleAuthorizationUrl ??
     'https://accounts.google.com/o/oauth2/v2/auth?state=test-google-state'
+  let authSessionCallCount = 0
 
   return vi.fn().mockImplementation((input: string, init?: RequestInit) => {
-    if (input === AUTH_SESSION_URL) {
-      return Promise.resolve(buildJsonResponse(authSession))
+    if (matchesRequestUrl(input, AUTH_SESSION_URL)) {
+      const nextAuthSession =
+        authSessionSequence[
+          Math.min(authSessionCallCount, authSessionSequence.length - 1)
+        ]
+      authSessionCallCount += 1
+      if (nextAuthSession instanceof Error) {
+        return Promise.reject(nextAuthSession)
+      }
+      return Promise.resolve(buildJsonResponse(nextAuthSession))
     }
-    if (input === AUTH_LOGIN_URL) {
+    if (matchesRequestUrl(input, AUTH_LOGIN_URL)) {
       return Promise.resolve(buildJsonResponse(sharedLoginSession))
     }
-    if (input === AUTH_ACCOUNT_LOGIN_URL) {
+    if (matchesRequestUrl(input, AUTH_ACCOUNT_LOGIN_URL)) {
       return Promise.resolve(buildJsonResponse(accountLoginSession))
     }
-    if (input === AUTH_GOOGLE_URL_URL) {
+    if (matchesRequestUrl(input, AUTH_GOOGLE_URL_URL)) {
       return Promise.resolve(
         buildJsonResponse({
           authorization_url: googleAuthorizationUrl,
@@ -147,16 +173,19 @@ function buildFetchMock(options?: {
         }),
       )
     }
-    if (input === AUTH_GOOGLE_URL) {
+    if (matchesRequestUrl(input, AUTH_GOOGLE_URL)) {
       return Promise.resolve(buildJsonResponse(googleLoginSession))
     }
-    if (input === AUTH_LOGOUT_URL) {
+    if (matchesRequestUrl(input, AUTH_LOGOUT_URL)) {
       return Promise.resolve({ ok: true })
     }
-    if (input === MODELS_URL) {
+    if (matchesRequestUrl(input, MODELS_URL)) {
       return Promise.resolve(buildJsonResponse({ models: ['gemma4:26b'] }))
     }
-    if (input.startsWith(MODEL_CAPABILITIES_URL_PREFIX)) {
+    if (
+      input.startsWith(MODEL_CAPABILITIES_URL_PREFIX) ||
+      new URL(input).pathname === new URL(MODEL_CAPABILITIES_URL_PREFIX).pathname
+    ) {
       return Promise.resolve(
         buildJsonResponse({
           model: 'gemma4:26b',
@@ -169,13 +198,13 @@ function buildFetchMock(options?: {
         }),
       )
     }
-    if (input === HISTORY_URL) {
+    if (matchesRequestUrl(input, HISTORY_URL)) {
       if (init?.method === 'DELETE') {
         return Promise.resolve(buildJsonResponse({}))
       }
       return Promise.resolve(buildJsonResponse({ sessions: [] }))
     }
-    if (input === SYSTEM_FEATURES_URL) {
+    if (matchesRequestUrl(input, SYSTEM_FEATURES_URL)) {
       return Promise.resolve(
         buildJsonResponse({
           code_sandbox: {
@@ -241,7 +270,7 @@ function buildFetchMock(options?: {
         }),
       )
     }
-    if (input === SYSTEM_GPU_URL) {
+    if (matchesRequestUrl(input, SYSTEM_GPU_URL)) {
       return Promise.resolve(
         buildJsonResponse({
           available: true,
@@ -257,7 +286,7 @@ function buildFetchMock(options?: {
         }),
       )
     }
-    if (input === SYSTEM_INFERENCE_URL) {
+    if (matchesRequestUrl(input, SYSTEM_INFERENCE_URL)) {
       return Promise.resolve(
         buildJsonResponse({
           chat_avg_ms: 10,
@@ -272,7 +301,7 @@ function buildFetchMock(options?: {
         }),
       )
     }
-    if (input === CHAT_URL) {
+    if (matchesRequestUrl(input, CHAT_URL)) {
       return Promise.resolve(
         buildStreamResponse([
           'data: {"type":"token","token":"Hello back"}\n\n',
@@ -291,7 +320,7 @@ function findCall(
   predicate?: (init: RequestInit | undefined) => boolean,
 ) {
   return mockedFetch.mock.calls.find(([calledUrl, init]) => {
-    if (calledUrl !== url) return false
+    if (!matchesRequestUrl(calledUrl as string, url)) return false
     return predicate ? predicate(init as RequestInit | undefined) : true
   })
 }
@@ -482,6 +511,54 @@ describe('App browser access integration', () => {
     expect(screen.getByText('User Example (user@example.com)')).toBeInTheDocument()
     expect(screen.queryByLabelText('API key')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Owner ID')).not.toBeInTheDocument()
+  })
+
+  it('retries desktop auth bootstrap until the bundled backend is reachable', async () => {
+    vi.spyOn(document, 'baseURI', 'get').mockReturnValue('https://asset.localhost/index.html')
+    const mockedFetch = buildFetchMock({
+      authSessionSequence: [new TypeError('Failed to fetch'), buildBrowserAuthSession()],
+    })
+    vi.stubGlobal('fetch', mockedFetch)
+
+    renderApp()
+    await waitForStartupFetches(mockedFetch)
+
+    expect(screen.queryByText('GOAT startup')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Unable to load this deployment right now/i)).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(vi.mocked(invoke)).toHaveBeenCalledWith('report_frontend_bootstrap_status', {
+        status: 'ready',
+      })
+    })
+    expect(
+      vi
+        .mocked(invoke)
+        .mock.calls.filter(([command]) => command === 'report_frontend_bootstrap_status')
+        .map(([, payload]) => payload),
+    ).toEqual([{ status: 'ready' }])
+  })
+
+  it('reports failed desktop bootstrap only for terminal startup errors', async () => {
+    vi.spyOn(document, 'baseURI', 'get').mockReturnValue('https://asset.localhost/index.html')
+    const mockedFetch = buildFetchMock({
+      authSessionSequence: [
+        new BrowserAuthApiError('Desktop startup issue.', {
+          code: null,
+          status: 503,
+        }),
+      ],
+    })
+    vi.stubGlobal('fetch', mockedFetch)
+
+    renderApp()
+
+    await screen.findByText('Desktop startup issue.')
+    await waitFor(() => {
+      expect(vi.mocked(invoke)).toHaveBeenCalledWith('report_frontend_bootstrap_status', {
+        status: 'failed',
+      })
+    })
+    expect(screen.getByText('GOAT AI desktop')).toBeInTheDocument()
   })
 
   it('starts Google login from the unified browser gate', async () => {

@@ -3,7 +3,7 @@
 use std::{
     path::Path,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU8, Ordering},
         Arc, Mutex,
     },
     thread,
@@ -28,6 +28,7 @@ use tauri_plugin_shell::{process::CommandChild, process::CommandEvent, ShellExt}
 const DEFAULT_BACKEND_HOST: &str = "127.0.0.1";
 const DEFAULT_BACKEND_PORT: &str = "62606";
 const HEALTH_TIMEOUT_SEC: u64 = 25;
+const FRONTEND_BOOTSTRAP_TIMEOUT_SEC: u64 = 15;
 const PRE_READY_RESTART_LIMIT: usize = 2;
 const PRE_READY_RESTART_BACKOFF_MS: u64 = 750;
 const INTERNAL_TEST_FLAG: &str = "GOAT_DESKTOP_INTERNAL_TEST";
@@ -56,6 +57,17 @@ struct BackendShutdownState(Arc<AtomicBool>);
 #[derive(Clone, Default)]
 struct BackendStartupFailureState(Arc<AtomicBool>);
 
+#[derive(Clone)]
+struct FrontendBootstrapState(Arc<AtomicU8>);
+
+impl Default for FrontendBootstrapState {
+    fn default() -> Self {
+        Self(Arc::new(AtomicU8::new(
+            FrontendBootstrapStatus::Pending.as_u8(),
+        )))
+    }
+}
+
 enum BackendProcessHandle {
     #[cfg(debug_assertions)]
     Dev(Child),
@@ -67,6 +79,53 @@ enum BackendProcessHandle {
 enum BackendStartupWaitOutcome {
     Ready,
     FailedEarly,
+    TimedOut,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum BackendLaunchDisposition {
+    ReuseExisting,
+    SpawnNew,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum FrontendBootstrapStatus {
+    Pending,
+    Ready,
+    Failed,
+}
+
+impl FrontendBootstrapStatus {
+    fn as_u8(self) -> u8 {
+        match self {
+            Self::Pending => 0,
+            Self::Ready => 1,
+            Self::Failed => 2,
+        }
+    }
+
+    fn from_u8(value: u8) -> Self {
+        match value {
+            1 => Self::Ready,
+            2 => Self::Failed,
+            _ => Self::Pending,
+        }
+    }
+
+    fn from_str(value: &str) -> Option<Self> {
+        match value.trim() {
+            "ready" => Some(Self::Ready),
+            "failed" => Some(Self::Failed),
+            "pending" => Some(Self::Pending),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum FrontendBootstrapWaitOutcome {
+    Ready,
+    Failed,
     TimedOut,
 }
 
@@ -99,6 +158,12 @@ fn backend_port() -> String {
 
 fn backend_health_url(host: &str, port: &str) -> String {
     format!("http://{}:{}/api/health", host, port)
+}
+
+fn existing_backend_reuse_diagnostic(health_url: &str) -> String {
+    format!(
+        "Reusing already-running GOAT desktop backend at {health_url} instead of spawning a second sidecar."
+    )
 }
 
 fn startup_failure_diagnostic(stage: &str, health_url: &str, detail: Option<&str>) -> String {
@@ -198,10 +263,69 @@ fn terminate_desktop_process<R: tauri::Runtime>(app_handle: &tauri::AppHandle<R>
     }
 }
 
+fn activate_existing_main_window_with<F, G>(mut show: F, mut focus: G) -> bool
+where
+    F: FnMut(),
+    G: FnMut(),
+{
+    show();
+    focus();
+    true
+}
+
+fn reveal_main_window<R: tauri::Runtime>(app_handle: &tauri::AppHandle<R>) -> bool {
+    if let Some(window) = app_handle.get_webview_window("main") {
+        return activate_existing_main_window_with(
+            || {
+                let _ = window.show();
+            },
+            || {
+                let _ = window.set_focus();
+            },
+        );
+    }
+    false
+}
+
+fn store_frontend_bootstrap_status(
+    state: &FrontendBootstrapState,
+    status: FrontendBootstrapStatus,
+) {
+    state.0.store(status.as_u8(), Ordering::SeqCst);
+}
+
+fn load_frontend_bootstrap_status(state: &FrontendBootstrapState) -> FrontendBootstrapStatus {
+    FrontendBootstrapStatus::from_u8(state.0.load(Ordering::SeqCst))
+}
+
+fn frontend_bootstrap_timeout_diagnostic() -> String {
+    format!(
+        "GOAT desktop startup issue [frontend_bootstrap_timeout]: frontend bootstrap did not report ready or failed within {} seconds; revealing the main window as a fallback.",
+        FRONTEND_BOOTSTRAP_TIMEOUT_SEC
+    )
+}
+
 fn store_backend_process(state: &BackendProcessState, child: BackendProcessHandle) {
     if let Ok(mut slot) = state.0.lock() {
         *slot = Some(child);
     }
+}
+
+fn resolve_backend_launch_disposition_with_probe<F>(
+    mut backend_ready_probe: F,
+) -> BackendLaunchDisposition
+where
+    F: FnMut() -> bool,
+{
+    if backend_ready_probe() {
+        BackendLaunchDisposition::ReuseExisting
+    } else {
+        BackendLaunchDisposition::SpawnNew
+    }
+}
+
+fn resolve_backend_launch_disposition(health_url: &str) -> BackendLaunchDisposition {
+    resolve_backend_launch_disposition_with_probe(|| backend_ready(health_url))
 }
 
 fn stop_active_backend_process(state: &BackendProcessState) {
@@ -309,13 +433,43 @@ fn resolve_desktop_log_path<R: tauri::Runtime>(
     Ok(log_path)
 }
 
+fn arm_frontend_bootstrap_window_reveal<R: tauri::Runtime>(
+    app_handle: tauri::AppHandle<R>,
+    frontend_bootstrap_state: FrontendBootstrapState,
+    shutdown_state: BackendShutdownState,
+    desktop_log_path: Option<PathBuf>,
+) {
+    thread::spawn(move || {
+        let outcome = wait_for_frontend_bootstrap(
+            Duration::from_secs(FRONTEND_BOOTSTRAP_TIMEOUT_SEC),
+            &frontend_bootstrap_state,
+        );
+        if shutdown_state.0.load(Ordering::SeqCst) {
+            return;
+        }
+        if matches!(outcome, FrontendBootstrapWaitOutcome::TimedOut) {
+            let diagnostic = frontend_bootstrap_timeout_diagnostic();
+            if let Some(log_path) = desktop_log_path.as_ref() {
+                append_desktop_log(log_path, &diagnostic);
+            }
+            eprintln!("{diagnostic}");
+        }
+        reveal_main_window(&app_handle);
+    });
+}
+
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            reveal_main_window(app);
+        }))
         .plugin(tauri_plugin_shell::init())
         .manage(BackendProcessState::default())
         .manage(BackendReadyState::default())
         .manage(BackendShutdownState::default())
         .manage(BackendStartupFailureState::default())
+        .manage(FrontendBootstrapState::default())
+        .invoke_handler(tauri::generate_handler![report_frontend_bootstrap_status])
         .setup(|app| {
             let backend_host = backend_host();
             let backend_port = backend_port();
@@ -330,6 +484,7 @@ fn main() {
             let ready_state = app.state::<BackendReadyState>().inner().clone();
             let shutdown_state = app.state::<BackendShutdownState>().inner().clone();
             let startup_failure_state = app.state::<BackendStartupFailureState>().inner().clone();
+            let frontend_bootstrap_state = app.state::<FrontendBootstrapState>().inner().clone();
             let app_handle = app.handle().clone();
             let desktop_log_path = packaged_desktop_log_path.clone();
             thread::spawn(move || {
@@ -340,6 +495,29 @@ fn main() {
                         return;
                     }
                     startup_failure_state.0.store(false, Ordering::SeqCst);
+                    store_frontend_bootstrap_status(
+                        &frontend_bootstrap_state,
+                        FrontendBootstrapStatus::Pending,
+                    );
+
+                    if matches!(
+                        resolve_backend_launch_disposition(&health_url),
+                        BackendLaunchDisposition::ReuseExisting
+                    ) {
+                        let diagnostic = existing_backend_reuse_diagnostic(&health_url);
+                        if let Some(log_path) = desktop_log_path.as_ref() {
+                            append_desktop_log(log_path, &diagnostic);
+                        }
+                        eprintln!("{diagnostic}");
+                        ready_state.0.store(true, Ordering::SeqCst);
+                        arm_frontend_bootstrap_window_reveal(
+                            app_handle.clone(),
+                            frontend_bootstrap_state.clone(),
+                            shutdown_state.clone(),
+                            desktop_log_path.clone(),
+                        );
+                        return;
+                    }
 
                     match spawn_backend(&app_handle) {
                         Ok(child) => store_backend_process(&process_state, child),
@@ -373,10 +551,12 @@ fn main() {
                     ) {
                         BackendStartupWaitOutcome::Ready => {
                             ready_state.0.store(true, Ordering::SeqCst);
-                            if let Some(window) = app_handle.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
+                            arm_frontend_bootstrap_window_reveal(
+                                app_handle.clone(),
+                                frontend_bootstrap_state.clone(),
+                                shutdown_state.clone(),
+                                desktop_log_path.clone(),
+                            );
                             return;
                         }
                         BackendStartupWaitOutcome::FailedEarly => {
@@ -605,11 +785,57 @@ fn wait_for_backend_startup(
     )
 }
 
+fn wait_for_frontend_bootstrap_with_probes<F>(
+    timeout: Duration,
+    interval: Duration,
+    mut status_probe: F,
+) -> FrontendBootstrapWaitOutcome
+where
+    F: FnMut() -> FrontendBootstrapStatus,
+{
+    let deadline = Instant::now() + timeout;
+    while Instant::now() < deadline {
+        match status_probe() {
+            FrontendBootstrapStatus::Ready => return FrontendBootstrapWaitOutcome::Ready,
+            FrontendBootstrapStatus::Failed => return FrontendBootstrapWaitOutcome::Failed,
+            FrontendBootstrapStatus::Pending => thread::sleep(interval),
+        }
+    }
+    FrontendBootstrapWaitOutcome::TimedOut
+}
+
+fn wait_for_frontend_bootstrap(
+    timeout: Duration,
+    frontend_bootstrap_state: &FrontendBootstrapState,
+) -> FrontendBootstrapWaitOutcome {
+    wait_for_frontend_bootstrap_with_probes(timeout, Duration::from_millis(100), || {
+        load_frontend_bootstrap_status(frontend_bootstrap_state)
+    })
+}
+
 fn backend_ready(health_url: &str) -> bool {
     match reqwest::blocking::get(health_url) {
         Ok(response) => response.status().is_success(),
         Err(_) => false,
     }
+}
+
+#[tauri::command]
+fn report_frontend_bootstrap_status(
+    app_handle: tauri::AppHandle,
+    frontend_bootstrap_state: tauri::State<'_, FrontendBootstrapState>,
+    status: String,
+) -> Result<(), String> {
+    let parsed = FrontendBootstrapStatus::from_str(&status)
+        .ok_or_else(|| format!("unsupported frontend bootstrap status: {status}"))?;
+    store_frontend_bootstrap_status(frontend_bootstrap_state.inner(), parsed);
+    if matches!(
+        parsed,
+        FrontendBootstrapStatus::Ready | FrontendBootstrapStatus::Failed
+    ) {
+        reveal_main_window(&app_handle);
+    }
+    Ok(())
 }
 
 #[allow(dead_code)]
@@ -620,14 +846,23 @@ fn _path_exists(path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        backend_health_url, backend_termination_diagnostic, configured_data_dir,
-        configured_desktop_log_path, configured_log_db_path, configured_path_override,
+        activate_existing_main_window_with, backend_health_url, backend_termination_diagnostic,
+        configured_data_dir, configured_desktop_log_path, configured_log_db_path,
+        configured_path_override, existing_backend_reuse_diagnostic,
+        frontend_bootstrap_timeout_diagnostic, load_frontend_bootstrap_status,
         normalize_configured_value, parse_positive_u64_override, pre_ready_restart_backoff,
-        startup_failure_diagnostic, wait_for_backend_startup_with_probes,
-        wait_for_backend_with_probe, BackendStartupWaitOutcome, DATA_DIR_ENV,
+        resolve_backend_launch_disposition_with_probe, startup_failure_diagnostic,
+        store_frontend_bootstrap_status, wait_for_backend_startup_with_probes,
+        wait_for_backend_with_probe, wait_for_frontend_bootstrap_with_probes,
+        BackendLaunchDisposition, BackendStartupWaitOutcome, FrontendBootstrapState,
+        FrontendBootstrapStatus, FrontendBootstrapWaitOutcome, DATA_DIR_ENV,
         DESKTOP_SHELL_LOG_PATH_ENV, LOG_PATH_ENV,
     };
-    use std::{path::PathBuf, sync::{Mutex, OnceLock}, time::Duration};
+    use std::{
+        path::PathBuf,
+        sync::{Arc, Mutex, OnceLock},
+        time::Duration,
+    };
 
     static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
@@ -718,7 +953,10 @@ mod tests {
         let _guard = env_lock();
         let snapshot = snapshot_env(&[DESKTOP_SHELL_LOG_PATH_ENV]);
         unsafe {
-            std::env::set_var(DESKTOP_SHELL_LOG_PATH_ENV, " C:/GOAT/logs/desktop-shell.log ");
+            std::env::set_var(
+                DESKTOP_SHELL_LOG_PATH_ENV,
+                " C:/GOAT/logs/desktop-shell.log ",
+            );
         }
         assert_eq!(
             configured_path_override(DESKTOP_SHELL_LOG_PATH_ENV),
@@ -743,7 +981,10 @@ mod tests {
         unsafe {
             std::env::set_var(LOG_PATH_ENV, "C:/GOAT/runtime/chat_logs.db");
             std::env::set_var(DATA_DIR_ENV, "C:/GOAT/runtime/data");
-            std::env::set_var(DESKTOP_SHELL_LOG_PATH_ENV, "C:/GOAT/runtime/logs/desktop-shell.log");
+            std::env::set_var(
+                DESKTOP_SHELL_LOG_PATH_ENV,
+                "C:/GOAT/runtime/logs/desktop-shell.log",
+            );
         }
         let data_root = PathBuf::from("C:/fallback");
 
@@ -834,6 +1075,119 @@ mod tests {
         );
 
         assert_eq!(outcome, BackendStartupWaitOutcome::TimedOut);
+    }
+
+    #[test]
+    fn frontend_bootstrap_status_round_trips_through_state() {
+        let state = FrontendBootstrapState::default();
+
+        assert_eq!(
+            load_frontend_bootstrap_status(&state),
+            FrontendBootstrapStatus::Pending
+        );
+        store_frontend_bootstrap_status(&state, FrontendBootstrapStatus::Ready);
+        assert_eq!(
+            load_frontend_bootstrap_status(&state),
+            FrontendBootstrapStatus::Ready
+        );
+        store_frontend_bootstrap_status(&state, FrontendBootstrapStatus::Failed);
+        assert_eq!(
+            load_frontend_bootstrap_status(&state),
+            FrontendBootstrapStatus::Failed
+        );
+    }
+
+    #[test]
+    fn wait_for_frontend_bootstrap_returns_ready_when_status_reports_ready() {
+        let outcome = wait_for_frontend_bootstrap_with_probes(
+            Duration::from_millis(50),
+            Duration::from_millis(0),
+            || FrontendBootstrapStatus::Ready,
+        );
+
+        assert_eq!(outcome, FrontendBootstrapWaitOutcome::Ready);
+    }
+
+    #[test]
+    fn wait_for_frontend_bootstrap_returns_failed_when_status_reports_failed() {
+        let mut attempts = 0;
+        let outcome = wait_for_frontend_bootstrap_with_probes(
+            Duration::from_millis(50),
+            Duration::from_millis(0),
+            || {
+                attempts += 1;
+                if attempts >= 3 {
+                    FrontendBootstrapStatus::Failed
+                } else {
+                    FrontendBootstrapStatus::Pending
+                }
+            },
+        );
+
+        assert_eq!(outcome, FrontendBootstrapWaitOutcome::Failed);
+    }
+
+    #[test]
+    fn wait_for_frontend_bootstrap_times_out_when_status_never_changes() {
+        let outcome = wait_for_frontend_bootstrap_with_probes(
+            Duration::from_millis(1),
+            Duration::from_millis(0),
+            || FrontendBootstrapStatus::Pending,
+        );
+
+        assert_eq!(outcome, FrontendBootstrapWaitOutcome::TimedOut);
+    }
+
+    #[test]
+    fn backend_launch_disposition_reuses_existing_healthy_backend() {
+        let disposition = resolve_backend_launch_disposition_with_probe(|| true);
+
+        assert_eq!(disposition, BackendLaunchDisposition::ReuseExisting);
+    }
+
+    #[test]
+    fn backend_launch_disposition_spawns_when_no_backend_is_ready() {
+        let disposition = resolve_backend_launch_disposition_with_probe(|| false);
+
+        assert_eq!(disposition, BackendLaunchDisposition::SpawnNew);
+    }
+
+    #[test]
+    fn activate_existing_main_window_calls_show_and_focus() {
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let show_calls = calls.clone();
+        let focus_calls = calls.clone();
+
+        let activated = activate_existing_main_window_with(
+            move || {
+                show_calls.lock().expect("show calls lock").push("show");
+            },
+            move || {
+                focus_calls.lock().expect("focus calls lock").push("focus");
+            },
+        );
+
+        assert!(activated);
+        assert_eq!(
+            calls.lock().expect("calls lock").as_slice(),
+            ["show", "focus"]
+        );
+    }
+
+    #[test]
+    fn frontend_bootstrap_timeout_diagnostic_mentions_fallback_window_reveal() {
+        let message = frontend_bootstrap_timeout_diagnostic();
+
+        assert!(message.contains("frontend_bootstrap_timeout"));
+        assert!(message.contains("revealing the main window"));
+    }
+
+    #[test]
+    fn existing_backend_reuse_diagnostic_mentions_reusing_running_backend() {
+        let message = existing_backend_reuse_diagnostic("http://127.0.0.1:62606/api/health");
+
+        assert!(message.contains("Reusing already-running GOAT desktop backend"));
+        assert!(message.contains("http://127.0.0.1:62606/api/health"));
     }
 }
 

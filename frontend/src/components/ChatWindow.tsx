@@ -17,6 +17,7 @@ interface Props {
   messages: Message[]
   chartSpec: ChartSpec | null
   isStreaming: boolean
+  personaStatusMessage?: string | null
   layoutDecisions: ChatLayoutDecisions
   models: string[]
   selectedModel: string
@@ -49,6 +50,7 @@ const ChatWindow: FC<Props> = ({
   messages,
   chartSpec,
   isStreaming,
+  personaStatusMessage = null,
   layoutDecisions,
   models,
   selectedModel,
@@ -123,6 +125,18 @@ const ChatWindow: FC<Props> = ({
         <div
           className={`ui-static flex h-full flex-col overflow-y-auto ${layoutDecisions.compactSpacing ? 'space-y-3 px-3 py-4' : 'space-y-4 px-5 py-6'}`}
         >
+          {personaStatusMessage && (
+            <div
+              className="rounded-2xl border px-4 py-3 text-sm"
+              style={{
+                borderColor: 'var(--border-color)',
+                background: 'var(--composer-muted-surface)',
+                color: 'var(--text-muted)',
+              }}
+            >
+              {personaStatusMessage}
+            </div>
+          )}
           {chartSpec && visibleMessages.length > 0 && (
             <Suspense
               fallback={

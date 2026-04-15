@@ -8,6 +8,13 @@ from backend.models.artifact import ChatArtifact
 from backend.models.workbench import WorkbenchWorkspaceOutputPayload
 
 
+class HistorySessionPersonaSnapshot(BaseModel):
+    """Persona inputs locked to one persisted chat session."""
+
+    theme_style: str = Field(..., pattern="^(classic|urochester|thu)$")
+    system_instruction: str
+
+
 class HistorySessionMessage(BaseModel):
     """Stored message row for persisted session history."""
 
@@ -59,6 +66,7 @@ class HistorySessionDetailResponse(HistorySessionSummary):
     """Body for GET /api/history/{session_id}."""
 
     messages: list[HistorySessionMessage]
+    persona_snapshot: HistorySessionPersonaSnapshot | None = None
     chart_spec: dict[str, object] | None = None
     file_context: HistorySessionFileContext | None = None
     knowledge_documents: list[HistorySessionKnowledgeDocument] = Field(

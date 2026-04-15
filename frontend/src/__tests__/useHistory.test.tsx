@@ -39,6 +39,7 @@ describe('useHistory', () => {
     vi.mocked(fetchSession).mockResolvedValue({
       ...sessionItem,
       messages: [],
+      persona_snapshot: null,
       chart_spec: null,
       file_context: null,
       knowledge_documents: [],

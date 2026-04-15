@@ -20,6 +20,7 @@
     "desktop:build": "node ./scripts/run-tauri.mjs build --config src-tauri/tauri.conf.json"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.10.1",
     "autoprefixer": "^10.4.27",
     "echarts": "^6.0.0",
     "echarts-for-react": "^3.0.6",

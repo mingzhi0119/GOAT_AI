@@ -87,6 +87,14 @@ class HealthyLaunchResult:
     runtime_target: object | None = None
     shell_log_path: str | None = None
     shell_log_source_path: str | None = None
+    second_launch_stdout_path: str | None = None
+    second_launch_stderr_path: str | None = None
+    second_launch_exit_code: int | None = None
+    second_launch_handoff_ok: bool | None = None
+    health_ready_after_second_launch: bool | None = None
+    ready_status_after_second_launch: int | None = None
+    shell_log_spawn_count_before_second_launch: int | None = None
+    shell_log_spawn_count_after_second_launch: int | None = None
     shutdown_method: str | None = None
     shutdown_exit_code: int | None = None
     status: str = "passed"
@@ -648,6 +656,14 @@ def _copy_shell_log(
     )
 
 
+def _shell_log_sidecar_start_count(shell_log_path: Path) -> int:
+    if not shell_log_path.is_file():
+        return 0
+    return shell_log_path.read_text(encoding="utf-8", errors="replace").count(
+        "Starting bundled backend sidecar."
+    )
+
+
 def _healthy_launch_result_from_context(
     *,
     context: dict[str, object],
@@ -663,6 +679,14 @@ def _healthy_launch_result_from_context(
     runtime_target: object | None = None,
     shell_log_path: str | None = None,
     shell_log_source_path: str | None = None,
+    second_launch_stdout_path: str | None = None,
+    second_launch_stderr_path: str | None = None,
+    second_launch_exit_code: int | None = None,
+    second_launch_handoff_ok: bool | None = None,
+    health_ready_after_second_launch: bool | None = None,
+    ready_status_after_second_launch: int | None = None,
+    shell_log_spawn_count_before_second_launch: int | None = None,
+    shell_log_spawn_count_after_second_launch: int | None = None,
     shutdown_method: str | None = None,
     shutdown_exit_code: int | None = None,
 ) -> HealthyLaunchResult:
@@ -687,6 +711,18 @@ def _healthy_launch_result_from_context(
         runtime_target=runtime_target,
         shell_log_path=shell_log_path,
         shell_log_source_path=shell_log_source_path,
+        second_launch_stdout_path=second_launch_stdout_path,
+        second_launch_stderr_path=second_launch_stderr_path,
+        second_launch_exit_code=second_launch_exit_code,
+        second_launch_handoff_ok=second_launch_handoff_ok,
+        health_ready_after_second_launch=health_ready_after_second_launch,
+        ready_status_after_second_launch=ready_status_after_second_launch,
+        shell_log_spawn_count_before_second_launch=(
+            shell_log_spawn_count_before_second_launch
+        ),
+        shell_log_spawn_count_after_second_launch=(
+            shell_log_spawn_count_after_second_launch
+        ),
         shutdown_method=shutdown_method,
         shutdown_exit_code=shutdown_exit_code,
         status=status,
@@ -741,6 +777,14 @@ def run_installed_healthy_launch(
     ready_payload: object | None = None
     runtime_target_status: int | None = None
     runtime_target: object | None = None
+    second_launch_stdout_path = healthy_dir / "second-launch.stdout.log"
+    second_launch_stderr_path = healthy_dir / "second-launch.stderr.log"
+    second_launch_exit_code: int | None = None
+    second_launch_handoff_ok: bool | None = None
+    health_ready_after_second_launch: bool | None = None
+    ready_status_after_second_launch: int | None = None
+    shell_log_spawn_count_before_second_launch: int | None = None
+    shell_log_spawn_count_after_second_launch: int | None = None
     shutdown_method: str | None = None
     shutdown_exit_code: int | None = None
 
@@ -820,6 +864,115 @@ def run_installed_healthy_launch(
                         ready_payload=ready_payload,
                         runtime_target_status=runtime_target_status,
                         runtime_target=runtime_target,
+                    ),
+                )
+
+            shell_log_spawn_count_before_second_launch = _shell_log_sidecar_start_count(
+                expected_shell_log_path
+            )
+            with (
+                second_launch_stdout_path.open(
+                    "w", encoding="utf-8"
+                ) as second_stdout_file,
+                second_launch_stderr_path.open(
+                    "w", encoding="utf-8"
+                ) as second_stderr_file,
+            ):
+                second_process = subprocess.Popen(  # noqa: S603
+                    [installation.desktop_exe],
+                    cwd=str(Path(installation.desktop_exe).parent),
+                    env=env,
+                    stdout=second_stdout_file,
+                    stderr=second_stderr_file,
+                    creationflags=CREATE_NO_WINDOW,
+                )
+                try:
+                    second_launch_exit_code = second_process.wait(timeout=10)
+                except subprocess.TimeoutExpired as exc:
+                    _best_effort_kill_process_tree(second_process)
+                    raise InstalledWindowsHealthyLaunchError(
+                        (
+                            "Installed desktop did not hand off a duplicate launch "
+                            "to the already-running instance."
+                        ),
+                        phase="healthy_launch:second_launch",
+                        result=_healthy_launch_result_from_context(
+                            context=context,
+                            healthy_dir=healthy_dir,
+                            started_at_utc=started_at_utc,
+                            status="failed",
+                            phase="second_launch",
+                            error=(
+                                "Installed desktop did not hand off a duplicate "
+                                "launch to the already-running instance."
+                            ),
+                            health_ready=health_ready,
+                            ready_status=ready_status,
+                            ready_payload=ready_payload,
+                            runtime_target_status=runtime_target_status,
+                            runtime_target=runtime_target,
+                            second_launch_stdout_path=str(second_launch_stdout_path),
+                            second_launch_stderr_path=str(second_launch_stderr_path),
+                            shell_log_spawn_count_before_second_launch=(
+                                shell_log_spawn_count_before_second_launch
+                            ),
+                        ),
+                    ) from exc
+
+            shell_log_spawn_count_after_second_launch = _shell_log_sidecar_start_count(
+                expected_shell_log_path
+            )
+            health_ready_after_second_launch = desktop_probe.wait_for_health(
+                base_url=f"http://{context['backend_host']}:{context['backend_port']}",
+                headers=headers,
+                timeout_sec=5.0,
+            )
+            ready_status_after_second_launch, _ = desktop_probe._request_json(
+                str(context["ready_url"]),
+                headers=headers,
+            )
+            second_launch_handoff_ok = (
+                second_launch_exit_code == 0
+                and process.poll() is None
+                and health_ready_after_second_launch
+                and ready_status_after_second_launch == 200
+                and shell_log_spawn_count_after_second_launch
+                == shell_log_spawn_count_before_second_launch
+            )
+            if not second_launch_handoff_ok:
+                raise InstalledWindowsHealthyLaunchError(
+                    (
+                        "Installed desktop duplicate launch broke the running "
+                        "instance or attempted a second sidecar startup."
+                    ),
+                    phase="healthy_launch:second_launch",
+                    result=_healthy_launch_result_from_context(
+                        context=context,
+                        healthy_dir=healthy_dir,
+                        started_at_utc=started_at_utc,
+                        status="failed",
+                        phase="second_launch",
+                        error=(
+                            "Installed desktop duplicate launch broke the running "
+                            "instance or attempted a second sidecar startup."
+                        ),
+                        health_ready=health_ready,
+                        ready_status=ready_status,
+                        ready_payload=ready_payload,
+                        runtime_target_status=runtime_target_status,
+                        runtime_target=runtime_target,
+                        second_launch_stdout_path=str(second_launch_stdout_path),
+                        second_launch_stderr_path=str(second_launch_stderr_path),
+                        second_launch_exit_code=second_launch_exit_code,
+                        second_launch_handoff_ok=second_launch_handoff_ok,
+                        health_ready_after_second_launch=health_ready_after_second_launch,
+                        ready_status_after_second_launch=ready_status_after_second_launch,
+                        shell_log_spawn_count_before_second_launch=(
+                            shell_log_spawn_count_before_second_launch
+                        ),
+                        shell_log_spawn_count_after_second_launch=(
+                            shell_log_spawn_count_after_second_launch
+                        ),
                     ),
                 )
 
@@ -924,6 +1077,18 @@ def run_installed_healthy_launch(
             runtime_target=runtime_target,
             shell_log_path=shell_log_path,
             shell_log_source_path=shell_log_source_path,
+            second_launch_stdout_path=str(second_launch_stdout_path),
+            second_launch_stderr_path=str(second_launch_stderr_path),
+            second_launch_exit_code=second_launch_exit_code,
+            second_launch_handoff_ok=second_launch_handoff_ok,
+            health_ready_after_second_launch=health_ready_after_second_launch,
+            ready_status_after_second_launch=ready_status_after_second_launch,
+            shell_log_spawn_count_before_second_launch=(
+                shell_log_spawn_count_before_second_launch
+            ),
+            shell_log_spawn_count_after_second_launch=(
+                shell_log_spawn_count_after_second_launch
+            ),
             shutdown_method=shutdown_method,
             shutdown_exit_code=shutdown_exit_code,
         )
