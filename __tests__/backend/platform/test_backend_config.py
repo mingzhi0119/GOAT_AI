@@ -39,3 +39,36 @@ def test_backend_port_prefers_goat_server_port_over_legacy_goat_port() -> None:
         _restore_env("GOAT_SERVER_PORT", original_server_port)
         _restore_env("GOAT_PORT", original_legacy_port)
         importlib.reload(backend_config)
+
+
+def test_cors_origins_default_to_dev_and_desktop_origins() -> None:
+    original_cors_origins = os.environ.get("GOAT_CORS_ORIGINS")
+    try:
+        os.environ.pop("GOAT_CORS_ORIGINS", None)
+        importlib.reload(backend_config)
+        assert backend_config.CORS_ORIGINS == [
+            "http://localhost:3000",
+            "http://tauri.localhost",
+            "http://asset.localhost",
+            "https://tauri.localhost",
+            "https://asset.localhost",
+            "tauri://localhost",
+            "asset://localhost",
+        ]
+    finally:
+        _restore_env("GOAT_CORS_ORIGINS", original_cors_origins)
+        importlib.reload(backend_config)
+
+
+def test_cors_origins_can_be_overridden_and_trimmed() -> None:
+    original_cors_origins = os.environ.get("GOAT_CORS_ORIGINS")
+    try:
+        os.environ["GOAT_CORS_ORIGINS"] = " http://localhost:3000 , http://example.com "
+        importlib.reload(backend_config)
+        assert backend_config.CORS_ORIGINS == [
+            "http://localhost:3000",
+            "http://example.com",
+        ]
+    finally:
+        _restore_env("GOAT_CORS_ORIGINS", original_cors_origins)
+        importlib.reload(backend_config)
