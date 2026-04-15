@@ -97,10 +97,16 @@ def main() -> None:
         str(spec_dir),
         "--add-data",
         _add_data_arg(REPO_ROOT / "backend" / "migrations", "backend/migrations"),
-        "--hidden-import",
-        "backend.main",
-        str(ENTRYPOINT),
     ]
+    for hidden_import in (
+        "backend.main",
+        "jaraco.context",
+        "jaraco.functools",
+        "jaraco.text",
+        "more_itertools",
+    ):
+        pyinstaller_command.extend(["--hidden-import", hidden_import])
+    pyinstaller_command.append(str(ENTRYPOINT))
 
     try:
         subprocess.run(pyinstaller_command, check=True, cwd=str(REPO_ROOT))
