@@ -1,18 +1,20 @@
 const ABSOLUTE_URL_PATTERN = /^[a-z][a-z0-9+.-]*:\/\//i
+const DESKTOP_BACKEND_ORIGIN = 'http://127.0.0.1:62606'
 
-function resolveAgainstAppBase(path: string): string {
-  if (typeof document === 'undefined' || !document.baseURI) {
-    return `/${path}`
+function resolveApiBaseUri(baseUri: string): string {
+  const parsed = new URL(baseUri)
+  if (
+    parsed.protocol === 'asset:' ||
+    parsed.protocol === 'tauri:' ||
+    parsed.hostname === 'asset.localhost' ||
+    parsed.hostname === 'tauri.localhost'
+  ) {
+    return DESKTOP_BACKEND_ORIGIN
   }
-  return new URL(path, document.baseURI).toString()
+  return baseUri
 }
 
-/**
- * Normalize internal API paths to app-relative `api/...` URLs so the SPA keeps
- * working behind sub-path proxies such as `/mingzhi/`.
- * Keeps absolute URLs unchanged so artifact downloads can still point elsewhere.
- */
-export function buildApiUrl(path: string): string {
+function normalizeApiPath(path: string): string {
   const trimmed = path.trim()
   if (!trimmed) {
     throw new Error('API path is required')
@@ -27,16 +29,39 @@ export function buildApiUrl(path: string): string {
   }
 
   if (normalized === '/api') {
-    return resolveAgainstAppBase('api')
+    return 'api'
   }
   if (normalized.startsWith('/api/')) {
-    return resolveAgainstAppBase(normalized.slice(1))
+    return normalized.slice(1)
   }
   if (normalized === 'api' || normalized.startsWith('api/')) {
-    return resolveAgainstAppBase(normalized)
+    return normalized
   }
   if (normalized.startsWith('/')) {
-    return resolveAgainstAppBase(`api${normalized}`)
+    return `api${normalized}`
   }
-  return resolveAgainstAppBase(`api/${normalized}`)
+  return `api/${normalized}`
+}
+
+export function buildApiUrlFromBase(path: string, baseUri: string): string {
+  const normalized = normalizeApiPath(path)
+  if (ABSOLUTE_URL_PATTERN.test(normalized) || normalized.startsWith('//')) {
+    return normalized
+  }
+  return new URL(normalized, resolveApiBaseUri(baseUri)).toString()
+}
+
+/**
+ * Normalize internal API paths to app-relative `api/...` URLs so the SPA keeps
+ * working behind sub-path proxies such as `/mingzhi/`.
+ * Keeps absolute URLs unchanged so artifact downloads can still point elsewhere.
+ */
+export function buildApiUrl(path: string): string {
+  if (typeof document === 'undefined' || !document.baseURI) {
+    const normalized = normalizeApiPath(path)
+    return ABSOLUTE_URL_PATTERN.test(normalized) || normalized.startsWith('//')
+      ? normalized
+      : `/${normalized}`
+  }
+  return buildApiUrlFromBase(path, document.baseURI)
 }

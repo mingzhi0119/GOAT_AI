@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildApiUrl } from '../api/urls'
+import { buildApiUrl, buildApiUrlFromBase } from '../api/urls'
 
 describe('buildApiUrl', () => {
   it('normalizes internal endpoints to current-origin api paths', () => {
@@ -20,6 +20,18 @@ describe('buildApiUrl', () => {
     window.history.replaceState({}, '', '/mingzhi/')
 
     expect(buildApiUrl('/auth/session')).toBe('http://localhost:3000/mingzhi/api/auth/session')
+  })
+
+  it('routes packaged desktop app origins to the local backend', () => {
+    expect(buildApiUrlFromBase('/auth/session', 'asset://localhost/index.html')).toBe(
+      'http://127.0.0.1:62606/api/auth/session',
+    )
+    expect(buildApiUrlFromBase('/auth/session', 'https://asset.localhost/index.html')).toBe(
+      'http://127.0.0.1:62606/api/auth/session',
+    )
+    expect(buildApiUrlFromBase('/auth/session', 'tauri://localhost/index.html')).toBe(
+      'http://127.0.0.1:62606/api/auth/session',
+    )
   })
 
   it('keeps absolute download urls unchanged', () => {
