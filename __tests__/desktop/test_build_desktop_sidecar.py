@@ -73,6 +73,21 @@ def test_add_data_arg_uses_platform_separator(monkeypatch: pytest.MonkeyPatch) -
     assert subject._add_data_arg(Path("a"), "b") == "a:b"
 
 
+def test_desktop_build_requirements_include_pkg_resources_stack() -> None:
+    requirements_text = (
+        Path(__file__).resolve().parents[2] / "requirements-desktop-build.txt"
+    ).read_text(encoding="utf-8")
+
+    for requirement in (
+        "setuptools==81.0.0",
+        "more-itertools==11.0.2",
+        "jaraco.context==6.1.2",
+        "jaraco.functools==4.4.0",
+        "jaraco.text==4.2.0",
+    ):
+        assert requirement in requirements_text
+
+
 def test_main_builds_and_installs_sidecar(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -111,8 +126,18 @@ def test_main_builds_and_installs_sidecar(
         assert "--add-data" in command
         add_data_index = command.index("--add-data")
         assert command[add_data_index + 1] == f"{migrations_dir};backend/migrations"
-        hidden_import_index = command.index("--hidden-import")
-        assert command[hidden_import_index + 1] == "backend.main"
+        hidden_imports = [
+            command[index + 1]
+            for index, token in enumerate(command)
+            if token == "--hidden-import"
+        ]
+        assert hidden_imports == [
+            "backend.main",
+            "jaraco.context",
+            "jaraco.functools",
+            "jaraco.text",
+            "more_itertools",
+        ]
         assert command[-1] == str(entrypoint)
         dist_dir = build_root / "dist"
         dist_dir.mkdir(parents=True, exist_ok=True)
