@@ -22,8 +22,8 @@ CORS complexity to chat, uploads, downloads, or SSE.
 - frontend runtime API calls now normalize to root-relative `/api/...` paths
 - `frontend/package.json` now uses `node: 24.x` so Vercel can satisfy the engine
   constraint without depending on a specific Node 24 minor
-- the SPA mounts immediately without an Auth bootstrap, so the shell remains usable
-  even while the backend is unavailable
+- the SPA mounts the app shell directly without an Auth or Startup bootstrap, so
+  the shell remains usable even while the backend is unavailable
 
 ## Vercel project setup
 

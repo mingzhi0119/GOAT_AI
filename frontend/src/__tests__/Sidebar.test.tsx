@@ -130,7 +130,13 @@ describe('Sidebar', () => {
 
     rerender(<Sidebar {...buildProps('thu')} />)
 
-    expect(screen.getByAltText('Tsinghua University')).toBeInTheDocument()
+    const thuLogo = screen.getByAltText('Tsinghua University')
+    expect(thuLogo).toBeInTheDocument()
+    expect(thuLogo).toHaveAttribute(
+      'src',
+      expect.stringContaining('Tsinghua_University_Logo.svg'),
+    )
+    expect(thuLogo).not.toHaveAttribute('src', '/Tsinghua_University_Logo.svg')
     expect(
       screen.queryByAltText('Simon Business School - University of Rochester'),
     ).not.toBeInTheDocument()

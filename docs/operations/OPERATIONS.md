@@ -69,10 +69,10 @@ npm run bundle:check
 npm run dev
 ```
 
-The browser UI is a public demo shell. It does not bootstrap Auth, show a login
-gate, collect API keys, or attach owner-id headers. Historical protected-access
-browser storage is scrubbed on startup so stale local values cannot affect API
-requests.
+The browser UI is a public demo shell. It mounts the app shell directly: no
+Startup screen, Auth bootstrap, login gate, API-key collection, or owner-id
+headers. Historical protected-access browser storage is scrubbed when the app
+mounts so stale local values cannot affect API requests.
 Frontend API contract types are generated from `docs/api/openapi.json`; refresh them
 with `npm run contract:generate` whenever the backend contract changes.
 `npm run depcruise` exercises the frontend-only import-direction and cycle guardrails for
@@ -165,7 +165,7 @@ Packaged desktop runtime diagnostics should first check:
 
 Cross-platform release prerequisites, updater gates, and macOS blockers live in
 [DESKTOP_DISTRIBUTION_READINESS.md](DESKTOP_DISTRIBUTION_READINESS.md).
-- Tauri startup now emits explicit diagnostics when sidecar spawn fails, `/api/health` does not become ready before the window reveal timeout, or the bundled backend exits unexpectedly after startup
+- Tauri startup now emits explicit diagnostics when sidecar spawn fails, `/api/health` does not become ready before the window reveal timeout, or the bundled backend exits unexpectedly after startup; after backend health is ready, the Rust shell reveals the main window directly without a frontend bootstrap bridge
 - before the main window is revealed, the Rust shell now allows only a small bounded sidecar restart/backoff budget; after reveal, unexpected sidecar exits still fail closed instead of silently recovering
 - packaged desktop startup still fails closed instead of revealing the main window on a broken backend
 
