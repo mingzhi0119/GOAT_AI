@@ -2,14 +2,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import TopBar from '../components/TopBar'
 
-function buildSharedAccessProps() {
-  return {
-    browserAuthSession: null,
-    isSigningOut: false,
-    onLogout: vi.fn(),
-  }
-}
-
 function renderTopBar() {
   const onOpenAppearance = vi.fn()
   const onRenameConversation = vi.fn()
@@ -33,10 +25,6 @@ function renderTopBar() {
       onOpenAppearance={onOpenAppearance}
       onRenameConversation={onRenameConversation}
       thinkingEnabled={true}
-      apiKey="secret-123"
-      ownerId="alice"
-      onApiKeyChange={vi.fn()}
-      onOwnerIdChange={vi.fn()}
       systemInstruction="Be concise."
       onSystemInstructionChange={onSystemInstructionChange}
       onExportMarkdown={onExportMarkdown}
@@ -50,7 +38,6 @@ function renderTopBar() {
       topP={0.9}
       onTopPChange={onTopPChange}
       onResetAdvanced={onResetAdvanced}
-      {...buildSharedAccessProps()}
     />,
   )
 
@@ -85,7 +72,7 @@ describe('TopBar options callout', () => {
     expect(screen.getByText('Vision')).toBeInTheDocument()
   })
 
-  it('opens the settings callout and no longer shows legacy helper copy', () => {
+  it('opens the settings callout without auth controls', () => {
     renderTopBar()
 
     fireEvent.click(screen.getByRole('button', { name: /settings/i }))
@@ -93,14 +80,9 @@ describe('TopBar options callout', () => {
     expect(screen.getByRole('dialog', { name: /settings/i })).toBeInTheDocument()
     expect(screen.queryByText(/Enter sends the message/i)).not.toBeInTheDocument()
     expect(screen.getByText(/^Generation$/)).toBeInTheDocument()
-    expect(screen.getByLabelText('API key')).toHaveValue('secret-123')
-    expect(screen.getByLabelText('Owner ID')).toHaveValue('alice')
-  })
-
-  it('removes the max-token helper copy from the options panel', () => {
-    renderTopBar()
-    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
-    expect(screen.queryByText(/API allows up to 131,072 generation tokens/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('API key')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Owner ID')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /logout/i })).not.toBeInTheDocument()
   })
 
   it('keeps system instruction editing and clear actions wired', () => {
@@ -114,50 +96,6 @@ describe('TopBar options callout', () => {
 
     expect(onSystemInstructionChange).toHaveBeenCalledWith('Use bullets.')
     expect(onSystemInstructionChange).toHaveBeenCalledWith('')
-  })
-
-  it('keeps protected-access settings wired', () => {
-    const onApiKeyChange = vi.fn()
-    const onOwnerIdChange = vi.fn()
-
-    render(
-      <TopBar
-        sessionTitle="Strategy Sync"
-        hasSession={true}
-        modelCapabilities={['completion', 'tools']}
-        appearanceSummary="Classic System"
-        desktopDiagnostics={null}
-        desktopDiagnosticsError={null}
-        onOpenAppearance={vi.fn()}
-        onRenameConversation={vi.fn()}
-        thinkingEnabled={false}
-        apiKey=""
-        ownerId=""
-        onApiKeyChange={onApiKeyChange}
-        onOwnerIdChange={onOwnerIdChange}
-        systemInstruction=""
-        onSystemInstructionChange={vi.fn()}
-        onExportMarkdown={vi.fn()}
-        onDeleteConversation={vi.fn()}
-        advancedOpen={true}
-        onAdvancedOpenChange={vi.fn()}
-        temperature={0.7}
-        onTemperatureChange={vi.fn()}
-        maxTokens={4096}
-        onMaxTokensChange={vi.fn()}
-        topP={0.9}
-        onTopPChange={vi.fn()}
-        onResetAdvanced={vi.fn()}
-        {...buildSharedAccessProps()}
-      />,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
-    fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'next-key' } })
-    fireEvent.change(screen.getByLabelText('Owner ID'), { target: { value: 'owner-42' } })
-
-    expect(onApiKeyChange).toHaveBeenCalledWith('next-key')
-    expect(onOwnerIdChange).toHaveBeenCalledWith('owner-42')
   })
 
   it('keeps generation settings, appearance, rename, export, and delete actions wired', () => {
@@ -273,10 +211,6 @@ describe('TopBar options callout', () => {
         onOpenAppearance={vi.fn()}
         onRenameConversation={vi.fn()}
         thinkingEnabled={true}
-        apiKey=""
-        ownerId=""
-        onApiKeyChange={vi.fn()}
-        onOwnerIdChange={vi.fn()}
         systemInstruction="Be concise."
         onSystemInstructionChange={vi.fn()}
         onExportMarkdown={vi.fn()}
@@ -290,7 +224,6 @@ describe('TopBar options callout', () => {
         topP={0.9}
         onTopPChange={vi.fn()}
         onResetAdvanced={vi.fn()}
-        {...buildSharedAccessProps()}
       />,
     )
 
@@ -328,10 +261,6 @@ describe('TopBar options callout', () => {
         onOpenAppearance={vi.fn()}
         onRenameConversation={vi.fn()}
         thinkingEnabled={false}
-        apiKey=""
-        ownerId=""
-        onApiKeyChange={vi.fn()}
-        onOwnerIdChange={vi.fn()}
         systemInstruction=""
         onSystemInstructionChange={vi.fn()}
         onExportMarkdown={vi.fn()}
@@ -345,7 +274,6 @@ describe('TopBar options callout', () => {
         topP={0.9}
         onTopPChange={vi.fn()}
         onResetAdvanced={vi.fn()}
-        {...buildSharedAccessProps()}
       />,
     )
 

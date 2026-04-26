@@ -89,8 +89,6 @@ describe('chat api', () => {
         credentials: 'same-origin',
         headers: {
           'content-type': 'application/json',
-          'X-GOAT-API-Key': 'secret-123',
-          'X-GOAT-Owner-Id': 'alice',
           'x-user-name': 'Simon',
         },
       }),

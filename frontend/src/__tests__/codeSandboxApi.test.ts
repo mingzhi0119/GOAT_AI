@@ -51,8 +51,6 @@ describe('code sandbox api', () => {
         credentials: 'same-origin',
         headers: {
           'content-type': 'application/json',
-          'X-GOAT-API-Key': 'secret-123',
-          'X-GOAT-Owner-Id': 'alice',
         },
       }),
     )
@@ -127,10 +125,7 @@ describe('code sandbox api', () => {
       buildApiUrl('/code-sandbox/executions/cs-1'),
       {
         credentials: 'same-origin',
-        headers: {
-          'X-GOAT-API-Key': 'secret-123',
-          'X-GOAT-Owner-Id': 'alice',
-        },
+        headers: {},
       },
     )
     expect(mockedFetch).toHaveBeenNthCalledWith(
@@ -138,10 +133,7 @@ describe('code sandbox api', () => {
       buildApiUrl('/code-sandbox/executions/cs-1/events'),
       {
         credentials: 'same-origin',
-        headers: {
-          'X-GOAT-API-Key': 'secret-123',
-          'X-GOAT-Owner-Id': 'alice',
-        },
+        headers: {},
       },
     )
   })
@@ -245,7 +237,7 @@ describe('code sandbox api', () => {
     )
   })
 
-  it('opens an authenticated fetch log stream with cursor replay support', async () => {
+  it('opens a public fetch log stream with cursor replay support', async () => {
     localStorage.setItem(API_KEY_STORAGE_KEY, 'secret-123')
     localStorage.setItem(OWNER_ID_STORAGE_KEY, 'alice')
     const encoder = new TextEncoder()
@@ -273,10 +265,7 @@ describe('code sandbox api', () => {
     expect(mockedFetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/code-sandbox/executions/cs-1/logs?after_seq=3'),
       expect.objectContaining({
-        headers: {
-          'X-GOAT-API-Key': 'secret-123',
-          'X-GOAT-Owner-Id': 'alice',
-        },
+        headers: {},
         signal: expect.any(AbortSignal),
       }),
     )

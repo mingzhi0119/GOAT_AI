@@ -4,14 +4,9 @@ Base path: `/api`
 
 ## Global behavior
 
-- If `GOAT_API_KEY` is configured, every endpoint except `GET /api/health` and `GET /api/ready` requires `X-GOAT-API-Key`
-- Browser login can be enabled with a shared password (`GOAT_SHARED_ACCESS_PASSWORD_HASH` or the legacy plaintext `GOAT_SHARED_ACCESS_PASSWORD` fallback), account sessions (`GOAT_ACCOUNT_AUTH_ENABLED=1`), or both; the browser/UI path always starts with `GET /api/auth/session` and then establishes either `goat_access_session` or `goat_account_session`
-- If `GOAT_API_KEY_WRITE` is configured, mutating routes (`POST`, `PATCH`, `DELETE`) require the write key or an equivalent write-scoped credential; otherwise the API returns `403` with `code = AUTH_WRITE_KEY_REQUIRED`
-- If `GOAT_REQUIRE_SESSION_OWNER` is enabled, chat and history routes require `X-GOAT-Owner-Id`; owner-mismatched protected reads resolve as `404` to avoid leaking resource existence
-- In shared-password browser mode, the bundled UI shows a site-password gate and derives history/artifact visibility from a browser-scoped owner id minted at login time
-- In account browser mode, the bundled UI shows account login options (email/password and optional Google OAuth) and derives history/artifact visibility from the stable owner id `user:<user_id>`
-- Outside browser-login mode, the bundled browser UI exposes protected headers in `Settings -> Protected access` and stores them locally in the browser for subsequent API calls
-- Auth-sensitive `GET` routes and artifact downloads return `Cache-Control: no-store` plus `Vary: Cookie, X-GOAT-API-Key, X-GOAT-Owner-Id`
+- GOAT AI is a public demo deployment: API key Auth, browser login, OAuth, and required owner-id headers are removed
+- Historical Auth env vars fail startup through `load_settings()` and should remain unset in every deployment profile
+- The bundled browser UI mounts immediately without `/api/auth/*` bootstrap and does not expose protected-access controls
 - Responses include `X-Request-ID`
 - Rate-limited requests return `429` with `Retry-After`
 - Standard error shape:
@@ -30,12 +25,6 @@ Base path: `/api`
 |--------|------|---------|
 | `GET` | `/api/health` | Liveness probe |
 | `GET` | `/api/ready` | Readiness (SQLite + optional Ollama) |
-| `GET` | `/api/auth/session` | Read unified browser-login session state |
-| `POST` | `/api/auth/login` | Create one shared-password browser session |
-| `POST` | `/api/auth/account/login` | Create one account browser session from email + password |
-| `GET` | `/api/auth/account/google/url` | Create one Google OAuth authorization URL and state cookie |
-| `POST` | `/api/auth/account/google` | Create one account browser session from Google OAuth |
-| `POST` | `/api/auth/logout` | Clear the current browser session cookies |
 | `GET` | `/api/system/metrics` | Prometheus text metrics |
 | `GET` | `/api/models` | List Ollama models |
 | `GET` | `/api/models/capabilities` | Read capabilities for one model |
@@ -91,144 +80,9 @@ Returns:
 
 Returns JSON `{ "ready": boolean, "checks": { ... } }`. HTTP `503` when any required check fails, for example SQLite is unreachable or the optional Ollama probe fails. Set `GOAT_READY_SKIP_OLLAMA_PROBE=1` to omit the Ollama HTTP check.
 
-## `GET /api/auth/session`
-
-Returns the unified browser-login posture for deployments that use a shared password, account login, Google OAuth, or any combination of those browser flows.
-
-Example unauthenticated response:
-
-```json
-{
-  "auth_required": true,
-  "authenticated": false,
-  "expires_at": null,
-  "available_login_methods": ["shared_password", "account_password", "google"],
-  "active_login_method": null,
-  "user": null
-}
-```
-
-Example authenticated response:
-
-```json
-{
-  "auth_required": true,
-  "authenticated": true,
-  "expires_at": "2026-05-13T19:42:11+00:00",
-  "available_login_methods": ["account_password", "google"],
-  "active_login_method": "google",
-  "user": {
-    "id": "user-123",
-    "email": "user@example.com",
-    "display_name": "Example User",
-    "provider": "google"
-  }
-}
-```
-
-Notes:
-
-- When neither shared-password nor account login is enabled, this route returns `auth_required = false`
-- The route remains public so the SPA can bootstrap before loading history/models/features
-- Responses include `Cache-Control: no-store`
-
-## `POST /api/auth/login`
-
-Request body:
-
-```json
-{
-  "password": "shared-site-password"
-}
-```
-
-Returns the same payload shape as `GET /api/auth/session` and sets a host-only `goat_access_session` cookie with:
-
-- `HttpOnly`
-- `Secure`
-- `SameSite=Lax`
-- `Path=/`
-- `Max-Age = GOAT_SHARED_ACCESS_SESSION_TTL_SEC` (default `2592000`)
-
-Current behavior:
-
-- Each successful login creates a fresh browser-scoped owner identity; sessions created by one browser are not visible to another browser even when both use the same shared password
-- Successful shared-password login clears any existing `goat_account_session` and Google OAuth state cookie so the browser stays on one active login mode at a time
-- Invalid passwords return `401` with `code = AUTH_INVALID_ACCESS_PASSWORD`
-- Excessive login attempts return `429` with `Retry-After`
-
-## `POST /api/auth/account/login`
-
-Request body:
-
-```json
-{
-  "email": "user@example.com",
-  "password": "account-password"
-}
-```
-
-Returns the same payload shape as `GET /api/auth/session` and sets a host-only `goat_account_session` cookie with:
-
-- `HttpOnly`
-- `Secure`
-- `SameSite=Lax`
-- `Path=/`
-- `Max-Age = GOAT_ACCOUNT_SESSION_TTL_SEC` (default `2592000`)
-
-Current behavior:
-
-- The session resolves to a stable owner id of the form `user:<user_id>` so history, uploads, artifacts, and other caller-scoped data follow the account across browsers
-- Successful account login clears any existing `goat_access_session` and Google OAuth state cookie
-- Unknown email or wrong password returns `401` with `code = AUTH_INVALID_ACCOUNT_CREDENTIALS`
-- Excessive login attempts return `429` with `Retry-After`
-
-## `GET /api/auth/account/google/url`
-
-Returns JSON like:
-
-```json
-{
-  "authorization_url": "https://accounts.google.com/o/oauth2/v2/auth?...",
-  "state_expires_at": "2026-05-13T19:42:11+00:00"
-}
-```
-
-Current behavior:
-
-- Sets a short-lived host-only `goat_google_oauth_state` cookie used to bind the eventual callback to the same browser
-- The returned Google URL is meant for frontend redirect, not for server-to-server use
-- This route is available only when all of `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI` are configured alongside `GOAT_ACCOUNT_AUTH_ENABLED=1`
-
-## `POST /api/auth/account/google`
-
-Request body:
-
-```json
-{
-  "code": "google-oauth-code",
-  "state": "opaque-state"
-}
-```
-
-Returns the same payload shape as `GET /api/auth/session` and sets a host-only `goat_account_session` cookie.
-
-Current behavior:
-
-- The backend exchanges the authorization code with Google, verifies the returned `id_token`, and only trusts identities whose `aud`, `iss`, `exp`, and `email_verified` claims pass validation
-- First-time Google users are upserted by email into the local account store and bound through a `google` identity record
-- If a local account already exists for the same email, the Google identity is linked to that existing account instead of creating a duplicate user
-- Invalid or expired OAuth state returns `401` with `code = AUTH_INVALID_GOOGLE_STATE`
-- Invalid or unverifiable Google tokens return `401` with `code = AUTH_INVALID_GOOGLE_TOKEN`
-- Excessive login attempts return `429` with `Retry-After`
-
-## `POST /api/auth/logout`
-
-Clears `goat_access_session`, `goat_account_session`, and `goat_google_oauth_state`, then returns `204 No Content`.
-
 ## `GET /api/system/metrics`
 
-Returns Prometheus exposition text (`text/plain`). Requires `X-GOAT-API-Key` when `GOAT_API_KEY` is set. Includes `http_requests_total`, `http_request_duration_seconds`, `chat_stream_completed_total`, `ollama_errors_total`, `sqlite_log_write_failures_total`, `feature_gate_denials_total{feature,gate_kind,reason}` (when any), and **Section 14.7** retrieval counters: `knowledge_retrieval_requests_total{retrieval_profile,outcome}` and `knowledge_query_rewrite_applied_total{retrieval_profile}`.
+Returns Prometheus exposition text (`text/plain`). Includes `http_requests_total`, `http_request_duration_seconds`, `chat_stream_completed_total`, `ollama_errors_total`, `sqlite_log_write_failures_total`, `feature_gate_denials_total{feature,gate_kind,reason}` (when any), and **Section 14.7** retrieval counters: `knowledge_retrieval_requests_total{retrieval_profile,outcome}` and `knowledge_query_rewrite_applied_total{retrieval_profile}`.
 
 ## `GET /api/system/features`
 
@@ -941,9 +795,8 @@ Returns session metadata list:
 
 Current behavior:
 
-- In shared browser-access mode, the list is filtered to sessions created by the current browser session owner
-- Without a valid shared browser session, the route returns `401` with `code = AUTH_LOGIN_REQUIRED`
-- In non-shared no-key mode, `X-GOAT-Owner-Id` still acts as an optional local owner filter instead of being discarded
+- Public demo deployments do not require browser sessions or protected headers
+- Existing owner and tenant fields remain internal provenance for persisted data
 
 ## `GET /api/history/{session_id}`
 

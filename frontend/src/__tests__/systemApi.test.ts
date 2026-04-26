@@ -39,10 +39,7 @@ describe('system api', () => {
       buildApiUrl('/system/gpu'),
       expect.objectContaining({
         credentials: 'same-origin',
-        headers: {
-          'X-GOAT-API-Key': 'secret-123',
-          'X-GOAT-Owner-Id': 'alice',
-        },
+        headers: {},
       }),
     )
   })
@@ -82,10 +79,7 @@ describe('system api', () => {
       buildApiUrl('/system/inference'),
       expect.objectContaining({
         credentials: 'same-origin',
-        headers: {
-          'X-GOAT-API-Key': 'secret-123',
-          'X-GOAT-Owner-Id': 'alice',
-        },
+        headers: {},
       }),
     )
   })
@@ -166,10 +160,7 @@ describe('system api', () => {
       buildApiUrl('/system/features'),
       expect.objectContaining({
         credentials: 'same-origin',
-        headers: {
-          'X-GOAT-API-Key': 'secret-123',
-          'X-GOAT-Owner-Id': 'alice',
-        },
+        headers: {},
       }),
     )
   })
@@ -341,10 +332,7 @@ describe('system api', () => {
       buildApiUrl('/system/desktop'),
       expect.objectContaining({
         credentials: 'same-origin',
-        headers: {
-          'X-GOAT-API-Key': 'secret-123',
-          'X-GOAT-Owner-Id': 'alice',
-        },
+        headers: {},
       }),
     )
   })

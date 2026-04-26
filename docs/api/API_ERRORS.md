@@ -18,15 +18,7 @@ JSON error responses use a **stable envelope** so logs, metrics, and clients sha
 
 | `code` | HTTP | Retry hint* | Typical meaning |
 |--------|------|-------------|-----------------|
-| `AUTH_INVALID_API_KEY` | 401 | no | Missing or wrong `X-GOAT-API-Key` when `GOAT_API_KEY` is set |
-| `AUTH_LOGIN_REQUIRED` | 401 | no | Browser login is enabled and the caller has not established a valid shared-password or account browser session yet |
-| `AUTH_INVALID_ACCESS_PASSWORD` | 401 | no | `POST /api/auth/login` received the wrong shared site password |
-| `AUTH_INVALID_ACCOUNT_CREDENTIALS` | 401 | no | `POST /api/auth/account/login` received an unknown email or wrong password |
-| `AUTH_INVALID_GOOGLE_STATE` | 401 | no | `POST /api/auth/account/google` received an expired or mismatched OAuth state |
-| `AUTH_INVALID_GOOGLE_TOKEN` | 401 | no | `POST /api/auth/account/google` could not verify the Google login token or code exchange |
-| `AUTH_WRITE_KEY_REQUIRED` | 403 | no | `GOAT_API_KEY_WRITE` is set but the request used the read key on a write route |
-| `AUTH_SESSION_OWNER_REQUIRED` | 403 | no | `GOAT_REQUIRE_SESSION_OWNER=1` but `X-GOAT-Owner-Id` was missing on chat/history |
-| `RATE_LIMITED` | 429 | yes (after Retry-After) | Per-key rate limit exceeded |
+| `RATE_LIMITED` | 429 | yes (after Retry-After) | Per-caller/IP rate limit exceeded |
 | `BAD_REQUEST` | 400 | no | Bad upload / business validation |
 | `IDEMPOTENCY_CONFLICT` | 409 | no | `Idempotency-Key` reused with different payload or while original request is still pending |
 | `RESOURCE_CONFLICT` | 409 | no | Resource is visible but the requested state transition is invalid (for example retrying a non-terminal execution or cancelling a non-queued execution) |

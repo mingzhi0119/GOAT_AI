@@ -20,7 +20,7 @@ function resolveDownloadFilename(
   return filenameMatch?.[1]?.trim() || fallbackFilename
 }
 
-export async function downloadFileWithAuth(
+export async function downloadFile(
   downloadUrl: string,
   fallbackFilename: string,
 ): Promise<void> {

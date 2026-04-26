@@ -10,7 +10,7 @@ on **Vercel** and the existing FastAPI backend stays on a Linux host behind
 - Backend origin: `https://goat-api.duckdns.org`
 - Browser API origin during runtime: `https://goat-dev.vercel.app/api/*`
 - Runtime proxy model: Vercel rewrites `/api/*` to `https://goat-api.duckdns.org/api/*`
-- Public browser auth model: shared password and/or account login, both backed by signed browser cookies
+- Public demo model: no browser login, API key, OAuth, or owner-id gate
 
 This preserves the frontend's same-origin runtime posture without adding browser
 CORS complexity to chat, uploads, downloads, or SSE.
@@ -22,8 +22,8 @@ CORS complexity to chat, uploads, downloads, or SSE.
 - frontend runtime API calls now normalize to root-relative `/api/...` paths
 - `frontend/package.json` now uses `node: 24.x` so Vercel can satisfy the engine
   constraint without depending on a specific Node 24 minor
-- the SPA now bootstraps `GET /api/auth/session` before loading history/models/features
-  and shows the appropriate shared-password/account login gate when the backend enables browser auth
+- the SPA mounts immediately without an Auth bootstrap, so the shell remains usable
+  even while the backend is unavailable
 
 ## Vercel project setup
 
@@ -83,22 +83,11 @@ Deploy the backend in this shape with:
 bash ops/deploy/deploy_remote_server.sh
 ```
 
-Recommended backend auth env vars for the public site:
-
-```bash
-export GOAT_SHARED_ACCESS_PASSWORD_HASH="$(python -c "from pwdlib import PasswordHash; print(PasswordHash.recommended().hash('replace-with-a-site-password'))")"
-export GOAT_SHARED_ACCESS_SESSION_SECRET='replace-with-a-long-random-signing-secret'
-export GOAT_SHARED_ACCESS_SESSION_TTL_SEC=2592000
-export GOAT_ACCOUNT_AUTH_ENABLED=1
-export GOAT_BROWSER_SESSION_SECRET='replace-with-a-second-long-random-signing-secret'
-export GOAT_ACCOUNT_SESSION_TTL_SEC=2592000
-export GOOGLE_CLIENT_ID='replace-with-google-client-id'
-export GOOGLE_CLIENT_SECRET='replace-with-google-client-secret'
-export GOOGLE_REDIRECT_URI='https://goat-dev.vercel.app/'
-```
-
-Keep header-based API keys only for operator/script access; the public browser
-path should rely on the signed cookie flow instead of a visible owner id.
+Do not set historical Auth env vars on this demo deployment. `load_settings()`
+fails fast if any of `GOAT_API_KEY`, `GOAT_API_KEY_WRITE`,
+`GOAT_API_CREDENTIALS_JSON`, `GOAT_SHARED_ACCESS_*`, `GOAT_ACCOUNT_*`,
+`GOOGLE_*`, or `GOAT_REQUIRE_SESSION_OWNER` are configured. Use the rate limiter,
+Ollama queueing, and host-level controls as the protection posture for the demo.
 
 Example Nginx server block:
 
@@ -163,22 +152,18 @@ npm run build
 Public deployment:
 
 1. `https://goat-api.duckdns.org/api/health` returns `200`.
-2. `https://goat-api.duckdns.org/api/auth/session` returns `200` with
-   `auth_required=true` and the expected `available_login_methods`.
-3. `https://goat-dev.vercel.app` loads and the browser can reach `GET /api/health`
+2. `https://goat-dev.vercel.app` loads the chat shell without a login screen,
+   even if the backend is temporarily unavailable.
+3. The browser can reach `GET /api/health`
    through the frontend origin.
 4. `POST /api/chat` from the frontend receives streamed `thinking` or `token`
    frames without proxy buffering delays.
-5. Anonymous `curl https://goat-dev.vercel.app/api/history` now returns `401`
-   with `code = AUTH_LOGIN_REQUIRED`.
-6. Two clean browser profiles can log in with the same shared site password but
-   only see their own history rows and artifact downloads.
-7. The same account can log in from two browsers and see the same stable history rows.
-8. If Google OAuth is enabled, the configured `GOOGLE_REDIRECT_URI` is allow-listed in Google Console and a browser login can round-trip through `/api/auth/account/google/url` plus `/api/auth/account/google`.
-9. History load, upload, artifact download, and `/api/system/features` all work
-   through `goat-dev.vercel.app` after login.
-10. Preview deployments still proxy `/api/*` to `goat-api.duckdns.org` as intended.
-11. Vercel build logs show the frontend root directory rather than repo-root
+5. Anonymous `curl https://goat-dev.vercel.app/api/history` does not return an
+   Auth-required response.
+6. History load, upload, artifact download, and `/api/system/features` all work
+   through `goat-dev.vercel.app` without Auth setup.
+7. Preview deployments still proxy `/api/*` to `goat-api.duckdns.org` as intended.
+8. Vercel build logs show the frontend root directory rather than repo-root
     entrypoint `.`.
 
 ## Rollback

@@ -19,18 +19,20 @@ describe('buildApiUrl', () => {
   it('keeps api requests under a sub-path proxy', () => {
     window.history.replaceState({}, '', '/mingzhi/')
 
-    expect(buildApiUrl('/auth/session')).toBe('http://localhost:3000/mingzhi/api/auth/session')
+    expect(buildApiUrl('/system/features')).toBe(
+      'http://localhost:3000/mingzhi/api/system/features',
+    )
   })
 
   it('routes packaged desktop app origins to the local backend', () => {
-    expect(buildApiUrlFromBase('/auth/session', 'asset://localhost/index.html')).toBe(
-      'http://127.0.0.1:62606/api/auth/session',
+    expect(buildApiUrlFromBase('/system/features', 'asset://localhost/index.html')).toBe(
+      'http://127.0.0.1:62606/api/system/features',
     )
-    expect(buildApiUrlFromBase('/auth/session', 'https://asset.localhost/index.html')).toBe(
-      'http://127.0.0.1:62606/api/auth/session',
+    expect(buildApiUrlFromBase('/system/features', 'https://asset.localhost/index.html')).toBe(
+      'http://127.0.0.1:62606/api/system/features',
     )
-    expect(buildApiUrlFromBase('/auth/session', 'tauri://localhost/index.html')).toBe(
-      'http://127.0.0.1:62606/api/auth/session',
+    expect(buildApiUrlFromBase('/system/features', 'tauri://localhost/index.html')).toBe(
+      'http://127.0.0.1:62606/api/system/features',
     )
   })
 

@@ -28,12 +28,8 @@ export function getStoredOwnerId(): string {
 }
 
 export function buildApiHeaders(extraHeaders?: Record<string, string>): Record<string, string> {
-  const headers = { ...(extraHeaders ?? {}) }
-  const apiKey = getStoredApiKey()
-  if (apiKey) headers['X-GOAT-API-Key'] = apiKey
-  const ownerId = getStoredOwnerId()
-  if (ownerId) headers['X-GOAT-Owner-Id'] = ownerId
-  return headers
+  clearStoredProtectedAccess()
+  return { ...(extraHeaders ?? {}) }
 }
 
 export function setStoredApiKey(apiKey: string): void {
