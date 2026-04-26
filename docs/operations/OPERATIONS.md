@@ -69,15 +69,10 @@ npm run bundle:check
 npm run dev
 ```
 
-If the backend is protected with `GOAT_API_KEY` or `GOAT_REQUIRE_SESSION_OWNER=1`
-and browser login is disabled, open the browser UI settings menu and
-populate `Protected access` with the shared API key and, when required, the
-owner ID. The SPA stores those values locally in the browser and attaches
-`X-GOAT-API-Key` / `X-GOAT-Owner-Id` to runtime API calls.
-If shared-password browser login or account browser login is enabled, the browser UI
-instead bootstraps `GET /api/auth/session`, shows the appropriate login gate, and
-stores access in HttpOnly signed cookies; the public UI no longer needs a manually
-entered owner id.
+The browser UI is a public demo shell. It does not bootstrap Auth, show a login
+gate, collect API keys, or attach owner-id headers. Historical protected-access
+browser storage is scrubbed on startup so stale local values cannot affect API
+requests.
 Frontend API contract types are generated from `docs/api/openapi.json`; refresh them
 with `npm run contract:generate` whenever the backend contract changes.
 `npm run depcruise` exercises the frontend-only import-direction and cycle guardrails for
@@ -187,7 +182,8 @@ Desktop smoke command:
 python -m tools.desktop.desktop_smoke --host 127.0.0.1 --port 62606
 ```
 
-When API protection is enabled, pass `--api-key "$GOAT_API_KEY"`.
+The desktop smoke command no longer accepts or requires an API key for demo
+deployments.
 
 Public Windows desktop release path:
 
@@ -261,8 +257,10 @@ Important behavior:
 - Artifact-first rollback is the preferred path; ref-based rollback remains available for manual recovery. See [ROLLBACK.md](ROLLBACK.md)
 - Windows deploy reuses Ollama on `127.0.0.1:11434` when available unless `OLLAMA_BASE_URL` is explicitly set
 - school deploy prefers `.env.school-ubuntu` for `GOAT_USE_SCHOOL_OLLAMA_LOCAL`, `GOAT_OLLAMA_PROFILE`, and `OLLAMA_BASE_URL`, uses `ops/systemd/goat-ai.school-ubuntu.service`, and starts the local Ollama helper before the backend process comes up
-- remote deployments are the only supported shape for browser/login auth or API-key auth; local and school deployments fail fast if any auth env vars are configured
-- remote deployments default to public/no-auth unless you explicitly set remote Auth env vars; use the built-in per-minute rate limit and FIFO Ollama queue as the default protection posture
+- all deployment profiles are public/no-auth demo deployments; startup fails fast
+  if historical Auth env vars are configured
+- use the built-in per-minute rate limit, FIFO Ollama queue, reverse proxy, and
+  host controls as the default protection posture
 - `ops/verification/watchdog.sh` now restarts through `ops/deploy/deploy_remote_server.sh` by default and may be redirected with `GOAT_WATCHDOG_DEPLOY_SCRIPT`
 - Deploy now includes a post-deploy contract check (`tools/ops/post_deploy_check.py`) before success is reported: it exercises `GET /api/health`, `GET /api/ready`, `GET /api/system/runtime-target`, and a short `POST /api/chat` stream. The chat step passes when the SSE body includes **at least one** `token` or **`thinking`** frame (so thinking-first models still validate), and fails on HTTP errors, empty SSE, or a first-frame `error`
 
@@ -275,8 +273,7 @@ When the frontend is hosted on Vercel and FastAPI remains on a Linux host, use
 That path keeps browser requests same-origin at `goat-dev.vercel.app/api/*` and lets
 Vercel rewrite `/api/*` to `https://goat-api.duckdns.org/api/*`.
 For the public site, use `ops/deploy/deploy_remote_server.sh` on the backend and
-enable browser login there instead of publishing `X-GOAT-Owner-Id` controls in
-the browser UI.
+keep historical Auth env vars unset.
 
 ## Deployment profiles
 
@@ -342,21 +339,6 @@ live in the configured bucket/prefix while SQLite metadata remains local.
 | `GOAT_OBJECT_STORE_ACCESS_KEY_ID` | Optional access key id for the `s3` backend | empty |
 | `GOAT_OBJECT_STORE_SECRET_ACCESS_KEY` | Optional secret access key for the `s3` backend | empty |
 | `GOAT_OBJECT_STORE_S3_ADDRESSING_STYLE` | S3 addressing mode: `auto`, `path`, or `virtual` | `auto` |
-| `GOAT_API_KEY` | Protect non-health APIs via `X-GOAT-API-Key`; supported only when `GOAT_DEPLOY_MODE=2` | empty |
-| `GOAT_API_KEY_WRITE` | Optional second key: `GET`/`HEAD`/`OPTIONS` may use read key (`GOAT_API_KEY`); other methods require this write key when set; supported only when `GOAT_DEPLOY_MODE=2` | empty |
-| `GOAT_API_CREDENTIALS_JSON` | Optional JSON credential registry; each entry may provide `secret` or `secret_sha256`, and when empty the app derives default read/write credentials from `GOAT_API_KEY` and `GOAT_API_KEY_WRITE`; supported only when `GOAT_DEPLOY_MODE=2` | empty |
-| `GOAT_SHARED_ACCESS_PASSWORD_HASH` | Preferred `pwdlib` hash for the shared site password on public browser deployments | empty |
-| `GOAT_SHARED_ACCESS_PASSWORD` | Legacy plaintext fallback for the shared site password; avoid in production when `GOAT_SHARED_ACCESS_PASSWORD_HASH` can be used instead | empty |
-| `GOAT_SHARED_ACCESS_SESSION_SECRET` | Required signing secret for `goat_access_session` cookies when shared browser access is enabled | empty |
-| `GOAT_SHARED_ACCESS_SESSION_TTL_SEC` | Browser-session cookie TTL in seconds for shared browser access | `2592000` |
-| `GOAT_ACCOUNT_AUTH_ENABLED` | Enables browser account login alongside or instead of the shared password flow; supported only when `GOAT_DEPLOY_MODE=2` | `false` |
-| `GOAT_BROWSER_SESSION_SECRET` | Required signing secret for `goat_account_session` and Google OAuth state cookies when account browser auth is enabled | empty |
-| `GOAT_ACCOUNT_SESSION_TTL_SEC` | Browser-session cookie TTL in seconds for account login | `2592000` |
-| `GOOGLE_CLIENT_ID` | Google OAuth client id for browser account login | empty |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret for browser account login | empty |
-| `GOOGLE_REDIRECT_URI` | Frontend callback URI that receives the Google OAuth authorization code | empty |
-| `GOAT_GOOGLE_OAUTH_STATE_TTL_SEC` | Google OAuth state-cookie TTL in seconds | `600` |
-| `GOAT_REQUIRE_SESSION_OWNER` | When `true`/`1`, chat and history routes require `X-GOAT-Owner-Id` (session scoping); supported only when `GOAT_DEPLOY_MODE=2` | `false` |
 | `GOAT_RATE_LIMIT_WINDOW_SEC` | Rate limit window | `60` |
 | `GOAT_RATE_LIMIT_MAX_REQUESTS` | Max requests per window | `60` |
 | `GOAT_DEPLOY_MODE` | `0=local`, `1=school_server`, `2=remote` | required |
@@ -460,113 +442,20 @@ Example line:
 
 ```json
 {"ts": "2026-04-07 12:00:00,000", "level": "INFO", "logger": "goat_ai.access", "message": "http_request", "request_id": "550e8400-e29b-41d4-a716-446655440000", "route": "/api/history", "status": 200, "duration_ms": 2.145}
-
-### Credential-backed authorization (historical authz 16C)
-
-- The server still accepts `X-GOAT-API-Key` at ingress, but requests now resolve to a request-scoped authorization context with:
-  - `principal_id`
-  - `tenant_id`
-  - `scopes`
-  - `credential_id`
-  - legacy `X-GOAT-Owner-Id`
-- This is credential-backed authorization, not end-user identity.
-- When `GOAT_API_CREDENTIALS_JSON` is empty:
-  - `GOAT_API_KEY` becomes `principal:read-default` with read scopes
-  - `GOAT_API_KEY_WRITE` becomes `principal:write-default` with read+write scopes plus `sandbox:execute`
-  - default tenant is `tenant:default`
-- Credential registry entries may provide either:
-  - `secret` for compatibility with existing deployments
-  - `secret_sha256` for non-reversible config storage
-- Raw API keys are hashed to SHA-256 in memory before comparison, and credential matching uses constant-time digest comparison.
-- Cross-owner or cross-tenant reads are concealed as `404` where possible.
-- Missing API key remains `401`; insufficient scope remains `403`.
-
-Example `GOAT_API_CREDENTIALS_JSON`:
-
-```json
-[
-  {
-    "credential_id": "cred-read-analytics",
-    "secret_sha256": "replace-with-lowercase-sha256-hex",
-    "principal_id": "principal:analytics-read",
-    "tenant_id": "tenant:default",
-    "status": "active",
-    "scopes": ["history:read", "knowledge:read", "media:read", "artifact:read"]
-  }
-]
 ```
 
-### Browser login modes for public deployments
+### Removed Auth surfaces
 
-Use browser login when a public browser deployment should stay behind either a
-shared site password, stable user accounts, or both, while keeping
-history/artifacts/media/workbench data aligned with the existing caller-scoped
-authorization model.
+GOAT AI is now operated as a public demo. Do not configure API keys, shared
+passwords, account login, Google OAuth, browser session cookies, or required
+owner-id headers. `load_settings()` fails fast when historical Auth env vars are
+present, and the frontend no longer exposes login, logout, or protected-access
+controls.
 
-Shared-password configuration:
-
-- set `GOAT_SHARED_ACCESS_PASSWORD_HASH` to a `pwdlib` hash of the public site password
-- set `GOAT_SHARED_ACCESS_SESSION_SECRET` to a long random signing secret
-- optionally tune `GOAT_SHARED_ACCESS_SESSION_TTL_SEC` (default `2592000`, or 30 days)
-
-Account-login configuration:
-
-- set `GOAT_ACCOUNT_AUTH_ENABLED=1`
-- set `GOAT_BROWSER_SESSION_SECRET` to a long random signing secret for `goat_account_session`
-- optionally tune `GOAT_ACCOUNT_SESSION_TTL_SEC` (default `2592000`, or 30 days)
-- pre-provision local accounts with `python -m tools.ops.create_local_account --email user@example.com`
-
-Optional Google OAuth configuration:
-
-- set all of `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI`
-- set `GOAT_GOOGLE_OAUTH_STATE_TTL_SEC` only if you need a non-default state-cookie TTL
-- add the same frontend callback origin or path to the Google Console redirect URI allow-list
-
-Generate the shared-password hash with:
-
-```bash
-python -c "from pwdlib import PasswordHash; print(PasswordHash.recommended().hash('replace-with-a-site-password'))"
-```
-
-Runtime behavior:
-
-- `GET /api/auth/session` and `POST /api/auth/logout` remain public so the SPA can bootstrap and recover
-- `POST /api/auth/login` issues `goat_access_session` for shared-password browser mode
-- `POST /api/auth/account/login` and `POST /api/auth/account/google` issue `goat_account_session` for stable user mode
-- `GET /api/auth/account/google/url` issues the short-lived `goat_google_oauth_state` cookie used to bind the OAuth callback to the same browser
-- successful login in one browser mode clears the other browser-mode cookies so the browser stays on one active login path at a time
-- shared-password login creates a fresh browser-specific owner id per login; account login resolves to stable owner ids of the form `user:<user_id>`
-- all other `/api` routes require either a valid browser session cookie or a valid API key
-- auth-sensitive `GET` routes and artifact downloads return `Cache-Control: no-store` and `Vary: Cookie, X-GOAT-API-Key, X-GOAT-Owner-Id`
-
-Minimum rollout order:
-
-1. Decide whether the deployment should expose shared password, account login, or both.
-2. Set the matching env vars and restart the backend.
-3. Verify `curl -i https://<backend>/api/auth/session` returns `200` with `auth_required=true` plus the expected `available_login_methods`.
-4. If shared-password mode is newly enabled, dry-run the ownerless history cleanup:
-
-   ```bash
-   python -m tools.ops.purge_ownerless_history
-   ```
-
-5. Execute the cleanup after reviewing the matched session ids:
-
-   ```bash
-   python -m tools.ops.purge_ownerless_history --execute
-   ```
-
-6. If account login is enabled, create at least one local test account:
-
-   ```bash
-   python -m tools.ops.create_local_account --email user@example.com
-   ```
-
-7. If Google OAuth is enabled, confirm the configured `GOOGLE_REDIRECT_URI` matches the frontend origin/path exactly.
-8. Smoke-test:
-   - two clean browser profiles using the same shared password cannot see each other's `/api/history` rows
-   - the same account can sign in from two browsers and see the same stable history
-   - invalid Google state or token returns `401` with `AUTH_INVALID_GOOGLE_STATE` or `AUTH_INVALID_GOOGLE_TOKEN`
+The backend still carries request-scoped authorization context fields such as
+`principal_id`, `tenant_id`, `scopes`, and `credential_id` for internal feature
+policy, persistence provenance, and historical data compatibility. Those fields
+are not deployment Auth knobs.
 
 ### Authorization audit events (historical authz 16C)
 
@@ -583,16 +472,14 @@ Minimum rollout order:
   - `reason_code`
   - `request_id`
 - Never log raw API keys or credential secrets.
-```
 
 ### Metrics (Prometheus)
 
 - `GET /api/system/metrics` returns Prometheus text
-- Same auth rules apply as other protected APIs when `GOAT_API_KEY` is set
 - Scrape example:
 
 ```bash
-curl -sS -H "X-GOAT-API-Key: $GOAT_API_KEY" http://127.0.0.1:62606/api/system/metrics
+curl -sS http://127.0.0.1:62606/api/system/metrics
 ```
 
 - Histogram contract: `http_request_duration_seconds` is exposed as standard Prometheus histogram series:
@@ -715,7 +602,7 @@ Load smoke command:
 python -m tools.quality.load_chat_smoke --base-url http://127.0.0.1:62606 --model qwen3:4b --runs 20 --show-system-inference
 ```
 
-When API protection is enabled, pass `--api-key "$GOAT_API_KEY"`.
+The load smoke command does not require an API key for demo deployments.
 
 Performance governance:
 

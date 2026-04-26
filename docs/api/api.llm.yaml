@@ -8,9 +8,8 @@ api:
   name: GOAT AI
   base_path: /api
   auth:
-    scheme: api_key_optional
-    header: X-GOAT-API-Key
-    applies_to: all_except_health
+    scheme: none
+    applies_to: public_demo
   common_headers:
     response:
       X-Request-ID: request trace id
@@ -18,8 +17,6 @@ api:
   common_errors:
     400:
       detail: bad request
-    401:
-      detail: invalid or missing api key
     404:
       detail: not found
     422:
@@ -29,38 +26,6 @@ api:
     503:
       detail: ai backend unavailable
 schemas:
-  AccountLoginRequest:
-    type: object
-    required:
-      - email
-      - password
-    properties:
-      email: string
-      password: string
-  AuthenticatedBrowserUser:
-    type: object
-    required:
-      - id
-      - email
-      - display_name
-      - provider
-    properties:
-      id: string
-      email: string
-      display_name: string
-      provider: local|google
-  BrowserAuthSessionResponse:
-    type: object
-    required:
-      - auth_required
-      - authenticated
-    properties:
-      auth_required: boolean
-      authenticated: boolean
-      expires_at: string|null
-      available_login_methods: shared_password|account_password|google[]
-      active_login_method: shared_password|account_password|google|null
-      user: AuthenticatedBrowserUser|null
   ChatArtifact:
     type: object
     required:
@@ -244,22 +209,6 @@ schemas:
       memory_total_mb: number|null
       temperature_c: number|null
       power_draw_w: number|null
-  GoogleOAuthLoginRequest:
-    type: object
-    required:
-      - code
-      - state
-    properties:
-      code: string
-      state: string
-  GoogleOAuthUrlResponse:
-    type: object
-    required:
-      - authorization_url
-      - state_expires_at
-    properties:
-      authorization_url: string
-      state_expires_at: string
   HistorySessionDetailResponse:
     type: object
     required:
@@ -570,12 +519,6 @@ schemas:
       current: RuntimeTargetItemResponse
       ordered_targets: RuntimeTargetItemResponse[]
       operational_contract: RuntimeOperationalContractResponse
-  SharedAccessLoginRequest:
-    type: object
-    required:
-      - password
-    properties:
-      password: string
   SystemFeaturesResponse:
     type: object
     required:
@@ -749,61 +692,6 @@ schemas:
     properties:
       outputs: WorkbenchWorkspaceOutputPayload[]
 endpoints:
-  - op: get_shared_access_session
-    method: GET
-    path: /auth/session
-    response:
-      200: BrowserAuthSessionResponse
-      errors:
-        - 429
-  - op: login_shared_access
-    method: POST
-    path: /auth/login
-    body: SharedAccessLoginRequest
-    content_type: application/json
-    response:
-      200: BrowserAuthSessionResponse
-      errors:
-        - 400
-        - 401
-        - 422
-        - 429
-  - op: login_account
-    method: POST
-    path: /auth/account/login
-    body: AccountLoginRequest
-    content_type: application/json
-    response:
-      200: BrowserAuthSessionResponse
-      errors:
-        - 400
-        - 401
-        - 422
-        - 429
-  - op: get_google_login_url
-    method: GET
-    path: /auth/account/google/url
-    response:
-      200: GoogleOAuthUrlResponse
-      errors:
-        - 400
-  - op: login_google_account
-    method: POST
-    path: /auth/account/google
-    body: GoogleOAuthLoginRequest
-    content_type: application/json
-    response:
-      200: BrowserAuthSessionResponse
-      errors:
-        - 400
-        - 401
-        - 422
-        - 429
-  - op: logout_shared_access
-    method: POST
-    path: /auth/logout
-    response:
-      204: no_content
   - op: list_models_route
     method: GET
     path: /models

@@ -1,22 +1,18 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
-import type { BrowserAuthSession, RuntimeFeature } from './api/types'
+import type { RuntimeFeature } from './api/types'
 import ChatWindow from './components/ChatWindow'
-import BrowserLoginGate from './components/BrowserLoginGate'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
 import { useBranding } from './config/branding'
 import { useAdvancedSettings } from './hooks/useAdvancedSettings'
 import { useAppearance } from './hooks/useAppearance'
-import { useApiKey } from './hooks/useApiKey'
-import { useBrowserAccessAuth } from './hooks/useBrowserAccessAuth'
 import { useChatLayoutMode } from './hooks/useChatLayoutMode'
 import { useChatSession } from './hooks/useChatSession'
 import { useChatShellActions } from './hooks/useChatShellActions'
 import { useDesktopDiagnostics } from './hooks/useDesktopDiagnostics'
 import { useGpuStatus } from './hooks/useGpuStatus'
 import { useModels } from './hooks/useModels'
-import { useOwnerId } from './hooks/useOwnerId'
 import { useSystemFeatures } from './hooks/useSystemFeatures'
 import { useSystemInstruction } from './hooks/useSystemInstruction'
 import { useUserName } from './hooks/useUserName'
@@ -28,9 +24,6 @@ const LazyAppearancePanel = lazy(() => import('./components/AppearancePanel'))
 
 interface AppShellProps {
   appTitle: string
-  browserAuthSession: BrowserAuthSession | null
-  isSigningOut: boolean
-  onLogout: () => Promise<void>
 }
 
 function describePlanModeAvailability(feature: RuntimeFeature | null): string {
@@ -46,67 +39,7 @@ function describePlanModeAvailability(feature: RuntimeFeature | null): string {
   return 'Backend planning runtime is unavailable on this deployment'
 }
 
-function FullscreenStatus({
-  title,
-  message,
-  isBusy,
-  onRetry,
-}: {
-  title: string
-  message: string
-  isBusy?: boolean
-  onRetry: () => Promise<void>
-}) {
-  return (
-    <div
-      className="flex min-h-screen items-center justify-center px-4"
-      style={{ background: 'var(--bg-main)' }}
-    >
-      <div
-        className="w-full max-w-md rounded-[28px] border px-6 py-7 shadow-[0_18px_48px_var(--panel-shadow-color)]"
-        style={{
-          background: 'var(--composer-menu-bg-strong)',
-          borderColor: 'var(--input-border)',
-          color: 'var(--text-main)',
-          backdropFilter: 'blur(18px)',
-        }}
-      >
-        <p
-          className="text-xs font-semibold uppercase tracking-[0.1em]"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          GOAT AI desktop
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em]">{title}</h1>
-        <p className="mt-3 text-sm leading-6" style={{ color: 'var(--text-muted)' }}>
-          {message}
-        </p>
-        <button
-          type="button"
-          className="mt-6 rounded-2xl border px-4 py-3 text-sm"
-          style={{
-            borderColor: 'var(--input-border)',
-            color: 'var(--text-main)',
-            opacity: isBusy ? 0.7 : 1,
-          }}
-          onClick={() => {
-            void onRetry()
-          }}
-          disabled={isBusy}
-        >
-          {isBusy ? 'Checking...' : 'Retry'}
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function AppShell({
-  appTitle,
-  browserAuthSession,
-  isSigningOut,
-  onLogout,
-}: AppShellProps) {
+function AppShell({ appTitle }: AppShellProps) {
   const [planModeEnabled, setPlanModeEnabled] = useState(false)
   const [reasoningLevel, setReasoningLevel] = useState<'low' | 'medium' | 'high'>('medium')
   const [thinkingEnabled, setThinkingEnabled] = useState(false)
@@ -119,11 +52,8 @@ function AppShell({
   const chatLayout = useMemo(() => getChatLayoutDecisions(layoutMode), [layoutMode])
   const supportsThinking = models.capabilities?.supports_thinking ?? false
   const effectiveThinkingEnabled = supportsThinking && thinkingEnabled
-  const { apiKey, setApiKey } = useApiKey()
-  const { ownerId, setOwnerId } = useOwnerId()
   const { userName, setUserName } = useUserName()
   const { systemInstruction, setSystemInstruction } = useSystemInstruction()
-  const systemFeatureRefreshKey = `${apiKey}\n${ownerId}`
   const advanced = useAdvancedSettings()
   const ollamaOptions = advanced.getOptionsForRequest(
     effectiveThinkingEnabled ? reasoningLevel : false,
@@ -137,7 +67,7 @@ function AppShell({
     ollamaOptions,
   })
   const gpu = useGpuStatus(session.isStreaming)
-  const systemFeatures = useSystemFeatures(systemFeatureRefreshKey)
+  const systemFeatures = useSystemFeatures('demo-public')
   const planModeFeature = systemFeatures.features?.workbench.plan_mode ?? null
   const planModeAvailable = !!planModeFeature?.effective_enabled
   const planModeAvailability = describePlanModeAvailability(planModeFeature)
@@ -208,10 +138,6 @@ function AppShell({
           thinkingEnabled={effectiveThinkingEnabled}
           desktopDiagnostics={desktopDiagnostics.diagnostics}
           desktopDiagnosticsError={desktopDiagnostics.error}
-          apiKey={apiKey}
-          ownerId={ownerId}
-          onApiKeyChange={setApiKey}
-          onOwnerIdChange={setOwnerId}
           systemInstruction={systemInstruction}
           onSystemInstructionChange={setSystemInstruction}
           onExportMarkdown={() =>
@@ -230,9 +156,6 @@ function AppShell({
           topP={advanced.topP}
           onTopPChange={advanced.setTopP}
           onResetAdvanced={advanced.resetAdvancedToDefaults}
-          browserAuthSession={browserAuthSession}
-          isSigningOut={isSigningOut}
-          onLogout={onLogout}
         />
         <ErrorBoundary>
           <ChatWindow
@@ -287,66 +210,13 @@ function AppShell({
   )
 }
 
-/** Root application: bootstrap browser auth first, then mount the shell. */
+/** Root application: mount the public demo shell without any auth bootstrap. */
 export default function App() {
   const branding = useBranding()
-  const auth = useBrowserAccessAuth()
-  const bootstrapStatus =
-    auth.isLoading && auth.session === null
-      ? 'pending'
-      : auth.session === null
-        ? 'failed'
-        : 'ready'
 
   useEffect(() => {
-    if (bootstrapStatus === 'pending') return
-    void reportDesktopBootstrapStatus(bootstrapStatus)
-  }, [bootstrapStatus])
+    void reportDesktopBootstrapStatus('ready')
+  }, [])
 
-  if (auth.isLoading && auth.session === null) {
-    return (
-      <FullscreenStatus
-        title={branding.appTitle}
-        message="Checking browser access for this deployment."
-        isBusy={true}
-        onRetry={auth.refresh}
-      />
-    )
-  }
-
-  if (auth.session?.auth_required && !auth.session.authenticated) {
-    return (
-      <BrowserLoginGate
-        appTitle={branding.appTitle}
-        session={auth.session}
-        isLoading={auth.isLoading}
-        isSubmitting={auth.isSubmitting}
-        error={auth.error}
-        onLoginShared={auth.loginShared}
-        onLoginAccount={auth.loginAccount}
-        onStartGoogleLogin={auth.startGoogleLogin}
-        onRetry={auth.refresh}
-      />
-    )
-  }
-
-  if (auth.session === null) {
-    return (
-      <FullscreenStatus
-        title={branding.appTitle}
-        message={auth.error ?? 'Unable to load this deployment right now.'}
-        onRetry={auth.refresh}
-      />
-    )
-  }
-
-  return (
-    <AppShell
-      key={auth.shellKey}
-      appTitle={branding.appTitle}
-      browserAuthSession={auth.session}
-      isSigningOut={auth.isSubmitting}
-      onLogout={auth.logout}
-    />
-  )
+  return <AppShell appTitle={branding.appTitle} />
 }

@@ -18,7 +18,6 @@ OUTPUT_PATH = REPO_ROOT / "docs" / "api" / "api.llm.yaml"
 
 COMMON_ERRORS: dict[str, dict[str, str]] = {
     "400": {"detail": "bad request"},
-    "401": {"detail": "invalid or missing api key"},
     "404": {"detail": "not found"},
     "422": {"detail": "validation error"},
     "429": {"detail": "too many requests"},
@@ -324,9 +323,8 @@ def _build_compact_spec(openapi: dict[str, Any]) -> dict[str, Any]:
             "name": title,
             "base_path": base_path,
             "auth": {
-                "scheme": "api_key_optional",
-                "header": "X-GOAT-API-Key",
-                "applies_to": "all_except_health",
+                "scheme": "none",
+                "applies_to": "public_demo",
             },
             "common_headers": {
                 "response": {

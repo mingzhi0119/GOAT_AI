@@ -36,10 +36,7 @@ describe('history api', () => {
       buildApiUrl('/history'),
       expect.objectContaining({
         credentials: 'same-origin',
-        headers: {
-          'X-GOAT-API-Key': 'secret-123',
-          'X-GOAT-Owner-Id': 'alice',
-        },
+        headers: {},
       }),
     )
   })
@@ -137,10 +134,7 @@ describe('history api', () => {
       buildApiUrl('/history/s1'),
       expect.objectContaining({
         credentials: 'same-origin',
-        headers: {
-          'X-GOAT-API-Key': 'secret-123',
-          'X-GOAT-Owner-Id': 'alice',
-        },
+        headers: {},
       }),
     )
   })
@@ -220,10 +214,7 @@ describe('history api', () => {
       expect.objectContaining({
         method: 'DELETE',
         credentials: 'same-origin',
-        headers: {
-          'X-GOAT-API-Key': 'secret-123',
-          'X-GOAT-Owner-Id': 'alice',
-        },
+        headers: {},
       }),
     )
   })
@@ -240,10 +231,7 @@ describe('history api', () => {
       expect.objectContaining({
         method: 'DELETE',
         credentials: 'same-origin',
-        headers: {
-          'X-GOAT-API-Key': 'secret-123',
-          'X-GOAT-Owner-Id': 'alice',
-        },
+        headers: {},
       }),
     )
   })
@@ -261,8 +249,6 @@ describe('history api', () => {
         method: 'PATCH',
         credentials: 'same-origin',
         headers: {
-          'X-GOAT-API-Key': 'secret-123',
-          'X-GOAT-Owner-Id': 'alice',
           'content-type': 'application/json',
         },
         body: JSON.stringify({ title: 'New title' }),

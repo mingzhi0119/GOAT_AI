@@ -1,22 +1,17 @@
-import { useCallback, useState } from 'react'
-import { getStoredApiKey, setStoredApiKey } from '../api/auth'
-
-const MAX_LEN = 256
+import { useCallback } from 'react'
+import { clearStoredProtectedAccess } from '../api/auth'
 
 export interface UseApiKeyReturn {
   apiKey: string
   setApiKey: (value: string) => void
 }
 
-/** Shared-secret key for protected API access; persisted locally per browser. */
+/** Deprecated no-op hook kept for compatibility while demo deployments stay public. */
 export function useApiKey(): UseApiKeyReturn {
-  const [apiKeyState, setApiKeyState] = useState<string>(() => getStoredApiKey())
-
   const setApiKey = useCallback((value: string) => {
-    const next = value.length > MAX_LEN ? value.slice(0, MAX_LEN) : value
-    setApiKeyState(next)
-    setStoredApiKey(next)
+    void value
+    clearStoredProtectedAccess()
   }, [])
 
-  return { apiKey: apiKeyState, setApiKey }
+  return { apiKey: '', setApiKey }
 }

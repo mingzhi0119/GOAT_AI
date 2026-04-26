@@ -61,16 +61,17 @@ const Sidebar: FC<Props> = ({
 }) => {
   const isNarrow = layoutMode === 'narrow'
   const isOpen = isNarrow ? open : true
+  const publicAssetBase = import.meta.env.BASE_URL || './'
   const schoolLogo =
     themeStyle === 'urochester'
       ? {
-          src: '/simon_logo.svg',
+          src: `${publicAssetBase}simon_logo.svg`,
           alt: 'Simon Business School - University of Rochester',
           className: 'sidebar-footer-logo simon-footer-logo w-full max-w-none',
         }
       : themeStyle === 'thu'
         ? {
-            src: '/Tsinghua_University_Logo.svg',
+            src: `${publicAssetBase}Tsinghua_University_Logo.svg`,
             alt: 'Tsinghua University',
             className: 'sidebar-footer-logo thu-footer-logo w-full max-w-none',
           }

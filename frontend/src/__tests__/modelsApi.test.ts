@@ -39,20 +39,14 @@ describe('models api', () => {
     expect(capabilities.supports_vision).toBe(true)
     expect(mockedFetch).toHaveBeenNthCalledWith(1, buildApiUrl('/models'), {
       credentials: 'same-origin',
-      headers: {
-        'X-GOAT-API-Key': 'secret-123',
-        'X-GOAT-Owner-Id': 'alice',
-      },
+      headers: {},
     })
     expect(mockedFetch).toHaveBeenNthCalledWith(
       2,
       buildApiUrl('/models/capabilities?model=gemma4%3A26b'),
       {
         credentials: 'same-origin',
-        headers: {
-          'X-GOAT-API-Key': 'secret-123',
-          'X-GOAT-Owner-Id': 'alice',
-        },
+        headers: {},
       },
     )
   })

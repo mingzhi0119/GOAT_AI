@@ -44,7 +44,7 @@ describe('MessageBubble', () => {
     expect(screen.getByText('128 B')).toBeInTheDocument()
   })
 
-  it('downloads artifacts with stored protected-access headers', async () => {
+  it('downloads artifacts without stale protected-access headers', async () => {
     localStorage.setItem(API_KEY_STORAGE_KEY, 'secret-123')
     localStorage.setItem(OWNER_ID_STORAGE_KEY, 'alice')
 
@@ -96,10 +96,7 @@ describe('MessageBubble', () => {
         expect(fetchMock).toHaveBeenCalledWith(buildApiUrl('/artifacts/art-1'), {
           method: 'GET',
           credentials: 'same-origin',
-          headers: {
-            'X-GOAT-API-Key': 'secret-123',
-            'X-GOAT-Owner-Id': 'alice',
-          },
+          headers: {},
         }),
       )
       expect(createObjectURL).toHaveBeenCalled()

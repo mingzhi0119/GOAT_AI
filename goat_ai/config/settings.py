@@ -52,6 +52,10 @@ _AUTH_CONFIG_ENV_NAMES: Final[tuple[str, ...]] = (
     "GOAT_GOOGLE_OAUTH_STATE_TTL_SEC",
     "GOAT_REQUIRE_SESSION_OWNER",
 )
+_REMOVED_AUTH_CONFIG_MESSAGE = (
+    "Auth configuration has been removed for GOAT AI demo deployments; "
+    "remove {names} from the current environment."
+)
 _DEFAULT_REMOTE_RATE_LIMIT_MAX_REQUESTS: Final[int] = 20
 _DEFAULT_NON_REMOTE_RATE_LIMIT_MAX_REQUESTS: Final[int] = 60
 
@@ -417,6 +421,13 @@ def load_settings() -> Settings:
     except ValueError as exc:
         raise ValueError("GOAT_DEPLOY_MODE must be one of: 0, 1, 2") from exc
     deploy_mode_name(_deploy_mode)
+    configured_auth_envs = [
+        name for name in _AUTH_CONFIG_ENV_NAMES if os.environ.get(name, "").strip()
+    ]
+    if configured_auth_envs:
+        raise ValueError(
+            _REMOVED_AUTH_CONFIG_MESSAGE.format(names=", ".join(configured_auth_envs))
+        )
     _default_rate_limit_max_requests = (
         _DEFAULT_REMOTE_RATE_LIMIT_MAX_REQUESTS
         if _deploy_mode == REMOTE_DEPLOY_MODE
@@ -687,15 +698,6 @@ def load_settings() -> Settings:
         os.environ.get("GOAT_SHARED_ACCESS_SESSION_TTL_SEC", str(60 * 60 * 24 * 30))
     )
     _require_session_owner = _env_bool("GOAT_REQUIRE_SESSION_OWNER", "false")
-    if _deploy_mode != REMOTE_DEPLOY_MODE:
-        configured_auth_envs = [
-            name for name in _AUTH_CONFIG_ENV_NAMES if os.environ.get(name, "").strip()
-        ]
-        if configured_auth_envs:
-            raise ValueError(
-                "Auth configuration is only supported when GOAT_DEPLOY_MODE=2; "
-                f"remove {', '.join(configured_auth_envs)} from the current environment."
-            )
     if _api_key_write and not _api_key:
         raise ValueError(
             "GOAT_API_KEY_WRITE requires GOAT_API_KEY (read key) to be set."

@@ -425,13 +425,15 @@ class DotenvConfigTests(unittest.TestCase):
             finally:
                 _restore_many(original_env)
 
-    def test_load_settings_rejects_api_key_auth_in_local_mode(self) -> None:
+    def test_load_settings_rejects_api_key_auth_in_any_mode(self) -> None:
         original_env = _capture_env("GOAT_DEPLOY_MODE", "GOAT_API_KEY")
         try:
             _clear_env(*original_env.keys())
             os.environ["GOAT_DEPLOY_MODE"] = "0"
             os.environ["GOAT_API_KEY"] = "local-secret"
-            with self.assertRaisesRegex(ValueError, "GOAT_DEPLOY_MODE=2"):
+            with self.assertRaisesRegex(
+                ValueError, "Auth configuration has been removed"
+            ):
                 config.load_settings()
         finally:
             _restore_many(original_env)
@@ -449,22 +451,24 @@ class DotenvConfigTests(unittest.TestCase):
                 hash_shared_access_password("school-secret")
             )
             os.environ["GOAT_SHARED_ACCESS_SESSION_SECRET"] = "school-session"
-            with self.assertRaisesRegex(ValueError, "GOAT_DEPLOY_MODE=2"):
+            with self.assertRaisesRegex(
+                ValueError, "Auth configuration has been removed"
+            ):
                 config.load_settings()
         finally:
             _restore_many(original_env)
 
-    def test_load_settings_allows_api_key_auth_in_remote_mode(self) -> None:
+    def test_load_settings_rejects_api_key_auth_in_remote_mode(self) -> None:
         original_env = _capture_env("GOAT_DEPLOY_MODE", "GOAT_API_KEY")
         try:
             _clear_env(*original_env.keys())
             os.environ["GOAT_DEPLOY_MODE"] = "2"
             os.environ["GOAT_API_KEY"] = "remote-secret"
 
-            settings = config.load_settings()
-
-            self.assertEqual("remote-secret", settings.api_key)
-            self.assertEqual(2, settings.deploy_mode)
+            with self.assertRaisesRegex(
+                ValueError, "Auth configuration has been removed"
+            ):
+                config.load_settings()
         finally:
             _restore_many(original_env)
 
@@ -502,7 +506,7 @@ class DotenvConfigTests(unittest.TestCase):
         finally:
             _restore_many(original_env)
 
-    def test_load_settings_parses_shared_access_env(self) -> None:
+    def test_load_settings_rejects_shared_access_env(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             app_root = Path(tmp)
             runtime_root = app_root / "var"
@@ -524,18 +528,14 @@ class DotenvConfigTests(unittest.TestCase):
                     patch.object(config, "APP_ROOT", app_root),
                     patch.object(config, "DEFAULT_RUNTIME_ROOT", runtime_root),
                 ):
-                    settings = config.load_settings()
-                self.assertEqual("", settings.shared_access_password)
-                self.assertTrue(settings.shared_access_password_hash)
-                self.assertEqual(
-                    "session-secret", settings.shared_access_session_secret
-                )
-                self.assertEqual(86400, settings.shared_access_session_ttl_sec)
-                self.assertTrue(settings.shared_access_enabled)
+                    with self.assertRaisesRegex(
+                        ValueError, "Auth configuration has been removed"
+                    ):
+                        config.load_settings()
             finally:
                 _restore_many(original_env)
 
-    def test_load_settings_accepts_legacy_plaintext_shared_access_password(
+    def test_load_settings_rejects_legacy_plaintext_shared_access_password(
         self,
     ) -> None:
         original_env = _capture_env(
@@ -550,11 +550,10 @@ class DotenvConfigTests(unittest.TestCase):
             os.environ["GOAT_SHARED_ACCESS_PASSWORD"] = "goat-shared"
             os.environ["GOAT_SHARED_ACCESS_SESSION_SECRET"] = "session-secret"
 
-            settings = config.load_settings()
-
-            self.assertEqual("goat-shared", settings.shared_access_password)
-            self.assertEqual("", settings.shared_access_password_hash)
-            self.assertTrue(settings.shared_access_enabled)
+            with self.assertRaisesRegex(
+                ValueError, "Auth configuration has been removed"
+            ):
+                config.load_settings()
         finally:
             _restore_many(original_env)
 
@@ -572,7 +571,7 @@ class DotenvConfigTests(unittest.TestCase):
             os.environ["GOAT_DEPLOY_MODE"] = "2"
             os.environ["GOAT_SHARED_ACCESS_PASSWORD"] = "goat-shared"
             with self.assertRaisesRegex(
-                ValueError, "GOAT_SHARED_ACCESS_SESSION_SECRET"
+                ValueError, "Auth configuration has been removed"
             ):
                 config.load_settings()
         finally:
@@ -615,7 +614,7 @@ class DotenvConfigTests(unittest.TestCase):
         finally:
             _restore_many(original_env)
 
-    def test_load_settings_parses_account_auth_and_google_oauth_env(self) -> None:
+    def test_load_settings_rejects_account_auth_and_google_oauth_env(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             app_root = Path(tmp)
             runtime_root = app_root / "var"
@@ -641,12 +640,10 @@ class DotenvConfigTests(unittest.TestCase):
                     patch.object(config, "APP_ROOT", app_root),
                     patch.object(config, "DEFAULT_RUNTIME_ROOT", runtime_root),
                 ):
-                    settings = config.load_settings()
-                self.assertTrue(settings.account_auth_enabled)
-                self.assertEqual("browser-secret", settings.browser_session_secret)
-                self.assertEqual(7200, settings.account_session_ttl_sec)
-                self.assertTrue(settings.google_oauth_enabled)
-                self.assertTrue(settings.browser_auth_required)
+                    with self.assertRaisesRegex(
+                        ValueError, "Auth configuration has been removed"
+                    ):
+                        config.load_settings()
             finally:
                 _restore_many(original_env)
 
@@ -662,7 +659,9 @@ class DotenvConfigTests(unittest.TestCase):
             _clear_env(*original_env.keys())
             os.environ["GOAT_DEPLOY_MODE"] = "2"
             os.environ["GOAT_ACCOUNT_AUTH_ENABLED"] = "1"
-            with self.assertRaisesRegex(ValueError, "GOAT_BROWSER_SESSION_SECRET"):
+            with self.assertRaisesRegex(
+                ValueError, "Auth configuration has been removed"
+            ):
                 config.load_settings()
         finally:
             _restore_many(original_env)

@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import rehypeKatex from 'rehype-katex'
 import remarkMath from 'remark-math'
 import remarkGfm from 'remark-gfm'
-import { downloadFileWithAuth } from '../api/download'
+import { downloadFile } from '../api/download'
 import type { ChatArtifact, Message } from '../api/types'
 import type { ChatLayoutMode } from '../utils/chatLayout'
 import { buildMathRenderPlan, normalizeDisplayMathMarkdown } from '../utils/mathRendering'
@@ -85,7 +85,7 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode 
     event.preventDefault()
     setDownloadError(null)
     try {
-      await downloadFileWithAuth(artifact.download_url, artifact.filename)
+      await downloadFile(artifact.download_url, artifact.filename)
     } catch {
       setDownloadError('Download failed. Check protected access settings.')
     }

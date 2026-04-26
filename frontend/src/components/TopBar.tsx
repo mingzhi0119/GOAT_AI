@@ -1,5 +1,5 @@
 import { useId, useRef, type FC } from 'react'
-import type { BrowserAuthSession, DesktopDiagnostics } from '../api/types'
+import type { DesktopDiagnostics } from '../api/types'
 import { useTopBarPanels } from '../hooks/useTopBarPanels'
 import type { ChatLayoutMode } from '../utils/chatLayout'
 import { ConversationActionsMenu, SettingsPanel } from './TopBarPanels'
@@ -17,10 +17,6 @@ interface Props {
   thinkingEnabled?: boolean
   desktopDiagnostics?: DesktopDiagnostics | null
   desktopDiagnosticsError?: string | null
-  apiKey: string
-  ownerId: string
-  onApiKeyChange: (value: string) => void
-  onOwnerIdChange: (value: string) => void
   systemInstruction: string
   onSystemInstructionChange: (value: string) => void
   onExportMarkdown: () => void
@@ -34,9 +30,6 @@ interface Props {
   topP: number
   onTopPChange: (v: number) => void
   onResetAdvanced: () => void
-  browserAuthSession: BrowserAuthSession | null
-  isSigningOut: boolean
-  onLogout: () => Promise<void>
 }
 
 interface CapabilityItem {
@@ -170,10 +163,6 @@ const TopBar: FC<Props> = ({
   thinkingEnabled = false,
   desktopDiagnostics = null,
   desktopDiagnosticsError = null,
-  apiKey,
-  ownerId,
-  onApiKeyChange,
-  onOwnerIdChange,
   systemInstruction,
   onSystemInstructionChange,
   onExportMarkdown,
@@ -187,9 +176,6 @@ const TopBar: FC<Props> = ({
   topP,
   onTopPChange,
   onResetAdvanced,
-  browserAuthSession,
-  isSigningOut,
-  onLogout,
 }) => {
   const panelBoundaryRef = useRef<HTMLDivElement>(null)
   const actionsTriggerRef = useRef<HTMLButtonElement | null>(null)
@@ -308,10 +294,6 @@ const TopBar: FC<Props> = ({
                 advancedOpen={advancedOpen}
                 desktopDiagnostics={desktopDiagnostics}
                 desktopDiagnosticsError={desktopDiagnosticsError}
-                apiKey={apiKey}
-                ownerId={ownerId}
-                onApiKeyChange={onApiKeyChange}
-                onOwnerIdChange={onOwnerIdChange}
                 systemInstruction={systemInstruction}
                 temperature={temperature}
                 maxTokens={maxTokens}
@@ -323,9 +305,6 @@ const TopBar: FC<Props> = ({
                 onTopPChange={onTopPChange}
                 onResetAdvanced={onResetAdvanced}
                 onOpenAppearance={onOpenAppearance}
-                browserAuthSession={browserAuthSession}
-                isSigningOut={isSigningOut}
-                onLogout={onLogout}
                 onClose={closeActivePanel}
               />
             )}
