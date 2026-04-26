@@ -3,7 +3,7 @@
 use std::{
     path::Path,
     sync::{
-        atomic::{AtomicBool, AtomicU8, Ordering},
+        atomic::{AtomicBool, Ordering},
         Arc, Mutex,
     },
     thread,
@@ -28,7 +28,6 @@ use tauri_plugin_shell::{process::CommandChild, process::CommandEvent, ShellExt}
 const DEFAULT_BACKEND_HOST: &str = "127.0.0.1";
 const DEFAULT_BACKEND_PORT: &str = "62606";
 const HEALTH_TIMEOUT_SEC: u64 = 25;
-const FRONTEND_BOOTSTRAP_TIMEOUT_SEC: u64 = 15;
 const PRE_READY_RESTART_LIMIT: usize = 2;
 const PRE_READY_RESTART_BACKOFF_MS: u64 = 750;
 const INTERNAL_TEST_FLAG: &str = "GOAT_DESKTOP_INTERNAL_TEST";
@@ -57,17 +56,6 @@ struct BackendShutdownState(Arc<AtomicBool>);
 #[derive(Clone, Default)]
 struct BackendStartupFailureState(Arc<AtomicBool>);
 
-#[derive(Clone)]
-struct FrontendBootstrapState(Arc<AtomicU8>);
-
-impl Default for FrontendBootstrapState {
-    fn default() -> Self {
-        Self(Arc::new(AtomicU8::new(
-            FrontendBootstrapStatus::Pending.as_u8(),
-        )))
-    }
-}
-
 enum BackendProcessHandle {
     #[cfg(debug_assertions)]
     Dev(Child),
@@ -86,47 +74,6 @@ enum BackendStartupWaitOutcome {
 enum BackendLaunchDisposition {
     ReuseExisting,
     SpawnNew,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum FrontendBootstrapStatus {
-    Pending,
-    Ready,
-    Failed,
-}
-
-impl FrontendBootstrapStatus {
-    fn as_u8(self) -> u8 {
-        match self {
-            Self::Pending => 0,
-            Self::Ready => 1,
-            Self::Failed => 2,
-        }
-    }
-
-    fn from_u8(value: u8) -> Self {
-        match value {
-            1 => Self::Ready,
-            2 => Self::Failed,
-            _ => Self::Pending,
-        }
-    }
-
-    fn from_str(value: &str) -> Option<Self> {
-        match value.trim() {
-            "ready" => Some(Self::Ready),
-            "failed" => Some(Self::Failed),
-            "pending" => Some(Self::Pending),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum FrontendBootstrapWaitOutcome {
-    Ready,
-    Failed,
-    TimedOut,
 }
 
 fn normalize_configured_value(value: Option<String>, default: &str) -> String {
@@ -287,24 +234,6 @@ fn reveal_main_window<R: tauri::Runtime>(app_handle: &tauri::AppHandle<R>) -> bo
     false
 }
 
-fn store_frontend_bootstrap_status(
-    state: &FrontendBootstrapState,
-    status: FrontendBootstrapStatus,
-) {
-    state.0.store(status.as_u8(), Ordering::SeqCst);
-}
-
-fn load_frontend_bootstrap_status(state: &FrontendBootstrapState) -> FrontendBootstrapStatus {
-    FrontendBootstrapStatus::from_u8(state.0.load(Ordering::SeqCst))
-}
-
-fn frontend_bootstrap_timeout_diagnostic() -> String {
-    format!(
-        "GOAT desktop startup issue [frontend_bootstrap_timeout]: frontend bootstrap did not report ready or failed within {} seconds; revealing the main window as a fallback.",
-        FRONTEND_BOOTSTRAP_TIMEOUT_SEC
-    )
-}
-
 fn store_backend_process(state: &BackendProcessState, child: BackendProcessHandle) {
     if let Ok(mut slot) = state.0.lock() {
         *slot = Some(child);
@@ -433,31 +362,6 @@ fn resolve_desktop_log_path<R: tauri::Runtime>(
     Ok(log_path)
 }
 
-fn arm_frontend_bootstrap_window_reveal<R: tauri::Runtime>(
-    app_handle: tauri::AppHandle<R>,
-    frontend_bootstrap_state: FrontendBootstrapState,
-    shutdown_state: BackendShutdownState,
-    desktop_log_path: Option<PathBuf>,
-) {
-    thread::spawn(move || {
-        let outcome = wait_for_frontend_bootstrap(
-            Duration::from_secs(FRONTEND_BOOTSTRAP_TIMEOUT_SEC),
-            &frontend_bootstrap_state,
-        );
-        if shutdown_state.0.load(Ordering::SeqCst) {
-            return;
-        }
-        if matches!(outcome, FrontendBootstrapWaitOutcome::TimedOut) {
-            let diagnostic = frontend_bootstrap_timeout_diagnostic();
-            if let Some(log_path) = desktop_log_path.as_ref() {
-                append_desktop_log(log_path, &diagnostic);
-            }
-            eprintln!("{diagnostic}");
-        }
-        reveal_main_window(&app_handle);
-    });
-}
-
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
@@ -468,8 +372,6 @@ fn main() {
         .manage(BackendReadyState::default())
         .manage(BackendShutdownState::default())
         .manage(BackendStartupFailureState::default())
-        .manage(FrontendBootstrapState::default())
-        .invoke_handler(tauri::generate_handler![report_frontend_bootstrap_status])
         .setup(|app| {
             let backend_host = backend_host();
             let backend_port = backend_port();
@@ -484,7 +386,6 @@ fn main() {
             let ready_state = app.state::<BackendReadyState>().inner().clone();
             let shutdown_state = app.state::<BackendShutdownState>().inner().clone();
             let startup_failure_state = app.state::<BackendStartupFailureState>().inner().clone();
-            let frontend_bootstrap_state = app.state::<FrontendBootstrapState>().inner().clone();
             let app_handle = app.handle().clone();
             let desktop_log_path = packaged_desktop_log_path.clone();
             thread::spawn(move || {
@@ -495,10 +396,6 @@ fn main() {
                         return;
                     }
                     startup_failure_state.0.store(false, Ordering::SeqCst);
-                    store_frontend_bootstrap_status(
-                        &frontend_bootstrap_state,
-                        FrontendBootstrapStatus::Pending,
-                    );
 
                     if matches!(
                         resolve_backend_launch_disposition(&health_url),
@@ -510,12 +407,7 @@ fn main() {
                         }
                         eprintln!("{diagnostic}");
                         ready_state.0.store(true, Ordering::SeqCst);
-                        arm_frontend_bootstrap_window_reveal(
-                            app_handle.clone(),
-                            frontend_bootstrap_state.clone(),
-                            shutdown_state.clone(),
-                            desktop_log_path.clone(),
-                        );
+                        reveal_main_window(&app_handle);
                         return;
                     }
 
@@ -551,12 +443,7 @@ fn main() {
                     ) {
                         BackendStartupWaitOutcome::Ready => {
                             ready_state.0.store(true, Ordering::SeqCst);
-                            arm_frontend_bootstrap_window_reveal(
-                                app_handle.clone(),
-                                frontend_bootstrap_state.clone(),
-                                shutdown_state.clone(),
-                                desktop_log_path.clone(),
-                            );
+                            reveal_main_window(&app_handle);
                             return;
                         }
                         BackendStartupWaitOutcome::FailedEarly => {
@@ -785,57 +672,11 @@ fn wait_for_backend_startup(
     )
 }
 
-fn wait_for_frontend_bootstrap_with_probes<F>(
-    timeout: Duration,
-    interval: Duration,
-    mut status_probe: F,
-) -> FrontendBootstrapWaitOutcome
-where
-    F: FnMut() -> FrontendBootstrapStatus,
-{
-    let deadline = Instant::now() + timeout;
-    while Instant::now() < deadline {
-        match status_probe() {
-            FrontendBootstrapStatus::Ready => return FrontendBootstrapWaitOutcome::Ready,
-            FrontendBootstrapStatus::Failed => return FrontendBootstrapWaitOutcome::Failed,
-            FrontendBootstrapStatus::Pending => thread::sleep(interval),
-        }
-    }
-    FrontendBootstrapWaitOutcome::TimedOut
-}
-
-fn wait_for_frontend_bootstrap(
-    timeout: Duration,
-    frontend_bootstrap_state: &FrontendBootstrapState,
-) -> FrontendBootstrapWaitOutcome {
-    wait_for_frontend_bootstrap_with_probes(timeout, Duration::from_millis(100), || {
-        load_frontend_bootstrap_status(frontend_bootstrap_state)
-    })
-}
-
 fn backend_ready(health_url: &str) -> bool {
     match reqwest::blocking::get(health_url) {
         Ok(response) => response.status().is_success(),
         Err(_) => false,
     }
-}
-
-#[tauri::command]
-fn report_frontend_bootstrap_status(
-    app_handle: tauri::AppHandle,
-    frontend_bootstrap_state: tauri::State<'_, FrontendBootstrapState>,
-    status: String,
-) -> Result<(), String> {
-    let parsed = FrontendBootstrapStatus::from_str(&status)
-        .ok_or_else(|| format!("unsupported frontend bootstrap status: {status}"))?;
-    store_frontend_bootstrap_status(frontend_bootstrap_state.inner(), parsed);
-    if matches!(
-        parsed,
-        FrontendBootstrapStatus::Ready | FrontendBootstrapStatus::Failed
-    ) {
-        reveal_main_window(&app_handle);
-    }
-    Ok(())
 }
 
 #[allow(dead_code)]
@@ -849,13 +690,10 @@ mod tests {
         activate_existing_main_window_with, backend_health_url, backend_termination_diagnostic,
         configured_data_dir, configured_desktop_log_path, configured_log_db_path,
         configured_path_override, existing_backend_reuse_diagnostic,
-        frontend_bootstrap_timeout_diagnostic, load_frontend_bootstrap_status,
         normalize_configured_value, parse_positive_u64_override, pre_ready_restart_backoff,
         resolve_backend_launch_disposition_with_probe, startup_failure_diagnostic,
-        store_frontend_bootstrap_status, wait_for_backend_startup_with_probes,
-        wait_for_backend_with_probe, wait_for_frontend_bootstrap_with_probes,
-        BackendLaunchDisposition, BackendStartupWaitOutcome, FrontendBootstrapState,
-        FrontendBootstrapStatus, FrontendBootstrapWaitOutcome, DATA_DIR_ENV,
+        wait_for_backend_startup_with_probes, wait_for_backend_with_probe,
+        BackendLaunchDisposition, BackendStartupWaitOutcome, DATA_DIR_ENV,
         DESKTOP_SHELL_LOG_PATH_ENV, LOG_PATH_ENV,
     };
     use std::{
@@ -1078,67 +916,6 @@ mod tests {
     }
 
     #[test]
-    fn frontend_bootstrap_status_round_trips_through_state() {
-        let state = FrontendBootstrapState::default();
-
-        assert_eq!(
-            load_frontend_bootstrap_status(&state),
-            FrontendBootstrapStatus::Pending
-        );
-        store_frontend_bootstrap_status(&state, FrontendBootstrapStatus::Ready);
-        assert_eq!(
-            load_frontend_bootstrap_status(&state),
-            FrontendBootstrapStatus::Ready
-        );
-        store_frontend_bootstrap_status(&state, FrontendBootstrapStatus::Failed);
-        assert_eq!(
-            load_frontend_bootstrap_status(&state),
-            FrontendBootstrapStatus::Failed
-        );
-    }
-
-    #[test]
-    fn wait_for_frontend_bootstrap_returns_ready_when_status_reports_ready() {
-        let outcome = wait_for_frontend_bootstrap_with_probes(
-            Duration::from_millis(50),
-            Duration::from_millis(0),
-            || FrontendBootstrapStatus::Ready,
-        );
-
-        assert_eq!(outcome, FrontendBootstrapWaitOutcome::Ready);
-    }
-
-    #[test]
-    fn wait_for_frontend_bootstrap_returns_failed_when_status_reports_failed() {
-        let mut attempts = 0;
-        let outcome = wait_for_frontend_bootstrap_with_probes(
-            Duration::from_millis(50),
-            Duration::from_millis(0),
-            || {
-                attempts += 1;
-                if attempts >= 3 {
-                    FrontendBootstrapStatus::Failed
-                } else {
-                    FrontendBootstrapStatus::Pending
-                }
-            },
-        );
-
-        assert_eq!(outcome, FrontendBootstrapWaitOutcome::Failed);
-    }
-
-    #[test]
-    fn wait_for_frontend_bootstrap_times_out_when_status_never_changes() {
-        let outcome = wait_for_frontend_bootstrap_with_probes(
-            Duration::from_millis(1),
-            Duration::from_millis(0),
-            || FrontendBootstrapStatus::Pending,
-        );
-
-        assert_eq!(outcome, FrontendBootstrapWaitOutcome::TimedOut);
-    }
-
-    #[test]
     fn backend_launch_disposition_reuses_existing_healthy_backend() {
         let disposition = resolve_backend_launch_disposition_with_probe(|| true);
 
@@ -1172,14 +949,6 @@ mod tests {
             calls.lock().expect("calls lock").as_slice(),
             ["show", "focus"]
         );
-    }
-
-    #[test]
-    fn frontend_bootstrap_timeout_diagnostic_mentions_fallback_window_reveal() {
-        let message = frontend_bootstrap_timeout_diagnostic();
-
-        assert!(message.contains("frontend_bootstrap_timeout"));
-        assert!(message.contains("revealing the main window"));
     }
 
     #[test]

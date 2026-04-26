@@ -2,11 +2,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('@tauri-apps/api/core', () => ({
-  invoke: vi.fn(),
-}))
-
-import { invoke } from '@tauri-apps/api/core'
 import App from '../App'
 import { API_KEY_STORAGE_KEY, OWNER_ID_STORAGE_KEY } from '../api/auth'
 import { buildApiUrl } from '../api/urls'
@@ -209,7 +204,7 @@ function findCall(
   })
 }
 
-async function waitForStartupFetches(mockedFetch: ReturnType<typeof buildFetchMock>) {
+async function waitForInitialShellFetches(mockedFetch: ReturnType<typeof buildFetchMock>) {
   await waitFor(() => {
     expect(findCall(mockedFetch, MODELS_URL)).toBeTruthy()
     expect(findCall(mockedFetch, HISTORY_URL)).toBeTruthy()
@@ -227,7 +222,7 @@ function renderApp() {
   )
 }
 
-describe('App demo startup integration', () => {
+describe('App demo shell integration', () => {
   afterEach(() => {
     window.history.replaceState({}, '', '/')
     localStorage.clear()
@@ -240,7 +235,7 @@ describe('App demo startup integration', () => {
     vi.stubGlobal('fetch', mockedFetch)
 
     renderApp()
-    await waitForStartupFetches(mockedFetch)
+    await waitForInitialShellFetches(mockedFetch)
 
     expect(findCall(mockedFetch, AUTH_SESSION_URL)).toBeFalsy()
     expect(screen.queryByLabelText('Shared password')).not.toBeInTheDocument()
@@ -254,7 +249,7 @@ describe('App demo startup integration', () => {
     vi.stubGlobal('fetch', mockedFetch)
 
     renderApp()
-    await waitForStartupFetches(mockedFetch)
+    await waitForInitialShellFetches(mockedFetch)
 
     for (const url of [
       MODELS_URL,
@@ -273,20 +268,5 @@ describe('App demo startup integration', () => {
     }
     expect(localStorage.getItem(API_KEY_STORAGE_KEY)).toBeNull()
     expect(localStorage.getItem(OWNER_ID_STORAGE_KEY)).toBeNull()
-  })
-
-  it('reports desktop bootstrap ready without probing auth', async () => {
-    vi.spyOn(document, 'baseURI', 'get').mockReturnValue('https://asset.localhost/index.html')
-    const mockedFetch = buildFetchMock()
-    vi.stubGlobal('fetch', mockedFetch)
-
-    renderApp()
-
-    await waitFor(() => {
-      expect(vi.mocked(invoke)).toHaveBeenCalledWith('report_frontend_bootstrap_status', {
-        status: 'ready',
-      })
-    })
-    expect(findCall(mockedFetch, AUTH_SESSION_URL)).toBeFalsy()
   })
 })

@@ -5,6 +5,8 @@ import type { AppearanceStyleId } from '../utils/appearance'
 import { brandingConfig } from '../config/branding'
 import GoatIcon from './GoatIcon'
 import { NewChatIcon, TrashIcon, CloseIcon } from './uiIcons'
+import simonLogoUrl from '../assets/simon_logo.svg?url'
+import thuLogoUrl from '../assets/Tsinghua_University_Logo.svg?url'
 import {
   sidebarFooterAttributionClass,
   sidebarFooterHighlightClass,
@@ -61,17 +63,16 @@ const Sidebar: FC<Props> = ({
 }) => {
   const isNarrow = layoutMode === 'narrow'
   const isOpen = isNarrow ? open : true
-  const publicAssetBase = import.meta.env.BASE_URL || './'
   const schoolLogo =
     themeStyle === 'urochester'
       ? {
-          src: `${publicAssetBase}simon_logo.svg`,
+          src: simonLogoUrl,
           alt: 'Simon Business School - University of Rochester',
           className: 'sidebar-footer-logo simon-footer-logo w-full max-w-none',
         }
       : themeStyle === 'thu'
         ? {
-            src: `${publicAssetBase}Tsinghua_University_Logo.svg`,
+            src: thuLogoUrl,
             alt: 'Tsinghua University',
             className: 'sidebar-footer-logo thu-footer-logo w-full max-w-none',
           }

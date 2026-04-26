@@ -16,7 +16,6 @@ import { useModels } from './hooks/useModels'
 import { useSystemFeatures } from './hooks/useSystemFeatures'
 import { useSystemInstruction } from './hooks/useSystemInstruction'
 import { useUserName } from './hooks/useUserName'
-import { reportDesktopBootstrapStatus } from './utils/desktopBootstrap'
 import { downloadChatAsMarkdown } from './utils/exportChatMarkdown'
 import { getChatLayoutDecisions } from './utils/chatLayout'
 
@@ -210,13 +209,9 @@ function AppShell({ appTitle }: AppShellProps) {
   )
 }
 
-/** Root application: mount the public demo shell without any auth bootstrap. */
+/** Root application: mount the public demo shell directly. */
 export default function App() {
   const branding = useBranding()
-
-  useEffect(() => {
-    void reportDesktopBootstrapStatus('ready')
-  }, [])
 
   return <AppShell appTitle={branding.appTitle} />
 }
