@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import os
 import tempfile
-from contextlib import contextmanager
 from collections.abc import Iterator
+from contextlib import contextmanager
 
 from goat_ai.config.settings import Settings, load_settings
 
@@ -14,10 +14,14 @@ from goat_ai.config.settings import Settings, load_settings
 def _contract_env() -> Iterator[None]:
     original_deploy_mode = os.environ.get("GOAT_DEPLOY_MODE")
     original_runtime_root = os.environ.get("GOAT_RUNTIME_ROOT")
+    original_serper_api_key = os.environ.get("SERPER_API_KEY")
 
     with tempfile.TemporaryDirectory(prefix="goat-ai-contract-") as runtime_root:
         os.environ["GOAT_DEPLOY_MODE"] = "0"
         os.environ["GOAT_RUNTIME_ROOT"] = runtime_root
+        os.environ["SERPER_API_KEY"] = (
+            original_serper_api_key or "contract-generation-placeholder"
+        )
         try:
             yield
         finally:
@@ -30,6 +34,11 @@ def _contract_env() -> Iterator[None]:
                 os.environ.pop("GOAT_RUNTIME_ROOT", None)
             else:
                 os.environ["GOAT_RUNTIME_ROOT"] = original_runtime_root
+
+            if original_serper_api_key is None:
+                os.environ.pop("SERPER_API_KEY", None)
+            else:
+                os.environ["SERPER_API_KEY"] = original_serper_api_key
 
 
 def load_contract_settings() -> Settings:

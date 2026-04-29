@@ -1471,7 +1471,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         )
         self.assertTrue(sources_body["sources"][0]["runtime_ready"])
         self.assertIsNone(sources_body["sources"][0]["deny_reason"])
-        self.assertIn("DDGS", sources_body["sources"][0]["description"])
+        self.assertIn("Serper.dev", sources_body["sources"][0]["description"])
         self.assertTrue(sources_body["sources"][1]["runtime_ready"])
         self.assertEqual(
             ["plan", "browse", "deep_research"],
@@ -1884,14 +1884,25 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.settings = replace(self.settings, feature_agent_workbench_enabled=True)
         self.client.app.dependency_overrides[get_settings] = lambda: self.settings
 
-        create_response = self.client.post(
-            "/api/workbench/tasks",
-            json={
-                "task_kind": "deep_research",
-                "prompt": "Investigate launches",
-                "source_ids": ["web"],
-            },
-        )
+        with patch(
+            "backend.services.workbench_execution_service.search_public_web",
+            return_value=[
+                WorkbenchWebSearchHit(
+                    title="Launch note",
+                    url="https://example.com/launch",
+                    snippet="Serper-backed launch evidence.",
+                    rank=1,
+                )
+            ],
+        ):
+            create_response = self.client.post(
+                "/api/workbench/tasks",
+                json={
+                    "task_kind": "deep_research",
+                    "prompt": "Investigate launches",
+                    "source_ids": ["web"],
+                },
+            )
         self.assertEqual(202, create_response.status_code)
         original_id = create_response.json()["task_id"]
 
@@ -2403,7 +2414,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
                 WorkbenchWebSearchHit(
                     title="OpenClaw note",
                     url="https://example.com/openclaw",
-                    snippet="DuckDuckGo-backed retrieval is enabled.",
+                    snippet="Serper-backed retrieval is enabled.",
                     rank=1,
                 )
             ],
@@ -2443,7 +2454,7 @@ class ApiBlackboxContractTests(unittest.TestCase):
         ]
         self.assertGreaterEqual(len(web_events), 1)
         self.assertTrue(
-            all(event["metadata"]["provider"] == "duckduckgo" for event in web_events)
+            all(event["metadata"]["provider"] == "serper" for event in web_events)
         )
 
     def test_workbench_canvas_task_completes_with_workspace_output(self) -> None:

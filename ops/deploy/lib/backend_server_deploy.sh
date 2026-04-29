@@ -39,6 +39,17 @@ read_first_dotenv_value() {
   return 0
 }
 
+source_dotenv_if_present() {
+  local dotenv_path="$1"
+  if [ ! -f "${dotenv_path}" ]; then
+    return 0
+  fi
+  set -a
+  # shellcheck disable=SC1090
+  . "${dotenv_path}"
+  set +a
+}
+
 free_port() {
   local p="$1"
   if command -v fuser >/dev/null 2>&1; then

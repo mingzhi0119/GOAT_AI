@@ -66,6 +66,7 @@ def test_canonical_deploy_scripts_use_factory_entrypoint() -> None:
     assert 'source "${SCRIPT_DIR}/lib/backend_server_deploy.sh"' in deploy_sh
     assert 'source "${SCRIPT_DIR}/lib/backend_server_deploy.sh"' in deploy_school
     assert 'source "${SCRIPT_DIR}/lib/backend_server_deploy.sh"' in deploy_remote
+    assert "source_dotenv_if_present()" in deploy_lib
     assert "server:create_app" in deploy_lib
     assert "--factory" in deploy_lib
     assert '"server:create_app"' in deploy_ps1
@@ -140,6 +141,8 @@ def test_watchdog_phase0_and_school_ollama_assets_align_with_supported_ops_contr
     assert 'GOAT_SYSTEMD_UNIT="${GOAT_SYSTEMD_UNIT:-goat-ai}"' in deploy_remote
     assert 'PRIMARY_DOTENV_PATH="${PROJECT_DIR}/.env"' in deploy_school
     assert 'SCHOOL_DOTENV_PATH="${PROJECT_DIR}/.env.school-ubuntu"' in deploy_school
+    assert 'source_dotenv_if_present "${PRIMARY_DOTENV_PATH}"' in deploy_school
+    assert 'source_dotenv_if_present "${SCHOOL_DOTENV_PATH}"' in deploy_school
     assert 'GOAT_DEPLOY_MODE="${GOAT_DEPLOY_MODE:-1}"' in deploy_school
     assert (
         'GOAT_SYSTEMD_UNIT="${GOAT_SYSTEMD_UNIT:-goat-ai.school-ubuntu}"'

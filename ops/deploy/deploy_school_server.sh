@@ -21,16 +21,24 @@ PRIMARY_DOTENV_PATH="${PROJECT_DIR}/.env"
 SCHOOL_DOTENV_PATH="${PROJECT_DIR}/.env.school-ubuntu"
 SCHOOL_LOCAL_OLLAMA_URL="${SCHOOL_LOCAL_OLLAMA_URL:-http://127.0.0.1:11435}"
 
-GOAT_DEPLOY_MODE="${GOAT_DEPLOY_MODE:-1}"
-if [ "${GOAT_DEPLOY_MODE}" != "1" ]; then
+if [ -n "${GOAT_DEPLOY_MODE:-}" ] && [ "${GOAT_DEPLOY_MODE}" != "1" ]; then
   echo "ops/deploy/deploy_school_server.sh requires GOAT_DEPLOY_MODE=1."
   exit 1
 fi
 
 DEPLOY_LABEL="GOAT AI school server deploy"
-GOAT_SYSTEMD_UNIT="${GOAT_SYSTEMD_UNIT:-goat-ai.school-ubuntu}"
 
 source "${SCRIPT_DIR}/lib/backend_server_deploy.sh"
+
+source_dotenv_if_present "${PRIMARY_DOTENV_PATH}"
+source_dotenv_if_present "${SCHOOL_DOTENV_PATH}"
+
+GOAT_DEPLOY_MODE="${GOAT_DEPLOY_MODE:-1}"
+if [ "${GOAT_DEPLOY_MODE}" != "1" ]; then
+  echo "ops/deploy/deploy_school_server.sh requires GOAT_DEPLOY_MODE=1."
+  exit 1
+fi
+GOAT_SYSTEMD_UNIT="${GOAT_SYSTEMD_UNIT:-goat-ai.school-ubuntu}"
 
 GOAT_USE_SCHOOL_OLLAMA_LOCAL="${GOAT_USE_SCHOOL_OLLAMA_LOCAL:-}"
 if [ -z "${GOAT_USE_SCHOOL_OLLAMA_LOCAL}" ]; then

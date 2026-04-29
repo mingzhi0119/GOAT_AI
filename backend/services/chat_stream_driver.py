@@ -6,6 +6,8 @@ from backend.services.chat_stream_run import ChatStreamRunContext
 from backend.services.sse import sse_event
 from goat_ai.charts.echarts_tool import GENERATE_CHART_V2_SCHEMA
 from goat_ai.llm.ollama_client import StreamTextPart, ToolCallPlan
+from goat_ai.search import WEB_SEARCH_TOOL_SCHEMA
+from goat_ai.search.providers import WebSearchError
 
 
 def emit_thinking_sse(text: str) -> Generator[str, None, None]:
@@ -77,10 +79,80 @@ def phase_llm_token_stream(run: ChatStreamRunContext) -> Generator[str, None, No
     if run.input_blocked:
         return
 
-    if run.should_use_native_chart_tools and run.chart_dataframe is not None:
+    if run.should_attempt_web_search:
+        yield from stream_web_search_tool_path(run)
+    elif run.should_use_native_chart_tools and run.chart_dataframe is not None:
         yield from stream_native_chart_tool_path(run)
     else:
         yield from stream_plain_completion(run)
+
+
+def stream_web_search_tool_path(
+    run: ChatStreamRunContext,
+) -> Generator[str, None, None]:
+    """Run web search for explicit search intents, with native tool calling when available."""
+    if run.settings is None:
+        yield from stream_plain_completion(run)
+        return
+
+    tool_event: ToolCallPlan | None = None
+    search_context: str | None = None
+    if run.should_use_native_web_search_tool:
+        for event in run.llm.stream_tokens_with_tools(
+            run.model,
+            run.turns,
+            run.effective_prompt,
+            tools=[WEB_SEARCH_TOOL_SCHEMA],
+            ollama_options=run.ollama_options,
+        ):
+            if isinstance(event, ToolCallPlan):
+                try:
+                    search_context = run.web_search_orchestrator.execute_from_tool_call(
+                        tool_plan=event,
+                        fallback_query=run.latest_user_text,
+                        settings=run.settings,
+                    )
+                except WebSearchError as exc:
+                    yield from emit_content_through_buffer(
+                        run,
+                        run.web_search_orchestrator.unavailable_message(exc),
+                    )
+                    return
+                if search_context is not None:
+                    tool_event = event
+                    break
+            elif isinstance(event, StreamTextPart) and event.kind == "thinking":
+                yield from consume_llm_stream_item(run, event)
+
+    if search_context is None:
+        try:
+            search_context = run.web_search_orchestrator.execute(
+                query=run.latest_user_text,
+                max_results=5,
+                settings=run.settings,
+            )
+        except WebSearchError as exc:
+            yield from emit_content_through_buffer(
+                run,
+                run.web_search_orchestrator.unavailable_message(exc),
+            )
+            return
+
+    followup_messages = run.web_search_orchestrator.build_followup_messages(
+        turns=run.turns,
+        effective_prompt=run.effective_prompt,
+        tool_event=tool_event,
+        search_context=search_context,
+    )
+    for token in run.llm.stream_tool_followup(
+        run.model,
+        followup_messages,
+        tools=[WEB_SEARCH_TOOL_SCHEMA],
+        ollama_options=run.ollama_options,
+    ):
+        yield from consume_llm_stream_item(run, token)
+        if run.output_buffer.blocked:
+            break
 
 
 def stream_native_chart_tool_path(

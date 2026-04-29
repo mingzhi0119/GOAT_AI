@@ -23,6 +23,7 @@ from backend.services.workbench_runtime import (
 from backend.services.workbench_web_search import (
     WorkbenchWebSearchError,
     WorkbenchWebSearchHit,
+    resolve_workbench_web_provider,
 )
 from backend.types import Settings
 
@@ -147,7 +148,7 @@ def _execute_web_source(
         source_id="web",
         citations=[_web_hit_to_citation(hit) for hit in web_hits],
         metadata={
-            "provider": context.settings.workbench_web_provider,
+            "provider": resolve_workbench_web_provider(web_hits, context.settings),
             "max_results": _resolve_web_result_limit(
                 task=context.task,
                 settings=context.settings,
