@@ -23,6 +23,13 @@ school-server source of truth before the generic `.env`, and the school systemd 
 keeps the same dedicated `EnvironmentFile`. The application config layer no longer
 auto-detects `../ollama-local` or changes ports based on sibling directories.
 
+The school profile enables the bounded Workbench feature family by default for the
+Business School demo path. Operators can still opt out explicitly in `.env.school-ubuntu`:
+
+```dotenv
+GOAT_FEATURE_AGENT_WORKBENCH=0
+```
+
 ## Systemd units
 
 - generic user unit: `ops/systemd/goat-ai.service`
@@ -63,5 +70,7 @@ bash scripts/ollama/ollama_local.sh pull <model>
 `ops/deploy/deploy_school_server.sh` is the only supported school-server deploy entrypoint.
 It runs as `GOAT_DEPLOY_MODE=1`, prefers `.env.school-ubuntu`, starts
 `start_ollama_local.sh` before the backend process, and uses the
-`goat-ai.school-ubuntu` user service when available. The generic local Linux and remote
-deploy wrappers never touch the school-only helper scripts.
+`goat-ai.school-ubuntu` user service when available. It also defaults
+`GOAT_FEATURE_AGENT_WORKBENCH=1` for the school profile unless the operator has set an
+explicit override. The generic local Linux and remote deploy wrappers never touch the
+school-only helper scripts.

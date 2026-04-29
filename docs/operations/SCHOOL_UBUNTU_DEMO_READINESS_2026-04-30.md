@@ -274,7 +274,9 @@ Create a simple chart comparing revenue for Jan, Feb, and Mar: 10, 15, 12.
 
 **English talk track:** “The Workbench is intentionally bounded: plan, browse, deep research, and canvas workflows produce durable task state, event timelines, and reusable outputs.”
 
-Only demo this if enabled:
+The school Ubuntu profile enables this by default through both the systemd unit and the
+deploy wrapper fallback. If an operator has explicitly disabled it, re-enable before
+demoing:
 
 ```dotenv
 GOAT_FEATURE_AGENT_WORKBENCH=1

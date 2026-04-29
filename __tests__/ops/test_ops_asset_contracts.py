@@ -148,6 +148,10 @@ def test_watchdog_phase0_and_school_ollama_assets_align_with_supported_ops_contr
         'GOAT_SYSTEMD_UNIT="${GOAT_SYSTEMD_UNIT:-goat-ai.school-ubuntu}"'
         in deploy_school
     )
+    assert 'GOAT_FEATURE_AGENT_WORKBENCH="${GOAT_FEATURE_AGENT_WORKBENCH:-1}"' in (
+        deploy_school
+    )
+    assert "export GOAT_FEATURE_AGENT_WORKBENCH" in deploy_school
     assert "School Ubuntu Ollama profile enabled" in deploy_school
     assert 'bash "${PROJECT_DIR}/scripts/ollama/start_ollama_local.sh"' in deploy_school
     assert (
@@ -165,6 +169,7 @@ def test_watchdog_phase0_and_school_ollama_assets_align_with_supported_ops_contr
     )
     assert "Environment=GOAT_DEPLOY_MODE=1" in school_service
     assert "Environment=GOAT_USE_SCHOOL_OLLAMA_LOCAL=1" in school_service
+    assert "Environment=GOAT_FEATURE_AGENT_WORKBENCH=1" in school_service
     assert "EnvironmentFile=-%h/GOAT_AI/.env.school-ubuntu" in school_service
 
     assert (

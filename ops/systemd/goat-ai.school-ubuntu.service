@@ -21,6 +21,7 @@ Environment=GOAT_LOG_DIR=%h/GOAT_AI/var/logs
 Environment=GOAT_LOG_PATH=%h/GOAT_AI/var/chat_logs.db
 Environment=GOAT_DATA_DIR=%h/GOAT_AI/var/data
 Environment=GOAT_USE_SCHOOL_OLLAMA_LOCAL=1
+Environment=GOAT_FEATURE_AGENT_WORKBENCH=1
 EnvironmentFile=-%h/GOAT_AI/.env
 EnvironmentFile=-%h/GOAT_AI/.env.school-ubuntu
 

@@ -39,6 +39,7 @@ if [ "${GOAT_DEPLOY_MODE}" != "1" ]; then
   exit 1
 fi
 GOAT_SYSTEMD_UNIT="${GOAT_SYSTEMD_UNIT:-goat-ai.school-ubuntu}"
+GOAT_FEATURE_AGENT_WORKBENCH="${GOAT_FEATURE_AGENT_WORKBENCH:-1}"
 
 GOAT_USE_SCHOOL_OLLAMA_LOCAL="${GOAT_USE_SCHOOL_OLLAMA_LOCAL:-}"
 if [ -z "${GOAT_USE_SCHOOL_OLLAMA_LOCAL}" ]; then
@@ -68,6 +69,7 @@ export GOAT_USE_SCHOOL_OLLAMA_LOCAL
 export GOAT_OLLAMA_PROFILE
 export GOAT_BIND_HOST
 export OLLAMA_BASE_URL
+export GOAT_FEATURE_AGENT_WORKBENCH
 
 goat_before_backend_start() {
   if [ ! -f "${PROJECT_DIR}/scripts/ollama/start_ollama_local.sh" ]; then
