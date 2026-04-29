@@ -291,6 +291,9 @@ class DotenvConfigTests(unittest.TestCase):
             app_root = Path(tmp)
             runtime_root = app_root / "var"
             original_env = _capture_env(
+                "SERPER_API_KEY",
+                "GOAT_SERPER_GL",
+                "GOAT_SERPER_HL",
                 "GOAT_WORKBENCH_WEB_PROVIDER",
                 "GOAT_WORKBENCH_WEB_MAX_RESULTS",
                 "GOAT_WORKBENCH_WEB_TIMEOUT_SEC",
@@ -302,11 +305,13 @@ class DotenvConfigTests(unittest.TestCase):
             )
             try:
                 _clear_env(*original_env.keys())
-                os.environ["GOAT_WORKBENCH_WEB_PROVIDER"] = "duckduckgo"
+                os.environ["SERPER_API_KEY"] = "serper-test-key"
                 os.environ["GOAT_WORKBENCH_WEB_MAX_RESULTS"] = "7"
                 os.environ["GOAT_WORKBENCH_WEB_TIMEOUT_SEC"] = "11"
                 os.environ["GOAT_WORKBENCH_WEB_REGION"] = "us-en"
                 os.environ["GOAT_WORKBENCH_WEB_SAFESEARCH"] = "off"
+                os.environ["GOAT_SERPER_GL"] = "ca"
+                os.environ["GOAT_SERPER_HL"] = "fr"
                 os.environ["GOAT_WORKBENCH_LANGGRAPH_ENABLED"] = "false"
                 os.environ["GOAT_WORKBENCH_BROWSE_MAX_STEPS"] = "1"
                 os.environ["GOAT_WORKBENCH_DEEP_RESEARCH_MAX_STEPS"] = "4"
@@ -315,7 +320,10 @@ class DotenvConfigTests(unittest.TestCase):
                     patch.object(config, "DEFAULT_RUNTIME_ROOT", runtime_root),
                 ):
                     settings = config.load_settings()
-                self.assertEqual("duckduckgo", settings.workbench_web_provider)
+                self.assertEqual("serper", settings.workbench_web_provider)
+                self.assertEqual("serper-test-key", settings.serper_api_key)
+                self.assertEqual("ca", settings.serper_gl)
+                self.assertEqual("fr", settings.serper_hl)
                 self.assertEqual(7, settings.workbench_web_max_results)
                 self.assertEqual(11, settings.workbench_web_timeout_sec)
                 self.assertEqual("us-en", settings.workbench_web_region)
@@ -323,6 +331,47 @@ class DotenvConfigTests(unittest.TestCase):
                 self.assertFalse(settings.workbench_langgraph_enabled)
                 self.assertEqual(1, settings.workbench_browse_max_steps)
                 self.assertEqual(4, settings.workbench_deep_research_max_steps)
+            finally:
+                _restore_many(original_env)
+
+    def test_load_settings_allows_default_serper_without_api_key(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            app_root = Path(tmp)
+            runtime_root = app_root / "var"
+            original_env = _capture_env(
+                "SERPER_API_KEY",
+                "GOAT_WORKBENCH_WEB_PROVIDER",
+            )
+            try:
+                _clear_env(*original_env.keys())
+                with (
+                    patch.object(config, "APP_ROOT", app_root),
+                    patch.object(config, "DEFAULT_RUNTIME_ROOT", runtime_root),
+                ):
+                    settings = config.load_settings()
+                self.assertEqual("serper", settings.workbench_web_provider)
+                self.assertEqual("", settings.serper_api_key)
+            finally:
+                _restore_many(original_env)
+
+    def test_load_settings_allows_explicit_duckduckgo_without_serper_key(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            app_root = Path(tmp)
+            runtime_root = app_root / "var"
+            original_env = _capture_env(
+                "SERPER_API_KEY",
+                "GOAT_WORKBENCH_WEB_PROVIDER",
+            )
+            try:
+                _clear_env(*original_env.keys())
+                os.environ["GOAT_WORKBENCH_WEB_PROVIDER"] = "duckduckgo"
+                with (
+                    patch.object(config, "APP_ROOT", app_root),
+                    patch.object(config, "DEFAULT_RUNTIME_ROOT", runtime_root),
+                ):
+                    settings = config.load_settings()
+                self.assertEqual("duckduckgo", settings.workbench_web_provider)
+                self.assertEqual("", settings.serper_api_key)
             finally:
                 _restore_many(original_env)
 

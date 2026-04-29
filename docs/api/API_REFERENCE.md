@@ -212,6 +212,7 @@ Purpose:
 - Stream LLM responses over SSE
 - Persist session history when `session_id` is present
 - Emit chart specs only from real native tool calls
+- Use the internal `web_search` tool for explicit current-web search requests when public-web retrieval is enabled
 - Apply lightweight safeguard blocking for clearly unsafe misuse
 - Reject models outside the deployment allowlist before calling Ollama
 
@@ -295,8 +296,9 @@ data: {"type":"done"}
 Notes:
 
 - Thinking-capable models may emit `thinking` before or interleaved with `token`; the web UI shows thinking in a collapsed disclosure; only `token` content is moderated by output safeguards and persisted as the assistant message body
-- If the selected model does not support native tools, chat remains text-only
+- If the selected model does not support native tools, explicit web-search requests use server-side search-result context fallback instead of pretending a native tool call occurred
 - Retrieval-backed chat reuses the normal chat streaming path; knowledge search builds bounded context for the model instead of streaming raw snippet dumps
+- Search-backed chat answers must cite returned result URLs; if search is unavailable, the answer should say so without invented citations
 - Unsafe prompts are converted into a safe refusal instead of passing through the raw request
 - Unsafe model output is replaced server-side before streaming
 - Downloadable generated files are emitted as `artifact` events and must be fetched from the server-provided `download_url`
@@ -431,13 +433,13 @@ Current behavior:
   - optional `deny_reason`
   - `description`
 - `knowledge` is hidden unless the caller can read knowledge resources
-- `web` is runtime-ready by default when `GOAT_WORKBENCH_WEB_PROVIDER=duckduckgo`
+- `web` is runtime-ready by default when `GOAT_WORKBENCH_WEB_PROVIDER=serper`; `SERPER_API_KEY` enables Serper.dev results, and missing/unavailable Serper automatically falls back to DuckDuckGo
 - `web` reports `runtime_ready = false` with `deny_reason = "disabled_by_operator"` when `GOAT_WORKBENCH_WEB_PROVIDER=disabled`
 - `project_memory` is read-only, supports `browse` / `deep_research`, and
   requires an explicit `project_id` when referenced by a task
 - visible connector bindings are read-only, operator-provisioned, and hidden
   entirely from callers who fail the binding visibility rules
-- current public-web retrieval is experimental and uses the DDGS DuckDuckGo-style provider to return bounded search-result evidence
+- current public-web retrieval uses Serper.dev Google Search results by default to return bounded search-result evidence; DuckDuckGo is both the automatic fallback for Serper failures and an explicit provider mode
 - callers without `workbench:read` receive `403`
 
 ## `GET /api/workbench/workspace-outputs`

@@ -59,6 +59,24 @@ class ChatOptionsTests(unittest.TestCase):
         self.assertIn("If the user asks for a downloadable file", prompt)
         self.assertIn("[report.md](report.md)", prompt)
 
+    def test_web_search_protocol_is_appended_only_when_enabled(self) -> None:
+        enabled_prompt = PromptComposer().compose(
+            base_prompt="Base prompt",
+            user_name="",
+            system_instruction="",
+            web_search_enabled=True,
+        )
+        disabled_prompt = PromptComposer().compose(
+            base_prompt="Base prompt",
+            user_name="",
+            system_instruction="",
+            web_search_enabled=False,
+        )
+
+        self.assertIn("WEB SEARCH PROTOCOL", enabled_prompt)
+        self.assertIn("web_search", enabled_prompt)
+        self.assertNotIn("WEB SEARCH PROTOCOL", disabled_prompt)
+
     def test_theme_default_prompts_vary_by_theme(self) -> None:
         classic = default_system_prompt_for_theme("classic")
         urochester = default_system_prompt_for_theme("urochester")

@@ -18,6 +18,7 @@ from backend.services.workbench_source_registry import WorkbenchSourceDescriptor
 from backend.services.workbench_web_search import (
     WorkbenchWebSearchError,
     WorkbenchWebSearchHit,
+    resolve_workbench_web_provider,
 )
 from backend.types import Settings
 
@@ -229,7 +230,7 @@ def execute_legacy_retrieval_task(
                 metadata={
                     "source_id": "web",
                     "citation_count": len(web_hits),
-                    "provider": settings.workbench_web_provider,
+                    "provider": resolve_workbench_web_provider(web_hits, settings),
                     "max_results": _resolve_web_result_limit(
                         task_kind=task.task_kind,
                         settings=settings,

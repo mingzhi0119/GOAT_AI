@@ -33,6 +33,7 @@ from backend.services.safeguard_service import (
 from backend.services.session_service import last_user_message, persist_chat_session
 from backend.services.sse import sse_done_event, sse_error_event, sse_token_event
 from backend.services.tabular_context import TabularContextExtractor
+from backend.types import Settings
 from goat_ai.shared.clocks import Clock
 from goat_ai.charts.echarts_tool import parse_chart_intent_v2
 from goat_ai.telemetry.latency_metrics import (
@@ -41,6 +42,17 @@ from goat_ai.telemetry.latency_metrics import (
 )
 from goat_ai.llm.ollama_client import LLMClient, ToolCallPlan
 from goat_ai.chat.tools import messages_for_ollama
+from goat_ai.search.providers import WebSearchError
+from goat_ai.search.tool import (
+    WEB_SEARCH_TOOL_NAME,
+    build_web_search_context,
+    parse_web_search_tool_args,
+    run_chat_web_search,
+    should_attempt_web_search,
+    tool_result_message,
+    web_search_protocol,
+    web_search_unavailable_message,
+)
 from goat_ai.shared.types import ChatTurn
 
 logger = logging.getLogger(__name__)
@@ -71,6 +83,7 @@ def _compose_system_prompt(
     system_instruction: str,
     *,
     plan_mode: bool = False,
+    web_search_enabled: bool = False,
 ) -> str:
     """Merge base GOAT prompt, optional planning prompt, name, and user instructions."""
     parts: list[str] = [
@@ -84,6 +97,9 @@ def _compose_system_prompt(
             "steps before answering, then give the final response without exposing "
             "hidden reasoning."
         )
+    search_protocol = web_search_protocol(web_search_enabled)
+    if search_protocol:
+        parts.append(search_protocol)
     if user_name.strip():
         parts.append(
             f"The student's name is {user_name.strip()}. Feel free to address them by name."
@@ -132,13 +148,96 @@ class PromptComposer:
         user_name: str,
         system_instruction: str,
         plan_mode: bool = False,
+        web_search_enabled: bool = False,
     ) -> str:
         return _compose_system_prompt(
             base_prompt,
             user_name,
             system_instruction,
             plan_mode=plan_mode,
+            web_search_enabled=web_search_enabled,
         )
+
+
+class WebSearchToolOrchestrator:
+    """Encapsulate chat public-web search eligibility and tool execution."""
+
+    def should_attempt_search(
+        self, *, user_text: str, settings: Settings | None
+    ) -> bool:
+        return (
+            settings is not None
+            and settings.workbench_web_provider != "disabled"
+            and should_attempt_web_search(user_text)
+        )
+
+    def should_use_native_tool(self, *, llm: LLMClient, model: str) -> bool:
+        return llm.supports_tool_calling(model)
+
+    def execute(
+        self,
+        *,
+        query: str,
+        max_results: int,
+        settings: Settings,
+    ) -> str:
+        hits = run_chat_web_search(
+            query=query,
+            max_results=max_results,
+            settings=settings,
+        )
+        return build_web_search_context(hits)
+
+    def execute_from_tool_call(
+        self,
+        *,
+        tool_plan: ToolCallPlan,
+        fallback_query: str,
+        settings: Settings,
+    ) -> str | None:
+        if tool_plan.tool_name != WEB_SEARCH_TOOL_NAME:
+            return None
+        query, max_results = parse_web_search_tool_args(
+            tool_plan.arguments,
+            fallback_query,
+        )
+        return self.execute(
+            query=query,
+            max_results=max_results,
+            settings=settings,
+        )
+
+    def build_followup_messages(
+        self,
+        *,
+        turns: list[ChatTurn],
+        effective_prompt: str,
+        tool_event: ToolCallPlan | None,
+        search_context: str,
+    ) -> list[dict[str, object]]:
+        if tool_event is None:
+            return [
+                *messages_for_ollama(turns, effective_prompt),
+                {
+                    "role": "system",
+                    "content": (
+                        "Public web search results for the latest user request. "
+                        "Use these results as evidence and cite the URLs:\n"
+                        + search_context
+                    ),
+                },
+            ]
+        return [
+            *messages_for_ollama(turns, effective_prompt),
+            tool_event.assistant_message,
+            tool_result_message(
+                tool_name=tool_event.tool_name,
+                content=search_context,
+            ),
+        ]
+
+    def unavailable_message(self, exc: WebSearchError) -> str:
+        return web_search_unavailable_message(exc)
 
 
 class ChartToolOrchestrator:

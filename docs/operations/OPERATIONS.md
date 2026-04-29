@@ -360,12 +360,15 @@ live in the configured bucket/prefix while SQLite metadata remains local.
 | `GOAT_MAX_CHAT_MESSAGES` | Max message count accepted by `POST /api/chat` (422 if exceeded) | `120` |
 | `GOAT_MAX_CHAT_PAYLOAD_BYTES` | Max UTF-8 request payload bytes accepted by `POST /api/chat` (422 if exceeded) | `512000` |
 | `GOAT_FEATURE_CODE_SANDBOX` | Operator allows code-sandbox feature (`0`/`1`); `effective_enabled` still requires the selected provider runtime probe | `0` |
-| `GOAT_FEATURE_AGENT_WORKBENCH` | Operator exposes the shared workbench feature family; actual sub-capability readiness still depends on runtime support (`plan`, `browse`, `deep_research`, and the shipped `canvas` workspace-output baseline with session restoration, direct reopen, and export-to-artifact linkage are implemented; public-web retrieval is now experimental DDGS-backed while project memory and connectors remain open) | `0` |
-| `GOAT_WORKBENCH_WEB_PROVIDER` | Public-web provider for browse/deep-research: `duckduckgo` or `disabled` | `duckduckgo` |
+| `GOAT_FEATURE_AGENT_WORKBENCH` | Operator exposes the shared workbench feature family; actual sub-capability readiness still depends on runtime support (`plan`, `browse`, `deep_research`, and the shipped `canvas` workspace-output baseline with session restoration, direct reopen, and export-to-artifact linkage are implemented; public-web retrieval is Serper-backed by default with DuckDuckGo fallback while project memory and connectors remain open) | `0` |
+| `GOAT_WORKBENCH_WEB_PROVIDER` | Public-web provider for Workbench browse/deep-research and explicit chat search: `serper` (default with DuckDuckGo fallback), `duckduckgo`, or `disabled` | `serper` |
+| `SERPER_API_KEY` | Optional Serper.dev key; when missing or Serper is unavailable, default `serper` mode falls back to DuckDuckGo | empty |
+| `GOAT_SERPER_GL` | Optional Serper country hint (`gl`) | `us` |
+| `GOAT_SERPER_HL` | Optional Serper language hint (`hl`) | `en` |
 | `GOAT_WORKBENCH_WEB_MAX_RESULTS` | Upper bound for returned public-web results per task | `6` |
 | `GOAT_WORKBENCH_WEB_TIMEOUT_SEC` | Timeout for the public-web provider request | `15` |
-| `GOAT_WORKBENCH_WEB_REGION` | DDGS region hint for public-web retrieval | `wt-wt` |
-| `GOAT_WORKBENCH_WEB_SAFESEARCH` | DDGS safesearch mode: `on`, `moderate`, or `off` | `moderate` |
+| `GOAT_WORKBENCH_WEB_REGION` | DuckDuckGo provider/fallback region hint for public-web retrieval | `wt-wt` |
+| `GOAT_WORKBENCH_WEB_SAFESEARCH` | DuckDuckGo provider/fallback safesearch mode: `on`, `moderate`, or `off` | `moderate` |
 | `GOAT_CODE_SANDBOX_PROVIDER` | Sandbox runtime backend: `docker` (default) or `localhost` (dev fallback) | `docker` |
 | `GOAT_DOCKER_SOCKET` | Override Docker socket/pipe path (empty = defaults: Unix `/var/run/docker.sock`, Windows `\\.\pipe\docker_engine`) | empty |
 | `GOAT_CODE_SANDBOX_LOCALHOST_SHELL` | Optional shell executable/path override for `localhost` provider | empty |

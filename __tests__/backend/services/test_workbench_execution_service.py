@@ -266,6 +266,7 @@ class WorkbenchExecutionServiceTests(unittest.TestCase):
                         url="https://example.com/report",
                         snippet="Web evidence snippet",
                         rank=1,
+                        provider="duckduckgo",
                     )
                 ],
             ),
@@ -277,6 +278,7 @@ class WorkbenchExecutionServiceTests(unittest.TestCase):
                         url="https://example.com/report",
                         snippet="Web evidence snippet",
                         rank=1,
+                        provider="duckduckgo",
                     )
                 ],
             ),

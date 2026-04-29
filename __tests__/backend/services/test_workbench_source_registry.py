@@ -70,7 +70,8 @@ class WorkbenchSourceRegistryTests(unittest.TestCase):
         )
         self.assertTrue(sources[0].runtime_ready)
         self.assertIsNone(sources[0].deny_reason)
-        self.assertIn("DDGS", sources[0].description)
+        self.assertIn("Serper.dev", sources[0].description)
+        self.assertIn("DuckDuckGo fallback", sources[0].description)
 
     def test_list_sources_marks_web_not_ready_when_provider_disabled(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:

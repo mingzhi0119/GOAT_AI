@@ -19,7 +19,7 @@ SCHOOL_OLLAMA_PROFILE = "school-ubuntu"
 
 ThemeStyleId = Literal["classic", "urochester", "thu"]
 CodeSandboxProviderId = Literal["docker", "localhost"]
-WorkbenchWebProviderId = Literal["disabled", "duckduckgo"]
+WorkbenchWebProviderId = Literal["disabled", "duckduckgo", "serper"]
 ObjectStoreBackendId = Literal["local", "s3"]
 ObjectStoreS3AddressingStyle = Literal["auto", "path", "virtual"]
 RuntimeMetadataBackendId = Literal["sqlite", "postgres"]
@@ -327,11 +327,14 @@ class Settings:
     feature_code_sandbox_enabled: bool = False
     feature_agent_workbench_enabled: bool = False
     code_sandbox_provider: CodeSandboxProviderId = "docker"
-    workbench_web_provider: WorkbenchWebProviderId = "duckduckgo"
+    workbench_web_provider: WorkbenchWebProviderId = "serper"
     workbench_web_max_results: int = 6
     workbench_web_timeout_sec: int = 15
     workbench_web_region: str = "wt-wt"
     workbench_web_safesearch: Literal["on", "moderate", "off"] = "moderate"
+    serper_api_key: str = ""
+    serper_gl: str = "us"
+    serper_hl: str = "en"
     workbench_langgraph_enabled: bool = True
     workbench_browse_max_steps: int = 2
     workbench_deep_research_max_steps: int = 3
@@ -559,7 +562,7 @@ def load_settings() -> Settings:
     _feature_sandbox = _env_bool("GOAT_FEATURE_CODE_SANDBOX", "false")
     _feature_agent_workbench = _env_bool("GOAT_FEATURE_AGENT_WORKBENCH", "false")
     _workbench_web_provider = (
-        os.environ.get("GOAT_WORKBENCH_WEB_PROVIDER", "duckduckgo").strip().lower()
+        os.environ.get("GOAT_WORKBENCH_WEB_PROVIDER", "serper").strip().lower()
     )
     _workbench_web_max_results = int(
         os.environ.get("GOAT_WORKBENCH_WEB_MAX_RESULTS", "6")
@@ -573,6 +576,9 @@ def load_settings() -> Settings:
     _workbench_web_safesearch = (
         os.environ.get("GOAT_WORKBENCH_WEB_SAFESEARCH", "moderate").strip().lower()
     )
+    _serper_api_key = os.environ.get("SERPER_API_KEY", "").strip()
+    _serper_gl = os.environ.get("GOAT_SERPER_GL", "us").strip().lower()
+    _serper_hl = os.environ.get("GOAT_SERPER_HL", "en").strip().lower()
     _workbench_langgraph_enabled = _env_bool("GOAT_WORKBENCH_LANGGRAPH_ENABLED", "true")
     _workbench_browse_max_steps = int(
         os.environ.get("GOAT_WORKBENCH_BROWSE_MAX_STEPS", "2")
@@ -623,9 +629,9 @@ def load_settings() -> Settings:
         raise ValueError("GOAT_CODE_SANDBOX_DEFAULT_IMAGE must not be empty")
     if _sandbox_provider not in {"docker", "localhost"}:
         raise ValueError("GOAT_CODE_SANDBOX_PROVIDER must be one of: docker, localhost")
-    if _workbench_web_provider not in {"disabled", "duckduckgo"}:
+    if _workbench_web_provider not in {"disabled", "duckduckgo", "serper"}:
         raise ValueError(
-            "GOAT_WORKBENCH_WEB_PROVIDER must be one of: disabled, duckduckgo"
+            "GOAT_WORKBENCH_WEB_PROVIDER must be one of: disabled, duckduckgo, serper"
         )
     if _workbench_web_max_results < 1 or _workbench_web_max_results > 10:
         raise ValueError("GOAT_WORKBENCH_WEB_MAX_RESULTS must be between 1 and 10")
@@ -838,6 +844,9 @@ def load_settings() -> Settings:
         workbench_web_safesearch=cast(
             Literal["on", "moderate", "off"], _workbench_web_safesearch
         ),
+        serper_api_key=_serper_api_key,
+        serper_gl=_serper_gl,
+        serper_hl=_serper_hl,
         workbench_langgraph_enabled=_workbench_langgraph_enabled,
         workbench_browse_max_steps=_workbench_browse_max_steps,
         workbench_deep_research_max_steps=_workbench_deep_research_max_steps,

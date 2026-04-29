@@ -14,6 +14,7 @@ from backend.services.chat_orchestration import (
     ChartToolOrchestrator,
     PromptComposer,
     SessionPersistenceService,
+    WebSearchToolOrchestrator,
 )
 from backend.services.chat_runtime import (
     ConversationLogger,
@@ -129,12 +130,15 @@ class ChatStreamRunContext:
     persona_snapshot: dict[str, str] | None
     ollama_options: dict[str, float | int | bool | str] | None
     prompt_composer: PromptComposer
+    web_search_orchestrator: WebSearchToolOrchestrator
     chart_orchestrator: ChartToolOrchestrator
     persistence: SessionPersistenceService
     turns: list[ChatTurn]
     latest_user_text: str
     effective_prompt: str
     output_buffer: StreamingOutputBuffer
+    should_attempt_web_search: bool
+    should_use_native_web_search_tool: bool
     should_use_native_chart_tools: bool
     chart_dataframe: pd.DataFrame | None
     chart_data_source: ChartDataSource
@@ -185,17 +189,29 @@ def prepare_chat_stream_run(
 ) -> ChatStreamRunContext:
     """Assemble collaborators, derived turns, and mutable stream state."""
     prompt_composer = PromptComposer()
+    web_search_orchestrator = WebSearchToolOrchestrator()
     chart_orchestrator = ChartToolOrchestrator(
         tabular_extractor or EmbeddedCsvTabularExtractor(),
     )
     persistence = SessionPersistenceService(clock=clock)
     turns = to_chat_turns(messages)
     latest_user_text = last_user_message(messages)
+    vision_b64 = vision_last_user_images_base64 or []
+    should_attempt_web_search = (
+        False
+        if vision_b64
+        else web_search_orchestrator.should_attempt_search(
+            user_text=latest_user_text,
+            settings=settings,
+        )
+    )
     effective_prompt = prompt_composer.compose(
         base_prompt=system_prompt,
         user_name=user_name,
         system_instruction=system_instruction,
         plan_mode=plan_mode,
+        web_search_enabled=settings is not None
+        and settings.workbench_web_provider != "disabled",
     )
     holdback_tokens = (
         _STREAM_OUTPUT_HOLDBACK_TOKENS if safeguard_service is not None else 0
@@ -205,10 +221,13 @@ def prepare_chat_stream_run(
         latest_user_text,
         holdback_tokens=holdback_tokens,
     )
-    vision_b64 = vision_last_user_images_base64 or []
+    should_use_native_web_search_tool = (
+        should_attempt_web_search
+        and web_search_orchestrator.should_use_native_tool(llm=llm, model=model)
+    )
     should_use_native_chart_tools = (
         False
-        if vision_b64
+        if vision_b64 or should_attempt_web_search
         else chart_orchestrator.should_use_tools(
             messages=messages,
             llm=llm,
@@ -239,12 +258,15 @@ def prepare_chat_stream_run(
         persona_snapshot=persona_snapshot,
         ollama_options=ollama_options,
         prompt_composer=prompt_composer,
+        web_search_orchestrator=web_search_orchestrator,
         chart_orchestrator=chart_orchestrator,
         persistence=persistence,
         turns=turns,
         latest_user_text=latest_user_text,
         effective_prompt=effective_prompt,
         output_buffer=output_buffer,
+        should_attempt_web_search=should_attempt_web_search,
+        should_use_native_web_search_tool=should_use_native_web_search_tool,
         should_use_native_chart_tools=should_use_native_chart_tools,
         chart_dataframe=chart_dataframe,
         chart_data_source=chart_data_source,
