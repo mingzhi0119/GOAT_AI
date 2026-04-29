@@ -21,6 +21,20 @@ class ChartV2ModelTests(unittest.TestCase):
         self.assertEqual("line", intent.chart_type)
         self.assertEqual("month", intent.x_key)
 
+    def test_parse_chart_intent_v2_accepts_gemma_series_data_key_alias(self) -> None:
+        intent = parse_chart_intent_v2(
+            {
+                "chart_type": "bar",
+                "title": "Revenue",
+                "x_key": "Month",
+                "series": [{"data_key": "Revenue", "name": "Revenue"}],
+            }
+        )
+
+        self.assertEqual("bar", intent.chart_type)
+        self.assertEqual("Month", intent.x_key)
+        self.assertEqual("Revenue", intent.series[0].key)
+
     def test_generate_chart_v2_schema_uses_intent_contract(self) -> None:
         function = GENERATE_CHART_V2_SCHEMA["function"]
         parameters = function["parameters"]

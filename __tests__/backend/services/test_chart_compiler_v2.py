@@ -33,6 +33,28 @@ class ChartCompilerV2Tests(unittest.TestCase):
         self.assertEqual("Order Date", spec.option["xAxis"]["name"])
         self.assertEqual("line", spec.option["series"][0]["type"])
 
+    def test_compile_line_chart_keeps_month_names_as_categories(self) -> None:
+        df = pd.DataFrame({"month": ["Jan", "Feb", "Mar"], "revenue": [10, 15, 12]})
+        intent = ChartIntentV2(
+            chart_type="line",
+            title="Revenue trend",
+            x_key="month",
+            series=[ChartIntentSeriesV2(key="revenue", name="Revenue")],
+        )
+
+        spec = compile_chart_spec_v2(df, intent)
+
+        self.assertIsNotNone(spec)
+        assert spec is not None
+        self.assertEqual(
+            [
+                {"month": "Jan", "revenue": 10},
+                {"month": "Feb", "revenue": 15},
+                {"month": "Mar", "revenue": 12},
+            ],
+            spec.dataset,
+        )
+
     def test_compile_stacked_bar_chart_aggregates_and_truncates(self) -> None:
         df = pd.DataFrame(
             {

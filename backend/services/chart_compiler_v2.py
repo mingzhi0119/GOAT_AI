@@ -64,6 +64,8 @@ def _temporal_columns(df: pd.DataFrame) -> list[str]:
             continue
         if pd.api.types.is_numeric_dtype(series):
             continue
+        if not series.dropna().astype(str).str.contains(r"\d").any():
+            continue
         parsed = pd.to_datetime(series, errors="coerce", format="mixed")
         if parsed.notna().sum() >= max(3, int(len(series) * 0.6)):
             results.append(str(col))
@@ -157,6 +159,11 @@ def _repair_series(
 
 def _coerce_time_grain(df: pd.DataFrame, x_key: str, time_grain: str) -> pd.Series:
     series = df[x_key]
+    if (
+        not pd.api.types.is_datetime64_any_dtype(series)
+        and not series.dropna().astype(str).str.contains(r"\d").any()
+    ):
+        return series.astype(str)
     parsed = pd.to_datetime(series, errors="coerce", format="mixed")
     if parsed.notna().sum() < max(3, int(len(series) * 0.6)):
         return series.astype(str)

@@ -18,7 +18,7 @@ from backend.services.chat_service import stream_chat_sse
 from backend.services.safeguard_service import RuleBasedSafeguardService
 from backend.services.sse import sse_event
 from goat_ai.config.settings import Settings
-from goat_ai.llm.ollama_client import ToolCallPlan
+from goat_ai.llm.ollama_client import StreamTextPart, ToolCallPlan
 from goat_ai.search.providers import WebSearchError, WebSearchHit
 from goat_ai.shared.types import ChatTurn
 from goat_ai.telemetry.latency_metrics import get_inference_snapshot
@@ -168,6 +168,59 @@ class FakeChartToolLLMClient(FakeLLMClient):
         ollama_options: dict[str, float | int] | None = None,
     ) -> Generator[str, None, None]:
         yield "Here is the chart-driven answer."
+
+
+class FakeThinkingChartToolLLMClient(FakeChartToolLLMClient):
+    def stream_tokens_with_tools(
+        self,
+        model: str,
+        messages: list[ChatTurn],
+        system_prompt: str,
+        *,
+        tools: list[dict[str, object]],
+        ollama_options: dict[str, float | int | bool | str] | None = None,
+    ) -> Generator[str | StreamTextPart | ToolCallPlan, None, None]:
+        _ = model, messages, system_prompt, tools
+        assert ollama_options == {"think": True}
+        yield StreamTextPart("thinking", "Inspecting uploaded columns.")
+        yield ToolCallPlan(
+            assistant_message={
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "function": {
+                            "name": "generate_chart_v2",
+                            "arguments": {
+                                "chart_type": "line",
+                                "title": "Revenue trend",
+                                "x_key": "month",
+                                "series": [
+                                    {
+                                        "data_key": "revenue",
+                                        "name": "Revenue",
+                                        "aggregate": "none",
+                                    }
+                                ],
+                            },
+                        }
+                    }
+                ],
+            },
+            tool_name="generate_chart_v2",
+            arguments={
+                "chart_type": "line",
+                "title": "Revenue trend",
+                "x_key": "month",
+                "series": [
+                    {
+                        "data_key": "revenue",
+                        "name": "Revenue",
+                        "aggregate": "none",
+                    }
+                ],
+            },
+        )
 
 
 class FakeWebSearchToolLLMClient(FakeLLMClient):
@@ -528,6 +581,41 @@ def test_stream_chat_sse_emits_chart_only_after_native_tool_followup_completes()
             if "Here is the chart-driven answer." in event
         )
         assert answer_index < chart_index
+        assert any('"type": "done"' in event for event in events)
+    finally:
+        tmp.cleanup()
+
+
+def test_stream_chat_sse_accepts_thinking_chart_tool_alias_arguments() -> None:
+    tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+    db_path = Path(tmp.name) / "chat_logs.db"
+    log_service.init_db(db_path)
+    try:
+        file_context = (
+            "[User uploaded tabular data for analysis]\n\n"
+            "Column names: month, revenue.\n\n"
+            "CHART_DATA_CSV:\n```\nmonth,revenue\nJan,10\nFeb,12\n```\n"
+        )
+        events = list(
+            stream_chat_sse(
+                llm=FakeThinkingChartToolLLMClient(),
+                model="test-model",
+                messages=[
+                    ChatMessage(role="user", content=file_context),
+                    ChatMessage(role="user", content="Please chart the revenue trend."),
+                ],
+                system_prompt="You are helpful.",
+                ip="127.0.0.1",
+                conversation_logger=SQLiteConversationLogger(db_path),
+                ollama_options={"think": True},
+            )
+        )
+
+        body = "".join(events)
+        assert '"type": "thinking"' in body
+        assert '"type": "chart_spec"' in body
+        assert '"Revenue trend"' in body
+        assert '"type": "error"' not in body
         assert any('"type": "done"' in event for event in events)
     finally:
         tmp.cleanup()

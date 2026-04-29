@@ -916,6 +916,58 @@ class ApiBlackboxContractTests(unittest.TestCase):
         self.assertEqual(200, history_detail.status_code)
         self.assertEqual("demo", history_detail.json()["chart_data_source"])
 
+    def test_chat_chart_flow_uses_uploaded_csv_knowledge_with_thinking_enabled(
+        self,
+    ) -> None:
+        upload = self.client.post(
+            "/api/upload",
+            files={
+                "file": (
+                    "sales.csv",
+                    b"month,revenue\nJan,10\nFeb,15\nMar,12\n",
+                    "text/csv",
+                )
+            },
+        )
+        self.assertEqual(200, upload.status_code)
+        upload_events = parse_sse_payloads(upload.text)
+        ready_event = next(
+            event for event in upload_events if event["type"] == "knowledge_ready"
+        )
+        document_id = ready_event["document_id"]
+
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "model": "gemma3:4b",
+                "session_id": "chart-knowledge-thinking",
+                "think": True,
+                "knowledge_document_ids": [document_id],
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Please chart the revenue trend from the uploaded CSV.",
+                    }
+                ],
+            },
+        )
+
+        self.assertEqual(200, response.status_code)
+        events = parse_sse_payloads(response.text)
+        chart_event = next(event for event in events if event["type"] == "chart_spec")
+        self.assertEqual("done", events[-1]["type"])
+        self.assertEqual(
+            [
+                {"month": "Jan", "revenue": 10},
+                {"month": "Feb", "revenue": 15},
+                {"month": "Mar", "revenue": 12},
+            ],
+            chart_event["chart"]["dataset"],
+        )
+        history_detail = self.client.get("/api/history/chart-knowledge-thinking")
+        self.assertEqual(200, history_detail.status_code)
+        self.assertEqual("uploaded", history_detail.json()["chart_data_source"])
+
     def test_chat_chart_prompt_with_tools_unsupported_model_stays_text_only(
         self,
     ) -> None:
