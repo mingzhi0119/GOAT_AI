@@ -1,4 +1,11 @@
-import { useState, type CSSProperties, type FC, type MouseEvent as ReactMouseEvent } from 'react'
+import {
+  Suspense,
+  lazy,
+  useState,
+  type CSSProperties,
+  type FC,
+  type MouseEvent as ReactMouseEvent,
+} from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeKatex from 'rehype-katex'
 import remarkMath from 'remark-math'
@@ -8,6 +15,8 @@ import type { ChatArtifact, Message } from '../api/types'
 import type { ChatLayoutMode } from '../utils/chatLayout'
 import { buildMathRenderPlan, normalizeDisplayMathMarkdown } from '../utils/mathRendering'
 import { ChevronRightIcon, CopiedIcon, CopyIcon } from './uiIcons'
+
+const LazyChartCard = lazy(() => import('./ChartCard'))
 
 interface Props {
   message: Message
@@ -261,6 +270,27 @@ const MessageBubble: FC<Props> = ({ message, hasFileContext = false, layoutMode 
                 </>
               )}
             </div>
+
+            {message.chartSpec && (
+              <div className="mt-3">
+                <Suspense
+                  fallback={
+                    <div
+                      className="rounded-2xl border p-4 text-sm"
+                      style={{
+                        borderColor: 'var(--border-color)',
+                        background: 'var(--bg-asst-bubble)',
+                        color: 'var(--text-muted)',
+                      }}
+                    >
+                      Loading chart...
+                    </div>
+                  }
+                >
+                  <LazyChartCard spec={message.chartSpec} />
+                </Suspense>
+              </div>
+            )}
 
             {!message.isStreaming && displayContent && (
               <div className="assistant-copy-footer mt-2 flex min-h-6 items-center gap-2">

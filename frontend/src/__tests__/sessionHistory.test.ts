@@ -15,7 +15,21 @@ describe('session history utils', () => {
       file_context: { prompt: '[User uploaded tabular data for analysis]\n\nCHART_DATA_CSV:\n```csv```' },
       knowledge_documents: [],
       workspace_outputs: [],
-      chart_spec: null,
+      chart_spec: {
+        version: '2.0',
+        engine: 'echarts',
+        kind: 'bar',
+        title: 'Revenue',
+        description: '',
+        dataset: [],
+        option: {},
+        meta: {
+          row_count: 0,
+          truncated: false,
+          warnings: [],
+          source_columns: [],
+        },
+      },
       chart_data_source: 'uploaded',
       messages: [
         { role: 'user', content: 'Please chart revenue.' },
@@ -47,6 +61,7 @@ describe('session history utils', () => {
       role: 'assistant',
       content: 'Done.',
       artifacts: [{ artifact_id: 'art-1', filename: 'brief.md' }],
+      chartSpec: { title: 'Revenue' },
     })
   })
 })

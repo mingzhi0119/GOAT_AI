@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, type FC } from 'react'
 import type { UploadStreamEvent } from '../api/upload'
 import type { GPUStatus, InferenceLatency } from '../api/system'
-import type { ChartSpec, CodeSandboxFeature, Message, RuntimeFeature } from '../api/types'
+import type { CodeSandboxFeature, Message, RuntimeFeature } from '../api/types'
 import type { FileBindingMode, FileContextItem } from '../hooks/useFileContext'
 import ChatComposer from './ChatComposer'
 import EmptyChatState, { type EmptyChatPrompt } from './EmptyChatState'
@@ -10,12 +10,10 @@ import { pickRandomPromptTexts, STARTER_PROMPT_POOL } from '../utils/starterProm
 import type { ChatLayoutDecisions } from '../utils/chatLayout'
 import type { ReasoningLevel } from './chatComposerPrimitives'
 
-const LazyChartCard = lazy(() => import('./ChartCard'))
 const LazyMessageBubble = lazy(() => import('./MessageBubble'))
 
 interface Props {
   messages: Message[]
-  chartSpec: ChartSpec | null
   isStreaming: boolean
   personaStatusMessage?: string | null
   layoutDecisions: ChatLayoutDecisions
@@ -48,7 +46,6 @@ interface Props {
 
 const ChatWindow: FC<Props> = ({
   messages,
-  chartSpec,
   isStreaming,
   personaStatusMessage = null,
   layoutDecisions,
@@ -136,24 +133,6 @@ const ChatWindow: FC<Props> = ({
             >
               {personaStatusMessage}
             </div>
-          )}
-          {chartSpec && visibleMessages.length > 0 && (
-            <Suspense
-              fallback={
-                <div
-                  className="rounded-2xl border p-4 text-sm"
-                  style={{
-                    borderColor: 'var(--border-color)',
-                    background: 'var(--bg-asst-bubble)',
-                    color: 'var(--text-muted)',
-                  }}
-                >
-                  Loading chart...
-                </div>
-              }
-            >
-              <LazyChartCard spec={chartSpec} />
-            </Suspense>
           )}
           {visibleMessages.length === 0 ? (
             <EmptyChatState

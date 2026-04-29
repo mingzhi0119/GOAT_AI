@@ -29,7 +29,7 @@ vi.mock('../hooks/useChat', async () => {
         isStreaming: false,
         sessionId,
         sendMessage: async (...args: unknown[]) => {
-          const activeSessionId = args[10] as string
+          const activeSessionId = args[9] as string
           setSessionId(activeSessionId)
           sendMessageMock(...args)
           return activeSessionId
@@ -96,7 +96,6 @@ describe('useChatSession', () => {
       '',
       'urochester',
       undefined,
-      expect.any(Function),
       undefined,
       expect.any(String),
     )
@@ -145,7 +144,6 @@ describe('useChatSession', () => {
       '',
       'urochester',
       undefined,
-      expect.any(Function),
       undefined,
       expect.any(String),
     )
@@ -198,7 +196,6 @@ describe('useChatSession', () => {
       'Be extra formal.',
       'thu',
       undefined,
-      expect.any(Function),
       undefined,
       expect.any(String),
     )
@@ -236,7 +233,6 @@ describe('useChatSession', () => {
       '',
       'urochester',
       undefined,
-      expect.any(Function),
       undefined,
       expect.any(String),
     )
@@ -276,7 +272,6 @@ describe('useChatSession', () => {
       '',
       'urochester',
       undefined,
-      expect.any(Function),
       ['img-1'],
       expect.any(String),
     )
@@ -329,7 +324,6 @@ describe('useChatSession', () => {
       'Use short bullets.',
       'classic',
       undefined,
-      expect.any(Function),
       undefined,
       'session-1',
     )
@@ -379,7 +373,6 @@ describe('useChatSession', () => {
       'Use current defaults.',
       'thu',
       undefined,
-      expect.any(Function),
       undefined,
       'session-1',
     )

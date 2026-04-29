@@ -159,7 +159,6 @@ function AppShell({ appTitle }: AppShellProps) {
         <ErrorBoundary>
           <ChatWindow
             messages={session.messages}
-            chartSpec={session.chartSpec}
             isStreaming={session.isStreaming}
             personaStatusMessage={session.personaStatusMessage}
             layoutDecisions={chatLayout}

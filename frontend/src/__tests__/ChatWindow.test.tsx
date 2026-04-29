@@ -28,6 +28,12 @@ vi.mock('../api/codeSandbox', () => ({
   openCodeSandboxLogStream: vi.fn(),
 }))
 
+vi.mock('../components/ChartCard', () => ({
+  default: ({ spec }: { spec: { title?: string } }) => (
+    <div data-testid="chart-card">Apache ECharts {spec.title}</div>
+  ),
+}))
+
 const baseGpuStatus: GPUStatus = {
   available: true,
   active: false,
@@ -61,7 +67,6 @@ function renderChatWindow(overrides: Partial<ComponentProps<typeof ChatWindow>> 
   const view = render(
     <ChatWindow
       messages={[]}
-      chartSpec={null}
       isStreaming={false}
       layoutDecisions={getChatLayoutDecisions('wide')}
       models={['test-model', 'backup-model']}
@@ -203,6 +208,47 @@ describe('ChatWindow composer', () => {
     expect(screen.getByText('Manage Uploads')).toBeInTheDocument()
     expect(screen.getByText('Plan Mode')).toBeInTheDocument()
     expect(screen.getByText('Thinking Mode')).toBeInTheDocument()
+  })
+
+  it('renders generated charts with the assistant reply that produced them', async () => {
+    renderChatWindow({
+      messages: [
+        { id: 'u1', role: 'user', content: 'Earlier question' },
+        { id: 'a1', role: 'assistant', content: 'Earlier answer' },
+        { id: 'u2', role: 'user', content: 'Make a chart' },
+        {
+          id: 'a2',
+          role: 'assistant',
+          content: 'Here is the chart.',
+          chartSpec: {
+            version: '2.0',
+            engine: 'echarts',
+            kind: 'bar',
+            title: 'Quarterly revenue',
+            description: '',
+            dataset: [],
+            option: {},
+            meta: {
+              row_count: 0,
+              truncated: false,
+              warnings: [],
+              source_columns: [],
+            },
+          },
+        },
+      ],
+    })
+
+    const earlierReply = await screen.findByText('Earlier answer')
+    const currentReply = await screen.findByText('Here is the chart.')
+    const chart = await screen.findByTestId('chart-card')
+
+    expect(
+      Boolean(earlierReply.compareDocumentPosition(chart) & Node.DOCUMENT_POSITION_FOLLOWING),
+    ).toBe(true)
+    expect(
+      Boolean(currentReply.compareDocumentPosition(chart) & Node.DOCUMENT_POSITION_FOLLOWING),
+    ).toBe(true)
   })
 
   it('shows a compact blue plan indicator beside reasoning only when plan mode is enabled', () => {

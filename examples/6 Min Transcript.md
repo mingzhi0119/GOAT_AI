@@ -66,6 +66,7 @@ python -m tools.ops.post_deploy_check --base-url http://127.0.0.1:62606
 
 - Prepare one small PDF, Markdown, DOCX, or CSV file for upload.
 - If web search is part of the live demo, verify the `SERPER_API_KEY` or be ready to explain DuckDuckGo fallback.
+- For the web-search demo, prefer official OpenAI release sources first, then business/tech media as supporting citations.
 - If the network is unstable, do not force a live search. Explain the architecture and fallback behavior instead.
 
 ### Live prompts to copy
@@ -87,7 +88,7 @@ Create a simple chart comparing revenue for Jan, Feb, and Mar: 10, 15, 12.
 ```
 
 ```text
-Search the latest news about AI deployment best practices and cite sources.
+Search the latest news about GPT-5.5. When was it released, and what are the business implications for students, analysts, and managers? Cite sources.
 ```
 
 ---
@@ -283,7 +284,7 @@ If the chart UI does not appear, I would still explain the event model: the back
 **Screen action:** If Workbench is enabled, briefly show the Workbench task surface. If network is stable, send:
 
 ```text
-Search the latest news about AI deployment best practices and cite sources.
+Search the latest news about GPT-5.5. When was it released, and what are the business implications for students, analysts, and managers? Cite sources.
 ```
 
 If network is not stable, skip the live query and explain the fallback policy.
@@ -295,6 +296,10 @@ GOAT AI also includes a Workbench layer for more advanced workflows. I describe 
 Workbench tasks can support planning, browsing, deeper research, and canvas-style outputs. The important design choice is that these workflows are explicit and capability-gated. If a feature is disabled by the operator or unavailable on the host, the system should say so clearly instead of pretending it worked.
 
 The web search path follows the same idea. Serper can be used for Google-backed results. But the school demo path is more robust now: Serper is not a startup blocker. If the Serper key is missing, or Serper times out, returns an HTTP error, hits a rate limit, or returns malformed data, the provider can fall back to DuckDuckGo.
+
+For a Business School audience, I use GPT-5.5 as the search topic because it is current, relevant, and easy to connect to business workflows. The answer should first identify the release date, then translate the news into implications for three audiences: students, analysts, and managers. The key takeaway is that newer AI models are moving from simple conversation toward more agentic work: research synthesis, coding and data analysis support, workflow automation, and higher-level managerial oversight.
+
+If the model cites media sources such as CNBC, TechCrunch, or Fortune, I will still frame official OpenAI release information as the preferred primary source when available, with media coverage as supporting evidence.
 
 If both providers fail, the assistant should say search is unavailable and avoid inventing citations. That is exactly the behavior I want in a live school demo: useful when the network works, graceful when an external dependency fails.
 

@@ -3,7 +3,6 @@ import { streamChat } from '../api/chat'
 import type { HistorySessionDetail } from '../api/history'
 import type {
   ChatStreamEvent,
-  ChartSpec,
   Message,
   OllamaOptionsPayload,
   ThemeStyle,
@@ -42,7 +41,6 @@ export interface UseChatReturn {
     systemInstruction?: string,
     themeStyle?: ThemeStyle,
     ollamaOptions?: OllamaOptionsPayload,
-    onChartSpec?: (spec: ChartSpec) => void,
     imageAttachmentIds?: string[],
     sessionIdOverride?: string,
   ) => Promise<string | undefined>
@@ -61,11 +59,10 @@ function useStreamIntoMessage() {
       msgId: string,
       setMessages: Dispatch<SetStateAction<Message[]>>,
       setStreaming: Dispatch<SetStateAction<boolean>>,
-      onChartSpec?: (spec: ChartSpec) => void,
     ) => {
       try {
         for await (const event of gen) {
-          setMessages(previous => applyStreamEvent(previous, msgId, event, onChartSpec))
+          setMessages(previous => applyStreamEvent(previous, msgId, event))
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Streaming error'
@@ -108,13 +105,12 @@ export function useChat(): UseChatReturn {
     async (
       gen: AsyncGenerator<ChatStreamEvent>,
       prependMessages?: Message[],
-      onChartSpec?: (spec: ChartSpec) => void,
       showThinking?: boolean,
     ) => {
       const assistantMessage = createAssistantStreamingMessage(showThinking)
       setMessages(previous => [...(prependMessages ?? previous), assistantMessage])
       setIsStreaming(true)
-      await runStreamIntoMessage(gen, assistantMessage.id, setMessages, setIsStreaming, onChartSpec)
+      await runStreamIntoMessage(gen, assistantMessage.id, setMessages, setIsStreaming)
     },
     [runStreamIntoMessage],
   )
@@ -129,7 +125,6 @@ export function useChat(): UseChatReturn {
       systemInstruction?: string,
       themeStyle?: ThemeStyle,
       ollamaOptions?: OllamaOptionsPayload,
-      onChartSpec?: (spec: ChartSpec) => void,
       imageAttachmentIds?: string[],
       sessionIdOverride?: string,
     ) => {
@@ -180,7 +175,6 @@ export function useChat(): UseChatReturn {
             { signal: controller.signal, userName },
           ),
           [...messagesRef.current, userMessage],
-          onChartSpec,
           shouldShowThinking(ollamaOptions?.think),
         )
       } finally {
@@ -194,7 +188,7 @@ export function useChat(): UseChatReturn {
   const streamToChat = useCallback(
     async (gen: AsyncGenerator<ChatStreamEvent>) => {
       if (isStreaming) return
-      await startStream(gen, undefined, undefined, false)
+      await startStream(gen, undefined, false)
     },
     [isStreaming, startStream],
   )

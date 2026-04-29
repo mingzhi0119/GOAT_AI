@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type {
-  ChartSpec,
   HistorySessionDetail,
   OllamaOptionsPayload,
   PersonaSnapshot,
@@ -51,7 +50,6 @@ export interface UseChatSessionReturn {
   sessionId: string | null
   sessionTitle: string | null
   personaStatusMessage: string | null
-  chartSpec: ChartSpec | null
   fileContexts: FileContextItem[]
   activeFileContext: FileContextItem | null
   historySessions: ReturnType<typeof useHistory>['sessions']
@@ -100,7 +98,6 @@ export function useChatSession({
     replaceFileContexts,
     clearFileContext,
   } = useFileContext()
-  const [chartSpec, setChartSpec] = useState<ChartSpec | null>(null)
   const draftPersonaSnapshot = useMemo(
     () => buildDraftPersonaSnapshot(themeStyle, systemInstruction),
     [systemInstruction, themeStyle],
@@ -180,14 +177,12 @@ export function useChatSession({
   const clearChatSession = useCallback(() => {
     chat.clearMessages()
     clearFileContext()
-    setChartSpec(null)
     clearLockedPersonaState()
   }, [chat, clearFileContext, clearLockedPersonaState])
 
   const clearFileContextSession = useCallback(() => {
     clearFileContext()
     chat.clearMessages()
-    setChartSpec(null)
     clearLockedPersonaState()
   }, [chat, clearFileContext, clearLockedPersonaState])
 
@@ -201,7 +196,6 @@ export function useChatSession({
   const loadHistorySession = useChatSessionHistorySync({
     chat,
     history,
-    setChartSpec,
     replaceFileContexts,
     clearFileContext,
     onSessionLoaded: handleHistorySessionLoaded,
@@ -216,7 +210,6 @@ export function useChatSession({
     planModeEnabled,
     resolvePersonaSnapshot,
     ollamaOptions,
-    setChartSpec,
     setFileContextMode,
   })
 
@@ -226,7 +219,6 @@ export function useChatSession({
     sessionId: chat.sessionId,
     sessionTitle,
     personaStatusMessage,
-    chartSpec,
     fileContexts,
     activeFileContext,
     historySessions: history.sessions,

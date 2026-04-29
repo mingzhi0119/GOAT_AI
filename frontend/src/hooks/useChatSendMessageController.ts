@@ -1,6 +1,5 @@
 import { useCallback } from 'react'
-import type { Dispatch, SetStateAction } from 'react'
-import type { ChartSpec, OllamaOptionsPayload, PersonaSnapshot, ThemeStyle } from '../api/types'
+import type { OllamaOptionsPayload, PersonaSnapshot, ThemeStyle } from '../api/types'
 import type { FileBindingMode, FileContextItem } from './useFileContext'
 import { normalizeSessionTitle } from '../utils/sessionTitle'
 
@@ -15,7 +14,6 @@ interface ChatSendController {
     systemInstruction: string,
     themeStyle: ThemeStyle,
     ollamaOptions: OllamaOptionsPayload | undefined,
-    setChartSpec: Dispatch<SetStateAction<ChartSpec | null>>,
     imageAttachmentIds: string[] | undefined,
     activeSessionId: string,
   ) => Promise<string | undefined>
@@ -43,7 +41,6 @@ interface UseChatSendMessageControllerArgs {
   planModeEnabled: boolean
   resolvePersonaSnapshot: (sessionId: string) => PersonaSnapshot
   ollamaOptions?: OllamaOptionsPayload
-  setChartSpec: Dispatch<SetStateAction<ChartSpec | null>>
   setFileContextMode: (id: string, mode: FileBindingMode) => void
 }
 
@@ -56,7 +53,6 @@ export function useChatSendMessageController({
   planModeEnabled,
   resolvePersonaSnapshot,
   ollamaOptions,
-  setChartSpec,
   setFileContextMode,
 }: UseChatSendMessageControllerArgs) {
   return useCallback(
@@ -89,7 +85,6 @@ export function useChatSendMessageController({
         personaSnapshot.system_instruction,
         personaSnapshot.theme_style,
         ollamaOptions,
-        setChartSpec,
         imageAttachmentIds,
         activeSessionId,
       )
@@ -106,7 +101,6 @@ export function useChatSendMessageController({
       planModeEnabled,
       resolvePersonaSnapshot,
       selectedModel,
-      setChartSpec,
       setFileContextMode,
       userName,
     ],

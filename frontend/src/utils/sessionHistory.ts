@@ -40,6 +40,16 @@ export function hydrateHistorySession(session: HistorySessionDetail): Message[] 
     })
   }
 
+  if (session.chart_spec) {
+    for (let index = mapped.length - 1; index >= 0; index -= 1) {
+      const message = mapped[index]
+      if (message?.role === 'assistant' && !message.hidden) {
+        mapped[index] = { ...message, chartSpec: session.chart_spec }
+        break
+      }
+    }
+  }
+
   return mapped
 }
 

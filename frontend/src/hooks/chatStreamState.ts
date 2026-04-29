@@ -1,4 +1,4 @@
-import type { ChatMessage, ChatStreamEvent, ChartSpec, Message } from '../api/types'
+import type { ChatMessage, ChatStreamEvent, Message } from '../api/types'
 
 const DEFAULT_IMAGE_PROMPT = 'What do you see in this image?'
 
@@ -47,7 +47,6 @@ export function applyStreamEvent(
   messages: Message[],
   messageId: string,
   event: ChatStreamEvent,
-  onChartSpec?: (spec: ChartSpec) => void,
 ): Message[] {
   switch (event.type) {
     case 'token':
@@ -74,8 +73,9 @@ export function applyStreamEvent(
       )
     }
     case 'chart_spec':
-      onChartSpec?.(event.chart)
-      return messages
+      return messages.map(message =>
+        message.id === messageId ? { ...message, chartSpec: event.chart } : message,
+      )
     case 'error':
       return messages.map(message =>
         message.id === messageId

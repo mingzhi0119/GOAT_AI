@@ -375,6 +375,8 @@ export interface Message {
   /** Whether the UI should render the Thinking disclosure for this message. */
   showThinking?: boolean
   artifacts?: ChatArtifact[]
+  /** UI-only chart payload associated with this assistant turn. */
+  chartSpec?: ChartSpec
   /** Set when this user turn included vision image attachments (for UI hints). */
   image_attachment_ids?: string[]
   /** Mirrors API `file_context` when sending hidden upload context to the backend. */
