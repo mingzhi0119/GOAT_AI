@@ -32,6 +32,20 @@ from goat_ai.shared.types import ChatTurn
 logger = logging.getLogger(__name__)
 
 
+def _apply_generation_options(
+    payload: dict[str, Any],
+    options: dict[str, float | int | bool | str] | None,
+) -> None:
+    """Ollama's thinking switch is a request field, not a sampling option."""
+    if not options:
+        return
+    sampling_options = dict(options)
+    if "think" in sampling_options:
+        payload["think"] = sampling_options.pop("think")
+    if sampling_options:
+        payload["options"] = sampling_options
+
+
 class _InferenceConcurrencyGate:
     """FIFO process-local inference gate for expensive Ollama generate/chat calls."""
 
@@ -478,8 +492,7 @@ class OllamaService:
             "messages": api_messages,
             "stream": True,
         }
-        if ollama_options:
-            payload["options"] = ollama_options
+        _apply_generation_options(payload, ollama_options)
         with self._reserve_inference_slot():
             res = self._post_chat(
                 payload,
@@ -509,8 +522,7 @@ class OllamaService:
         """Yield streamed text segments from /api/generate (thinking vs answer)."""
         model = self._resolve_model_for_deployment(model)
         payload: dict[str, Any] = {"model": model, "prompt": prompt, "stream": True}
-        if ollama_options:
-            payload["options"] = ollama_options
+        _apply_generation_options(payload, ollama_options)
         with self._reserve_inference_slot():
             try:
                 with otel_span("ollama.api.generate", stream="true"):
@@ -549,8 +561,7 @@ class OllamaService:
         """Return a single non-streaming completion from /api/generate."""
         model = self._resolve_model_for_deployment(model)
         payload: dict[str, Any] = {"model": model, "prompt": prompt, "stream": False}
-        if ollama_options:
-            payload["options"] = ollama_options
+        _apply_generation_options(payload, ollama_options)
         with self._reserve_inference_slot():
             try:
                 with otel_span("ollama.api.generate", stream="false"):
@@ -617,8 +628,7 @@ class OllamaService:
             "tools": tools,
             "stream": True,
         }
-        if ollama_options:
-            payload["options"] = ollama_options
+        _apply_generation_options(payload, ollama_options)
 
         with self._reserve_inference_slot():
             try:
@@ -689,8 +699,7 @@ class OllamaService:
             "tools": tools,
             "stream": False,
         }
-        if ollama_options:
-            payload["options"] = ollama_options
+        _apply_generation_options(payload, ollama_options)
 
         with self._reserve_inference_slot():
             try:
