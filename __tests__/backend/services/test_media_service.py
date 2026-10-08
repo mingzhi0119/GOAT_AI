@@ -147,7 +147,9 @@ class MediaServiceTests(unittest.TestCase):
         self.assertIsNotNone(stored)
         assert stored is not None
         self.assertTrue(Path(stored.storage_path).is_file())
-        self.assertTrue(str(Path(stored.storage_path)).startswith(str(root)))
+        self.assertTrue(
+            Path(stored.storage_path).resolve().is_relative_to(root.resolve())
+        )
 
         encoded_images = load_images_base64_for_chat(
             attachment_ids=[response.attachment_id],
