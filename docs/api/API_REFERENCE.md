@@ -240,6 +240,12 @@ Optional `knowledge_document_ids` binds the turn to already indexed knowledge do
 
 Optional **`think`** accepts `true`, `false`, or `"low" | "medium" | "high"` when the model supports Ollama thinking mode. Omit it to use model defaults.
 
+The Ollama adapter forwards `think` as a top-level request field on chat and
+generate calls, including tool paths. Sampling controls remain in `options`.
+Supported boolean and effort values depend on the selected model. See
+[Ollama chat parameters](https://docs.ollama.com/api/chat) and
+[thinking support](https://docs.ollama.com/capabilities/thinking).
+
 Optional boolean **`plan_mode`** asks the system prompt to plan before answering.
 
 Optional **`theme_style`** accepts `classic`, `urochester`, or `thu`. When no explicit `GOAT_SYSTEM_PROMPT` override is configured, the backend uses it to select the default assistant persona:
