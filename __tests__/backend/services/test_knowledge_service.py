@@ -215,9 +215,9 @@ class KnowledgeServiceTests(unittest.TestCase):
         self.assertTrue(stored.storage_key.startswith("knowledge/"))
         self.assertTrue(Path(stored.storage_path).is_file())
         self.assertTrue(
-            str(Path(stored.storage_path)).startswith(
-                str(self.settings.object_store_root)
-            )
+            Path(stored.storage_path)
+            .resolve()
+            .is_relative_to(self.settings.object_store_root.resolve())
         )
 
     def test_resolve_knowledge_documents_preserves_order_with_injected_repository(

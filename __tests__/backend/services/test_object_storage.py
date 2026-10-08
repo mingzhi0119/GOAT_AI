@@ -78,7 +78,9 @@ class ObjectStorageTests(unittest.TestCase):
             self.assertTrue(bool(descriptor.sha256))
             self.assertIsNotNone(descriptor.filesystem_path)
             assert descriptor.filesystem_path is not None
-            self.assertTrue(root in descriptor.filesystem_path.parents)
+            self.assertTrue(
+                descriptor.filesystem_path.resolve().is_relative_to(root.resolve())
+            )
 
             store.delete(descriptor.storage_key)
 
